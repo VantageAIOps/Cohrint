@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vantage AI — Know exactly what your AI costs</title>
+<meta name="description" content="Token tracking, model pricing comparison, efficiency scoring and budget alerts for developers and organisations using AI APIs.">
+<meta property="og:title" content="Vantage AI — AI Cost Intelligence">
+<meta property="og:description" content="One line of code. Full visibility into your AI spending.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080c0f;--bg2:#0d1318;--bg3:#121920;--bg4:#161d25;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+  --text:#e8edf2;--muted:#6b7b8a;--dim:#3a4550;
+  --accent:#00d4a1;--blue:#0098ff;--amber:#f59e0b;--red:#f87171;
+  --mono:'DM Mono',monospace;--serif:'Instrument Serif',Georgia,serif;--sans:'DM Sans',sans-serif;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:16px;line-height:1.6;overflow-x:hidden}
+
+/* NOISE */
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0;opacity:.4}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:18px 48px;border-bottom:1px solid var(--border);background:rgba(8,12,15,.88);backdrop-filter:blur(16px)}
+.nav-logo{font-family:var(--mono);font-size:15px;letter-spacing:.08em;color:var(--text);text-decoration:none;display:flex;align-items:center;gap:10px}
+.logo-dot{width:8px;height:8px;background:var(--accent);border-radius:50%;box-shadow:0 0 12px var(--accent);animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.8)}}
+.nav-links{display:flex;align-items:center;gap:32px}
+.nav-links a{font-size:13px;color:var(--muted);text-decoration:none;letter-spacing:.02em;transition:color .2s}
+.nav-links a:hover{color:var(--text)}
+.nav-cta{background:var(--accent)!important;color:#000!important;padding:8px 20px;border-radius:6px;font-weight:500!important;transition:opacity .2s!important}
+.nav-cta:hover{opacity:.85}
+
+/* HERO */
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:120px 24px 60px;text-align:center;position:relative}
+.hero-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);background-size:60px 60px;mask-image:radial-gradient(ellipse 80% 60% at 50% 40%,black 0%,transparent 80%)}
+.hero-glow{position:absolute;top:20%;left:50%;transform:translateX(-50%);width:600px;height:300px;background:radial-gradient(ellipse,rgba(0,212,161,.12) 0%,transparent 70%);pointer-events:none}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(0,212,161,.08);border:1px solid rgba(0,212,161,.2);border-radius:100px;padding:6px 16px;font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.06em;margin-bottom:36px;animation:fadeUp .6s ease both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.hero h1{font-family:var(--serif);font-size:clamp(48px,7vw,92px);font-weight:400;line-height:1.05;letter-spacing:-.02em;max-width:880px;animation:fadeUp .7s .1s ease both}
+.hero h1 em{font-style:italic;color:var(--accent)}
+.hero-sub{margin-top:28px;font-size:18px;color:var(--muted);max-width:540px;line-height:1.7;font-weight:300;animation:fadeUp .7s .2s ease both}
+.hero-actions{display:flex;align-items:center;gap:16px;margin-top:44px;animation:fadeUp .7s .3s ease both}
+.btn-primary{background:var(--accent);color:#000;padding:14px 32px;border-radius:8px;font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.04em;border:none;cursor:pointer;text-decoration:none;transition:opacity .2s,transform .2s;display:inline-block}
+.btn-primary:hover{opacity:.85;transform:translateY(-1px)}
+.btn-ghost{color:var(--muted);padding:14px 24px;border-radius:8px;font-size:14px;border:1px solid var(--border2);cursor:pointer;text-decoration:none;transition:color .2s,border-color .2s;display:inline-flex;align-items:center;gap:8px}
+.btn-ghost:hover{color:var(--text);border-color:rgba(255,255,255,.25)}
+.install-box{margin-top:56px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px 24px;font-family:var(--mono);font-size:13px;color:var(--muted);display:inline-flex;align-items:center;gap:16px;animation:fadeUp .7s .4s ease both}
+.install-box span{color:var(--accent)}
+.copy-btn{background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:4px 12px;border-radius:5px;font-family:var(--mono);font-size:11px;cursor:pointer;transition:all .2s}
+.copy-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* TICKER */
+.ticker-wrap{width:100%;overflow:hidden;border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--bg2);padding:14px 0}
+.ticker{display:flex;gap:64px;animation:ticker 30s linear infinite;width:max-content}
+@keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.ticker-item{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:12px;color:var(--muted);white-space:nowrap}
+.ticker-val{color:var(--accent);font-weight:500}
+
+/* STATS STRIP */
+.stats-strip{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.stat-item{padding:48px 40px;border-right:1px solid var(--border);text-align:center}
+.stat-item:last-child{border-right:none}
+.stat-num{font-family:var(--serif);font-size:54px;font-weight:400;line-height:1;letter-spacing:-.03em}
+.stat-num span{color:var(--accent)}
+.stat-lbl{font-size:13px;color:var(--muted);margin-top:8px}
+
+/* SECTIONS */
+section{padding:100px 24px;max-width:1140px;margin:0 auto}
+.sec-label{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:16px}
+.sec-title{font-family:var(--serif);font-size:clamp(34px,4vw,52px);font-weight:400;line-height:1.1;letter-spacing:-.02em;max-width:620px}
+.sec-title em{font-style:italic;color:var(--muted)}
+
+/* FEATURES */
+.feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-top:60px}
+.feat-card{background:var(--bg2);padding:32px 28px;transition:background .2s;cursor:default}
+.feat-card:hover{background:var(--bg3)}
+.feat-icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:19px;margin-bottom:18px}
+.feat-title{font-size:15px;font-weight:500;margin-bottom:8px}
+.feat-desc{font-size:13px;color:var(--muted);line-height:1.6}
+.feat-tag{font-family:var(--mono);font-size:10px;color:var(--accent);margin-top:14px;opacity:.8}
+
+/* INTEGRATIONS */
+.integrations-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:60px}
+.int-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;display:flex;flex-direction:column;align-items:flex-start;gap:10px;transition:border-color .2s,background .2s;cursor:default}
+.int-card:hover{border-color:var(--border2);background:var(--bg3)}
+.int-logo{font-size:22px}
+.int-name{font-size:14px;font-weight:500}
+.int-how{font-size:12px;color:var(--muted);line-height:1.5}
+.int-badge{font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:20px;margin-top:auto}
+.badge-mcp{background:rgba(0,212,161,.1);color:var(--accent)}
+.badge-ext{background:rgba(0,152,255,.1);color:var(--blue)}
+.badge-sdk{background:rgba(245,158,11,.1);color:var(--amber)}
+
+/* CODE BLOCK */
+.code-tabs{display:flex;gap:4px;margin-bottom:-1px;position:relative;z-index:1}
+.code-tab{font-family:var(--mono);font-size:12px;padding:8px 16px;border-radius:8px 8px 0 0;border:1px solid var(--border);border-bottom:none;cursor:pointer;color:var(--muted);background:var(--bg2);transition:all .15s}
+.code-tab.active{background:var(--bg3);color:var(--text);border-color:var(--border2)}
+.code-block{background:var(--bg3);border:1px solid var(--border2);border-radius:0 12px 12px 12px;padding:24px;font-family:var(--mono);font-size:13px;line-height:1.7;overflow-x:auto;position:relative}
+.code-snippet{display:none}
+.code-snippet.active{display:block}
+.c-comment{color:var(--muted)}
+.c-keyword{color:#c792ea}
+.c-string{color:#c3e88d}
+.c-func{color:var(--accent)}
+.c-var{color:#82aaff}
+.c-num{color:var(--amber)}
+
+/* DEMO PREVIEW */
+.demo-wrap{margin-top:60px;border:1px solid var(--border2);border-radius:16px;overflow:hidden;background:var(--bg2);box-shadow:0 40px 80px rgba(0,0,0,.4)}
+.demo-bar{display:flex;align-items:center;gap:8px;padding:14px 20px;border-bottom:1px solid var(--border);background:var(--bg3)}
+.demo-dot{width:10px;height:10px;border-radius:50%}
+.demo-url{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--bg);border-radius:6px;padding:5px 14px;flex:1;max-width:280px}
+.demo-tag{font-family:var(--mono);font-size:10px;background:rgba(0,212,161,.1);color:var(--accent);padding:3px 10px;border-radius:20px;margin-left:auto}
+.demo-body{display:grid;grid-template-columns:200px 1fr;min-height:400px}
+.demo-sidebar{border-right:1px solid var(--border);padding:16px 0}
+.d-nav{padding:9px 14px;margin:1px 8px;border-radius:7px;cursor:pointer;font-size:12px;color:var(--muted);transition:all .15s;display:flex;align-items:center;gap:10px}
+.d-nav:hover{background:rgba(255,255,255,.03);color:var(--text)}
+.d-nav.active{background:rgba(0,212,161,.08);color:var(--accent)}
+.demo-main{padding:24px}
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
+.kpi{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px}
+.kpi-lbl{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.kpi-val{font-family:var(--mono);font-size:22px;font-weight:500;margin-top:4px}
+.kpi-ch{font-size:11px;margin-top:3px}
+.up{color:var(--red)}.down{color:var(--accent)}
+.chart-area{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;height:150px;position:relative;overflow:hidden}
+.chart-lbl{font-family:var(--mono);font-size:9px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em}
+.bars{display:flex;align-items:flex-end;gap:3px;height:100px}
+.bar{flex:1;border-radius:2px 2px 0 0;background:rgba(0,212,161,.18);transition:background .2s}
+.bar:hover{background:rgba(0,212,161,.45)}
+.bar.today{background:rgba(0,212,161,.7)}
+
+/* PRICING */
+.pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-top:60px}
+.plan{background:var(--bg2);padding:40px 32px}
+.plan.featured{background:var(--bg3);border-top:2px solid var(--accent)}
+.plan-badge{font-family:var(--mono);font-size:10px;letter-spacing:.08em;background:rgba(0,212,161,.1);color:var(--accent);padding:4px 12px;border-radius:100px;display:inline-block;margin-bottom:20px}
+.plan-name{font-size:13px;color:var(--muted);font-family:var(--mono);letter-spacing:.04em}
+.plan-price{font-family:var(--serif);font-size:52px;font-weight:400;line-height:1;margin:10px 0 4px}
+.plan-price sup{font-size:20px;vertical-align:super;font-family:var(--sans)}
+.plan-period{font-size:12px;color:var(--muted);margin-bottom:28px}
+.plan-cta{display:block;text-align:center;padding:12px;border-radius:8px;font-size:13px;text-decoration:none;border:1px solid var(--border2);color:var(--text);margin-bottom:28px;transition:all .2s;font-family:var(--mono)}
+.plan-cta:hover{border-color:var(--accent);color:var(--accent)}
+.plan.featured .plan-cta{background:var(--accent);color:#000;border-color:var(--accent);font-weight:500}
+.plan.featured .plan-cta:hover{opacity:.85}
+.plan-feats{list-style:none}
+.plan-feats li{font-size:13px;color:var(--muted);padding:7px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.plan-feats li:last-child{border-bottom:none}
+.plan-feats li::before{content:'—';color:var(--accent);flex-shrink:0}
+
+/* CTA */
+.cta-section{text-align:center;padding:120px 24px;position:relative;overflow:hidden}
+.cta-glow{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:500px;height:200px;background:radial-gradient(ellipse,rgba(0,212,161,.08) 0%,transparent 70%);pointer-events:none}
+.cta-section h2{font-family:var(--serif);font-size:clamp(38px,5vw,68px);font-weight:400;line-height:1.1;letter-spacing:-.02em;max-width:680px;margin:0 auto 32px}
+.cta-section h2 em{font-style:italic;color:var(--accent)}
+.cta-mono{font-family:var(--mono);font-size:13px;color:var(--muted);margin-bottom:40px}
+
+/* FOOTER */
+footer{border-top:1px solid var(--border);padding:36px 48px;display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--muted);font-family:var(--mono)}
+footer a{color:var(--muted);text-decoration:none;transition:color .2s}
+footer a:hover{color:var(--text)}
+
+/* RESPONSIVE */
+@media(max-width:900px){
+  nav{padding:16px 20px}
+  .nav-links{display:none}
+  .feat-grid,.pricing-grid{grid-template-columns:1fr}
+  .stats-strip{grid-template-columns:repeat(2,1fr)}
+  .integrations-grid{grid-template-columns:repeat(2,1fr)}
+  .demo-body{grid-template-columns:1fr}
+  .demo-sidebar{display:none}
+  .kpi-row{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="#" class="nav-logo"><span class="logo-dot"></span>VANTAGE</a>
+  <div class="nav-links">
+    <a href="/calculator.html">Calculator</a>
+    <a href="/app.html">Dashboard</a>
+    <a href="/docs.html">Docs</a>
+    <a href="/signup.html">Pricing</a>
+    
+    <a href="/signup.html" class="nav-cta">Start free →</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow"></div>
+  <div class="hero-badge">↗ Open source · Free forever · No credit card</div>
+  <h1>Know exactly what your<br><em>AI actually costs</em></h1>
+  <p class="hero-sub">Token consumption, model pricing, efficiency scores and budget alerts — all in one dashboard. One line to install.</p>
+  <div class="hero-actions">
+    <a href="/signup.html" class="btn-primary">Start for free →</a>
+    <a href="#demo" class="btn-ghost"><span>▶</span> Live demo</a>
+  </div>
+  <div class="install-box">
+    <span>$</span> pip install vantage-ai
+    <button class="copy-btn" onclick="copyInstall('pip install vantage-ai', this)">copy</button>
+    <span style="color:var(--dim)">·</span>
+    <span>$</span> npm install vantage-ai
+    <button class="copy-btn" onclick="copyInstall('npm install vantage-ai', this)">copy</button>
+  </div>
+</div>
+
+<!-- TICKER -->
+<div class="ticker-wrap">
+  <div class="ticker" id="ticker"></div>
+</div>
+
+<!-- STATS -->
+<div class="stats-strip">
+  <div class="stat-item reveal"><div class="stat-num">34<span>%</span></div><div class="stat-lbl">avg token waste in typical AI pipelines</div></div>
+  <div class="stat-item reveal"><div class="stat-num">8<span>×</span></div><div class="stat-lbl">price spread between cheapest and costliest model for the same task</div></div>
+  <div class="stat-item reveal"><div class="stat-num">67<span>%</span></div><div class="stat-lbl">of AI teams only find quality regressions after user complaints</div></div>
+  <div class="stat-item reveal"><div class="stat-num"><span>$</span>0</div><div class="stat-lbl">to get started — full features, no credit card required</div></div>
+</div>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="sec-label">// capabilities</div>
+  <div class="sec-title">Everything you need to run AI <em>intelligently</em></div>
+  <div class="feat-grid">
+    <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(0,212,161,.1)">📊</div><div class="feat-title">Token & cost analytics</div><div class="feat-desc">Real-time breakdown of token usage and spend per model, feature, user and team. See which 5% of requests consume 50% of your budget.</div><div class="feat-tag">→ per-request granularity</div></div>
+    <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(0,152,255,.1)">💱</div><div class="feat-title">Cross-model pricing intelligence</div><div class="feat-desc">Live pricing across every major LLM. Run your actual usage through each model and see exactly how much you'd save by switching.</div><div class="feat-tag">→ "save $3,200/mo on Gemini Flash"</div></div>
+    <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(245,158,11,.1)">⚡</div><div class="feat-title">Efficiency scorer</div><div class="feat-desc">Automatically flags bloated system prompts, redundant context and inefficient few-shot examples. Get a prompt efficiency score on every call.</div><div class="feat-tag">→ ML-powered token optimizer</div></div>
+    <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(248,113,113,.1)">🔔</div><div class="feat-title">Budget alerts & governance</div><div class="feat-desc">Set spend caps by team or feature. Slack/email alerts before budgets blow. Detect runaway agents before they hit your invoice.</div><div class="feat-tag">→ anomaly detection built-in</div></div>
+    <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(0,212,161,.1)">📈</div><div class="feat-title">Exec ROI dashboard</div><div class="feat-desc">Translate token costs into business outcomes — cost per resolved ticket, per summary, per customer interaction. Built for CTOs and CFOs.</div><div class="feat-tag">→ no raw tokens visible</div></div>
+    <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(0,152,255,.1)">🏷️</div><div class="feat-title">Cost attribution</div><div class="feat-desc">Break down AI spend by department, product feature or customer. Connect to billing to charge-back AI costs to the teams that incur them.</div><div class="feat-tag">→ integrates with Stripe</div></div>
+  </div>
+</section>
+
+<!-- INTEGRATIONS -->
+<section id="integrations" style="padding-top:0">
+  <div class="sec-label">// works everywhere</div>
+  <div class="sec-title">Drop into your stack in <em>60 seconds</em></div>
+  <div class="integrations-grid">
+    <div class="int-card reveal"><div class="int-logo">⚡</div><div class="int-name">Cursor</div><div class="int-how">MCP server — ask Cursor's AI about your spend directly in chat</div><span class="int-badge badge-mcp">MCP SERVER</span></div>
+    <div class="int-card reveal"><div class="int-logo">🌊</div><div class="int-name">Windsurf</div><div class="int-how">MCP server — Cascade can answer cost questions using live data</div><span class="int-badge badge-mcp">MCP SERVER</span></div>
+    <div class="int-card reveal"><div class="int-logo">🤖</div><div class="int-name">Claude Code</div><div class="int-how">Native MCP support — add one config block and you're live</div><span class="int-badge badge-mcp">MCP SERVER</span></div>
+    <div class="int-card reveal"><div class="int-logo">💻</div><div class="int-name">VS Code</div><div class="int-how">Extension with status bar counter, sidebar dashboard and alerts</div><span class="int-badge badge-ext">EXTENSION</span></div>
+    <div class="int-card reveal"><div class="int-logo">🐍</div><div class="int-name">Python</div><div class="int-how">Two-line drop-in proxy for OpenAI and Anthropic SDKs</div><span class="int-badge badge-sdk">SDK</span></div>
+    <div class="int-card reveal"><div class="int-logo">🟨</div><div class="int-name">TypeScript / JS</div><div class="int-how">createOpenAIProxy() wraps any existing client with zero changes</div><span class="int-badge badge-sdk">SDK</span></div>
+    <div class="int-card reveal"><div class="int-logo">◆</div><div class="int-name">Zed</div><div class="int-how">Context server config — one JSON block in settings</div><span class="int-badge badge-mcp">MCP SERVER</span></div>
+    <div class="int-card reveal"><div class="int-logo">⬛</div><div class="int-name">JetBrains</div><div class="int-how">AI Assistant MCP plugin — IntelliJ, PyCharm, WebStorm</div><span class="int-badge badge-mcp">MCP SERVER</span></div>
+  </div>
+</section>
+
+<!-- CODE EXAMPLES -->
+<section style="padding-top:0">
+  <div class="sec-label">// integration</div>
+  <div class="sec-title">Two lines. Seriously <em>that's it.</em></div>
+  <div style="margin-top:48px">
+    <div class="code-tabs">
+      <div class="code-tab active" onclick="switchTab('python',this)">Python</div>
+      <div class="code-tab" onclick="switchTab('typescript',this)">TypeScript</div>
+      <div class="code-tab" onclick="switchTab('mcp',this)">MCP (Cursor)</div>
+    </div>
+    <div class="code-block">
+      <div class="code-snippet active" id="tab-python"><pre><span class="c-comment"># Before</span>
+<span class="c-keyword">from</span> openai <span class="c-keyword">import</span> <span class="c-var">OpenAI</span>
+
+<span class="c-comment"># After — only 2 lines changed</span>
+<span class="c-keyword">import</span> vantage
+<span class="c-keyword">from</span> vantage.proxy.openai_proxy <span class="c-keyword">import</span> <span class="c-var">OpenAI</span>
+
+vantage.<span class="c-func">init</span>(<span class="c-var">api_key</span>=<span class="c-string">"vnt_your_key"</span>)
+client = <span class="c-var">OpenAI</span>(<span class="c-var">api_key</span>=<span class="c-string">"sk-..."</span>)
+
+<span class="c-comment"># Everything else is identical — Vantage wraps transparently</span>
+response = client.chat.completions.<span class="c-func">create</span>(
+    <span class="c-var">model</span>=<span class="c-string">"gpt-4o"</span>,
+    <span class="c-var">messages</span>=[{<span class="c-string">"role"</span>: <span class="c-string">"user"</span>, <span class="c-string">"content"</span>: <span class="c-string">"Hello!"</span>}],
+)
+<span class="c-comment"># ✓ Tokens: 12 in, 8 out  ✓ Cost: $0.000110  ✓ Latency: 423ms
+# ✓ Cheapest alternative: gemini-1.5-flash — save 94%</span></pre></div>
+      <div class="code-snippet" id="tab-typescript"><pre><span class="c-comment">// Before</span>
+<span class="c-keyword">import</span> <span class="c-var">OpenAI</span> <span class="c-keyword">from</span> <span class="c-string">"openai"</span>;
+
+<span class="c-comment">// After — only 2 lines changed</span>
+<span class="c-keyword">import</span> { <span class="c-var">init</span>, <span class="c-var">createOpenAIProxy</span> } <span class="c-keyword">from</span> <span class="c-string">"vantage-ai"</span>;
+<span class="c-keyword">import</span> <span class="c-var">OpenAI</span> <span class="c-keyword">from</span> <span class="c-string">"openai"</span>;
+
+<span class="c-func">init</span>({ <span class="c-var">apiKey</span>: <span class="c-string">"vnt_your_key"</span> });
+<span class="c-keyword">const</span> openai = <span class="c-func">createOpenAIProxy</span>(<span class="c-keyword">new</span> <span class="c-var">OpenAI</span>());
+
+<span class="c-comment">// Identical API — Vantage wraps every call automatically</span>
+<span class="c-keyword">const</span> response = <span class="c-keyword">await</span> openai.chat.completions.<span class="c-func">create</span>({
+  <span class="c-var">model</span>: <span class="c-string">"gpt-4o"</span>,
+  <span class="c-var">messages</span>: [{ <span class="c-var">role</span>: <span class="c-string">"user"</span>, <span class="c-var">content</span>: <span class="c-string">"Hello!"</span> }],
+});
+<span class="c-comment">// ✓ Captured: tokens, cost, latency, cheapest alternative</span></pre></div>
+      <div class="code-snippet" id="tab-mcp"><pre><span class="c-comment">// ~/.cursor/mcp.json  (or windsurf / claude-code equivalent)</span>
+{
+  <span class="c-string">"mcpServers"</span>: {
+    <span class="c-string">"vantage"</span>: {
+      <span class="c-string">"command"</span>: <span class="c-string">"npx"</span>,
+      <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"vantage-ai-mcp"</span>],
+      <span class="c-string">"env"</span>: {
+        <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"vnt_your_key"</span>,
+        <span class="c-string">"VANTAGE_ORG_ID"</span>: <span class="c-string">"your_org_id"</span>
+      }
+    }
+  }
+}
+
+<span class="c-comment">// Then ask Cursor / Claude Code / Windsurf in chat:</span>
+<span class="c-comment">// "How much did I spend on AI this week?"</span>
+<span class="c-comment">// "Which model is cheapest for my summarisation workflow?"</span>
+<span class="c-comment">// "Show requests wasting the most tokens"</span></pre></div>
+    </div>
+  </div>
+</section>
+
+<!-- DEMO -->
+<section id="demo" style="padding-top:0">
+  <div class="sec-label">// live demo</div>
+  <div class="sec-title">See it in action — <em>no login needed</em></div>
+  <div class="demo-wrap">
+    <div class="demo-bar">
+      <div class="demo-dot" style="background:#f87171"></div>
+      <div class="demo-dot" style="background:#fbbf24"></div>
+      <div class="demo-dot" style="background:#34d399"></div>
+      <div class="demo-url">app.vantage.ai / overview</div>
+      <div class="demo-tag">LIVE DEMO</div>
+    </div>
+    <div class="demo-body">
+      <div class="demo-sidebar">
+        <div class="d-nav active">◈ Overview</div>
+        <div class="d-nav">◎ Usage</div>
+        <div class="d-nav">⟁ Pricing</div>
+        <div class="d-nav">⊡ Efficiency</div>
+        <div class="d-nav">◷ Alerts <span style="margin-left:auto;background:rgba(248,113,113,.15);color:var(--red);font-family:var(--mono);font-size:9px;padding:1px 7px;border-radius:10px">3</span></div>
+        <div class="d-nav">⊞ Teams</div>
+      </div>
+      <div class="demo-main">
+        <div class="kpi-row">
+          <div class="kpi"><div class="kpi-lbl">MTD Spend</div><div class="kpi-val" id="kpi-spend">$4,821</div><div class="kpi-ch up">↑ 12%</div></div>
+          <div class="kpi"><div class="kpi-lbl">Tokens Used</div><div class="kpi-val">182M</div><div class="kpi-ch down">↓ eff +8%</div></div>
+          <div class="kpi"><div class="kpi-lbl">Efficiency</div><div class="kpi-val" style="color:var(--accent)">74/100</div><div class="kpi-ch down">↑ 6pts</div></div>
+          <div class="kpi" style="border-color:rgba(245,158,11,.25)"><div class="kpi-lbl">Potential Save</div><div class="kpi-val" style="color:var(--amber)">$1,240</div><div class="kpi-ch" style="color:var(--muted)">2 workflows</div></div>
+        </div>
+        <div class="chart-area">
+          <div class="chart-lbl">Daily token spend — last 30 days</div>
+          <div class="bars" id="demo-bars"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p style="text-align:center;margin-top:20px;font-size:13px;color:var(--muted)">
+    <a href="/signup.html" style="color:var(--accent);text-decoration:none">Create a free account →</a> to see your actual data
+  </p>
+</section>
+
+<!-- PRICING -->
+<section id="pricing">
+  <div class="sec-label">// pricing</div>
+  <div class="sec-title">Simple, <em>transparent</em> pricing</div>
+  <div class="pricing-grid">
+    <div class="plan">
+      <div class="plan-name">FREE</div>
+      <div class="plan-price"><sup>$</sup>0</div>
+      <div class="plan-period">forever · no credit card</div>
+      <a href="/signup.html" class="plan-cta">Get started →</a>
+      <ul class="plan-feats">
+        <li>Up to 10,000 requests/month</li>
+        <li>Token & cost dashboard</li>
+        <li>3 models tracked</li>
+        <li>7-day log retention</li>
+        <li>1 user seat</li>
+        <li>Community support</li>
+      </ul>
+    </div>
+    <div class="plan featured">
+      <div class="plan-badge">MOST POPULAR</div>
+      <div class="plan-name">TEAM</div>
+      <div class="plan-price"><sup>$</sup>99</div>
+      <div class="plan-period">per month · billed annually</div>
+      <a href="/signup.html" class="plan-cta">Start 14-day trial →</a>
+      <ul class="plan-feats">
+        <li>Unlimited requests</li>
+        <li>All models tracked</li>
+        <li>Cross-model pricing intelligence</li>
+        <li>Efficiency scorer + optimizer</li>
+        <li>Budget alerts (Slack, email)</li>
+        <li>Cost attribution by team</li>
+        <li>90-day log retention</li>
+        <li>Up to 10 seats</li>
+      </ul>
+    </div>
+    <div class="plan">
+      <div class="plan-name">ENTERPRISE</div>
+      <div class="plan-price" style="font-size:36px;padding-top:8px">Custom</div>
+      <div class="plan-period">contact us for pricing</div>
+      <a href="/signup.html" class="plan-cta">Talk to sales →</a>
+      <ul class="plan-feats">
+        <li>Everything in Team</li>
+        <li>Self-hosted deployment</li>
+        <li>SSO / SAML</li>
+        <li>Exec ROI dashboards</li>
+        <li>Stripe cost chargeback</li>
+        <li>SOC2 + HIPAA compliance</li>
+        <li>Unlimited retention</li>
+        <li>Dedicated support</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<div class="cta-section">
+  <div class="cta-glow"></div>
+  <h2>Stop guessing.<br>Start <em>measuring.</em></h2>
+  <p class="cta-mono">// one line of code · full visibility in 60 seconds · free forever</p>
+  <a href="/signup.html" class="btn-primary" style="font-size:14px;padding:16px 44px">Create free account →</a>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <a href="#">Vantage AI</a>
+  <div style="display:flex;gap:24px">
+    <a href="/docs.html">Docs</a>
+    
+    <a href="mailto:hello@vantage.ai">Contact</a>
+    <a href="/privacy">Privacy</a>
+    <a href="/terms">Terms</a>
+  </div>
+  <span style="color:var(--dim)">© 2026 Vantage AI</span>
+</footer>
+
+<script>
+// ── Ticker ───────────────────────────────────────────────────────────────────
+const items = [
+  ["GPT-4o","$2.50/M input"],["Claude Sonnet 4.6","$3.00/M input"],
+  ["Gemini 2.0 Flash","$0.10/M input"],["Llama 3.3 70B","$0.23/M input"],
+  ["GPT-4o-mini","$0.15/M input"],["Claude Haiku 4.5","$0.80/M input"],
+  ["Gemini 1.5 Flash","$0.075/M input"],["Mistral Large","$2.00/M input"],
+  ["Avg token waste","34% of spend"],
+];
+const ticker = document.getElementById("ticker");
+const all = [...items,...items]; // double for seamless loop
+all.forEach(([name,val],i) => {
+  ticker.innerHTML += `<span class="ticker-item">${name} <span class="ticker-val">${val}</span></span>`;
+  if(i < all.length-1) ticker.innerHTML += `<span class="ticker-item" style="color:var(--border2)">·</span>`;
+});
+
+// ── Demo bars ────────────────────────────────────────────────────────────────
+const heights = [45,52,38,61,70,55,43,67,72,58,80,65,74,60,82,78,90,75,68,85,72,95,88,92,78,84,88,76,92,100];
+const barsEl = document.getElementById("demo-bars");
+heights.forEach((h,i) => {
+  const b = document.createElement("div");
+  b.className = "bar" + (i===29?" today":"");
+  b.style.height = h+"%";
+  barsEl.appendChild(b);
+});
+
+// ── Copy buttons ──────────────────────────────────────────────────────────────
+function copyInstall(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = "copied!";
+    btn.style.color = "var(--accent)";
+    setTimeout(() => { btn.textContent = orig; btn.style.color = ""; }, 1500);
+  });
+}
+
+// ── Code tabs ─────────────────────────────────────────────────────────────────
+function switchTab(id, el) {
+  document.querySelectorAll(".code-snippet").forEach(s => s.classList.remove("active"));
+  document.querySelectorAll(".code-tab").forEach(t => t.classList.remove("active"));
+  document.getElementById("tab-"+id).classList.add("active");
+  el.classList.add("active");
+}
+
+// ── Scroll reveal ─────────────────────────────────────────────────────────────
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => { if(e.isIntersecting) { e.target.style.opacity="1"; e.target.style.transform="translateY(0)"; }});
+}, { threshold: 0.08 });
+document.querySelectorAll(".reveal").forEach((el,i) => {
+  el.style.opacity="0"; el.style.transform="translateY(18px)";
+  el.style.transition=`opacity 0.5s ${i*0.06}s ease, transform 0.5s ${i*0.06}s ease`;
+  obs.observe(el);
+});
+</script>
+</body>
+</html>

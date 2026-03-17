@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Join the waitlist — Vantage AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#080c0f;--bg2:#0d1318;--bg3:#121920;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);--text:#e8edf2;--muted:#6b7b8a;--dim:#3a4550;--accent:#00d4a1;--mono:'DM Mono',monospace;--serif:'Instrument Serif',Georgia,serif;--sans:'DM Sans',sans-serif}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;display:flex;flex-direction:column}
+nav{display:flex;align-items:center;justify-content:space-between;padding:16px 48px;border-bottom:1px solid var(--border);background:rgba(8,12,15,.9);backdrop-filter:blur(16px)}
+.logo{font-family:var(--mono);font-size:14px;letter-spacing:.08em;display:flex;align-items:center;gap:9px;text-decoration:none;color:var(--text)}
+.dot{width:7px;height:7px;background:var(--accent);border-radius:50%;box-shadow:0 0 10px var(--accent);animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.7)}}
+.nav-links a{font-size:13px;color:var(--muted);text-decoration:none;transition:color .2s;margin-left:28px}
+.nav-links a:hover{color:var(--text)}
+.page{flex:1;display:flex;align-items:center;justify-content:center;padding:60px 24px;position:relative}
+.glow{position:absolute;top:20%;left:50%;transform:translateX(-50%);width:600px;height:300px;background:radial-gradient(ellipse,rgba(0,212,161,.1) 0%,transparent 70%);pointer-events:none}
+.grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);background-size:60px 60px;mask-image:radial-gradient(ellipse 80% 80% at 50% 40%,black 0%,transparent 80%)}
+.wrap{position:relative;z-index:1;width:100%;max-width:560px;text-align:center}
+.badge{display:inline-flex;align-items:center;gap:8px;background:rgba(0,212,161,.08);border:1px solid rgba(0,212,161,.2);border-radius:100px;padding:6px 16px;font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.06em;margin-bottom:32px}
+h1{font-family:var(--serif);font-size:clamp(40px,6vw,68px);font-weight:400;line-height:1.05;letter-spacing:-.02em;margin-bottom:20px}
+h1 em{font-style:italic;color:var(--accent)}
+.sub{font-size:16px;color:var(--muted);line-height:1.7;max-width:440px;margin:0 auto 48px;font-weight:300}
+.form-row{display:flex;gap:10px;margin-bottom:14px}
+.email-input{flex:1;background:var(--bg2);border:1px solid var(--border2);color:var(--text);padding:14px 16px;border-radius:9px;font-size:14px;font-family:var(--sans);outline:none;transition:border-color .2s}
+.email-input:focus{border-color:var(--accent)}
+.email-input::placeholder{color:var(--dim)}
+.join-btn{background:var(--accent);color:#000;border:none;padding:14px 28px;border-radius:9px;font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.04em;cursor:pointer;transition:opacity .2s,transform .2s;white-space:nowrap}
+.join-btn:hover{opacity:.85;transform:translateY(-1px)}
+.join-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.hint{font-size:12px;color:var(--dim);margin-bottom:48px}
+.stats{display:flex;align-items:center;justify-content:center;gap:40px;padding:32px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin-bottom:48px}
+.stat-num{font-family:var(--serif);font-size:36px;font-weight:400;color:var(--text)}
+.stat-num span{color:var(--accent)}
+.stat-lbl{font-size:12px;color:var(--muted);margin-top:4px}
+.features{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;text-align:left;margin-bottom:48px}
+.feat{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px}
+.feat-icon{font-size:18px;margin-bottom:10px}
+.feat-title{font-size:13px;font-weight:500;margin-bottom:5px}
+.feat-desc{font-size:12px;color:var(--muted);line-height:1.5}
+.success-state{display:none;background:rgba(0,212,161,.06);border:1px solid rgba(0,212,161,.15);border-radius:14px;padding:32px;margin-bottom:20px}
+.success-state h2{font-family:var(--serif);font-size:28px;font-weight:400;margin-bottom:10px}
+.success-state p{font-size:14px;color:var(--muted)}
+footer{border-top:1px solid var(--border);padding:24px 48px;display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--muted);font-family:var(--mono)}
+footer a{color:var(--muted);text-decoration:none;transition:color .2s}
+footer a:hover{color:var(--text)}
+@media(max-width:600px){.form-row{flex-direction:column}.stats{gap:24px}.features{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<nav>
+  <a href="/" class="logo"><span class="dot"></span>VANTAGE</a>
+  <div class="nav-links">
+    <a href="/calculator.html">Calculator</a>
+    <a href="/app.html">Demo</a>
+    <a href="/docs.html">Docs</a>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="grid"></div>
+  <div class="glow"></div>
+  <div class="wrap">
+
+    <div class="badge">&#8599; Free &middot; Open source &middot; No credit card ever</div>
+    <h1>AI cost intelligence<br>for <em>every developer</em></h1>
+    <p class="sub">Track token usage, compare model pricing, and cut your AI bill — in two lines of code. Join the waitlist to get early access.</p>
+
+    <!-- WAITLIST FORM -->
+    <div id="form-state">
+      <div class="form-row">
+        <input class="email-input" type="email" id="email-input" placeholder="your@email.com" required>
+        <button class="join-btn" id="join-btn" onclick="joinWaitlist()">Join waitlist &rarr;</button>
+      </div>
+      <p class="hint">No spam. We'll email you when early access opens. Takes 5 seconds.</p>
+    </div>
+
+    <!-- SUCCESS STATE -->
+    <div class="success-state" id="success-state">
+      <div style="font-size:32px;margin-bottom:12px">&#10003;</div>
+      <h2>You're on the list!</h2>
+      <p>We'll email you at <strong id="confirmed-email" style="color:var(--text)"></strong> when early access opens.<br>
+      In the meantime, explore the <a href="/app.html" style="color:var(--accent)">live demo</a> or <a href="/calculator.html" style="color:var(--accent)">pricing calculator</a>.</p>
+    </div>
+
+    <!-- STATS -->
+    <div class="stats">
+      <div>
+        <div class="stat-num">2<span>&nbsp;lines</span></div>
+        <div class="stat-lbl">to integrate</div>
+      </div>
+      <div style="color:var(--dim)">&#183;</div>
+      <div>
+        <div class="stat-num"><span>$</span>0</div>
+        <div class="stat-lbl">to get started</div>
+      </div>
+      <div style="color:var(--dim)">&#183;</div>
+      <div>
+        <div class="stat-num">20<span>+</span></div>
+        <div class="stat-lbl">models tracked</div>
+      </div>
+    </div>
+
+    <!-- FEATURES -->
+    <div class="features">
+      <div class="feat">
+        <div class="feat-icon">&#128202;</div>
+        <div class="feat-title">Token analytics</div>
+        <div class="feat-desc">Real-time cost breakdown per model, team, and feature.</div>
+      </div>
+      <div class="feat">
+        <div class="feat-icon">&#128176;</div>
+        <div class="feat-title">Price comparison</div>
+        <div class="feat-desc">Live pricing across GPT-4o, Claude, Gemini, Llama and more.</div>
+      </div>
+      <div class="feat">
+        <div class="feat-icon">&#9889;</div>
+        <div class="feat-title">Efficiency scorer</div>
+        <div class="feat-desc">Auto-flags bloated prompts and cheaper model alternatives.</div>
+      </div>
+    </div>
+
+    <p style="font-size:12px;color:var(--dim)">
+      Also available: <a href="/calculator.html" style="color:var(--muted)">pricing calculator</a> &middot; 
+      <a href="/app.html" style="color:var(--muted)">live dashboard demo</a> &middot; 
+      <a href="/docs.html" style="color:var(--muted)">integration docs</a>
+    </p>
+
+  </div>
+</div>
+
+<footer>
+  <a href="/">Vantage AI</a>
+  <div style="display:flex;gap:24px">
+    <a href="/docs.html">Docs</a>
+    <a href="/calculator.html">Calculator</a>
+    
+  </div>
+  <span>&copy; 2026 Vantage AI &mdash; Free forever</span>
+</footer>
+
+<script>
+// Stores email in localStorage - zero backend, zero cost
+// When you're ready for a real backend, replace this with a fetch() call
+function joinWaitlist() {
+  const emailEl = document.getElementById("email-input");
+  const email   = emailEl.value.trim();
+  if (!email || !email.includes("@")) {
+    emailEl.style.borderColor = "#f87171";
+    emailEl.focus();
+    return;
+  }
+
+  const btn = document.getElementById("join-btn");
+  btn.disabled = true;
+  btn.textContent = "Joining...";
+
+  // Save locally (replace with your backend/Formspree/Google Form later)
+  const waitlist = JSON.parse(localStorage.getItem("vantage_waitlist") || "[]");
+  if (!waitlist.includes(email)) {
+    waitlist.push(email);
+    localStorage.setItem("vantage_waitlist", JSON.stringify(waitlist));
+  }
+
+  // Simulate brief delay then show success
+  setTimeout(() => {
+    document.getElementById("confirmed-email").textContent = email;
+    document.getElementById("form-state").style.display   = "none";
+    document.getElementById("success-state").style.display = "block";
+  }, 600);
+}
+
+// Allow Enter key to submit
+document.getElementById("email-input").addEventListener("keydown", e => {
+  if (e.key === "Enter") joinWaitlist();
+});
+
+// If already signed up, show success
+const existing = JSON.parse(localStorage.getItem("vantage_waitlist") || "[]");
+if (existing.length > 0) {
+  document.getElementById("confirmed-email").textContent = existing[existing.length - 1];
+  document.getElementById("form-state").style.display   = "none";
+  document.getElementById("success-state").style.display = "block";
+}
+</script>
+</body>
+</html>

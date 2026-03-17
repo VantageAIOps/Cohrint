@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Vantage — Deployment Check</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#080c0f;color:#e8edf2;font-family:'DM Mono',monospace;padding:40px 24px;font-size:13px}
+h1{color:#00d4a1;margin-bottom:8px;font-size:18px}
+.sub{color:#6b7b8a;margin-bottom:32px;font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:24px}
+.card{background:#0d1318;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:16px}
+.card-title{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#3a4550;margin-bottom:10px}
+.frow{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.frow:last-child{border:none}
+.fname{flex:1}
+.fname .fn{font-size:12px;color:#e8edf2}
+.fname .fd{font-size:10px;color:#3a4550;margin-top:1px}
+.badge{font-size:10px;padding:2px 8px;border-radius:20px;white-space:nowrap}
+.ok{background:rgba(0,212,161,.1);color:#00d4a1}
+.fail{background:rgba(248,113,113,.1);color:#f87171}
+.warn{background:rgba(245,158,11,.1);color:#f59e0b}
+.loading{background:rgba(255,255,255,.06);color:#6b7b8a}
+.summary{padding:14px 18px;border-radius:10px;font-size:13px;margin-bottom:20px}
+.s-ok{background:rgba(0,212,161,.08);border:1px solid rgba(0,212,161,.2);color:#00d4a1}
+.s-fail{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);color:#f87171}
+.actions{display:flex;gap:10px;flex-wrap:wrap}
+.btn{background:#00d4a1;color:#000;border:none;padding:10px 22px;border-radius:8px;font-family:monospace;font-size:12px;font-weight:600;cursor:pointer}
+.btn:hover{opacity:.85}
+.btn-g{background:rgba(255,255,255,.07);color:#e8edf2;border:1px solid rgba(255,255,255,.1)}
+.fix-box{margin-top:24px;background:#0d1318;border:1px solid rgba(248,113,113,.2);border-radius:10px;padding:20px;display:none}
+.fix-box.show{display:block}
+.fix-title{color:#f87171;font-size:12px;margin-bottom:12px}
+.fix-step{color:#6b7b8a;font-size:12px;padding:5px 0;line-height:1.6}
+.fix-step strong{color:#e8edf2}
+</style>
+</head>
+<body>
+
+<h1>&#9989; Vantage — Deployment Check</h1>
+<p class="sub">Verifies all required files are accessible on this Cloudflare Pages deployment.</p>
+
+<div id="summary-box"></div>
+
+<div class="grid" id="results-grid"></div>
+
+<div class="actions">
+  <button class="btn" onclick="runChecks()">&#9654; Re-run checks</button>
+  <a href="/"><button class="btn btn-g">&#8592; Home</button></a>
+  <a href="/app.html"><button class="btn btn-g">&#128202; Dashboard</button></a>
+</div>
+
+<div class="fix-box" id="fix-box">
+  <div class="fix-title">&#10007; Some files are not reachable — here's how to fix it:</div>
+  <div class="fix-step"><strong>Step 1:</strong> Go to your Cloudflare Pages project → Deployments → latest deployment</div>
+  <div class="fix-step"><strong>Step 2:</strong> Click <strong>"Upload assets"</strong> (or "Manage deployment" → "Upload files")</div>
+  <div class="fix-step"><strong>Step 3:</strong> <span style="color:#f87171">DO NOT upload a zip.</span> Click "Upload" and select the individual files listed above in red.</div>
+  <div class="fix-step"><strong>Step 4:</strong> After upload completes, click <strong>Re-run checks</strong> above.</div>
+  <div class="fix-step" style="margin-top:12px;color:#f59e0b">&#9888; If uploading from a zip: unzip it first, then drag the individual files into Cloudflare's upload area.</div>
+</div>
+
+<script>
+const FILES = [
+  { group:"Pages", file:"/",                  label:"index.html",        desc:"Landing page",           critical:true  },
+  { group:"Pages", file:"/auth.html",         label:"auth.html",         desc:"Login / Google OAuth",   critical:true  },
+  { group:"Pages", file:"/app.html",          label:"app.html",          desc:"Enterprise dashboard",   critical:true  },
+  { group:"Pages", file:"/calculator.html",   label:"calculator.html",   desc:"Pricing calculator",     critical:true  },
+  { group:"Pages", file:"/docs.html",         label:"docs.html",         desc:"Documentation",          critical:false },
+  { group:"Pages", file:"/signup.html",       label:"signup.html",       desc:"Waitlist",               critical:false },
+  { group:"Pages", file:"/check.html",        label:"check.html",        desc:"This page",              critical:false },
+  { group:"JS",    file:"/vantage-models.js", label:"vantage-models.js", desc:"AI model pricing data",  critical:true  },
+  { group:"JS",    file:"/seed-data.js",      label:"seed-data.js",      desc:"Test data generator",    critical:true  },
+  { group:"Config",file:"/_redirects",        label:"_redirects",        desc:"URL routing rules",      critical:false },
+];
+
+async function checkFile(f) {
+  try {
+    const r = await fetch(f.file, { method:"HEAD", cache:"no-store" });
+    return { ok: r.ok, status: r.status };
+  } catch(e) {
+    return { ok: false, status: "ERR" };
+  }
+}
+
+async function runChecks() {
+  const grid    = document.getElementById("results-grid");
+  const summary = document.getElementById("summary-box");
+  const fixBox  = document.getElementById("fix-box");
+  grid.innerHTML = "";
+  summary.innerHTML = `<div class="summary loading" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#6b7b8a">Checking files...</div>`;
+  fixBox.classList.remove("show");
+
+  // Build group cards
+  const groups = {};
+  FILES.forEach(f => { if (!groups[f.group]) groups[f.group] = []; groups[f.group].push(f); });
+
+  const cardEls = {};
+  for (const [g, files] of Object.entries(groups)) {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `<div class="card-title">${g}</div>` +
+      files.map(f => `<div class="frow" id="row_${f.label.replace(/[^a-z0-9]/gi,'_')}">
+        <div class="fname"><div class="fn">${f.label}${f.critical?' <span style="color:#f59e0b;font-size:9px">*</span>':''}</div><div class="fd">${f.desc}</div></div>
+        <span class="badge loading" id="st_${f.label.replace(/[^a-z0-9]/gi,'_')}">checking</span>
+      </div>`).join("");
+    grid.appendChild(card);
+  }
+
+  let total=0, passed=0, critFail=0, failedFiles=[];
+  for (const f of FILES) {
+    total++;
+    const id  = f.label.replace(/[^a-z0-9]/gi,"_");
+    const el  = document.getElementById("st_"+id);
+    const res = await checkFile(f);
+    if (res.ok) {
+      passed++;
+      if (el) { el.textContent="200 OK"; el.className="badge ok"; }
+    } else {
+      if (f.critical) { critFail++; failedFiles.push(f.label); }
+      if (el) { el.textContent=res.status+" FAIL"; el.className=`badge ${f.critical?"fail":"warn"}`; }
+    }
+  }
+
+  if (critFail === 0) {
+    summary.innerHTML = `<div class="summary s-ok">&#10003; All ${passed}/${total} files reachable &mdash; deployment is healthy. <a href="/app.html" style="color:#00d4a1;margin-left:12px">Open dashboard &rarr;</a></div>`;
+  } else {
+    summary.innerHTML = `<div class="summary s-fail">&#10007; ${critFail} critical file(s) not found: <strong>${failedFiles.join(", ")}</strong><br><span style="font-size:11px;opacity:.8">See fix instructions below.</span></div>`;
+    fixBox.classList.add("show");
+  }
+}
+
+runChecks();
+</script>
+</body>
+</html>

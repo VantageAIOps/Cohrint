@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI Model Pricing Calculator — Vantage</title>
+<meta name="description" content="Compare real-time pricing across GPT-4o, Claude, Gemini, Llama and more. Find the cheapest model for your exact usage.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/* vantage-shared.css — loaded by all pages */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080c0f;--bg2:#0d1318;--bg3:#121920;--bg4:#161d25;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+  --text:#e8edf2;--muted:#6b7b8a;--dim:#3a4550;
+  --accent:#00d4a1;--blue:#0098ff;--amber:#f59e0b;--red:#f87171;--purple:#a78bfa;
+  --mono:'DM Mono',monospace;--serif:'Instrument Serif',Georgia,serif;--sans:'DM Sans',sans-serif;
+  --radius:10px;--radius-lg:14px;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.6;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:16px 48px;border-bottom:1px solid var(--border);background:rgba(8,12,15,.9);backdrop-filter:blur(16px)}
+.nav-logo{font-family:var(--mono);font-size:14px;letter-spacing:.08em;display:flex;align-items:center;gap:9px}
+.logo-dot{width:7px;height:7px;background:var(--accent);border-radius:50%;box-shadow:0 0 10px var(--accent);animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.7)}}
+.nav-links{display:flex;align-items:center;gap:28px}
+.nav-links a{font-size:13px;color:var(--muted);transition:color .2s}
+.nav-links a:hover,.nav-links a.active{color:var(--text)}
+.nav-cta{background:var(--accent)!important;color:#000!important;padding:7px 18px;border-radius:6px;font-weight:500!important;font-size:12px!important;transition:opacity .2s!important}
+.nav-cta:hover{opacity:.85!important}
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:11px 24px;border-radius:8px;font-size:13px;font-family:var(--mono);font-weight:500;letter-spacing:.03em;cursor:pointer;border:none;transition:opacity .2s,transform .2s;text-decoration:none}
+.btn:hover{transform:translateY(-1px)}
+.btn-primary{background:var(--accent);color:#000}
+.btn-primary:hover{opacity:.85}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border2)}
+.btn-ghost:hover{color:var(--text);border-color:rgba(255,255,255,.25)}
+/* CARDS */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px}
+.card:hover{border-color:var(--border2)}
+/* PAGE WRAPPER */
+.page{padding-top:80px;min-height:100vh}
+.container{max-width:1100px;margin:0 auto;padding:0 24px}
+/* SECTION */
+.sec-label{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:14px}
+.sec-title{font-family:var(--serif);font-size:clamp(30px,3.5vw,46px);font-weight:400;line-height:1.1;letter-spacing:-.02em}
+.sec-title em{font-style:italic;color:var(--muted)}
+/* CODE */
+pre,code{font-family:var(--mono)}
+.code-block{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:20px 24px;font-size:12px;line-height:1.8;overflow-x:auto}
+.c-comment{color:var(--muted)}.c-keyword{color:#c792ea}.c-string{color:#c3e88d}.c-func{color:var(--accent)}.c-var{color:#82aaff}.c-num{color:var(--amber)}
+/* TAGS */
+.tag{display:inline-flex;align-items:center;font-family:var(--mono);font-size:10px;padding:3px 9px;border-radius:20px;font-weight:500}
+.tag-green{background:rgba(0,212,161,.1);color:var(--accent)}
+.tag-blue{background:rgba(0,152,255,.1);color:var(--blue)}
+.tag-amber{background:rgba(245,158,11,.1);color:var(--amber)}
+.tag-red{background:rgba(248,113,113,.1);color:var(--red)}
+.tag-purple{background:rgba(167,139,250,.1);color:var(--purple)}
+.tag-gray{background:rgba(255,255,255,.06);color:var(--muted)}
+/* FOOTER */
+footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--muted);font-family:var(--mono)}
+footer a{color:var(--muted);transition:color .2s}
+footer a:hover{color:var(--text)}
+@media(max-width:768px){
+  nav{padding:14px 20px}
+  .nav-links{gap:16px}
+  .nav-links a:not(.nav-cta){display:none}
+  footer{flex-direction:column;gap:16px;text-align:center;padding:24px}
+}
+
+</style>
+<style>
+.hero-calc{padding:80px 0 40px;text-align:center}
+.hero-calc h1{font-family:var(--serif);font-size:clamp(36px,5vw,62px);font-weight:400;line-height:1.1;letter-spacing:-.02em;margin-bottom:16px}
+.hero-calc p{font-size:16px;color:var(--muted);max-width:500px;margin:0 auto}
+
+/* INPUTS */
+.calc-inputs{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:40px 0 32px}
+.input-group{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px}
+.input-group:focus-within{border-color:var(--accent)}
+.input-label{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
+.input-wrap{display:flex;align-items:center;gap:8px}
+.input-wrap input[type=range]{flex:1;-webkit-appearance:none;height:4px;border-radius:2px;background:var(--bg3);outline:none;cursor:pointer}
+.input-wrap input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);cursor:pointer;box-shadow:0 0 8px rgba(0,212,161,.4)}
+.input-val{font-family:var(--mono);font-size:18px;font-weight:500;min-width:56px;text-align:right}
+.input-hint{font-size:11px;color:var(--dim);margin-top:8px}
+
+/* FILTER STRIP */
+.filter-strip{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+.filter-btn{font-family:var(--mono);font-size:11px;padding:5px 14px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s}
+.filter-btn:hover{color:var(--text);border-color:rgba(255,255,255,.25)}
+.filter-btn.active{background:rgba(0,212,161,.1);border-color:rgba(0,212,161,.3);color:var(--accent)}
+.filter-sep{color:var(--dim);margin:0 4px}
+
+/* RESULTS TABLE */
+.results-table{width:100%;border-collapse:collapse}
+.results-table th{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+.results-table td{padding:13px 14px;border-bottom:1px solid var(--border);font-size:13px;transition:background .15s}
+.results-table tr:hover td{background:rgba(255,255,255,.02)}
+.results-table tr:last-child td{border-bottom:none}
+.results-table tr.best td:first-child{border-left:2px solid var(--accent)}
+.model-cell{display:flex;align-items:center;gap:10px}
+.model-provider{font-size:10px;color:var(--muted);font-family:var(--mono)}
+.cost-cell{font-family:var(--mono);font-weight:500}
+.cost-bar-cell{width:140px}
+.cost-bar-bg{height:5px;background:var(--bg3);border-radius:3px;overflow:hidden}
+.cost-bar-fill{height:100%;border-radius:3px;background:var(--accent);transition:width .4s ease}
+.saving-cell{font-family:var(--mono);font-size:12px}
+
+/* SUMMARY CARDS */
+.summary-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:32px}
+.sum-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px}
+.sum-card.highlight{border-color:rgba(0,212,161,.3)}
+.sum-label{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px}
+.sum-val{font-family:var(--serif);font-size:32px;font-weight:400;line-height:1}
+.sum-sub{font-size:12px;color:var(--muted);margin-top:6px}
+
+/* SCALE PICKER */
+.scale-row{display:flex;align-items:center;gap:10px;margin-bottom:24px;font-size:13px;color:var(--muted)}
+.scale-btn{font-family:var(--mono);font-size:11px;padding:4px 12px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s}
+.scale-btn:hover,.scale-btn.active{background:var(--bg3);color:var(--text);border-color:var(--border2)}
+
+@media(max-width:768px){
+  .calc-inputs{grid-template-columns:1fr}
+  .summary-row{grid-template-columns:1fr}
+  .cost-bar-cell{display:none}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo"><span class="logo-dot"></span>VANTAGE</a>
+  <div class="nav-links">
+    <a href="/calculator.html" class="active">Calculator</a>
+    <a href="/app.html">Dashboard</a>
+    <a href="/docs.html">Docs</a>
+    <a href="/signup.html" class="nav-cta">Start free →</a>
+  </div>
+</nav>
+
+<div class="page">
+<div class="container">
+
+  <div class="hero-calc">
+    <div class="sec-label">// live pricing calculator</div>
+    <h1>Find the cheapest model<br>for your <em>exact</em> usage</h1>
+    <p>Drag the sliders to match your token usage and see real costs across every major LLM — updated live.</p>
+  </div>
+
+  <!-- INPUT SLIDERS -->
+  <div class="calc-inputs">
+    <div class="input-group">
+      <div class="input-label">Input tokens <span id="label-prompt">1,000</span></div>
+      <div class="input-wrap">
+        <input type="range" id="slider-prompt" min="100" max="2000000" value="10000" step="100" oninput="update()">
+        <div class="input-val" id="val-prompt">10K</div>
+      </div>
+      <div class="input-hint">Prompt + context sent to the model</div>
+    </div>
+    <div class="input-group">
+      <div class="input-label">Output tokens <span id="label-completion">500</span></div>
+      <div class="input-wrap">
+        <input type="range" id="slider-completion" min="50" max="500000" value="2000" step="50" oninput="update()">
+        <div class="input-val" id="val-completion">2K</div>
+      </div>
+      <div class="input-hint">Completion generated by the model</div>
+    </div>
+    <div class="input-group">
+      <div class="input-label">Requests/month <span id="label-requests">1,000</span></div>
+      <div class="input-wrap">
+        <input type="range" id="slider-requests" min="1" max="10000000" value="10000" step="100" oninput="update()">
+        <div class="input-val" id="val-requests">10K</div>
+      </div>
+      <div class="input-hint">Total API calls per month</div>
+    </div>
+  </div>
+
+  <!-- SCALE QUICK PICK -->
+  <div class="scale-row">
+    <span>Quick pick:</span>
+    <button class="scale-btn" onclick="setProfile('hobby')">Hobby</button>
+    <button class="scale-btn" onclick="setProfile('startup')">Startup</button>
+    <button class="scale-btn active" onclick="setProfile('growth')">Growth</button>
+    <button class="scale-btn" onclick="setProfile('scale')">Scale</button>
+    <button class="scale-btn" onclick="setProfile('enterprise')">Enterprise</button>
+  </div>
+
+  <!-- SUMMARY -->
+  <div class="summary-row" id="summary-row"></div>
+
+  <!-- FILTER -->
+  <div class="filter-strip">
+    <span style="font-family:var(--mono);font-size:11px;color:var(--muted)">Show:</span>
+    <button class="filter-btn active" onclick="setFilter('all',this)">All models</button>
+    <button class="filter-btn" onclick="setFilter('frontier',this)">Frontier</button>
+    <button class="filter-btn" onclick="setFilter('mid',this)">Mid tier</button>
+    <button class="filter-btn" onclick="setFilter('fast',this)">Fast & cheap</button>
+    <span class="filter-sep">·</span>
+    <button class="filter-btn" onclick="setFilter('openai',this)">OpenAI</button>
+    <button class="filter-btn" onclick="setFilter('anthropic',this)">Anthropic</button>
+    <button class="filter-btn" onclick="setFilter('google',this)">Google</button>
+    <button class="filter-btn" onclick="setFilter('meta',this)">Meta / OSS</button>
+  </div>
+
+  <!-- TABLE -->
+  <div class="card" style="padding:0;overflow:hidden;margin-bottom:80px">
+    <table class="results-table">
+      <thead>
+        <tr>
+          <th>Model</th>
+          <th>Tier</th>
+          <th>Input $/M</th>
+          <th>Output $/M</th>
+          <th>Per call</th>
+          <th>Monthly total</th>
+          <th class="cost-bar-cell"></th>
+          <th>vs cheapest</th>
+          <th>Context</th>
+        </tr>
+      </thead>
+      <tbody id="results-body"></tbody>
+    </table>
+  </div>
+
+</div>
+</div>
+
+<footer>
+  <a href="/">Vantage AI</a>
+  <div style="display:flex;gap:24px"><a href="/docs.html">Docs</a><a href="/calculator.html">Calculator</a><a href="/app.html">Dashboard</a></div>
+  <span>© 2026 Vantage AI</span>
+</footer>
+
+<script>
+// ── Pricing DB ────────────────────────────────────────────────────────────────
+const MODELS = [
+  {provider:"openai",  model:"gpt-4o",              input:2.50,  output:10.00, context:128,  tier:"frontier"},
+  {provider:"openai",  model:"gpt-4o-mini",          input:0.15,  output:0.60,  context:128,  tier:"fast"},
+  {provider:"openai",  model:"o1",                   input:15.00, output:60.00, context:200,  tier:"frontier"},
+  {provider:"openai",  model:"o3-mini",              input:1.10,  output:4.40,  context:200,  tier:"mid"},
+  {provider:"openai",  model:"gpt-3.5-turbo",        input:0.50,  output:1.50,  context:16,   tier:"fast"},
+  {provider:"anthropic",model:"claude-opus-4-6",     input:15.00, output:75.00, context:200,  tier:"frontier"},
+  {provider:"anthropic",model:"claude-sonnet-4-6",   input:3.00,  output:15.00, context:200,  tier:"mid"},
+  {provider:"anthropic",model:"claude-haiku-4-5",    input:0.80,  output:4.00,  context:200,  tier:"fast"},
+  {provider:"anthropic",model:"claude-3-5-sonnet",   input:3.00,  output:15.00, context:200,  tier:"mid"},
+  {provider:"anthropic",model:"claude-3-haiku",      input:0.25,  output:1.25,  context:200,  tier:"fast"},
+  {provider:"google",  model:"gemini-1.5-pro",       input:1.25,  output:5.00,  context:1000, tier:"frontier"},
+  {provider:"google",  model:"gemini-1.5-flash",     input:0.075, output:0.30,  context:1000, tier:"fast"},
+  {provider:"google",  model:"gemini-2.0-flash",     input:0.10,  output:0.40,  context:1000, tier:"fast"},
+  {provider:"google",  model:"gemini-1.5-flash-8b",  input:0.0375,output:0.15,  context:1000, tier:"fast"},
+  {provider:"mistral", model:"mistral-large-latest", input:2.00,  output:6.00,  context:131,  tier:"frontier"},
+  {provider:"mistral", model:"mistral-small-latest", input:0.10,  output:0.30,  context:131,  tier:"fast"},
+  {provider:"meta",    model:"llama-3.3-70b",        input:0.23,  output:0.40,  context:128,  tier:"mid"},
+  {provider:"meta",    model:"llama-3.1-8b",         input:0.05,  output:0.08,  context:128,  tier:"fast"},
+  {provider:"meta",    model:"llama-3.1-405b",       input:3.00,  output:3.00,  context:128,  tier:"frontier"},
+];
+
+const PROVIDER_COLORS = {openai:"#74aa9c",anthropic:"#d97757",google:"#4285f4",mistral:"#f97316",meta:"#0866ff"};
+const TIER_TAGS = {frontier:"frontier",mid:"mid",fast:"fast & cheap"};
+
+let activeFilter = "all";
+
+function fmt(n) {
+  if(n>=1e6) return "$"+(n/1e6).toFixed(2)+"M";
+  if(n>=1000) return "$"+(n/1000).toFixed(2)+"K";
+  if(n>=1) return "$"+n.toFixed(2);
+  if(n>=0.01) return "$"+n.toFixed(4);
+  return "$"+n.toFixed(6);
+}
+function fmtTokens(n) {
+  if(n>=1e6) return (n/1e6).toFixed(1)+"M";
+  if(n>=1000) return (n/1000).toFixed(0)+"K";
+  return n.toString();
+}
+
+function calcCost(m, p, c) {
+  return (p/1e6)*m.input + (c/1e6)*m.output;
+}
+
+const profiles = {
+  hobby:      {prompt:1000,  completion:300,  requests:500},
+  startup:    {prompt:5000,  completion:1000, requests:5000},
+  growth:     {prompt:10000, completion:2000, requests:10000},
+  scale:      {prompt:50000, completion:5000, requests:100000},
+  enterprise: {prompt:200000,completion:20000,requests:1000000},
+};
+
+function setProfile(name) {
+  const p = profiles[name];
+  document.getElementById("slider-prompt").value = p.prompt;
+  document.getElementById("slider-completion").value = p.completion;
+  document.getElementById("slider-requests").value = p.requests;
+  document.querySelectorAll(".scale-btn").forEach(b=>b.classList.remove("active"));
+  event.target.classList.add("active");
+  update();
+}
+
+function setFilter(f, btn) {
+  activeFilter = f;
+  document.querySelectorAll(".filter-btn").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
+  update();
+}
+
+function update() {
+  const prompt      = +document.getElementById("slider-prompt").value;
+  const completion  = +document.getElementById("slider-completion").value;
+  const requests    = +document.getElementById("slider-requests").value;
+
+  document.getElementById("val-prompt").textContent     = fmtTokens(prompt);
+  document.getElementById("val-completion").textContent  = fmtTokens(completion);
+  document.getElementById("val-requests").textContent   = fmtTokens(requests);
+
+  // Filter
+  let models = MODELS.filter(m => {
+    if(activeFilter==="all") return true;
+    if(["frontier","mid","fast"].includes(activeFilter)) return m.tier===activeFilter;
+    return m.provider===activeFilter;
+  });
+
+  // Calculate costs
+  const results = models.map(m => ({
+    ...m,
+    perCall:  calcCost(m, prompt, completion),
+    monthly:  calcCost(m, prompt, completion) * requests,
+  })).sort((a,b)=>a.monthly-b.monthly);
+
+  const cheapest = results[0].monthly;
+  const mostExpensive = results[results.length-1].monthly;
+
+  // Summary cards
+  const bestModel = results[0];
+  const currentModel = results.find(r=>r.model==="gpt-4o") || results[results.length-1];
+  const saving = currentModel.monthly - bestModel.monthly;
+
+  document.getElementById("summary-row").innerHTML = `
+    <div class="sum-card highlight">
+      <div class="sum-label">Cheapest option</div>
+      <div class="sum-val">${fmt(bestModel.monthly)}<span style="font-size:16px;color:var(--muted)">/mo</span></div>
+      <div class="sum-sub">${bestModel.model} · ${fmtTokens(prompt)}→${fmtTokens(completion)} tokens · ${fmtTokens(requests)} calls</div>
+    </div>
+    <div class="sum-card">
+      <div class="sum-label">GPT-4o equivalent</div>
+      <div class="sum-val">${fmt(currentModel.monthly)}<span style="font-size:16px;color:var(--muted)">/mo</span></div>
+      <div class="sum-sub">Most common starting model</div>
+    </div>
+    <div class="sum-card">
+      <div class="sum-label">Potential saving</div>
+      <div class="sum-val" style="color:var(--accent)">${fmt(saving)}<span style="font-size:16px">/mo</span></div>
+      <div class="sum-sub">Switching from GPT-4o → ${bestModel.model}</div>
+    </div>
+  `;
+
+  // Table rows
+  const tbody = document.getElementById("results-body");
+  tbody.innerHTML = results.map((r,i)=>{
+    const barWidth = mostExpensive>0 ? (r.monthly/mostExpensive)*100 : 0;
+    const vsChp = r.monthly-cheapest;
+    const tierTag = r.tier==="frontier"
+      ? `<span class="tag tag-purple">${TIER_TAGS[r.tier]}</span>`
+      : r.tier==="mid"
+      ? `<span class="tag tag-blue">${TIER_TAGS[r.tier]}</span>`
+      : `<span class="tag tag-green">${TIER_TAGS[r.tier]}</span>`;
+
+    return `<tr class="${i===0?'best':''}">
+      <td>
+        <div class="model-cell">
+          ${i===0?'<span style="color:var(--accent);margin-right:4px">★</span>':''}
+          <div>
+            <div style="font-weight:500">${r.model}</div>
+            <div class="model-provider">${r.provider}</div>
+          </div>
+        </div>
+      </td>
+      <td>${tierTag}</td>
+      <td style="font-family:var(--mono)">$${r.input}</td>
+      <td style="font-family:var(--mono)">$${r.output}</td>
+      <td style="font-family:var(--mono)">${fmt(r.perCall)}</td>
+      <td class="cost-cell" style="color:${i===0?'var(--accent)':'var(--text)'}">${fmt(r.monthly)}</td>
+      <td class="cost-bar-cell"><div class="cost-bar-bg"><div class="cost-bar-fill" style="width:${barWidth}%;background:${i===0?'var(--accent)':i<3?'var(--blue)':'var(--dim)'}"></div></div></td>
+      <td class="saving-cell" style="color:${vsChp===0?'var(--accent)':'var(--muted)'}">
+        ${vsChp===0?'cheapest':'+'+fmt(vsChp)}
+      </td>
+      <td style="font-family:var(--mono);color:var(--muted)">${r.context}k</td>
+    </tr>`;
+  }).join("");
+}
+
+// Init
+update();
+</script>
+</body>
+</html>

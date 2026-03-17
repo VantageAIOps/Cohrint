@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Docs — Vantage AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/* vantage-shared.css — loaded by all pages */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080c0f;--bg2:#0d1318;--bg3:#121920;--bg4:#161d25;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+  --text:#e8edf2;--muted:#6b7b8a;--dim:#3a4550;
+  --accent:#00d4a1;--blue:#0098ff;--amber:#f59e0b;--red:#f87171;--purple:#a78bfa;
+  --mono:'DM Mono',monospace;--serif:'Instrument Serif',Georgia,serif;--sans:'DM Sans',sans-serif;
+  --radius:10px;--radius-lg:14px;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.6;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:16px 48px;border-bottom:1px solid var(--border);background:rgba(8,12,15,.9);backdrop-filter:blur(16px)}
+.nav-logo{font-family:var(--mono);font-size:14px;letter-spacing:.08em;display:flex;align-items:center;gap:9px}
+.logo-dot{width:7px;height:7px;background:var(--accent);border-radius:50%;box-shadow:0 0 10px var(--accent);animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.7)}}
+.nav-links{display:flex;align-items:center;gap:28px}
+.nav-links a{font-size:13px;color:var(--muted);transition:color .2s}
+.nav-links a:hover,.nav-links a.active{color:var(--text)}
+.nav-cta{background:var(--accent)!important;color:#000!important;padding:7px 18px;border-radius:6px;font-weight:500!important;font-size:12px!important;transition:opacity .2s!important}
+.nav-cta:hover{opacity:.85!important}
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:11px 24px;border-radius:8px;font-size:13px;font-family:var(--mono);font-weight:500;letter-spacing:.03em;cursor:pointer;border:none;transition:opacity .2s,transform .2s;text-decoration:none}
+.btn:hover{transform:translateY(-1px)}
+.btn-primary{background:var(--accent);color:#000}
+.btn-primary:hover{opacity:.85}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border2)}
+.btn-ghost:hover{color:var(--text);border-color:rgba(255,255,255,.25)}
+/* CARDS */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px}
+.card:hover{border-color:var(--border2)}
+/* PAGE WRAPPER */
+.page{padding-top:80px;min-height:100vh}
+.container{max-width:1100px;margin:0 auto;padding:0 24px}
+/* SECTION */
+.sec-label{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:14px}
+.sec-title{font-family:var(--serif);font-size:clamp(30px,3.5vw,46px);font-weight:400;line-height:1.1;letter-spacing:-.02em}
+.sec-title em{font-style:italic;color:var(--muted)}
+/* CODE */
+pre,code{font-family:var(--mono)}
+.code-block{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:20px 24px;font-size:12px;line-height:1.8;overflow-x:auto}
+.c-comment{color:var(--muted)}.c-keyword{color:#c792ea}.c-string{color:#c3e88d}.c-func{color:var(--accent)}.c-var{color:#82aaff}.c-num{color:var(--amber)}
+/* TAGS */
+.tag{display:inline-flex;align-items:center;font-family:var(--mono);font-size:10px;padding:3px 9px;border-radius:20px;font-weight:500}
+.tag-green{background:rgba(0,212,161,.1);color:var(--accent)}
+.tag-blue{background:rgba(0,152,255,.1);color:var(--blue)}
+.tag-amber{background:rgba(245,158,11,.1);color:var(--amber)}
+.tag-red{background:rgba(248,113,113,.1);color:var(--red)}
+.tag-purple{background:rgba(167,139,250,.1);color:var(--purple)}
+.tag-gray{background:rgba(255,255,255,.06);color:var(--muted)}
+/* FOOTER */
+footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--muted);font-family:var(--mono)}
+footer a{color:var(--muted);transition:color .2s}
+footer a:hover{color:var(--text)}
+@media(max-width:768px){
+  nav{padding:14px 20px}
+  .nav-links{gap:16px}
+  .nav-links a:not(.nav-cta){display:none}
+  footer{flex-direction:column;gap:16px;text-align:center;padding:24px}
+}
+
+</style>
+<style>
+.docs-layout{display:grid;grid-template-columns:240px 1fr;gap:0;min-height:calc(100vh - 53px)}
+.docs-sidebar{background:var(--bg2);border-right:1px solid var(--border);padding:24px 0;position:sticky;top:53px;height:calc(100vh - 53px);overflow-y:auto}
+.docs-nav-sec{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);padding:14px 20px 6px}
+.docs-nav-item{display:block;padding:7px 20px;font-size:13px;color:var(--muted);cursor:pointer;transition:all .15s;border-left:2px solid transparent}
+.docs-nav-item:hover{color:var(--text);background:rgba(255,255,255,.03)}
+.docs-nav-item.active{color:var(--accent);border-left-color:var(--accent);background:rgba(0,212,161,.05)}
+.docs-content{padding:48px 64px;max-width:820px}
+h1{font-family:var(--serif);font-size:42px;font-weight:400;letter-spacing:-.02em;margin-bottom:16px;line-height:1.1}
+h2{font-family:var(--serif);font-size:28px;font-weight:400;letter-spacing:-.01em;margin:48px 0 16px;padding-top:48px;border-top:1px solid var(--border)}
+h2:first-of-type{margin-top:32px;padding-top:0;border-top:none}
+h3{font-size:16px;font-weight:500;margin:28px 0 10px;color:var(--text)}
+p{font-size:14px;color:var(--muted);line-height:1.8;margin-bottom:16px}
+code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:2px 6px;border-radius:4px;color:var(--text)}
+pre{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;padding:20px 24px;font-size:12px;line-height:1.8;overflow-x:auto;margin:16px 0}
+.step-row{display:flex;align-items:flex-start;gap:14px;margin:12px 0}
+.step-num{width:24px;height:24px;border-radius:50%;background:rgba(0,212,161,.1);border:1px solid rgba(0,212,161,.2);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;flex-shrink:0;font-family:var(--mono)}
+.step-body{flex:1;font-size:14px;color:var(--muted);line-height:1.7}
+.info-box{background:rgba(0,152,255,.06);border:1px solid rgba(0,152,255,.15);border-radius:10px;padding:16px 20px;margin:16px 0;font-size:13px;color:var(--muted)}
+.warn-box{background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.15);border-radius:10px;padding:16px 20px;margin:16px 0;font-size:13px;color:var(--muted)}
+.tab-row{display:flex;gap:4px;margin-bottom:-1px;position:relative;z-index:1}
+.tab{font-family:var(--mono);font-size:11px;padding:7px 16px;border-radius:8px 8px 0 0;border:1px solid var(--border);border-bottom:none;cursor:pointer;color:var(--muted);background:var(--bg2);transition:all .15s}
+.tab.active{background:var(--bg3);color:var(--text);border-color:var(--border2)}
+.tab-content{display:none;background:var(--bg3);border:1px solid var(--border2);border-radius:0 12px 12px 12px;padding:20px 24px;font-size:12px;line-height:1.8;overflow-x:auto}
+.tab-content.active{display:block}
+.c-comment{color:var(--muted)}.c-keyword{color:#c792ea}.c-string{color:#c3e88d}.c-func{color:var(--accent)}.c-var{color:#82aaff}.c-num{color:var(--amber)}
+.editor-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:16px 0}
+.editor-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px}
+.editor-name{font-size:13px;font-weight:500;margin-bottom:4px}
+.editor-desc{font-size:12px;color:var(--muted);margin-bottom:10px}
+.api-table{width:100%;border-collapse:collapse;font-size:13px;margin:16px 0}
+.api-table th{font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:8px 12px;text-align:left;border-bottom:1px solid var(--border)}
+.api-table td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+.api-table tr:last-child td{border-bottom:none}
+.api-table code{font-size:11px}
+@media(max-width:768px){.docs-layout{grid-template-columns:1fr}.docs-sidebar{display:none}.docs-content{padding:32px 24px}}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo"><span class="logo-dot"></span>VANTAGE</a>
+  <div class="nav-links">
+    <a href="/calculator.html">Calculator</a>
+    <a href="/app.html">Dashboard</a>
+    <a href="/docs.html" class="active">Docs</a>
+    <a href="/signup.html" class="nav-cta">Start free →</a>
+  </div>
+</nav>
+
+<div class="page" style="padding-top:53px">
+<div class="docs-layout">
+
+  <!-- SIDEBAR -->
+  <div class="docs-sidebar">
+    <div class="docs-nav-sec">Getting started</div>
+    <a class="docs-nav-item active" onclick="show('quickstart',this)">Quickstart</a>
+    <a class="docs-nav-item" onclick="show('install',this)">Installation</a>
+    <a class="docs-nav-item" onclick="show('concepts',this)">Core concepts</a>
+
+    <div class="docs-nav-sec">SDKs</div>
+    <a class="docs-nav-item" onclick="show('python',this)">Python SDK</a>
+    <a class="docs-nav-item" onclick="show('typescript',this)">TypeScript / JS</a>
+
+    <div class="docs-nav-sec">Editor integrations</div>
+    <a class="docs-nav-item" onclick="show('mcp',this)">MCP server</a>
+    <a class="docs-nav-item" onclick="show('cursor',this)">Cursor</a>
+    <a class="docs-nav-item" onclick="show('windsurf',this)">Windsurf</a>
+    <a class="docs-nav-item" onclick="show('claudecode',this)">Claude Code</a>
+    <a class="docs-nav-item" onclick="show('vscode',this)">VS Code</a>
+    <a class="docs-nav-item" onclick="show('zed',this)">Zed / JetBrains</a>
+
+    <div class="docs-nav-sec">Features</div>
+    <a class="docs-nav-item" onclick="show('tagging',this)">Cost attribution tags</a>
+    <a class="docs-nav-item" onclick="show('alerts',this)">Budget alerts</a>
+    <a class="docs-nav-item" onclick="show('clickhouse',this)">ClickHouse setup</a>
+    <a class="docs-nav-item" onclick="show('selfhost',this)">Self-hosting</a>
+
+    <div class="docs-nav-sec">Reference</div>
+    <a class="docs-nav-item" onclick="show('api',this)">REST API</a>
+    <a class="docs-nav-item" onclick="show('mcp-tools',this)">MCP tools</a>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="docs-content" id="docs-content"></div>
+
+</div>
+</div>
+
+<footer>
+  <a href="/">Vantage AI</a>
+  <div style="display:flex;gap:24px"><a href="/docs.html">Docs</a><a href="/calculator.html">Calculator</a></div>
+  <span>© 2026 Vantage AI</span>
+</footer>
+
+<script>
+const DOCS = {
+
+quickstart: `
+<h1>Quickstart</h1>
+<p>Add Vantage to your project in under 2 minutes. No account required to start — the free tier covers 10,000 requests/month.</p>
+
+<div class="step-row"><div class="step-num">1</div><div class="step-body">Install the SDK for your language</div></div>
+<div class="tab-row"><div class="tab active" onclick="switchTab('qs',this,'qs-py')">Python</div><div class="tab" onclick="switchTab('qs',this,'qs-ts')">TypeScript</div></div>
+<div id="qs-py" class="tab-content active"><pre>pip install vantage-ai[openai]       # OpenAI support
+pip install vantage-ai[anthropic]    # Anthropic support
+pip install vantage-ai[all]          # Everything</pre></div>
+<div id="qs-ts" class="tab-content"><pre>npm install vantage-ai               # TypeScript / Node.js</pre></div>
+
+<div class="step-row"><div class="step-num">2</div><div class="step-body">Add two lines to your existing code</div></div>
+<div class="tab-row"><div class="tab active" onclick="switchTab('qs2',this,'qs2-py')">Python</div><div class="tab" onclick="switchTab('qs2',this,'qs2-ts')">TypeScript</div></div>
+<div id="qs2-py" class="tab-content active"><pre><span class="c-comment"># Before</span>
+<span class="c-keyword">from</span> openai <span class="c-keyword">import</span> <span class="c-var">OpenAI</span>
+
+<span class="c-comment"># After — add these 2 lines</span>
+<span class="c-keyword">import</span> vantage
+<span class="c-keyword">from</span> vantage.proxy.openai_proxy <span class="c-keyword">import</span> <span class="c-var">OpenAI</span>
+
+vantage.<span class="c-func">init</span>(<span class="c-var">api_key</span>=<span class="c-string">"vnt_your_key"</span>)
+client = <span class="c-var">OpenAI</span>(<span class="c-var">api_key</span>=<span class="c-string">"sk-..."</span>)   <span class="c-comment"># identical to before</span>
+
+<span class="c-comment"># All your existing calls work unchanged</span>
+response = client.chat.completions.<span class="c-func">create</span>(
+    <span class="c-var">model</span>=<span class="c-string">"gpt-4o"</span>,
+    <span class="c-var">messages</span>=[{<span class="c-string">"role"</span>: <span class="c-string">"user"</span>, <span class="c-string">"content"</span>: <span class="c-string">"Hello!"</span>}]
+)
+<span class="c-comment"># Vantage now logs: tokens, cost, latency, cheapest alternative</span></pre></div>
+<div id="qs2-ts" class="tab-content"><pre><span class="c-comment">// Before</span>
+<span class="c-keyword">import</span> <span class="c-var">OpenAI</span> <span class="c-keyword">from</span> <span class="c-string">"openai"</span>;
+
+<span class="c-comment">// After — add these 2 lines</span>
+<span class="c-keyword">import</span> { <span class="c-func">init</span>, <span class="c-func">createOpenAIProxy</span> } <span class="c-keyword">from</span> <span class="c-string">"vantage-ai"</span>;
+<span class="c-keyword">import</span> <span class="c-var">OpenAI</span> <span class="c-keyword">from</span> <span class="c-string">"openai"</span>;
+
+<span class="c-func">init</span>({ <span class="c-var">apiKey</span>: <span class="c-string">"vnt_your_key"</span> });
+<span class="c-keyword">const</span> openai = <span class="c-func">createOpenAIProxy</span>(<span class="c-keyword">new</span> <span class="c-var">OpenAI</span>());</pre></div>
+
+<div class="step-row"><div class="step-num">3</div><div class="step-body">Get your API key — free, no credit card</div></div>
+<p>Sign up at <a href="/signup.html" style="color:var(--accent)">app.vantage.ai</a> and copy your key from Settings → API Keys. Keys start with <code>vnt_</code>.</p>
+
+<div class="info-box">💡 <strong style="color:var(--text)">No key? No problem.</strong> Vantage silently skips logging if <code>api_key</code> is missing or invalid. Your app won't break — you just won't see data in the dashboard.</div>`,
+
+install: `
+<h1>Installation</h1>
+<h2>Python</h2>
+<p>The Python SDK has zero required dependencies. Provider packages are optional extras.</p>
+<pre>pip install vantage-ai            # core only (no dependencies)
+pip install vantage-ai[openai]    # + OpenAI proxy
+pip install vantage-ai[anthropic] # + Anthropic proxy
+pip install vantage-ai[server]    # + FastAPI ingest server
+pip install vantage-ai[all]       # everything</pre>
+<p>Requires Python 3.10+.</p>
+
+<h2>TypeScript / JavaScript</h2>
+<pre>npm install vantage-ai            # ESM + CJS, works in Node 18+
+# peer deps (install whichever you use)
+npm install openai                # OpenAI proxy
+npm install @anthropic-ai/sdk     # Anthropic proxy</pre>
+
+<h2>MCP server (for editors)</h2>
+<pre>npm install -g vantage-ai-mcp     # global install
+# or run without installing:
+npx vantage-ai-mcp</pre>
+
+<h2>VS Code extension</h2>
+<p>Search <strong>Vantage AI</strong> in the Extensions marketplace, or:</p>
+<pre>code --install-extension vantage-ai.vantage-ai</pre>`,
+
+concepts: `
+<h1>Core concepts</h1>
+<h2>How the proxy works</h2>
+<p>Vantage uses a transparent proxy pattern — it wraps your LLM client and intercepts every API call. Your application code doesn't change. Vantage captures the request, response, and timing, then enqueues the data asynchronously.</p>
+<p>The key design constraint: <strong>zero latency impact</strong>. Events are queued in memory and flushed to the ingest server every 2 seconds by a background thread/timer. Your API calls are never blocked waiting for analytics.</p>
+
+<h2>Event model</h2>
+<p>Every LLM call produces one <code>VantageEvent</code> with these fields:</p>
+<table class="api-table"><thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>provider</code></td><td>string</td><td>openai | anthropic | google | mistral</td></tr>
+<tr><td><code>model</code></td><td>string</td><td>gpt-4o | claude-sonnet-4-6 etc.</td></tr>
+<tr><td><code>prompt_tokens</code></td><td>int</td><td>Input tokens billed</td></tr>
+<tr><td><code>completion_tokens</code></td><td>int</td><td>Output tokens billed</td></tr>
+<tr><td><code>cached_tokens</code></td><td>int</td><td>Tokens served from provider cache</td></tr>
+<tr><td><code>total_cost_usd</code></td><td>float</td><td>Actual cost in USD</td></tr>
+<tr><td><code>latency_ms</code></td><td>float</td><td>Wall-clock time for the API call</td></tr>
+<tr><td><code>cheapest_model</code></td><td>string</td><td>Model that would be cheapest for this usage</td></tr>
+<tr><td><code>potential_saving_usd</code></td><td>float</td><td>Cost delta vs cheapest model</td></tr>
+<tr><td><code>tags</code></td><td>dict</td><td>Your custom metadata (feature, team, user_id…)</td></tr>
+</tbody></table>
+
+<h2>Data flow</h2>
+<pre>Your app → Vantage proxy → async queue → background flush → Ingest API → ClickHouse</pre>`,
+
+python: `
+<h1>Python SDK</h1>
+<h2>OpenAI proxy</h2>
+<pre><span class="c-keyword">import</span> vantage
+<span class="c-keyword">from</span> vantage.proxy.openai_proxy <span class="c-keyword">import</span> <span class="c-var">OpenAI</span>
+
+vantage.<span class="c-func">init</span>(<span class="c-var">api_key</span>=<span class="c-string">"vnt_your_key"</span>, <span class="c-var">environment</span>=<span class="c-string">"production"</span>)
+client = <span class="c-var">OpenAI</span>(<span class="c-var">api_key</span>=<span class="c-string">"sk-..."</span>)
+
+<span class="c-comment"># Non-streaming</span>
+response = client.chat.completions.<span class="c-func">create</span>(
+    <span class="c-var">model</span>=<span class="c-string">"gpt-4o"</span>,
+    <span class="c-var">messages</span>=[{<span class="c-string">"role"</span>: <span class="c-string">"user"</span>, <span class="c-string">"content"</span>: <span class="c-string">"Hello"</span>}]
+)
+
+<span class="c-comment"># Streaming — works identically</span>
+<span class="c-keyword">with</span> client.chat.completions.<span class="c-func">create</span>(<span class="c-var">stream</span>=<span class="c-keyword">True</span>, ...) <span class="c-keyword">as</span> stream:
+    <span class="c-keyword">for</span> chunk <span class="c-keyword">in</span> stream:
+        <span class="c-func">print</span>(chunk.choices[<span class="c-num">0</span>].delta.content, end=<span class="c-string">""</span>)</pre>
+
+<h2>Anthropic proxy</h2>
+<pre><span class="c-keyword">from</span> vantage.proxy.anthropic_proxy <span class="c-keyword">import</span> <span class="c-var">Anthropic</span>
+
+claude = <span class="c-var">Anthropic</span>(<span class="c-var">api_key</span>=<span class="c-string">"sk-ant-..."</span>)
+message = claude.messages.<span class="c-func">create</span>(
+    <span class="c-var">model</span>=<span class="c-string">"claude-sonnet-4-6"</span>, <span class="c-var">max_tokens</span>=<span class="c-num">1024</span>,
+    <span class="c-var">messages</span>=[{<span class="c-string">"role"</span>: <span class="c-string">"user"</span>, <span class="c-string">"content"</span>: <span class="c-string">"Hello"</span>}]
+)</pre>
+
+<h2>init() options</h2>
+<table class="api-table"><thead><tr><th>Parameter</th><th>Default</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>api_key</code></td><td>required</td><td>Your Vantage API key (vnt_…)</td></tr>
+<tr><td><code>environment</code></td><td>"production"</td><td>Tag events: production | staging | development</td></tr>
+<tr><td><code>flush_interval</code></td><td>2.0</td><td>Seconds between background flushes</td></tr>
+<tr><td><code>batch_size</code></td><td>50</td><td>Max events per HTTP request</td></tr>
+<tr><td><code>async_mode</code></td><td>True</td><td>False = flush synchronously (for testing)</td></tr>
+<tr><td><code>debug</code></td><td>False</td><td>Print each event to stdout</td></tr>
+</tbody></table>`,
+
+typescript: `
+<h1>TypeScript / JavaScript SDK</h1>
+<h2>Basic usage</h2>
+<pre><span class="c-keyword">import</span> { <span class="c-func">init</span>, <span class="c-func">createOpenAIProxy</span>, <span class="c-func">createAnthropicProxy</span> } <span class="c-keyword">from</span> <span class="c-string">"vantage-ai"</span>;
+<span class="c-keyword">import</span> <span class="c-var">OpenAI</span> <span class="c-keyword">from</span> <span class="c-string">"openai"</span>;
+<span class="c-keyword">import</span> <span class="c-var">Anthropic</span> <span class="c-keyword">from</span> <span class="c-string">"@anthropic-ai/sdk"</span>;
+
+<span class="c-func">init</span>({
+  <span class="c-var">apiKey</span>: process.env.<span class="c-var">VANTAGE_API_KEY</span>!,
+  <span class="c-var">environment</span>: process.env.<span class="c-var">NODE_ENV</span> ?? <span class="c-string">"development"</span>,
+  <span class="c-var">debug</span>: process.env.<span class="c-var">NODE_ENV</span> !== <span class="c-string">"production"</span>,
+});
+
+<span class="c-keyword">const</span> openai  = <span class="c-func">createOpenAIProxy</span>(<span class="c-keyword">new</span> <span class="c-var">OpenAI</span>());
+<span class="c-keyword">const</span> claude  = <span class="c-func">createAnthropicProxy</span>(<span class="c-keyword">new</span> <span class="c-var">Anthropic</span>());
+
+<span class="c-comment">// Identical API to the original clients</span>
+<span class="c-keyword">const</span> res = <span class="c-keyword">await</span> openai.chat.completions.<span class="c-func">create</span>({ ... });</pre>
+
+<h2>Pricing utilities</h2>
+<pre><span class="c-keyword">import</span> { <span class="c-func">getAllCostsForUsage</span>, <span class="c-func">calculateCost</span> } <span class="c-keyword">from</span> <span class="c-string">"vantage-ai"</span>;
+
+<span class="c-comment">// Compare all models for your usage</span>
+<span class="c-keyword">const</span> results = <span class="c-func">getAllCostsForUsage</span>(<span class="c-num">10000</span>, <span class="c-num">2000</span>);
+results.slice(<span class="c-num">0</span>,<span class="c-num">5</span>).<span class="c-func">forEach</span>(r =>
+  console.<span class="c-func">log</span>(<span class="c-string">\`\${r.model}: $\${r.totalCost.toFixed(4)}\`</span>)
+);</pre>`,
+
+mcp: `
+<h1>MCP Server</h1>
+<p>The Vantage MCP server connects any MCP-compatible AI coding assistant to your live usage data. Once connected, you can ask your AI questions about costs directly in chat.</p>
+
+<h2>Install</h2>
+<pre>npm install -g vantage-ai-mcp</pre>
+
+<h2>Available tools</h2>
+<table class="api-table"><thead><tr><th>Tool</th><th>What it answers</th></tr></thead><tbody>
+<tr><td><code>get_usage_summary</code></td><td>"How much did I spend on AI this week?"</td></tr>
+<tr><td><code>get_cost_breakdown</code></td><td>"Which team / feature is most expensive?"</td></tr>
+<tr><td><code>get_savings_opportunities</code></td><td>"Where can I cut costs without losing quality?"</td></tr>
+<tr><td><code>compare_models</code></td><td>"What's cheapest for 5k in + 1k out tokens?"</td></tr>
+<tr><td><code>get_token_efficiency</code></td><td>"Which prompts are bloated?"</td></tr>
+<tr><td><code>get_budget_status</code></td><td>"Will I blow my AI budget this month?"</td></tr>
+<tr><td><code>get_model_pricing</code></td><td>"What does GPT-4o cost per million tokens?"</td></tr>
+</tbody></table>`,
+
+cursor: `
+<h1>Cursor</h1>
+<h2>Setup (2 minutes)</h2>
+<div class="step-row"><div class="step-num">1</div><div class="step-body">Install the MCP server globally: <code>npm install -g vantage-ai-mcp</code></div></div>
+<div class="step-row"><div class="step-num">2</div><div class="step-body">Create or edit <code>~/.cursor/mcp.json</code>:</div></div>
+<pre>{
+  <span class="c-string">"mcpServers"</span>: {
+    <span class="c-string">"vantage"</span>: {
+      <span class="c-string">"command"</span>: <span class="c-string">"vantage-mcp"</span>,
+      <span class="c-string">"env"</span>: {
+        <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"vnt_your_key"</span>,
+        <span class="c-string">"VANTAGE_ORG_ID"</span>: <span class="c-string">"your_org_id"</span>
+      }
+    }
+  }
+}</pre>
+<div class="step-row"><div class="step-num">3</div><div class="step-body">Restart Cursor. The Vantage tools appear in Cursor's tool list.</div></div>
+<h2>Example prompts</h2>
+<pre><span class="c-comment">In Cursor chat:</span>
+How much have I spent on AI this week?
+Which model is cheapest for my summarisation workflow?
+Show me the requests wasting the most tokens
+What's my projected month-end AI spend?
+Compare GPT-4o vs Gemini Flash for 10k input + 2k output tokens</pre>`,
+
+windsurf: `
+<h1>Windsurf</h1>
+<pre>{
+  <span class="c-string">"mcpServers"</span>: {
+    <span class="c-string">"vantage"</span>: {
+      <span class="c-string">"command"</span>: <span class="c-string">"npx"</span>,
+      <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"vantage-ai-mcp"</span>],
+      <span class="c-string">"env"</span>: {
+        <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"vnt_your_key"</span>,
+        <span class="c-string">"VANTAGE_ORG_ID"</span>: <span class="c-string">"your_org_id"</span>
+      }
+    }
+  }
+}</pre>
+<p>Save to <code>~/.codeium/windsurf/mcp_config.json</code> and restart Windsurf. Cascade will have access to all Vantage tools.</p>`,
+
+claudecode: `
+<h1>Claude Code</h1>
+<p>Claude Code supports MCP natively. Add to your project's <code>.mcp.json</code> (or <code>~/.mcp.json</code> for global):</p>
+<pre>{
+  <span class="c-string">"mcpServers"</span>: {
+    <span class="c-string">"vantage"</span>: {
+      <span class="c-string">"type"</span>: <span class="c-string">"stdio"</span>,
+      <span class="c-string">"command"</span>: <span class="c-string">"npx"</span>,
+      <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"vantage-ai-mcp"</span>],
+      <span class="c-string">"env"</span>: {
+        <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"vnt_your_key"</span>,
+        <span class="c-string">"VANTAGE_ORG_ID"</span>: <span class="c-string">"your_org_id"</span>
+      }
+    }
+  }
+}</pre>`,
+
+vscode: `
+<h1>VS Code Extension</h1>
+<h2>Install</h2>
+<pre>code --install-extension vantage-ai.vantage-ai</pre>
+<p>Or search <strong>Vantage AI</strong> in the Extensions marketplace.</p>
+<h2>Configure</h2>
+<p>Open Settings (<code>Cmd+,</code>) and search <strong>Vantage</strong>. Add your API key to <code>vantage.apiKey</code>.</p>
+<h2>Features</h2>
+<p>Status bar shows live token count and session cost. The sidebar dashboard (click the Vantage icon in the activity bar) shows your 30-day spend chart, model breakdown, efficiency tips, and active alerts. Use the command palette for quick access: <code>Vantage: Compare Model Prices</code>, <code>Vantage: Open Dashboard</code>.</p>`,
+
+zed: `
+<h1>Zed & JetBrains</h1>
+<h2>Zed</h2>
+<p>Add to <code>~/.config/zed/settings.json</code>:</p>
+<pre>{
+  <span class="c-string">"context_servers"</span>: {
+    <span class="c-string">"vantage"</span>: {
+      <span class="c-string">"command"</span>: { <span class="c-string">"path"</span>: <span class="c-string">"npx"</span>, <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"vantage-ai-mcp"</span>],
+        <span class="c-string">"env"</span>: { <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"vnt_your_key"</span>, <span class="c-string">"VANTAGE_ORG_ID"</span>: <span class="c-string">"your_org"</span> } }
+    }
+  }
+}</pre>
+<h2>JetBrains</h2>
+<p>Settings → Tools → AI Assistant → Model Context Protocol → Add server:</p>
+<p>Command: <code>vantage-mcp</code> · Env: <code>VANTAGE_API_KEY=vnt_your_key</code></p>`,
+
+tagging: `
+<h1>Cost attribution tags</h1>
+<p>Tags let you break down AI costs by any dimension — feature, team, user, experiment, or anything meaningful to your org.</p>
+<div class="tab-row"><div class="tab active" onclick="switchTab('tag',this,'tag-py')">Python</div><div class="tab" onclick="switchTab('tag',this,'tag-ts')">TypeScript</div></div>
+<div id="tag-py" class="tab-content active"><pre><span class="c-comment"># Thread-scoped — applies to all subsequent calls on this thread</span>
+vantage.<span class="c-func">tag</span>(<span class="c-string">"feature"</span>, <span class="c-string">"customer_support"</span>)
+vantage.<span class="c-func">tag</span>(<span class="c-string">"team"</span>, <span class="c-string">"product"</span>)
+vantage.<span class="c-func">tag</span>(<span class="c-string">"user_id"</span>, user.id)
+
+<span class="c-comment"># Context manager for scoped tagging</span>
+<span class="c-keyword">from</span> contextlib <span class="c-keyword">import</span> contextmanager
+
+<span class="c-keyword">@contextmanager</span>
+<span class="c-keyword">def</span> <span class="c-func">vantage_feature</span>(name, **tags):
+    vantage.<span class="c-func">tag</span>(<span class="c-string">"feature"</span>, name)
+    <span class="c-keyword">for</span> k, v <span class="c-keyword">in</span> tags.items(): vantage.<span class="c-func">tag</span>(k, v)
+    <span class="c-keyword">try</span>:
+        <span class="c-keyword">yield</span>
+    <span class="c-keyword">finally</span>:
+        vantage.get_client().<span class="c-func">clear_tags</span>()
+
+<span class="c-keyword">with</span> <span class="c-func">vantage_feature</span>(<span class="c-string">"doc_summary"</span>, team=<span class="c-string">"content"</span>):
+    response = client.chat.completions.<span class="c-func">create</span>(...)</pre></div>
+<div id="tag-ts" class="tab-content"><pre><span class="c-keyword">import</span> { <span class="c-func">tag</span>, <span class="c-func">getClient</span> } <span class="c-keyword">from</span> <span class="c-string">"vantage-ai"</span>;
+
+<span class="c-func">tag</span>(<span class="c-string">"feature"</span>, <span class="c-string">"chat"</span>);
+<span class="c-func">tag</span>(<span class="c-string">"team"</span>, <span class="c-string">"product"</span>);
+<span class="c-func">tag</span>(<span class="c-string">"user_id"</span>, user.id);
+
+<span class="c-comment">// Clear after the request</span>
+<span class="c-keyword">const</span> response = <span class="c-keyword">await</span> openai.chat.completions.<span class="c-func">create</span>({ ... });
+<span class="c-func">getClient</span>().<span class="c-func">clearTags</span>();</pre></div>`,
+
+alerts: `
+<h1>Budget alerts</h1>
+<h2>Dashboard configuration</h2>
+<p>Configure alerts at <a href="/app.html" style="color:var(--accent)">app.vantage.ai/alerts</a> — no code required. Set thresholds by team, feature, or total org spend.</p>
+<h2>Alert types</h2>
+<table class="api-table"><thead><tr><th>Type</th><th>Triggers when</th></tr></thead><tbody>
+<tr><td>Budget threshold</td><td>MTD spend exceeds X% of set budget</td></tr>
+<tr><td>Anomaly spike</td><td>Usage deviates 2σ from 7-day rolling baseline</td></tr>
+<tr><td>Efficiency drop</td><td>Efficiency score falls below threshold</td></tr>
+<tr><td>Savings opportunity</td><td>Detected saving above $X/month</td></tr>
+</tbody></table>
+<h2>Delivery</h2>
+<p>Alerts deliver via Slack webhook, email, or PagerDuty. Configure in Settings → Notifications.</p>`,
+
+clickhouse: `
+<h1>ClickHouse Cloud setup</h1>
+<p>Vantage uses ClickHouse for time-series storage. The free tier handles early production load.</p>
+<div class="step-row"><div class="step-num">1</div><div class="step-body">Sign up at <a href="https://clickhouse.cloud" style="color:var(--accent)">clickhouse.cloud</a> → New service → Development tier (free)</div></div>
+<div class="step-row"><div class="step-num">2</div><div class="step-body">Note hostname, username (default), password</div></div>
+<div class="step-row"><div class="step-num">3</div><div class="step-body">Create the schema:</div></div>
+<pre><span class="c-keyword">from</span> vantage.storage.clickhouse <span class="c-keyword">import</span> <span class="c-var">ClickHouseStorage</span>
+storage = <span class="c-var">ClickHouseStorage</span>(
+    <span class="c-var">host</span>=<span class="c-string">"your-service.clickhouse.cloud"</span>,
+    <span class="c-var">password</span>=<span class="c-string">"your-password"</span>
+)
+storage.<span class="c-func">create_schema</span>()  <span class="c-comment"># creates table + 2 materialised views</span></pre>`,
+
+selfhost: `
+<h1>Self-hosting</h1>
+<p>Run the full Vantage stack on your own infrastructure. Required for HIPAA/GDPR compliance.</p>
+<h2>Docker Compose (fastest)</h2>
+<pre>git clone https://github.com/vantage-ai/vantage
+cd vantage
+cp .env.example .env    # set CLICKHOUSE_HOST, CLICKHOUSE_PASSWORD
+docker-compose up -d</pre>
+<h2>Point SDK at your server</h2>
+<pre><span class="c-comment"># Python</span>
+vantage.<span class="c-func">init</span>(<span class="c-var">api_key</span>=<span class="c-string">"vnt_local"</span>)  <span class="c-comment"># override INGEST_URL in vantage/client.py</span>
+
+<span class="c-comment">// TypeScript</span>
+<span class="c-func">init</span>({ <span class="c-var">apiKey</span>: <span class="c-string">"vnt_local"</span>, <span class="c-var">ingestUrl</span>: <span class="c-string">"http://localhost:8000/v1/events"</span> });</pre>`,
+
+api: `
+<h1>REST API</h1>
+<h2>Base URL</h2>
+<pre>https://ingest.vantage.ai</pre>
+<h2>Authentication</h2>
+<pre>Authorization: Bearer vnt_your_key
+X-Vantage-Org: your_org_id</pre>
+<h2>POST /v1/events</h2>
+<p>Ingest a batch of events. Called automatically by the SDK — you rarely need this directly.</p>
+<h2>GET /v1/stats/:org_id</h2>
+<p>Returns cost_by_day, cost_by_model, savings_opportunities, mtd totals.</p>
+<pre>GET /v1/stats/acmecorp?days=30</pre>
+<h2>GET /health</h2>
+<p>Returns <code>{"status":"ok","clickhouse":"connected"}</code>.</p>`,
+
+"mcp-tools": `
+<h1>MCP tools reference</h1>
+<table class="api-table"><thead><tr><th>Tool name</th><th>Parameters</th><th>Returns</th></tr></thead><tbody>
+<tr><td><code>get_usage_summary</code></td><td><code>days</code> (1–365, default 30)</td><td>Total spend, tokens, top models</td></tr>
+<tr><td><code>get_cost_breakdown</code></td><td><code>days</code>, <code>groupBy</code> (model|provider|feature|team)</td><td>Cost per group, ranked</td></tr>
+<tr><td><code>get_savings_opportunities</code></td><td><code>days</code></td><td>Model-switch recommendations with savings</td></tr>
+<tr><td><code>compare_models</code></td><td><code>promptTokens</code>, <code>completionTokens</code>, <code>topN</code></td><td>Cost across all models, sorted</td></tr>
+<tr><td><code>get_token_efficiency</code></td><td><code>days</code>, <code>limit</code></td><td>System prompt waste, expensive requests</td></tr>
+<tr><td><code>get_budget_status</code></td><td>none</td><td>MTD spend, daily rate, projected total</td></tr>
+<tr><td><code>get_model_pricing</code></td><td><code>model</code> (optional)</td><td>Live prices for one model or all</td></tr>
+</tbody></table>`
+};
+
+function switchTab(group, el, targetId) {
+  document.querySelectorAll(`[id^="${group}-"]`).forEach(t => {
+    if(t.classList.contains("tab-content")) t.classList.remove("active");
+  });
+  document.querySelectorAll(".tab-row .tab").forEach(t => {
+    if(t.getAttribute("onclick")?.includes(`'${group}'`)) t.classList.remove("active");
+  });
+  const target = document.getElementById(targetId);
+  if(target) target.classList.add("active");
+  el.classList.add("active");
+}
+
+function show(id, el) {
+  document.querySelectorAll(".docs-nav-item").forEach(n => n.classList.remove("active"));
+  el.classList.add("active");
+  const content = DOCS[id] || "<p>Coming soon.</p>";
+  document.getElementById("docs-content").innerHTML = content;
+  window.scrollTo(0, 0);
+}
+
+// Init with quickstart
+document.getElementById("docs-content").innerHTML = DOCS.quickstart;
+</script>
+</body>
+</html>

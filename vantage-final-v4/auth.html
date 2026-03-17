@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sign in — Vantage AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js">
+// Show notice if Supabase not configured
+window.addEventListener("DOMContentLoaded", () => {
+  const notConfigured = SUPABASE_URL.startsWith("YOUR_") || (typeof CONFIGURED_CHECK !== "undefined" && !CONFIGURED_CHECK);
+  if (notConfigured) {
+    const notice = document.createElement("div");
+    notice.style.cssText = "background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2);color:#f59e0b;padding:12px 16px;border-radius:9px;font-size:12px;margin-bottom:16px;text-align:center";
+    notice.innerHTML = "&#9888; Demo mode — Supabase not configured. <a href='/app.html' style='color:#f59e0b;text-decoration:underline'>Go to dashboard demo &rarr;</a>";
+    const form = document.getElementById("auth-form");
+    if (form) form.parentNode.insertBefore(notice, form);
+  }
+});
+
+</script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080c0f;--bg2:#0d1318;--bg3:#121920;
+  --b1:rgba(255,255,255,.07);--b2:rgba(255,255,255,.13);--b3:rgba(255,255,255,.2);
+  --tx:#e8edf2;--mu:#6b7b8a;--di:#3a4550;
+  --ac:#00d4a1;--re:#f87171;--am:#f59e0b;--bl:#0098ff;
+  --mono:'DM Mono',monospace;--serif:'Instrument Serif',Georgia,serif;--sans:'DM Sans',sans-serif;
+}
+body{background:var(--bg);color:var(--tx);font-family:var(--sans);min-height:100vh;display:flex;flex-direction:column;overflow-x:hidden}
+
+/* ── Grid bg ── */
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);background-size:60px 60px;mask-image:radial-gradient(ellipse 70% 70% at 50% 40%,black 0%,transparent 80%);pointer-events:none}
+
+/* ── Nav ── */
+nav{padding:18px 40px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--b1);background:rgba(8,12,15,.8);backdrop-filter:blur(16px);position:relative;z-index:10}
+.logo{font-family:var(--mono);font-size:14px;letter-spacing:.08em;display:flex;align-items:center;gap:9px;text-decoration:none;color:var(--tx)}
+.dot{width:7px;height:7px;background:var(--ac);border-radius:50%;box-shadow:0 0 10px var(--ac);animation:pulse 2.4s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.7)}}
+.back-link{font-size:13px;color:var(--mu);text-decoration:none;transition:color .2s}
+.back-link:hover{color:var(--tx)}
+
+/* ── Page ── */
+.page{flex:1;display:flex;align-items:center;justify-content:center;padding:48px 24px;position:relative;z-index:1}
+.glow{position:absolute;top:20%;left:50%;transform:translateX(-50%);width:500px;height:280px;background:radial-gradient(ellipse,rgba(0,212,161,.1) 0%,transparent 70%);pointer-events:none}
+
+/* ── Box ── */
+.box{width:100%;max-width:420px;background:var(--bg2);border:1px solid var(--b2);border-radius:20px;padding:40px;position:relative;z-index:1}
+
+/* ── Mode tabs ── */
+.mode-tabs{display:flex;gap:3px;background:var(--bg3);border-radius:10px;padding:4px;margin-bottom:28px}
+.mode-tab{flex:1;text-align:center;padding:8px 6px;border-radius:7px;font-size:12px;cursor:pointer;font-family:var(--mono);color:var(--mu);transition:all .15s;border:none;background:transparent;white-space:nowrap}
+.mode-tab.active{background:var(--bg2);color:var(--tx);box-shadow:0 1px 4px rgba(0,0,0,.4)}
+
+/* ── Header ── */
+.box-header{text-align:center;margin-bottom:28px}
+.box-header h1{font-family:var(--serif);font-size:28px;font-weight:400;letter-spacing:-.02em;line-height:1.1;margin-bottom:8px}
+.box-header h1 em{font-style:italic;color:var(--ac)}
+.box-header p{font-size:13px;color:var(--mu)}
+
+/* ── Google button ── */
+.google-btn{width:100%;background:var(--bg3);border:1px solid var(--b2);color:var(--tx);padding:12px 16px;border-radius:10px;font-size:14px;font-family:var(--sans);font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:12px;transition:border-color .2s,background .2s;margin-bottom:12px}
+.google-btn:hover{border-color:var(--b3);background:var(--bg)}
+.google-icon{width:20px;height:20px;flex-shrink:0}
+
+/* ── Divider ── */
+.or-divider{display:flex;align-items:center;gap:12px;margin:16px 0;color:var(--di);font-size:12px}
+.or-divider::before,.or-divider::after{content:'';flex:1;height:1px;background:var(--b1)}
+
+/* ── Form ── */
+.field{margin-bottom:16px}
+.field label{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--mu);margin-bottom:7px;display:block}
+.field input{width:100%;background:var(--bg3);border:1px solid var(--b2);color:var(--tx);padding:11px 13px;border-radius:9px;font-size:14px;font-family:var(--sans);outline:none;transition:border-color .2s}
+.field input:focus{border-color:var(--ac)}
+.field input::placeholder{color:var(--di)}
+.field input.err{border-color:var(--re)}
+.forgot{font-size:12px;color:var(--mu);float:right;margin-top:-4px;cursor:pointer;transition:color .2s}
+.forgot:hover{color:var(--ac)}
+
+/* ── Submit ── */
+.submit{width:100%;background:var(--ac);color:#000;border:none;padding:13px;border-radius:9px;font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.04em;cursor:pointer;transition:opacity .2s;margin-top:4px}
+.submit:hover:not(:disabled){opacity:.85}
+.submit:disabled{opacity:.5;cursor:not-allowed}
+
+/* ── Messages ── */
+.msg{border-radius:9px;padding:11px 14px;font-size:13px;margin-bottom:14px;display:none;line-height:1.4}
+.msg.error{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);color:var(--re)}
+.msg.info{background:rgba(0,152,255,.08);border:1px solid rgba(0,152,255,.2);color:var(--bl)}
+.msg.success{background:rgba(0,212,161,.06);border:1px solid rgba(0,212,161,.2);color:var(--ac)}
+
+/* ── Magic link section ── */
+.magic-section{display:none}
+
+/* ── Footer text ── */
+.box-footer{text-align:center;font-size:12px;color:var(--di);margin-top:18px}
+.box-footer a{color:var(--mu);transition:color .2s}
+.box-footer a:hover{color:var(--ac)}
+
+/* ── Social proof ── */
+.social-proof{display:flex;align-items:center;justify-content:center;gap:24px;margin-top:36px;font-size:12px;color:var(--di)}
+.proof-item{display:flex;align-items:center;gap:6px}
+.proof-dot{width:5px;height:5px;border-radius:50%;background:var(--ac)}
+
+/* ── Page footer ── */
+footer{padding:20px 40px;text-align:center;font-size:11px;color:var(--di);font-family:var(--mono);border-top:1px solid var(--b1);position:relative;z-index:1}
+footer a{color:var(--di);transition:color .2s}
+footer a:hover{color:var(--mu)}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="logo"><span class="dot"></span>VANTAGE</a>
+  <a href="/" class="back-link">&#8592; Back to home</a>
+</nav>
+
+<div class="page">
+  <div class="glow"></div>
+
+  <div class="box">
+    <!-- Mode tabs: Sign in / Sign up / Magic link -->
+    <div class="mode-tabs">
+      <button class="mode-tab active" onclick="setMode('signin',this)">Sign in</button>
+      <button class="mode-tab" onclick="setMode('signup',this)">Create account</button>
+      <button class="mode-tab" onclick="setMode('magic',this)">Magic link</button>
+    </div>
+
+    <!-- Header -->
+    <div class="box-header" id="box-header">
+      <h1>Welcome <em>back</em></h1>
+      <p>Sign in to your Vantage dashboard</p>
+    </div>
+
+    <!-- Message area -->
+    <div id="msg" class="msg"></div>
+
+    <!-- Google OAuth -->
+    <button class="google-btn" id="google-btn" onclick="signInWithGoogle()">
+      <svg class="google-icon" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      Continue with Google
+    </button>
+
+    <!-- Email form (signin + signup) -->
+    <div id="email-section">
+      <div class="or-divider">or continue with email</div>
+
+      <form id="auth-form" onsubmit="handleSubmit(event)">
+        <div class="field" id="name-field" style="display:none">
+          <label>Full name</label>
+          <input type="text" id="inp-name" placeholder="Jane Smith" autocomplete="name">
+        </div>
+        <div class="field">
+          <label>Email address</label>
+          <input type="email" id="inp-email" placeholder="you@company.com" required autocomplete="email">
+        </div>
+        <div class="field" id="pass-field">
+          <label>Password <span class="forgot" id="forgot-link" onclick="showForgot()">Forgot password?</span></label>
+          <input type="password" id="inp-pass" placeholder="Min. 8 characters" required minlength="8" autocomplete="current-password">
+        </div>
+        <button type="submit" class="submit" id="submit-btn">Sign in</button>
+      </form>
+    </div>
+
+    <!-- Magic link section -->
+    <div id="magic-section" class="magic-section">
+      <div class="or-divider">passwordless sign in</div>
+      <div class="field">
+        <label>Email address</label>
+        <input type="email" id="magic-email" placeholder="you@company.com" autocomplete="email">
+      </div>
+      <button class="submit" onclick="sendMagicLink()">Send magic link</button>
+    </div>
+
+    <div class="box-footer" id="box-footer">
+      Don't have an account? <a onclick="setMode('signup',document.querySelectorAll('.mode-tab')[1])" style="cursor:pointer;color:var(--ac)">Create one free →</a>
+    </div>
+  </div>
+
+  <div class="social-proof">
+    <div class="proof-item"><div class="proof-dot"></div>Free forever</div>
+    <div class="proof-item"><div class="proof-dot"></div>No credit card</div>
+    <div class="proof-item"><div class="proof-dot"></div>50k MAU free</div>
+  </div>
+</div>
+
+<footer>
+  <a href="/privacy.html">Privacy</a> &nbsp;&middot;&nbsp;
+  <a href="/terms.html">Terms</a> &nbsp;&middot;&nbsp;
+  &copy; 2026 Vantage AI
+</footer>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// CONFIG — replace with your Supabase project values
+// Supabase Dashboard → Project Settings → API
+// ═══════════════════════════════════════════════════════
+const SUPABASE_URL  = "https://oyljzpvwdfktrkeotmon.supabase.co";
+const SUPABASE_ANON = "sb_publishable_ZCgWwpZv5XBR0AjiJ8I9ig_yZ-8XFWN";
+const APP_URL       = window.location.origin + "/app.html";
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// ── Redirect if already logged in ──────────────────────
+// Only redirect if Supabase is actually configured
+const SUPABASE_CONFIGURED = !SUPABASE_URL.startsWith("YOUR_");
+if (SUPABASE_CONFIGURED) {
+  sb.auth.getSession().then(({ data: { session } }) => {
+    if (session) window.location.replace(APP_URL);
+  }).catch(() => {}); // silently fail if not configured
+}
+
+// Listen for auth state (handles magic link callback)
+sb.auth.onAuthStateChange((event, session) => {
+  if (event === "SIGNED_IN" && session) {
+    window.location.replace(APP_URL);
+  }
+});
+
+// ── Mode switching ──────────────────────────────────────
+let mode = "signin";
+
+function setMode(m, el) {
+  mode = m;
+  document.querySelectorAll(".mode-tab").forEach(t => t.classList.remove("active"));
+  el.classList.add("active");
+  clearMsg();
+
+  const emailSec  = document.getElementById("email-section");
+  const magicSec  = document.getElementById("magic-section");
+  const nameField = document.getElementById("name-field");
+  const passFld   = document.getElementById("pass-field");
+  const forgotLnk = document.getElementById("forgot-link");
+  const header    = document.getElementById("box-header");
+  const footer    = document.getElementById("box-footer");
+  const submitBtn = document.getElementById("submit-btn");
+  const passInp   = document.getElementById("inp-pass");
+
+  if (m === "magic") {
+    emailSec.style.display = "none";
+    magicSec.style.display = "block";
+    header.innerHTML = `<h1>Magic <em>link</em></h1><p>We'll email you a sign-in link — no password needed</p>`;
+    footer.style.display = "none";
+    return;
+  }
+
+  emailSec.style.display = "block";
+  magicSec.style.display = "none";
+  footer.style.display = "block";
+
+  if (m === "signup") {
+    nameField.style.display = "block";
+    passFld.style.display = "block";
+    forgotLnk.style.display = "none";
+    passInp.placeholder = "Min. 8 characters";
+    passInp.setAttribute("autocomplete", "new-password");
+    passInp.required = true;
+    submitBtn.textContent = "Create free account";
+    header.innerHTML = `<h1>Get started <em>free</em></h1><p>No credit card · 10,000 requests/month</p>`;
+    footer.innerHTML = `Already have an account? <a onclick="setMode('signin',document.querySelectorAll('.mode-tab')[0])" style="cursor:pointer;color:var(--ac)">Sign in →</a>`;
+  } else {
+    nameField.style.display = "none";
+    passFld.style.display = "block";
+    forgotLnk.style.display = "inline";
+    passInp.placeholder = "Your password";
+    passInp.setAttribute("autocomplete", "current-password");
+    submitBtn.textContent = "Sign in";
+    header.innerHTML = `<h1>Welcome <em>back</em></h1><p>Sign in to your Vantage dashboard</p>`;
+    footer.innerHTML = `Don't have an account? <a onclick="setMode('signup',document.querySelectorAll('.mode-tab')[1])" style="cursor:pointer;color:var(--ac)">Create one free →</a>`;
+  }
+}
+
+// ── Google OAuth ────────────────────────────────────────
+async function signInWithGoogle() {
+  const btn = document.getElementById("google-btn");
+  btn.disabled = true;
+  btn.textContent = "Redirecting to Google...";
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: APP_URL,
+      queryParams: { access_type: "offline", prompt: "consent" }
+    }
+  });
+  if (error) { showMsg(error.message, "error"); btn.disabled = false; btn.innerHTML = googleBtnHTML(); }
+}
+
+function googleBtnHTML() {
+  return `<svg class="google-icon" viewBox="0 0 24 24" width="20" height="20"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Continue with Google`;
+}
+
+// ── Email form submit ───────────────────────────────────
+async function handleSubmit(e) {
+  e.preventDefault();
+  clearMsg();
+  const btn   = document.getElementById("submit-btn");
+  const email = document.getElementById("inp-email").value.trim();
+  const pass  = document.getElementById("inp-pass").value;
+  const name  = document.getElementById("inp-name").value.trim();
+
+  btn.disabled = true;
+  btn.textContent = mode === "signup" ? "Creating account..." : "Signing in...";
+
+  try {
+    if (mode === "signup") {
+      const { data, error } = await sb.auth.signUp({
+        email, password: pass,
+        options: {
+          data: { full_name: name || email.split("@")[0] },
+          emailRedirectTo: APP_URL,
+        }
+      });
+      if (error) throw error;
+      if (data.user && !data.user.confirmed_at) {
+        showMsg(`&#10003; Check your email at <strong>${email}</strong> to confirm your account, then sign in.`, "success");
+      } else if (data.session) {
+        window.location.replace(APP_URL);
+      }
+    } else {
+      const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+      if (error) throw error;
+      window.location.replace(APP_URL);
+    }
+  } catch (err) {
+    showMsg(err.message || "Something went wrong. Please try again.", "error");
+  }
+  btn.disabled = false;
+  btn.textContent = mode === "signup" ? "Create free account" : "Sign in";
+}
+
+// ── Magic link ──────────────────────────────────────────
+async function sendMagicLink() {
+  const email = document.getElementById("magic-email").value.trim();
+  if (!email) return;
+  const { error } = await sb.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: APP_URL }
+  });
+  if (error) showMsg(error.message, "error");
+  else showMsg(`&#10003; Magic link sent to <strong>${email}</strong>. Check your inbox.`, "success");
+}
+
+// ── Forgot password ─────────────────────────────────────
+async function showForgot() {
+  const email = document.getElementById("inp-email").value.trim();
+  if (!email) {
+    showMsg("Enter your email address first, then click Forgot password.", "info");
+    return;
+  }
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + "/reset-password.html"
+  });
+  if (error) showMsg(error.message, "error");
+  else showMsg(`&#10003; Password reset email sent to <strong>${email}</strong>.`, "success");
+}
+
+// ── Utils ───────────────────────────────────────────────
+function showMsg(text, type) {
+  const el = document.getElementById("msg");
+  el.innerHTML = text; el.className = "msg " + type; el.style.display = "block";
+}
+function clearMsg() {
+  const el = document.getElementById("msg"); el.style.display = "none";
+}
+</script>
+</body>
+</html>

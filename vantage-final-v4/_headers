@@ -1,0 +1,10 @@
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+
+/calculator.html
+  Cache-Control: public, max-age=3600
+
+/dashboard.html
+  Cache-Control: public, max-age=3600

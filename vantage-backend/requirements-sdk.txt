@@ -1,0 +1,6 @@
+# Minimal SDK — no heavy deps
+# Install extras as needed:
+#   pip install vantage-ai[openai]
+#   pip install vantage-ai[anthropic]
+#   pip install vantage-ai[litellm]
+#   pip install vantage-ai[all]

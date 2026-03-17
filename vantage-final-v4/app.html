@@ -1,0 +1,1476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data:;">
+<title>Vantage AI — Enterprise Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* ── Reset & Variables ─────────────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080c0f;--bg2:#0d1318;--bg3:#121920;--bg4:#161d25;--bg5:#1a2330;
+  --b1:rgba(255,255,255,.07);--b2:rgba(255,255,255,.12);--b3:rgba(255,255,255,.18);
+  --tx:#e8edf2;--mu:#6b7b8a;--di:#3a4550;
+  --ac:#00d4a1;--bl:#0098ff;--am:#f59e0b;--re:#f87171;--pu:#a78bfa;--or:#f97316;
+  --ac2:rgba(0,212,161,.1);--bl2:rgba(0,152,255,.1);--am2:rgba(245,158,11,.1);--re2:rgba(248,113,113,.1);--pu2:rgba(167,139,250,.1);
+  --mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;
+  --r:8px;--rl:12px;--rxl:16px;
+}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--tx);font-family:var(--sans);font-size:14px;line-height:1.5;display:flex;flex-direction:column}
+a{color:inherit;text-decoration:none}
+button{font-family:var(--sans);cursor:pointer}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--di);border-radius:2px}
+
+/* ── Top bar ───────────────────────────────────────────────────────────── */
+#topbar{height:52px;min-height:52px;background:var(--bg2);border-bottom:1px solid var(--b1);display:flex;align-items:center;padding:0 20px;gap:14px;z-index:50}
+.tb-logo{font-family:var(--mono);font-size:13px;letter-spacing:.08em;display:flex;align-items:center;gap:8px;margin-right:8px}
+.tb-dot{width:7px;height:7px;background:var(--ac);border-radius:50%;box-shadow:0 0 8px var(--ac);animation:pulse 2.4s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.7)}}
+.tb-sep{width:1px;height:24px;background:var(--b1)}
+.tb-org{font-size:12px;color:var(--mu);display:flex;align-items:center;gap:8px}
+.tb-org-badge{background:var(--bg3);border:1px solid var(--b2);border-radius:6px;padding:3px 10px;font-family:var(--mono);font-size:10px}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.tb-period{background:var(--bg3);border:1px solid var(--b2);color:var(--tx);padding:5px 10px;border-radius:var(--r);font-size:12px;font-family:var(--mono);outline:none}
+.tb-btn{background:var(--bg3);border:1px solid var(--b2);color:var(--tx);padding:5px 10px;border-radius:var(--r);font-size:12px;display:flex;align-items:center;gap:5px;transition:border-color .15s}
+.tb-btn:hover{border-color:var(--b3)}
+.tb-notif{position:relative}
+.tb-notif-dot{position:absolute;top:3px;right:3px;width:6px;height:6px;background:var(--re);border-radius:50%}
+.demo-pill{background:var(--ac2);border:1px solid rgba(0,212,161,.2);color:var(--ac);font-family:var(--mono);font-size:10px;padding:3px 10px;border-radius:20px}
+
+/* ── App shell ─────────────────────────────────────────────────────────── */
+#shell{flex:1;display:flex;overflow:hidden}
+#sidebar{width:220px;min-width:220px;background:var(--bg2);border-right:1px solid var(--b1);display:flex;flex-direction:column;overflow-y:auto}
+#main{flex:1;overflow-y:auto;background:var(--bg)}
+
+/* ── Sidebar ───────────────────────────────────────────────────────────── */
+.sb-section{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--di);padding:14px 16px 5px}
+.sb-item{display:flex;align-items:center;gap:9px;padding:8px 12px;margin:1px 8px;border-radius:var(--r);cursor:pointer;font-size:12px;color:var(--mu);transition:all .15s;user-select:none;position:relative;border:none;background:none;width:calc(100% - 16px);text-align:left}
+.sb-item:hover{background:rgba(255,255,255,.04);color:var(--tx)}
+.sb-item.active{background:var(--ac2);color:var(--ac)}
+.sb-item .ico{font-size:14px;width:18px;text-align:center;flex-shrink:0}
+.sb-badge{margin-left:auto;font-family:var(--mono);font-size:9px;padding:1px 6px;border-radius:10px;background:var(--re2);color:var(--re)}
+.sb-bottom{margin-top:auto;padding:12px;border-top:1px solid var(--b1)}
+.sb-user{display:flex;align-items:center;gap:9px;padding:8px;background:var(--bg3);border-radius:var(--r)}
+.sb-avatar{width:26px;height:26px;background:linear-gradient(135deg,var(--ac),var(--bl));border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#000;flex-shrink:0}
+.sb-uname{font-size:12px;font-weight:500}
+.sb-uplan{font-size:9px;color:var(--ac);font-family:var(--mono)}
+
+/* ── View container ────────────────────────────────────────────────────── */
+.view{display:none;padding:24px 28px;animation:fadeIn .2s ease}
+.view.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.view-title{font-size:18px;font-weight:500;margin-bottom:4px}
+.view-sub{font-size:12px;color:var(--mu);margin-bottom:24px}
+
+/* ── Cards ─────────────────────────────────────────────────────────────── */
+.card{background:var(--bg2);border:1px solid var(--b1);border-radius:var(--rl)}
+.card-p{padding:18px 20px}
+.card-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.card-title{font-size:13px;font-weight:500}
+.card-sub{font-size:11px;color:var(--mu)}
+
+/* ── KPI grid ──────────────────────────────────────────────────────────── */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.kpi{background:var(--bg2);border:1px solid var(--b1);border-radius:var(--rl);padding:16px 18px}
+.kpi-lbl{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--mu);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.kpi-val{font-family:var(--mono);font-size:24px;font-weight:500;line-height:1}
+.kpi-ch{font-size:11px;margin-top:5px;display:flex;align-items:center;gap:3px}
+.up{color:var(--re)}.dn{color:var(--ac)}.flat{color:var(--mu)}
+
+/* ── Grid layouts ──────────────────────────────────────────────────────── */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
+.g21{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px}
+.g12{display:grid;grid-template-columns:1fr 2fr;gap:14px;margin-bottom:14px}
+.mb{margin-bottom:14px}
+
+/* ── Tables ────────────────────────────────────────────────────────────── */
+.tbl{width:100%;border-collapse:collapse;font-size:12px}
+.tbl th{font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--mu);padding:8px 12px;text-align:left;border-bottom:1px solid var(--b1);white-space:nowrap}
+.tbl td{padding:10px 12px;border-bottom:1px solid var(--b1);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:rgba(255,255,255,.02)}
+.tbl-wrap{overflow-x:auto}
+
+/* ── Tags & badges ─────────────────────────────────────────────────────── */
+.tag{display:inline-flex;align-items:center;font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:20px;font-weight:500;white-space:nowrap}
+.tag-green{background:var(--ac2);color:var(--ac)}
+.tag-blue{background:var(--bl2);color:var(--bl)}
+.tag-amber{background:var(--am2);color:var(--am)}
+.tag-red{background:var(--re2);color:var(--re)}
+.tag-purple{background:var(--pu2);color:var(--pu)}
+.tag-gray{background:rgba(255,255,255,.06);color:var(--mu)}
+
+/* Provider tags */
+.prov{display:inline-flex;align-items:center;font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:4px}
+.prov-openai{background:rgba(116,170,156,.15);color:#74aa9c}
+.prov-anthropic{background:rgba(217,119,87,.15);color:#d97757}
+.prov-google{background:rgba(66,133,244,.15);color:#4285f4}
+.prov-meta{background:rgba(167,139,250,.15);color:#a78bfa}
+.prov-mistral{background:rgba(249,115,22,.15);color:#f97316}
+.prov-cohere{background:rgba(6,182,212,.15);color:#06b6d4}
+.prov-xai{background:rgba(226,232,240,.1);color:#e2e8f0}
+
+/* ── Mini bars & progress ──────────────────────────────────────────────── */
+.bar-wrap{height:4px;background:var(--bg3);border-radius:2px;overflow:hidden;flex:1}
+.bar-fill{height:100%;border-radius:2px;transition:width .5s ease}
+.score-bar{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px}
+
+/* ── Model row ─────────────────────────────────────────────────────────── */
+.model-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--b1)}
+.model-row:last-child{border-bottom:none}
+.model-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+
+/* ── Alert items ───────────────────────────────────────────────────────── */
+.alert-item{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--b1)}
+.alert-item:last-child{border-bottom:none}
+.alert-ico{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.alert-title{font-size:12px;font-weight:500;margin-bottom:2px}
+.alert-desc{font-size:11px;color:var(--mu);line-height:1.4}
+.alert-time{font-family:var(--mono);font-size:9px;color:var(--di);white-space:nowrap;margin-left:auto}
+
+/* ── Buttons ───────────────────────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--r);font-size:12px;font-family:var(--mono);font-weight:500;cursor:pointer;border:none;transition:opacity .2s}
+.btn-primary{background:var(--ac);color:#000}
+.btn-primary:hover{opacity:.85}
+.btn-ghost{background:var(--bg3);border:1px solid var(--b2);color:var(--tx)}
+.btn-ghost:hover{border-color:var(--b3)}
+.btn-danger{background:var(--re2);border:1px solid rgba(248,113,113,.2);color:var(--re)}
+
+/* ── Misc ──────────────────────────────────────────────────────────────── */
+.mono{font-family:var(--mono)}
+.muted{color:var(--mu)}
+.small{font-size:11px}
+.code-block{background:var(--bg3);border:1px solid var(--b2);border-radius:var(--rl);padding:16px 18px;font-family:var(--mono);font-size:12px;line-height:1.8;overflow-x:auto}
+.c-kw{color:#c792ea}.c-str{color:#c3e88d}.c-fn{color:var(--ac)}.c-cm{color:var(--mu)}.c-num{color:var(--am)}
+.divider{border:none;border-top:1px solid var(--b1);margin:16px 0}
+.info-box{background:var(--bl2);border:1px solid rgba(0,152,255,.15);border-radius:var(--r);padding:12px 14px;font-size:12px;color:var(--mu)}
+.warn-box{background:var(--am2);border:1px solid rgba(245,158,11,.2);border-radius:var(--r);padding:12px 14px;font-size:12px;color:var(--mu)}
+.success-box{background:var(--ac2);border:1px solid rgba(0,212,161,.2);border-radius:var(--r);padding:12px 14px;font-size:12px;color:var(--mu)}
+.efficiency-tip{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--b1);font-size:12px}
+.efficiency-tip:last-child{border-bottom:none}
+.eff-save{font-family:var(--mono);font-size:11px;color:var(--ac);white-space:nowrap;margin-left:auto}
+.section-label{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ac);margin-bottom:10px}
+.toggle{display:flex;gap:3px;background:var(--bg3);border-radius:var(--r);padding:3px}
+.toggle-btn{font-family:var(--mono);font-size:11px;padding:5px 12px;border-radius:6px;border:none;background:transparent;color:var(--mu);cursor:pointer;transition:all .15s}
+.toggle-btn.active{background:var(--bg2);color:var(--tx);box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.score-circle{display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:50%;border:3px solid;font-family:var(--mono);font-size:16px;font-weight:500}
+.input{background:var(--bg3);border:1px solid var(--b2);color:var(--tx);padding:8px 12px;border-radius:var(--r);font-size:13px;font-family:var(--sans);outline:none;transition:border-color .2s;width:100%}
+.input:focus{border-color:var(--ac)}
+.select{background:var(--bg3);border:1px solid var(--b2);color:var(--tx);padding:7px 10px;border-radius:var(--r);font-size:12px;font-family:var(--mono);outline:none}
+.grid-stat{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.grid-stat-card{background:var(--bg3);border-radius:var(--r);padding:12px 14px;text-align:center}
+.grid-stat-val{font-family:var(--mono);font-size:22px;font-weight:500}
+.grid-stat-lbl{font-size:11px;color:var(--mu);margin-top:3px}
+
+/* ── Responsive ────────────────────────────────────────────────────────── */
+@media(max-width:900px){
+  #sidebar{width:54px;min-width:54px}
+  .sb-item span:not(.ico){display:none}
+  .sb-section,.sb-badge,.sb-uname,.sb-uplan{display:none}
+  .kpi-grid{grid-template-columns:repeat(2,1fr)}
+  .g2,.g3,.g21,.g12{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="tb-logo"><span class="tb-dot"></span>VANTAGE</div>
+  <div class="tb-sep"></div>
+  <div class="tb-org">
+    <span class="tb-org-badge">Acme Corp</span>
+    <span class="small muted">TEAM PLAN</span>
+  </div>
+  <div class="demo-pill">LIVE DEMO</div>
+  <div class="tb-right">
+    <select class="tb-period" onchange="setPeriod(this.value)" id="period-sel">
+      <option value="7">Last 7 days</option>
+      <option value="30" selected>Last 30 days</option>
+      <option value="90">Last 90 days</option>
+    </select>
+    <span id="api-status" class="tb-period" style="font-size:11px;padding:5px 10px;">Config: local</span>
+    <button class="tb-btn" onclick="openSettings()">&#9881; Settings</button>
+    <button class="tb-btn tb-notif">&#128276;<div class="tb-notif-dot"></div></button>
+    <a href="/" class="tb-btn" style="color:var(--mu)">&#8592; Home</a>
+      <button class="tb-btn" onclick="showSeedPanel()" title="Load test data" style="color:var(--am)">&#127806; Seed data</button>
+    <div id="user-menu" style="position:relative">
+      <button class="tb-btn" id="user-btn" onclick="toggleUserMenu()" style="gap:8px">
+        <div id="user-avatar" style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,var(--ac),var(--bl));display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#000">?</div>
+        <span id="user-email-short" class="small muted">Account</span>
+      </button>
+      <div id="user-dropdown" style="display:none;position:absolute;right:0;top:calc(100% + 8px);background:var(--bg2);border:1px solid var(--b2);border-radius:12px;padding:8px;min-width:200px;z-index:100;box-shadow:0 8px 32px rgba(0,0,0,.4)">
+        <div id="user-info" style="padding:8px 10px;border-bottom:1px solid var(--b1);margin-bottom:6px">
+          <div style="font-size:12px;font-weight:500" id="user-name">Loading...</div>
+          <div style="font-size:11px;color:var(--mu)" id="user-email-full"></div>
+        </div>
+        <button onclick="goToApp()" style="width:100%;text-align:left;padding:8px 10px;font-size:12px;color:var(--tx);background:transparent;border:none;border-radius:7px;cursor:pointer;display:block;font-family:var(--sans)">&#128202; Dashboard</button>
+        <button onclick="window.location='/docs.html'" style="width:100%;text-align:left;padding:8px 10px;font-size:12px;color:var(--tx);background:transparent;border:none;border-radius:7px;cursor:pointer;display:block;font-family:var(--sans)">&#128196; Docs</button>
+        <hr style="border:none;border-top:1px solid var(--b1);margin:6px 0">
+        <button onclick="signOut()" style="width:100%;text-align:left;padding:8px 10px;font-size:12px;color:var(--re);background:transparent;border:none;border-radius:7px;cursor:pointer;display:block;font-family:var(--sans)">&#8594; Sign out</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- APP SHELL -->
+<div id="shell">
+
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <div class="sb-section">Core</div>
+    <button class="sb-item active" onclick="nav('cost',this)"><span class="ico">&#128176;</span><span>Cost Intelligence</span></button>
+    <button class="sb-item" onclick="nav('tokens',this)"><span class="ico">&#128290;</span><span>Token Analytics</span></button>
+    <button class="sb-item" onclick="nav('models',this)"><span class="ico">&#9878;</span><span>Model Comparison</span></button>
+    <button class="sb-item" onclick="nav('perf',this)"><span class="ico">&#9889;</span><span>Performance & Latency</span></button>
+    <div class="sb-section">Intelligence</div>
+    <button class="sb-item" onclick="nav('quality',this)"><span class="ico">&#127919;</span><span>Quality & Evaluation</span></button>
+    <button class="sb-item" onclick="nav('ai',this)"><span class="ico">&#129504;</span><span>AI Intelligence Layer</span></button>
+    <div class="sb-section">Enterprise</div>
+    <button class="sb-item" onclick="nav('reports',this)"><span class="ico">&#128202;</span><span>Enterprise Reporting</span></button>
+    <button class="sb-item" onclick="nav('security',this)"><span class="ico">&#128274;</span><span>Security & Governance</span></button>
+    <div class="sb-section">Platform</div>
+    <button class="sb-item" onclick="nav('devx',this)"><span class="ico">&#128295;</span><span>Developer Experience</span><span class="sb-badge">3</span></button>
+    <div class="sb-bottom">
+      <div class="sb-user">
+        <div class="sb-avatar">AC</div>
+        <div><div class="sb-uname">Admin User</div><div class="sb-uplan">TEAM PLAN</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div id="main">
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         MODULE 1 — COST INTELLIGENCE
+    ═══════════════════════════════════════════════════════════════════════ -->
+    <div class="view active" id="view-cost">
+      <div class="view-title">&#128176; Cost Intelligence</div>
+      <div class="view-sub muted">Real-time AI spend tracking across all providers, models, teams and features</div>
+
+      <div class="kpi-grid" id="cost-kpis"></div>
+
+      <div class="g21">
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Daily spend</span><span class="tag tag-green" id="cost-period-tag">30 DAYS</span></div>
+          <canvas id="costChart" height="180"></canvas>
+        </div>
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Cost by model</span></div>
+          <div id="model-cost-rows"></div>
+        </div>
+      </div>
+
+      <div class="g3">
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Cost by team</span></div>
+          <canvas id="teamChart" height="160"></canvas>
+        </div>
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Budget status</span><span class="tag tag-amber">MTD</span></div>
+          <canvas id="budgetChart" height="110" style="margin-bottom:12px"></canvas>
+          <div id="budget-details"></div>
+        </div>
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Active alerts</span><span class="tag tag-red">3 NEW</span></div>
+          <div id="cost-alerts"></div>
+        </div>
+      </div>
+
+      <div class="card card-p mb">
+        <div class="card-hdr"><span class="card-title">Top expensive requests</span><span class="tag tag-gray">TOP 10</span></div>
+        <div class="tbl-wrap">
+          <table class="tbl" id="expensive-tbl">
+            <thead><tr><th>Time</th><th>Endpoint</th><th>Model</th><th>Tokens in</th><th>Tokens out</th><th>Cost</th><th>Latency</th><th>Team</th></tr></thead>
+            <tbody id="expensive-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         MODULE 2 — TOKEN ANALYTICS
+    ═══════════════════════════════════════════════════════════════════════ -->
+    <div class="view" id="view-tokens">
+      <div class="view-title">&#128290; Token Analytics</div>
+      <div class="view-sub muted">Efficiency analysis — identify waste in system prompts, context windows and caching opportunities</div>
+
+      <div class="kpi-grid">
+        <div class="kpi"><div class="kpi-lbl">Total tokens<span>MTD</span></div><div class="kpi-val" id="tok-total">182M</div><div class="kpi-ch flat">&#8722; steady usage</div></div>
+        <div class="kpi"><div class="kpi-lbl">Efficiency score</div><div class="kpi-val" style="color:var(--ac)" id="tok-eff">74/100</div><div class="kpi-ch dn">&#8679; +6 pts this week</div></div>
+        <div class="kpi"><div class="kpi-lbl">Cache hit rate</div><div class="kpi-val" id="tok-cache">21%</div><div class="kpi-ch flat">Target: 40%+</div></div>
+        <div class="kpi" style="border-color:rgba(248,113,113,.25)"><div class="kpi-lbl">Wasted tokens</div><div class="kpi-val" style="color:var(--re)" id="tok-waste">38M</div><div class="kpi-ch up">&#8679; $1,240/mo excess</div></div>
+      </div>
+
+      <div class="g21">
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Token usage breakdown — daily</span></div>
+          <canvas id="tokenChart" height="200"></canvas>
+        </div>
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">System prompt analysis</span><span class="tag tag-red">ACTION NEEDED</span></div>
+          <div id="prompt-analysis"></div>
+        </div>
+      </div>
+
+      <div class="g2">
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Token efficiency by endpoint</span></div>
+          <canvas id="effEndpointChart" height="180"></canvas>
+        </div>
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Optimization recommendations</span><span class="tag tag-amber">SAVE $1,240/mo</span></div>
+          <div id="opt-tips"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         MODULE 3 — MODEL COMPARISON
+    ═══════════════════════════════════════════════════════════════════════ -->
+    <div class="view" id="view-models">
+      <div class="view-title">&#9878; Model Comparison</div>
+      <div class="view-sub muted">Live pricing across all 23 models — find the optimal model for your exact usage profile</div>
+
+      <div class="g2" style="margin-bottom:20px">
+        <div class="card card-p">
+          <div class="card-title" style="margin-bottom:14px">Usage profile</div>
+          <div class="g2">
+            <div>
+              <div class="small muted" style="margin-bottom:5px">Prompt tokens (per call)</div>
+              <input class="input" type="number" id="cmp-prompt" value="5000" oninput="updateComparison()">
+            </div>
+            <div>
+              <div class="small muted" style="margin-bottom:5px">Completion tokens (per call)</div>
+              <input class="input" type="number" id="cmp-completion" value="1000" oninput="updateComparison()">
+            </div>
+          </div>
+          <div style="margin-top:12px">
+            <div class="small muted" style="margin-bottom:5px">Requests per month</div>
+            <input class="input" type="number" id="cmp-requests" value="10000" oninput="updateComparison()">
+          </div>
+        </div>
+        <div class="card card-p" id="cmp-summary"></div>
+      </div>
+
+      <div class="card mb">
+        <div style="padding:14px 16px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between">
+          <span class="card-title">All models — sorted by monthly cost</span>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost" style="font-size:11px" onclick="filterModels('all')">All</button>
+            <button class="btn btn-ghost" style="font-size:11px" onclick="filterModels('frontier')">Frontier</button>
+            <button class="btn btn-ghost" style="font-size:11px" onclick="filterModels('fast')">Fast</button>
+          </div>
+        </div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>Model</th><th>Provider</th><th>Tier</th><th>Input $/M</th><th>Output $/M</th><th>Cache $/M</th><th>Per call</th><th>Monthly</th><th>vs cheapest</th><th>Context</th></tr></thead>
+            <tbody id="model-cmp-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="g2">
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Cost scatter — quality vs price</span></div>
+          <canvas id="scatterChart" height="200"></canvas>
+        </div>
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Provider breakdown</span></div>
+          <canvas id="providerChart" height="200"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         MODULE 4 — PERFORMANCE & LATENCY
+    ═══════════════════════════════════════════════════════════════════════ -->
+    <div class="view" id="view-perf">
+      <div class="view-title">&#9889; Performance &amp; Latency</div>
+      <div class="view-sub muted">p50/p95/p99 latency, TTFT, error rates and SLA compliance across all models</div>
+
+      <div class="kpi-grid">
+        <div class="kpi"><div class="kpi-lbl">p50 latency</div><div class="kpi-val">843<span style="font-size:13px">ms</span></div><div class="kpi-ch dn">&#8679; Improved 12%</div></div>
+        <div class="kpi"><div class="kpi-lbl">p99 latency</div><div class="kpi-val" style="color:var(--am)">4.2<span style="font-size:13px">s</span></div><div class="kpi-ch up">&#8681; Watch p99 spike</div></div>
+        <div class="kpi"><div class="kpi-lbl">Avg TTFT</div><div class="kpi-val">218<span style="font-size:13px">ms</span></div><div class="kpi-ch dn">&#8679; Improved 8%</div></div>
+        <div class="kpi" style="border-color:rgba(0,212,161,.25)"><div class="kpi-lbl">Error rate</div><div class="kpi-val" style="color:var(--ac)">0.4<span style="font-size:13px">%</span></div><div class="kpi-ch dn">&#8679; Below SLA 1%</div></div>
+      </div>
+
+      <div class="g21">
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Latency percentiles — daily</span></div>
+          <canvas id="latencyChart" height="200"></canvas>
+        </div>
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Latency by model</span></div>
+          <canvas id="modelLatencyChart" height="200"></canvas>
+        </div>
+      </div>
+
+      <div class="g2">
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Error rate over time</span><span class="tag tag-green">SLA: &lt;1%</span></div>
+          <canvas id="errorChart" height="160"></canvas>
+        </div>
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">TTFT distribution</span></div>
+          <canvas id="ttftChart" height="160"></canvas>
+        </div>
+      </div>
+
+      <div class="card card-p mb">
+        <div class="card-hdr"><span class="card-title">SLA compliance by model</span><span class="tag tag-green">All within SLA</span></div>
+        <div id="sla-table-wrap" class="tbl-wrap">
+          <table class="tbl" id="sla-tbl">
+            <thead><tr><th>Model</th><th>p50</th><th>p95</th><th>p99</th><th>Error%</th><th>Requests</th><th>SLA Status</th></tr></thead>
+            <tbody id="sla-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         MODULE 5 — QUALITY & EVALUATION
+    ═══════════════════════════════════════════════════════════════════════ -->
+    <div class="view" id="view-quality">
+      <div class="view-title">&#127919; Quality &amp; Evaluation</div>
+      <div class="view-sub muted">Prompt versioning, A/B testing, side-by-side output comparison and regression tracking</div>
+
+      <div class="kpi-grid">
+        <div class="kpi"><div class="kpi-lbl">Avg quality score</div><div class="kpi-val" style="color:var(--ac)">8.4/10</div><div class="kpi-ch dn">&#8679; +0.3 this week</div></div>
+        <div class="kpi"><div class="kpi-lbl">Active A/B tests</div><div class="kpi-val">3</div><div class="kpi-ch flat">&#9654; Running</div></div>
+        <div class="kpi"><div class="kpi-lbl">Eval datasets</div><div class="kpi-val">12</div><div class="kpi-ch dn">+2 this month</div></div>
+        <div class="kpi" style="border-color:rgba(248,113,113,.25)"><div class="kpi-lbl">Regressions</div><div class="kpi-val" style="color:var(--re)">1</div><div class="kpi-ch up">&#9888; Needs review</div></div>
+      </div>
+
+      <div class="g2">
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Active A/B experiments</span><button class="btn btn-primary" style="font-size:11px">+ New test</button></div>
+          <table class="tbl">
+            <thead><tr><th>Experiment</th><th>Variant A</th><th>Variant B</th><th>Metric</th><th>Status</th><th>Winner</th></tr></thead>
+            <tbody id="ab-body"></tbody>
+          </table>
+        </div>
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Quality scores over time</span></div>
+          <canvas id="qualityChart" height="180"></canvas>
+        </div>
+      </div>
+
+      <div class="card card-p mb">
+        <div class="card-hdr">
+          <span class="card-title">Side-by-side output comparison</span>
+          <div class="toggle"><button class="toggle-btn active" onclick="cmpToggle('cost',this)">By cost</button><button class="toggle-btn" onclick="cmpToggle('quality',this)">By quality</button></div>
+        </div>
+        <div class="g2">
+          <div>
+            <div style="font-family:var(--mono);font-size:10px;color:var(--mu);margin-bottom:8px">CURRENT: GPT-4o • $0.0085/call • Score: 8.2/10</div>
+            <div class="code-block" style="font-size:11px;min-height:120px;line-height:1.7">The quarterly earnings report shows a <span style="background:rgba(0,212,161,.15);border-radius:2px">strong performance</span> across all business units, with revenue growing 23% year-over-year to $4.2B. Operating margins expanded 180bps driven by efficiency initiatives...</div>
+          </div>
+          <div>
+            <div style="font-family:var(--mono);font-size:10px;color:var(--am);margin-bottom:8px">CANDIDATE: Gemini 1.5 Flash • $0.0006/call • Score: 8.0/10</div>
+            <div class="code-block" style="font-size:11px;min-height:120px;line-height:1.7">Quarterly earnings demonstrate <span style="background:rgba(245,158,11,.15);border-radius:2px">robust growth</span> across all divisions, with 23% YoY revenue increase reaching $4.2B. Operating margin improvement of 180bps reflects successful efficiency programs...</div>
+          </div>
+        </div>
+        <div class="info-box" style="margin-top:12px">&#128161; Gemini Flash achieves 97.5% of GPT-4o quality at 7% of the cost for this summarisation task. Estimated monthly saving: <strong style="color:var(--ac)">$680</strong></div>
+      </div>
+
+      <div class="card card-p mb">
+        <div class="card-hdr"><span class="card-title">Eval results — latest run</span><span class="tag tag-gray">12 datasets &bull; 2h ago</span></div>
+        <table class="tbl">
+          <thead><tr><th>Dataset</th><th>Model</th><th>Accuracy</th><th>Coherence</th><th>Factuality</th><th>Avg score</th><th>vs baseline</th></tr></thead>
+          <tbody id="eval-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         MODULE 6 — AI INTELLIGENCE LAYER
+    ═══════════════════════════════════════════════════════════════════════ -->
+    <div class="view" id="view-ai">
+      <div class="view-title">&#129504; AI Intelligence Layer</div>
+      <div class="view-sub muted">The moat — auto model router, prompt optimizer agent, and intelligent cost autopilot</div>
+
+      <div class="kpi-grid">
+        <div class="kpi"><div class="kpi-lbl">Router savings</div><div class="kpi-val" style="color:var(--ac)">$2,840</div><div class="kpi-ch dn">saved this month</div></div>
+        <div class="kpi"><div class="kpi-lbl">Routes optimized</div><div class="kpi-val">64%</div><div class="kpi-ch dn">of all requests</div></div>
+        <div class="kpi"><div class="kpi-lbl">Prompt compress</div><div class="kpi-val">28%</div><div class="kpi-ch dn">avg token reduction</div></div>
+        <div class="kpi"><div class="kpi-lbl">Quality maintained</div><div class="kpi-val" style="color:var(--ac)">99.1%</div><div class="kpi-ch flat">vs baseline</div></div>
+      </div>
+
+      <div class="g2">
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">&#128259; Auto model router</span><span class="tag tag-green">ACTIVE</span></div>
+          <div class="info-box mb" style="margin-bottom:14px">The router automatically selects the cheapest model that meets your quality threshold per request type.</div>
+          <div id="router-rules"></div>
+          <div style="margin-top:14px;display:flex;gap:8px">
+            <button class="btn btn-primary" style="font-size:11px">+ Add route rule</button>
+            <button class="btn btn-ghost" style="font-size:11px">&#128202; View routing log</button>
+          </div>
+        </div>
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Router decisions — last 7 days</span></div>
+          <canvas id="routerChart" height="200"></canvas>
+        </div>
+      </div>
+
+      <div class="g2">
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">&#129302; Prompt optimizer agent</span><span class="tag tag-amber">BETA</span></div>
+          <div class="warn-box" style="margin-bottom:14px">AI-powered prompt compression — maintains semantic meaning while reducing token count by 20-35%.</div>
+          <div id="optimizer-results"></div>
+        </div>
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">&#128196; Smart caching recommendations</span></div>
+          <div id="cache-recs"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         MODULE 7 — ENTERPRISE REPORTING
+    ═══════════════════════════════════════════════════════════════════════ -->
+    <div class="view" id="view-reports">
+      <div class="view-title">&#128202; Enterprise Reporting</div>
+      <div class="view-sub muted">CFO-ready dashboards, departmental chargeback and automated executive summaries</div>
+
+      <div class="g3">
+        <div class="kpi"><div class="kpi-lbl">Total AI spend YTD</div><div class="kpi-val mono">$38.4K</div><div class="kpi-ch flat">Q1 2026</div></div>
+        <div class="kpi"><div class="kpi-lbl">Budget remaining</div><div class="kpi-val mono" style="color:var(--am)">$21.6K</div><div class="kpi-ch flat">of $60K annual</div></div>
+        <div class="kpi"><div class="kpi-lbl">Cost per request</div><div class="kpi-val mono">$0.048</div><div class="kpi-ch dn">&#8679; 14% more efficient</div></div>
+      </div>
+
+      <div class="g21">
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Monthly spend — YTD</span></div>
+          <canvas id="ytdChart" height="200"></canvas>
+        </div>
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">ROI metrics</span></div>
+          <div id="roi-metrics"></div>
+        </div>
+      </div>
+
+      <div class="card card-p mb">
+        <div class="card-hdr">
+          <span class="card-title">Departmental chargeback report</span>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost" style="font-size:11px">&#128196; Export CSV</button>
+            <button class="btn btn-ghost" style="font-size:11px">&#128247; Export PDF</button>
+          </div>
+        </div>
+        <table class="tbl">
+          <thead><tr><th>Department</th><th>MTD Spend</th><th>Requests</th><th>Top model</th><th>Cost/request</th><th>Efficiency</th><th>Budget %</th><th>YoY</th></tr></thead>
+          <tbody id="chargeback-body"></tbody>
+        </table>
+      </div>
+
+      <div class="card card-p mb">
+        <div class="card-hdr"><span class="card-title">Scheduled reports</span><button class="btn btn-primary" style="font-size:11px">+ New report</button></div>
+        <div id="scheduled-reports"></div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         MODULE 8 — SECURITY & GOVERNANCE
+    ═══════════════════════════════════════════════════════════════════════ -->
+    <div class="view" id="view-security">
+      <div class="view-title">&#128274; Security &amp; Governance</div>
+      <div class="view-sub muted">API key management, audit logs, RBAC, data retention and compliance controls</div>
+
+      <div class="g3">
+        <div class="kpi"><div class="kpi-lbl">Active API keys</div><div class="kpi-val">7</div><div class="kpi-ch flat">3 teams</div></div>
+        <div class="kpi"><div class="kpi-lbl">Audit events today</div><div class="kpi-val">284</div><div class="kpi-ch flat">All normal</div></div>
+        <div class="kpi"><div class="kpi-lbl">Compliance</div><div class="kpi-val" style="color:var(--ac)">100%</div><div class="kpi-ch dn">SOC2 compliant</div></div>
+      </div>
+
+      <div class="g2">
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">API keys</span><button class="btn btn-primary" style="font-size:11px">+ Generate key</button></div>
+          <table class="tbl">
+            <thead><tr><th>Key</th><th>Name</th><th>Org</th><th>Created</th><th>Last used</th><th>Status</th><th></th></tr></thead>
+            <tbody id="keys-body"></tbody>
+          </table>
+        </div>
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Role-based access control</span></div>
+          <table class="tbl">
+            <thead><tr><th>User</th><th>Role</th><th>Can view</th><th>Can export</th><th>Can configure</th></tr></thead>
+            <tbody id="rbac-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card card-p mb">
+        <div class="card-hdr"><span class="card-title">Audit log</span><span class="tag tag-gray">Last 24h</span></div>
+        <table class="tbl">
+          <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Resource</th><th>IP address</th><th>Status</th></tr></thead>
+          <tbody id="audit-body"></tbody>
+        </table>
+      </div>
+
+      <div class="g2">
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Data retention policy</span></div>
+          <div id="retention-settings"></div>
+        </div>
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Compliance status</span></div>
+          <div id="compliance-status"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         MODULE 9 — DEVELOPER EXPERIENCE
+    ═══════════════════════════════════════════════════════════════════════ -->
+    <div class="view" id="view-devx">
+      <div class="view-title">&#128295; Developer Experience</div>
+      <div class="view-sub muted">SDK setup, integration health, API explorer, webhook config and debug tools</div>
+
+      <div class="g3">
+        <div class="kpi"><div class="kpi-lbl">SDK integrations</div><div class="kpi-val">4</div><div class="kpi-ch flat">Python, TS, Go, Ruby</div></div>
+        <div class="kpi"><div class="kpi-lbl">Webhook endpoints</div><div class="kpi-val">3</div><div class="kpi-ch dn">All healthy</div></div>
+        <div class="kpi" style="border-color:rgba(248,113,113,.25)"><div class="kpi-lbl">Failing webhooks</div><div class="kpi-val" style="color:var(--re)">1</div><div class="kpi-ch up">&#9888; Needs fix</div></div>
+      </div>
+
+      <div class="g2">
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Quickstart — Python</span><div class="toggle"><button class="toggle-btn active" onclick="sdkTab('py',this)">Python</button><button class="toggle-btn" onclick="sdkTab('ts',this)">TypeScript</button><button class="toggle-btn" onclick="sdkTab('curl',this)">cURL</button></div></div>
+          <div id="sdk-py" class="code-block" style="font-size:11px">
+<span class="c-cm"># Install</span>
+pip install vantage-ai[openai]
+
+<span class="c-cm"># Usage — 2 line change</span>
+<span class="c-kw">import</span> vantage
+<span class="c-kw">from</span> vantage.proxy.openai_proxy <span class="c-kw">import</span> OpenAI
+
+vantage.<span class="c-fn">init</span>(<span class="c-str">"vnt_acme_xxxxxxxxxxxx"</span>)
+client = <span class="c-fn">OpenAI</span>(api_key=<span class="c-str">"sk-..."</span>)
+
+<span class="c-cm"># Identical API — Vantage wraps transparently</span>
+response = client.chat.completions.<span class="c-fn">create</span>(
+    model=<span class="c-str">"gpt-4o"</span>,
+    messages=[{<span class="c-str">"role"</span>: <span class="c-str">"user"</span>, <span class="c-str">"content"</span>: <span class="c-str">"Hello"</span>}]
+)
+<span class="c-cm"># ✓ Cost: $0.000110 | Tokens: 12+8 | Latency: 423ms</span></div>
+          <div id="sdk-ts" class="code-block" style="display:none;font-size:11px">
+<span class="c-cm">// Install</span>
+npm install vantage-ai openai
+
+<span class="c-cm">// Usage</span>
+<span class="c-kw">import</span> { init, createOpenAIProxy } <span class="c-kw">from</span> <span class="c-str">"vantage-ai"</span>;
+<span class="c-kw">import</span> OpenAI <span class="c-kw">from</span> <span class="c-str">"openai"</span>;
+
+<span class="c-fn">init</span>({ apiKey: <span class="c-str">"vnt_acme_xxxxxxxxxxxx"</span> });
+<span class="c-kw">const</span> openai = <span class="c-fn">createOpenAIProxy</span>(<span class="c-kw">new</span> <span class="c-fn">OpenAI</span>());
+
+<span class="c-kw">const</span> res = <span class="c-kw">await</span> openai.chat.completions.<span class="c-fn">create</span>({ ... });</div>
+          <div id="sdk-curl" class="code-block" style="display:none;font-size:11px">
+<span class="c-cm"># Ingest events directly</span>
+curl -X POST https://ingest.vantage.ai/v1/events \
+  -H <span class="c-str">"Authorization: Bearer vnt_acme_xxx"</span> \
+  -H <span class="c-str">"Content-Type: application/json"</span> \
+  -d <span class="c-str">'{"events": [...]}'</span></div>
+        </div>
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Integration health</span></div>
+          <div id="integration-health"></div>
+        </div>
+      </div>
+
+      <div class="g2">
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Webhook configuration</span><button class="btn btn-primary" style="font-size:11px">+ Add webhook</button></div>
+          <table class="tbl">
+            <thead><tr><th>Endpoint URL</th><th>Events</th><th>Last delivery</th><th>Status</th><th></th></tr></thead>
+            <tbody id="webhook-body"></tbody>
+          </table>
+        </div>
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Live event stream</span><span class="tag tag-green" id="stream-status">LIVE</span></div>
+          <div id="event-stream" style="font-family:var(--mono);font-size:11px;height:220px;overflow-y:auto;background:var(--bg3);border-radius:var(--r);padding:10px;line-height:1.9"></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /shell -->
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="seed-data.js"></script>
+<script src="vantage-models.js"></script>
+<script>
+/* ════════════════════════════════════════════════════════════════════════════
+   DATA LAYER — Synthetic but realistic demo data
+═══════════════════════════════════════════════════════════════════════════ */
+const TEAMS = ["Product","Engineering","Content","Data","Growth"];
+const ENDPOINTS = ["/chat/complete","/summarize","/classify","/embed","/analyze","/generate","/translate","/extract"];
+const DEMO_MODELS = [
+  {name:"gpt-4o",         provider:"openai",    color:"#74aa9c", cost:2840, pct:39, p50:843,  p95:1820, p99:3200, err:0.3},
+  {name:"claude-sonnet-4-6",provider:"anthropic",color:"#d97757",cost:1120, pct:20, p50:920,  p95:1940, p99:3400, err:0.2},
+  {name:"gemini-2.0-flash",provider:"google",   color:"#4285f4", cost:580,  pct:16, p50:480,  p95:1100, p99:2100, err:0.4},
+  {name:"gpt-4o-mini",    provider:"openai",    color:"#a8cdc4", cost:420,  pct:12, p50:620,  p95:1400, p99:2600, err:0.5},
+  {name:"llama-3.3-70b",  provider:"meta",      color:"#a78bfa", cost:281,  pct:8,  p50:540,  p95:1200, p99:2200, err:0.6},
+  {name:"claude-haiku-4-5",provider:"anthropic",color:"#e8b4a0",cost:180,  pct:5,  p50:380,  p95:850,  p99:1600, err:0.3},
+];
+
+let period = 30;
+let charts = {};
+
+/**
+ * Backend integration helpers
+ * - config is stored in localStorage and/or query params
+ * - API key is passed as Bearer token (or X-API-Key in future)
+ */
+function parseOrgFromKey(key){
+  if(!key) return "";
+  const m = key.match(/^vnt_([^_]+)_/);
+  return m ? m[1] : "";
+}
+function getConfig(){
+  const params = new URLSearchParams(window.location.search);
+  const apiBase = (params.get("api_base") || localStorage.getItem("vantage_api_base") || "https://vantage-ingest.onrender.com").replace(/\/+$/g, "");
+  const apiKey  = params.get("api_key") || localStorage.getItem("vantage_api_key") || "";
+  const org     = params.get("org") || localStorage.getItem("vantage_org") || parseOrgFromKey(apiKey) || "acme";
+  return {apiBase, apiKey, org};
+}
+function saveConfig({apiBase, apiKey, org}){
+  localStorage.setItem("vantage_api_base", apiBase);
+  localStorage.setItem("vantage_api_key", apiKey);
+  localStorage.setItem("vantage_org", org);
+}
+async function apiFetch(path, opts={}){
+  const {apiBase, apiKey} = getConfig();
+  const headers = {"Content-Type":"application/json", ...opts.headers};
+  if(apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+  const res = await fetch(`${apiBase}${path}`, {...opts, headers});
+  if(!res.ok) throw new Error(`API request failed ${res.status} ${res.statusText}`);
+  return res.json();
+}
+async function loadKpis(org, days){
+  try{ return await apiFetch(`/v1/kpis/${encodeURIComponent(org)}?days=${days}`); }
+  catch(e){ console.warn("Failed to fetch KPIs", e); return null; }
+}
+async function loadTimeseries(org, days){
+  try{ return await apiFetch(`/v1/timeseries/${encodeURIComponent(org)}?days=${days}`); }
+  catch(e){ console.warn("Failed to fetch timeseries", e); return null; }
+}
+
+function updateStatus(){
+  const cfg = getConfig();
+  const el = document.getElementById("api-status");
+  if(!el) return;
+  const keyState = cfg.apiKey ? "connected" : "no API key";
+  el.textContent = `API: ${cfg.apiBase} (${keyState})`;
+}
+
+function openSettings(){
+  const cfg = getConfig();
+  const apiBase = prompt("Backend API base URL:", cfg.apiBase) || cfg.apiBase;
+  const apiKey = prompt("Vantage API key (vnt_...):", cfg.apiKey) || cfg.apiKey;
+  const org = prompt("Org ID (used in /v1/kpis/:org):", cfg.org) || cfg.org;
+  saveConfig({apiBase, apiKey, org});
+  updateStatus();
+  alert("Settings saved. Reload the page for best results.");
+}
+
+function rnd(min,max){return Math.random()*(max-min)+min}
+function ri(min,max){return Math.floor(rnd(min,max))}
+function fmt(n){if(n>=1e6)return"$"+(n/1e6).toFixed(2)+"M";if(n>=1000)return"$"+(n/1000).toFixed(1)+"K";if(n>=1)return"$"+n.toFixed(2);if(n>=.01)return"$"+n.toFixed(4);return"$"+n.toFixed(6)}
+function fmtNum(n){if(n>=1e9)return(n/1e9).toFixed(1)+"B";if(n>=1e6)return(n/1e6).toFixed(1)+"M";if(n>=1000)return(n/1000).toFixed(0)+"K";return n.toString()}
+function mult(){return period===7?.25:period===90?3:1}
+
+const days30 = Array.from({length:30},(_,i)=>{const d=new Date();d.setDate(d.getDate()-29+i);return d.toLocaleDateString('en',{month:'short',day:'numeric'})});
+function daysSlice(){return days30.slice(-period)}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   NAV
+═══════════════════════════════════════════════════════════════════════════ */
+function nav(id, el) {
+  document.querySelectorAll(".sb-item").forEach(b=>b.classList.remove("active"));
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+  el.classList.add("active");
+  document.getElementById("view-"+id).classList.add("active");
+  // Lazy init charts for that view
+  if(!window["init_"+id]) return;
+  if(!window["inited_"+id]){window["init_"+id]();window["inited_"+id]=true;}
+}
+
+function setPeriod(v){
+  period=+v;
+  document.getElementById("cost-period-tag").textContent=v+" DAYS";
+  rebuildAll();
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   CHART HELPERS
+═══════════════════════════════════════════════════════════════════════════ */
+const CHART_DEFAULTS = {
+  responsive:true,
+  plugins:{legend:{display:false},tooltip:{backgroundColor:"#161d25",titleColor:"#e8edf2",bodyColor:"#6b7b8a",borderColor:"rgba(255,255,255,.1)",borderWidth:1}},
+  scales:{x:{display:false},y:{display:false,beginAtZero:true}},
+};
+function mkChart(id,type,data,opts={}){
+  const el=document.getElementById(id);if(!el)return null;
+  if(charts[id])charts[id].destroy();
+  charts[id]=new Chart(el,{type,data,options:{...CHART_DEFAULTS,...opts}});
+  return charts[id];
+}
+function lineDs(data,color,fill=false){return{data,borderColor:color,backgroundColor:color.replace(")",",0.15)").replace("rgb","rgba"),fill,tension:.4,borderWidth:2,pointRadius:0}}
+function barDs(data,color){return{data,backgroundColor:data.map((_,i)=>i===data.length-1?color:color.replace(")",",0.25)").replace("rgb","rgba")),borderRadius:3}}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MODULE 1 — COST INTELLIGENCE
+═══════════════════════════════════════════════════════════════════════════ */
+async function init_cost(){
+  const cfg = getConfig();
+  const kpis = await loadKpis(cfg.org, period);
+  const ts = (await loadTimeseries(cfg.org, period))?.series || [];
+
+  const spend = kpis?.total_cost_usd ?? (4821*mult()).toFixed(0);
+  const tokens = kpis?.total_tokens ?? Math.round(182*mult());
+  const efficiency = kpis?.efficiency_score ?? 74;
+  const potential = kpis?.potential_savings_usd ?? (1240*mult()).toFixed(0);
+  const diff = kpis?.cost_change_pct ?? 12;
+  const diffDir = diff > 0 ? "up" : diff < 0 ? "dn" : "flat";
+  const diffText = `${Math.abs(diff)}% vs prev`;
+
+  document.getElementById("cost-kpis").innerHTML=`
+    <div class="kpi"><div class="kpi-lbl">MTD Spend<span class="tag tag-gray" style="font-size:9px">PERIOD</span></div><div class="kpi-val">$${spend}</div><div class="kpi-ch ${diffDir}">${diffDir==="up"?"&#8679;":"&#8681;"} ${diffText}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Tokens used</div><div class="kpi-val">${fmtNum(tokens)}</div><div class="kpi-ch dn">&#8681; eff +8%</div></div>
+    <div class="kpi"><div class="kpi-lbl">Efficiency score</div><div class="kpi-val" style="color:var(--ac)">${efficiency}/100</div><div class="kpi-ch dn">&#8679; +6 pts</div></div>
+    <div class="kpi" style="border-color:rgba(245,158,11,.3)"><div class="kpi-lbl">Potential savings</div><div class="kpi-val" style="color:var(--am)">$${potential}</div><div class="kpi-ch flat">switch 2 workflows</div></div>`;
+
+  // Spend chart
+  const labels = ts.length ? ts.map(r => r.date) : daysSlice();
+  const spendData = ts.length ? ts.map(r => r.cost_usd) : Array.from({length:period},(_,i)=>Math.round((80+i*(period===7?45:12)+rnd(-30,50))*mult()));
+  mkChart("costChart","bar",{labels, datasets:[barDs(spendData,"rgb(0,212,161)")]});
+
+  // Model cost rows
+  document.getElementById("model-cost-rows").innerHTML=DEMO_MODELS.map(m=>`
+    <div class="model-row">
+      <div class="model-dot" style="background:${m.color}"></div>
+      <div style="flex:1;font-size:12px">${m.name}</div>
+      <div class="bar-wrap"><div class="bar-fill" style="width:${m.pct}%;background:${m.color}40;border-right:2px solid ${m.color}"></div></div>
+      <div class="mono" style="font-size:11px;min-width:54px;text-align:right">$${(m.cost*mult()).toFixed(0)}</div>
+      <div class="mono muted" style="font-size:10px;min-width:30px;text-align:right">${m.pct}%</div>
+    </div>`).join("");
+
+  // Team chart
+  const teamData=[32,28,18,12,10].map(v=>Math.round(v*48.21*mult()/100));
+  mkChart("teamChart","doughnut",{labels:TEAMS,datasets:[{data:teamData,backgroundColor:["#0098ff","#00d4a1","#f59e0b","#a78bfa","#f87171"],borderWidth:0}]},{plugins:{legend:{display:true,position:"right",labels:{color:"#6b7b8a",font:{size:11},boxWidth:10}}}});
+
+  // Budget donut
+  const pct=Math.min(100,+spend/6000*100);
+  mkChart("budgetChart","doughnut",{datasets:[{data:[pct,100-pct],backgroundColor:[pct>85?"#f87171":pct>60?"#f59e0b":"#00d4a1","rgba(255,255,255,.04)"],borderWidth:0}]},{cutout:"82%",plugins:{legend:{display:false},tooltip:{enabled:false}}});
+  document.getElementById("budget-details").innerHTML=`
+    <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--mu)">
+      <span>Spent: $${spend}</span><span>Budget: $6,000</span>
+    </div>
+    <div class="small muted" style="margin-top:6px">${(100-pct).toFixed(0)}% remaining &bull; Resets in ${30-(new Date().getDate())} days</div>`;
+
+  // Alerts
+  document.getElementById("cost-alerts").innerHTML=`
+    <div class="alert-item"><div class="alert-ico" style="background:var(--re2)">&#128679;</div><div><div class="alert-title">/analytics budget at 90%</div><div class="alert-desc">$1,800 of $2,000 used</div></div><div class="alert-time">2m</div></div>
+    <div class="alert-item"><div class="alert-ico" style="background:var(--am2)">&#9889;</div><div><div class="alert-title">Token spike — GPT-4o</div><div class="alert-desc">3× above baseline, 14:22 UTC</div></div><div class="alert-time">18m</div></div>
+    <div class="alert-item"><div class="alert-ico" style="background:var(--ac2)">&#128161;</div><div><div class="alert-title">Savings opportunity</div><div class="alert-desc">Switch /embed &#8594; save $680/mo</div></div><div class="alert-time">1h</div></div>`;
+
+  // Expensive requests table
+  document.getElementById("expensive-body").innerHTML=Array.from({length:10},(_,i)=>{
+    const m=DEMO_MODELS[i%DEMO_MODELS.length];
+    const ti=ri(500,8000),to=ri(200,2000);
+    const cost=((ti*.0000025)+(to*.00001)).toFixed(5);
+    const lat=ri(400,3000);
+    return`<tr>
+      <td class="mono muted">${ri(1,60)}m ago</td>
+      <td class="mono">${ENDPOINTS[i%ENDPOINTS.length]}</td>
+      <td><span class="prov prov-${m.provider}">${m.name}</span></td>
+      <td class="mono">${ti.toLocaleString()}</td>
+      <td class="mono">${to.toLocaleString()}</td>
+      <td class="mono" style="color:var(--am)">$${cost}</td>
+      <td class="mono">${lat}ms</td>
+      <td><span class="tag tag-gray">${TEAMS[i%TEAMS.length]}</span></td>
+    </tr>`;}).join("");
+}
+window.init_cost=init_cost;
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MODULE 2 — TOKEN ANALYTICS
+═══════════════════════════════════════════════════════════════════════════ */
+window.init_tokens=function(){
+  document.getElementById("tok-total").textContent=fmtNum(Math.round(182e6*mult()));
+  document.getElementById("tok-eff").textContent="74/100";
+  document.getElementById("tok-cache").textContent=Math.round(21)+'%';
+  document.getElementById("tok-waste").textContent=fmtNum(Math.round(38e6*mult()));
+
+  const lbl=daysSlice();
+  const p=Array.from({length:period},()=>ri(4,9)*mult());
+  const c=Array.from({length:period},()=>ri(1,3)*mult());
+  const ca=Array.from({length:period},()=>ri(0,2)*mult());
+  mkChart("tokenChart","bar",{labels:lbl,datasets:[
+    {label:"Prompt",data:p,backgroundColor:"rgba(0,152,255,.45)",stack:"s"},
+    {label:"Completion",data:c,backgroundColor:"rgba(0,212,161,.5)",stack:"s"},
+    {label:"Cached",data:ca,backgroundColor:"rgba(167,139,250,.4)",stack:"s"},
+  ]},{plugins:{legend:{display:true,labels:{color:"#6b7b8a",font:{size:11},boxWidth:10}}},scales:{x:{display:false},y:{display:false}}});
+
+  // System prompt analysis
+  document.getElementById("prompt-analysis").innerHTML=`
+    ${[{ep:"/chat",toks:2400,pct:68,color:"var(--re)"},{ep:"/analyze",toks:1820,pct:52,color:"var(--am)"},{ep:"/summarize",toks:980,pct:28,color:"var(--ac)"},{ep:"/classify",toks:420,pct:12,color:"var(--ac)"}].map(r=>`
+    <div class="model-row">
+      <div style="font-size:12px;width:90px;font-family:var(--mono)">${r.ep}</div>
+      <div class="bar-wrap"><div class="bar-fill" style="width:${r.pct}%;background:${r.color}40;border-right:2px solid ${r.color}"></div></div>
+      <div class="mono" style="font-size:11px;min-width:54px;text-align:right;color:${r.color}">${r.toks.toLocaleString()} tok</div>
+      <div class="mono muted" style="font-size:10px;min-width:30px;text-align:right">${r.pct}%</div>
+    </div>`).join("")}
+    <div class="warn-box" style="margin-top:12px">&#9888; <strong>/chat</strong> system prompt is 2,400 tokens — recommended &lt;500 tokens for this use case</div>`;
+
+  mkChart("effEndpointChart","bar",{labels:ENDPOINTS,datasets:[{data:[58,42,71,88,65,79,82,74],backgroundColor:[58,42,71,88,65,79,82,74].map(v=>v>=75?"rgba(0,212,161,.5)":v>=55?"rgba(245,158,11,.5)":"rgba(248,113,113,.5)"),borderRadius:4}]},{indexAxis:"y",scales:{x:{max:100,ticks:{color:"#6b7b8a",font:{size:10}}},y:{ticks:{color:"#e8edf2",font:{size:11}}}}});
+
+  document.getElementById("opt-tips").innerHTML=`
+    <div class="efficiency-tip"><span>&#128308;</span><span style="flex:1">Trim <strong>/chat</strong> system prompt from 2,400 → 500 tokens. Enable caching.</span><span class="eff-save">-$${(340*mult()).toFixed(0)}/mo</span></div>
+    <div class="efficiency-tip"><span>&#128992;</span><span style="flex:1">Switch <strong>/summarize</strong> to Gemini Flash — same quality at 40× less cost</span><span class="eff-save">-$${(680*mult()).toFixed(0)}/mo</span></div>
+    <div class="efficiency-tip"><span>&#128993;</span><span style="flex:1">Cache <strong>/classify</strong> — identical 500-token context repeated 12k times/mo</span><span class="eff-save">-$${(220*mult()).toFixed(0)}/mo</span></div>
+    <div class="success-box" style="margin-top:12px">Total recoverable: <strong style="color:var(--ac)">$${(1240*mult()).toFixed(0)}/month</strong> (${Math.round(1240/4821*100)}% of current spend)</div>`;
+};
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MODULE 3 — MODEL COMPARISON
+═══════════════════════════════════════════════════════════════════════════ */
+function updateComparison(){
+  const p=+document.getElementById("cmp-prompt").value||5000;
+  const c=+document.getElementById("cmp-completion").value||1000;
+  const r=+document.getElementById("cmp-requests").value||10000;
+
+  const results=VANTAGE_MODELS.map(m=>{
+    const perCall=(p/1e6)*m.input+(c/1e6)*m.output;
+    const monthly=perCall*r;
+    return{...m,perCall,monthly};
+  }).sort((a,b)=>a.monthly-b.monthly);
+
+  const cheapest=results[0];
+  const gpt4o=results.find(x=>x.name==="gpt-4o")||results[results.length-1];
+  const saving=gpt4o.monthly-cheapest.monthly;
+
+  document.getElementById("cmp-summary").innerHTML=`
+    <div class="card-title" style="margin-bottom:16px">Summary</div>
+    <div class="grid-stat">
+      <div class="grid-stat-card"><div class="grid-stat-val" style="color:var(--ac)">${fmt(cheapest.monthly)}</div><div class="grid-stat-lbl">Cheapest option/mo</div></div>
+      <div class="grid-stat-card"><div class="grid-stat-val">${fmt(gpt4o.monthly)}</div><div class="grid-stat-lbl">GPT-4o equiv/mo</div></div>
+      <div class="grid-stat-card"><div class="grid-stat-val" style="color:var(--am)">${fmt(saving)}</div><div class="grid-stat-lbl">Max saving/mo</div></div>
+    </div>
+    <div class="info-box"><strong style="color:var(--tx)">Best value:</strong> ${cheapest.label} (${cheapest.provider}) at ${fmt(cheapest.perCall)}/call<br>Switching from GPT-4o saves <strong style="color:var(--ac)">${fmt(saving)}/month</strong></div>`;
+
+  document.getElementById("model-cmp-body").innerHTML=results.map((m,i)=>{
+    const vs=m.monthly-cheapest.monthly;
+    const pr=PROVIDER_META?PROVIDER_META[m.provider]:{color:"#888",bg:"rgba(128,128,128,.15)"};
+    return`<tr style="${i===0?'background:rgba(0,212,161,.04)':''}">
+      <td style="font-weight:${i===0?'500':'400'}">${i===0?'★ ':''}${m.label}</td>
+      <td><span class="prov prov-${m.provider}">${m.provider}</span></td>
+      <td><span class="tag ${m.tier==='frontier'?'tag-purple':m.tier==='mid'?'tag-blue':'tag-green'}">${m.tier}</span></td>
+      <td class="mono">$${m.input}</td><td class="mono">$${m.output}</td>
+      <td class="mono muted">${m.cacheRead>0?'$'+m.cacheRead:'—'}</td>
+      <td class="mono">${fmt(m.perCall)}</td>
+      <td class="mono" style="color:${i===0?'var(--ac)':'var(--tx)'};font-weight:${i===0?'500':'400'}">${fmt(m.monthly)}</td>
+      <td class="mono" style="color:${vs===0?'var(--ac)':'var(--mu)'}">${vs===0?'cheapest':'+'+fmt(vs)}</td>
+      <td class="mono muted">${m.context}k</td>
+    </tr>`;}).join("");
+}
+window.init_models=function(){
+  updateComparison();
+  // Scatter: quality vs cost (simulated)
+  const scatterData=VANTAGE_MODELS.slice(0,12).map(m=>({x:rnd(5,9.5),y:((+m.input+m.output)/2),label:m.label}));
+  mkChart("scatterChart","scatter",{datasets:[{data:scatterData,backgroundColor:"rgba(0,212,161,.5)",borderColor:"var(--ac)",pointRadius:6}]},{scales:{x:{title:{display:true,text:"Quality score",color:"#6b7b8a"},ticks:{color:"#6b7b8a"},grid:{color:"rgba(255,255,255,.05)"}},y:{title:{display:true,text:"Avg $/M tokens",color:"#6b7b8a"},ticks:{color:"#6b7b8a"},grid:{color:"rgba(255,255,255,.05)"}}}});
+
+  const provCounts={};VANTAGE_MODELS.forEach(m=>{provCounts[m.provider]=(provCounts[m.provider]||0)+1});
+  mkChart("providerChart","doughnut",{labels:Object.keys(provCounts),datasets:[{data:Object.values(provCounts),backgroundColor:Object.keys(provCounts).map(p=>PROVIDER_META?PROVIDER_META[p]?.color||"#888":"#888"),borderWidth:0}]},{plugins:{legend:{display:true,position:"right",labels:{color:"#6b7b8a",font:{size:11},boxWidth:10}}}});
+};
+window.filterModels=function(tier){
+  document.getElementById("model-cmp-body").querySelectorAll("tr").forEach(r=>{
+    r.style.display=tier==="all"||r.querySelector(".tag")?.textContent===tier?"":"none";
+  });
+};
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MODULE 4 — PERFORMANCE & LATENCY
+═══════════════════════════════════════════════════════════════════════════ */
+window.init_perf=function(){
+  const lbl=daysSlice();
+  const p50=Array.from({length:period},()=>ri(600,1100));
+  const p95=Array.from({length:period},()=>ri(1400,2500));
+  const p99=Array.from({length:period},()=>ri(2800,5000));
+  mkChart("latencyChart","line",{labels:lbl,datasets:[lineDs(p50,"rgb(0,212,161)"),lineDs(p95,"rgb(245,158,11)"),lineDs(p99,"rgb(248,113,113)")]},{plugins:{legend:{display:true,labels:{color:"#6b7b8a",font:{size:11}}}},scales:{x:{display:false},y:{display:false}}});
+
+  mkChart("modelLatencyChart","bar",{labels:DEMO_MODELS.map(m=>m.name.split("-").slice(-1)[0]),datasets:[
+    {label:"p50",data:DEMO_MODELS.map(m=>m.p50),backgroundColor:"rgba(0,212,161,.5)",borderRadius:3},
+    {label:"p95",data:DEMO_MODELS.map(m=>m.p95),backgroundColor:"rgba(245,158,11,.5)",borderRadius:3},
+    {label:"p99",data:DEMO_MODELS.map(m=>m.p99),backgroundColor:"rgba(248,113,113,.5)",borderRadius:3},
+  ]},{plugins:{legend:{display:true,labels:{color:"#6b7b8a",font:{size:11}}}},scales:{x:{ticks:{color:"#6b7b8a",font:{size:9}}},y:{display:false}}});
+
+  const errData=Array.from({length:period},()=>rnd(.1,1.2));
+  mkChart("errorChart","line",{labels:lbl,datasets:[lineDs(errData,"rgb(248,113,113)")]});
+  mkChart("ttftChart","bar",{labels:["<100ms","100-300ms","300-600ms","600ms-1s",">1s"],datasets:[barDs([5,32,45,14,4],"rgb(0,152,255)")]});
+
+  document.getElementById("sla-body").innerHTML=DEMO_MODELS.map(m=>`<tr>
+    <td><span class="prov prov-${m.provider}">${m.name}</span></td>
+    <td class="mono">${m.p50}ms</td><td class="mono">${m.p95}ms</td><td class="mono">${m.p99}ms</td>
+    <td class="mono ${m.err>0.8?'':''}">${m.err}%</td>
+    <td class="mono">${fmtNum(ri(5000,50000))}</td>
+    <td><span class="tag tag-green">&#10003; Within SLA</span></td>
+  </tr>`).join("");
+};
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MODULE 5 — QUALITY & EVALUATION
+═══════════════════════════════════════════════════════════════════════════ */
+window.init_quality=function(){
+  document.getElementById("ab-body").innerHTML=[
+    {name:"Prompt v12 vs v11",a:"GPT-4o",b:"Claude Sonnet",metric:"Quality score",status:"Running",winner:"—"},
+    {name:"Gemini vs GPT-4o",a:"Gemini Pro",b:"GPT-4o",metric:"Cost efficiency",status:"Complete",winner:"Gemini Pro ✓"},
+    {name:"Haiku vs Sonnet",a:"Claude Haiku",b:"Claude Sonnet",metric:"Speed + quality",status:"Running",winner:"—"},
+  ].map(r=>`<tr>
+    <td>${r.name}</td><td><span class="prov prov-openai">${r.a}</span></td><td><span class="prov prov-anthropic">${r.b}</span></td>
+    <td class="muted small">${r.metric}</td>
+    <td><span class="tag ${r.status==='Running'?'tag-green':'tag-gray'}">${r.status}</span></td>
+    <td class="mono ${r.winner!=='—'?'':'muted'}" style="font-size:11px">${r.winner}</td>
+  </tr>`).join("");
+
+  mkChart("qualityChart","line",{labels:daysSlice(),datasets:[
+    lineDs(Array.from({length:period},()=>rnd(7.8,9.2)),"rgb(0,212,161)"),
+    lineDs(Array.from({length:period},()=>rnd(7.4,8.8)),"rgb(0,152,255)"),
+  ]},{plugins:{legend:{display:false}},scales:{x:{display:false},y:{min:6,max:10,ticks:{color:"#6b7b8a",font:{size:10}},grid:{color:"rgba(255,255,255,.04)"}}}});
+
+  const EVALS=["Customer support","Code review","Summarisation","Classification","Translation","RAG Q&A"];
+  document.getElementById("eval-body").innerHTML=EVALS.map(e=>{
+    const [a,b,c]=[rnd(7.5,9.8),rnd(7.5,9.8),rnd(7.5,9.8)];
+    const avg=((a+b+c)/3).toFixed(1);
+    const delta=(rnd(-.5,.5)).toFixed(2);
+    return`<tr>
+      <td>${e}</td>
+      <td><span class="prov prov-openai">gpt-4o</span></td>
+      <td><div class="score-bar"><div class="bar-wrap"><div class="bar-fill" style="width:${a/10*100}%;background:var(--ac)"></div></div><span class="mono" style="font-size:10px">${a.toFixed(1)}</span></div></td>
+      <td><div class="score-bar"><div class="bar-wrap"><div class="bar-fill" style="width:${b/10*100}%;background:var(--bl)"></div></div><span class="mono" style="font-size:10px">${b.toFixed(1)}</span></div></td>
+      <td><div class="score-bar"><div class="bar-wrap"><div class="bar-fill" style="width:${c/10*100}%;background:var(--pu)"></div></div><span class="mono" style="font-size:10px">${c.toFixed(1)}</span></div></td>
+      <td class="mono" style="color:var(--ac)">${avg}</td>
+      <td class="mono" style="color:${+delta>0?'var(--ac)':'var(--re)'};font-size:11px">${+delta>0?'+':''}${delta}</td>
+    </tr>`;}).join("");
+};
+window.cmpToggle=function(_,el){document.querySelectorAll(".toggle-btn").forEach(b=>b.classList.remove("active"));el.classList.add("active")};
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MODULE 6 — AI INTELLIGENCE LAYER
+═══════════════════════════════════════════════════════════════════════════ */
+window.init_ai=function(){
+  document.getElementById("router-rules").innerHTML=[
+    {endpoint:"/summarize",condition:"tokens < 2000",route:"Gemini Flash",saving:"94%"},
+    {endpoint:"/classify",condition:"all requests",route:"Claude Haiku",saving:"88%"},
+    {endpoint:"/chat",condition:"quality > 8.5 required",route:"GPT-4o",saving:"0%"},
+    {endpoint:"/embed",condition:"all requests",route:"text-embedding-3-small",saving:"72%"},
+  ].map(r=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--b1);font-size:12px">
+      <span class="mono" style="min-width:100px;color:var(--bl)">${r.endpoint}</span>
+      <span class="muted" style="flex:1">${r.condition}</span>
+      <span class="tag tag-green">&#8594; ${r.route}</span>
+      <span class="mono" style="color:var(--ac);min-width:40px;text-align:right">${r.saving}</span>
+    </div>`).join("");
+
+  mkChart("routerChart","line",{labels:daysSlice(),datasets:[
+    lineDs(Array.from({length:period},()=>ri(50,80)),"rgb(0,212,161)",true),
+    lineDs(Array.from({length:period},()=>ri(20,50)),"rgb(0,152,255)",true),
+  ]},{scales:{x:{display:false},y:{display:false,beginAtZero:true}}});
+
+  document.getElementById("optimizer-results").innerHTML=[
+    {endpoint:"/chat",before:2400,after:720,saving:"70%"},
+    {endpoint:"/analyze",before:1820,after:480,saving:"74%"},
+    {endpoint:"/summarize",before:980,after:340,saving:"65%"},
+  ].map(r=>`
+    <div style="padding:10px 0;border-bottom:1px solid var(--b1)">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+        <span class="mono" style="color:var(--bl)">${r.endpoint}</span>
+        <span class="tag tag-green">&#8595; ${r.saving} tokens</span>
+      </div>
+      <div style="display:flex;gap:10px;font-size:11px;color:var(--mu)">
+        <span>Before: <strong style="color:var(--re)">${r.before} tok</strong></span>
+        <span>After: <strong style="color:var(--ac)">${r.after} tok</strong></span>
+      </div>
+    </div>`).join("");
+
+  document.getElementById("cache-recs").innerHTML=[
+    {endpoint:"/classify",hitRate:0,potential:89,saving:220},
+    {endpoint:"/embed",hitRate:12,potential:71,saving:180},
+    {endpoint:"/chat",hitRate:21,potential:45,saving:340},
+  ].map(r=>`
+    <div style="padding:10px 0;border-bottom:1px solid var(--b1)">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+        <span class="mono" style="color:var(--bl)">${r.endpoint}</span>
+        <span class="eff-save">$${r.saving}/mo</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:11px">
+        <span class="muted">Current:</span><div class="bar-wrap" style="width:60px"><div class="bar-fill" style="width:${r.hitRate}%;background:var(--mu)"></div></div>
+        <span class="mono">${r.hitRate}%</span>
+        <span class="muted">Potential:</span><div class="bar-wrap" style="width:60px"><div class="bar-fill" style="width:${r.potential}%;background:var(--ac)"></div></div>
+        <span class="mono" style="color:var(--ac)">${r.potential}%</span>
+      </div>
+    </div>`).join("");
+};
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MODULE 7 — ENTERPRISE REPORTING
+═══════════════════════════════════════════════════════════════════════════ */
+window.init_reports=function(){
+  const months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].slice(0,new Date().getMonth()+1);
+  const ytdData=months.map((_,i)=>ri(8000,18000));
+  mkChart("ytdChart","bar",{labels:months,datasets:[barDs(ytdData,"rgb(0,212,161)")]},{scales:{x:{ticks:{color:"#6b7b8a"}},y:{display:false,beginAtZero:true}}});
+
+  document.getElementById("roi-metrics").innerHTML=[
+    {label:"Cost per 1K tokens","value":"$0.048","trend":"dn","chg":"-14%"},
+    {label:"Requests automated","value":"284K","trend":"dn","chg":"+22%"},
+    {label:"Eng hours saved/mo","value":"420h","trend":"dn","chg":"+12%"},
+    {label:"AI ROI multiple","value":"8.4×","trend":"dn","chg":"+1.2×"},
+  ].map(r=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--b1)">
+      <span class="small muted">${r.label}</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="mono" style="font-size:14px;font-weight:500">${r.value}</span>
+        <span class="small dn">${r.chg}</span>
+      </div>
+    </div>`).join("");
+
+  const depts=[
+    {name:"Product",spend:1840,req:42000,model:"gpt-4o",cpr:0.044,eff:78,budget:2500},
+    {name:"Engineering",spend:1350,req:28000,model:"claude-sonnet",cpr:0.048,eff:82,budget:2000},
+    {name:"Content",spend:960,req:22000,model:"gemini-flash",cpr:0.044,eff:65,budget:1200},
+    {name:"Data",spend:580,req:15000,model:"llama-70b",cpr:0.039,eff:88,budget:800},
+    {name:"Growth",spend:280,req:8000,model:"gpt-4o-mini",cpr:0.035,eff:71,budget:500},
+  ];
+  document.getElementById("chargeback-body").innerHTML=depts.map(d=>{
+    const pct=Math.round(d.spend/d.budget*100);
+    return`<tr>
+      <td style="font-weight:500">${d.name}</td>
+      <td class="mono">$${(d.spend*mult()).toFixed(0)}</td>
+      <td class="mono">${fmtNum(d.req)}</td>
+      <td><span class="prov prov-openai">${d.model}</span></td>
+      <td class="mono">$${d.cpr}</td>
+      <td><div class="score-bar"><div class="bar-wrap"><div class="bar-fill" style="width:${d.eff}%;background:${d.eff>75?'var(--ac)':d.eff>55?'var(--am)':'var(--re)'}"></div></div><span class="mono" style="font-size:10px">${d.eff}</span></div></td>
+      <td><div class="score-bar"><div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${pct>85?'var(--re)':pct>60?'var(--am)':'var(--ac)'}"></div></div><span class="mono" style="font-size:10px">${pct}%</span></div></td>
+      <td class="mono small" style="color:var(--ac)">+18% YoY</td>
+    </tr>`;}).join("");
+
+  document.getElementById("scheduled-reports").innerHTML=[
+    {name:"Weekly exec summary",schedule:"Every Mon 9am",last:"Mon Mar 10",format:"PDF"},
+    {name:"Monthly cost report",schedule:"1st of month",last:"Mar 1",format:"PDF+CSV"},
+    {name:"Chargeback report",schedule:"Last Fri of month",last:"Feb 28",format:"CSV"},
+  ].map(r=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--b1)">
+      <div>
+        <div style="font-size:13px;font-weight:500">${r.name}</div>
+        <div class="small muted">${r.schedule} &bull; Last: ${r.last}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="tag tag-gray">${r.format}</span>
+        <button class="btn btn-ghost" style="font-size:11px">Run now</button>
+      </div>
+    </div>`).join("");
+};
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MODULE 8 — SECURITY & GOVERNANCE
+═══════════════════════════════════════════════════════════════════════════ */
+window.init_security=function(){
+  document.getElementById("keys-body").innerHTML=[
+    {key:"vnt_acme_prod_****8f3a",name:"Production",org:"Acme Corp",created:"2026-01-15",last:"2m ago",status:"active"},
+    {key:"vnt_acme_stag_****2b9c",name:"Staging",org:"Acme Corp",created:"2026-02-01",last:"1h ago",status:"active"},
+    {key:"vnt_acme_dev_****4d1e",name:"Development",org:"Acme Corp",created:"2026-02-20",last:"3d ago",status:"active"},
+    {key:"vnt_acme_old_****9a2f",name:"Legacy (deprecated)",org:"Acme Corp",created:"2025-10-01",last:"30d ago",status:"revoked"},
+  ].map(r=>`<tr>
+    <td class="mono" style="font-size:11px">${r.key}</td>
+    <td>${r.name}</td><td class="muted small">${r.org}</td>
+    <td class="mono muted small">${r.created}</td>
+    <td class="mono muted small">${r.last}</td>
+    <td><span class="tag ${r.status==='active'?'tag-green':'tag-red'}">${r.status}</span></td>
+    <td><button class="btn btn-ghost" style="font-size:10px;padding:4px 8px">${r.status==='active'?'Revoke':'Deleted'}</button></td>
+  </tr>`).join("");
+
+  document.getElementById("rbac-body").innerHTML=[
+    {user:"admin@acme.com",role:"Owner",view:true,export:true,config:true},
+    {user:"dev@acme.com",role:"Developer",view:true,export:true,config:false},
+    {user:"analyst@acme.com",role:"Analyst",view:true,export:true,config:false},
+    {user:"viewer@acme.com",role:"Viewer",view:true,export:false,config:false},
+  ].map(r=>`<tr>
+    <td class="mono" style="font-size:11px">${r.user}</td>
+    <td><span class="tag ${r.role==='Owner'?'tag-purple':r.role==='Developer'?'tag-blue':'tag-gray'}">${r.role}</span></td>
+    <td>${r.view?'<span class="tag tag-green">&#10003;</span>':'<span class="tag tag-red">&#10005;</span>'}</td>
+    <td>${r.export?'<span class="tag tag-green">&#10003;</span>':'<span class="tag tag-red">&#10005;</span>'}</td>
+    <td>${r.config?'<span class="tag tag-green">&#10003;</span>':'<span class="tag tag-red">&#10005;</span>'}</td>
+  </tr>`).join("");
+
+  const actions=["API key created","User login","Report exported","Config changed","API call","API call","Report exported","User login"];
+  document.getElementById("audit-body").innerHTML=actions.map((a,i)=>`<tr>
+    <td class="mono muted small">${ri(1,59)}m ago</td>
+    <td class="mono small">admin@acme.com</td>
+    <td>${a}</td>
+    <td class="mono muted small">${i%2===0?'/settings':'/api/v1/events'}</td>
+    <td class="mono muted small">104.${ri(1,254)}.${ri(1,254)}.${ri(1,254)}</td>
+    <td><span class="tag tag-green">200 OK</span></td>
+  </tr>`).join("");
+
+  document.getElementById("retention-settings").innerHTML=[
+    {tier:"Free",retention:"7 days",detail:"Request logs and events"},
+    {tier:"Team",retention:"90 days",detail:"All data including traces"},
+    {tier:"Enterprise",retention:"Unlimited",detail:"Custom per data type"},
+  ].map(r=>`
+    <div style="padding:10px 0;border-bottom:1px solid var(--b1)">
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+        <span style="font-weight:500">${r.tier}</span>
+        <span class="mono" style="color:var(--ac)">${r.retention}</span>
+      </div>
+      <div class="small muted">${r.detail}</div>
+    </div>`).join("");
+
+  document.getElementById("compliance-status").innerHTML=[
+    {name:"SOC 2 Type II",status:"Certified",icon:"&#128274;",color:"var(--ac)"},
+    {name:"GDPR",status:"Compliant",icon:"&#127759;",color:"var(--ac)"},
+    {name:"HIPAA",status:"Enterprise only",icon:"&#9877;",color:"var(--am)"},
+    {name:"CCPA",status:"Compliant",icon:"&#127758;",color:"var(--ac)"},
+    {name:"ISO 27001",status:"In progress",icon:"&#128203;",color:"var(--mu)"},
+  ].map(r=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--b1)">
+      <span>${r.icon}</span>
+      <span style="flex:1">${r.name}</span>
+      <span class="mono" style="font-size:11px;color:${r.color}">${r.status}</span>
+    </div>`).join("");
+};
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MODULE 9 — DEVELOPER EXPERIENCE
+═══════════════════════════════════════════════════════════════════════════ */
+window.init_devx=function(){
+  document.getElementById("integration-health").innerHTML=[
+    {name:"Python SDK",version:"0.1.4",status:"healthy",lastCall:"12s ago"},
+    {name:"TypeScript SDK",version:"0.1.4",status:"healthy",lastCall:"2m ago"},
+    {name:"MCP Server",version:"0.1.2",status:"healthy",lastCall:"5m ago"},
+    {name:"VS Code Extension",version:"0.1.0",status:"warning",lastCall:"3h ago"},
+  ].map(r=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--b1)">
+      <div style="width:8px;height:8px;border-radius:50%;background:${r.status==='healthy'?'var(--ac)':'var(--am)'}"></div>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:500">${r.name}</div>
+        <div class="small muted">v${r.version} &bull; Last: ${r.lastCall}</div>
+      </div>
+      <span class="tag ${r.status==='healthy'?'tag-green':'tag-amber'}">${r.status}</span>
+    </div>`).join("");
+
+  document.getElementById("webhook-body").innerHTML=[
+    {url:"https://hooks.slack.com/services/***",events:"budget.alert, anomaly.spike",last:"2m ago",status:"ok"},
+    {url:"https://acme.com/api/vantage-webhook",events:"all events",last:"Failed",status:"error"},
+    {url:"https://app.pagerduty.com/generic/***",events:"error.critical",last:"6h ago",status:"ok"},
+  ].map(r=>`<tr>
+    <td class="mono" style="font-size:11px">${r.url}</td>
+    <td class="muted small">${r.events}</td>
+    <td class="mono small" style="color:${r.last==='Failed'?'var(--re)':'var(--mu)'}">${r.last}</td>
+    <td><span class="tag ${r.status==='ok'?'tag-green':'tag-red'}">${r.status==='ok'?'&#10003; healthy':'&#10007; failing'}</span></td>
+    <td><button class="btn btn-ghost" style="font-size:10px;padding:4px 8px">Test</button></td>
+  </tr>`).join("");
+
+  // Live event stream
+  const streamEl=document.getElementById("event-stream");
+  const provs=["openai","anthropic","google","meta"];
+  const mods=["gpt-4o","claude-sonnet-4-6","gemini-2.0-flash","llama-3.3-70b"];
+  function addEvent(){
+    const p=provs[ri(0,provs.length)];
+    const m=mods[ri(0,mods.length)];
+    const cost=(rnd(.0001,.005)).toFixed(5);
+    const lat=ri(200,2000);
+    const line=document.createElement("div");
+    line.style.cssText="border-bottom:1px solid rgba(255,255,255,.04);padding:2px 0";
+    const t=new Date().toLocaleTimeString("en",{hour12:false});
+    line.innerHTML=`<span style="color:var(--di)">${t}</span> <span style="color:var(--bl)">/chat</span> <span style="color:var(--mu)">${m}</span> <span style="color:var(--ac)">$${cost}</span> <span style="color:var(--di)">${lat}ms</span>`;
+    streamEl.insertBefore(line,streamEl.firstChild);
+    while(streamEl.children.length>30)streamEl.removeChild(streamEl.lastChild);
+  }
+  addEvent();
+  setInterval(addEvent,2200);
+};
+
+window.sdkTab=function(tab,el){
+  ["py","ts","curl"].forEach(t=>{
+    document.getElementById("sdk-"+t).style.display=t===tab?"block":"none";
+  });
+  document.querySelectorAll(".toggle-btn").forEach(b=>b.classList.remove("active"));
+  el.classList.add("active");
+};
+
+/* ════════════════════════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════════════════════ */
+function rebuildAll(){
+  updateStatus();
+  Object.values(charts).forEach(c=>c.destroy());
+  charts={};
+  // Reset inited flags
+  ["cost","tokens","models","perf","quality","ai","reports","security","devx"].forEach(v=>{window["inited_"+v]=false;});
+  // Re-init active view
+  const active=document.querySelector(".view.active");
+  if(active){
+    const id=active.id.replace("view-","");
+    if(window["init_"+id]){window["init_"+id]();window["inited_"+id]=true;}
+  }
+}
+// Init first view
+updateStatus();
+init_cost(); window["inited_cost"]=true;
+</script>
+
+<!-- Seed data overlay panel -->
+<div id="seed-panel" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)" onclick="if(event.target===this)hideSeedPanel()">
+  <div style="background:var(--bg2);border:1px solid var(--b2);border-radius:20px;padding:40px;width:100%;max-width:500px;margin:24px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div style="font-size:18px;font-weight:500">&#127806; Seed test data</div>
+      <button onclick="hideSeedPanel()" style="background:var(--bg3);border:1px solid var(--b2);color:var(--tx);width:28px;height:28px;border-radius:7px;cursor:pointer;font-size:14px">&#10005;</button>
+    </div>
+    <div style="font-size:13px;color:var(--mu);margin-bottom:20px;line-height:1.6">
+      Generates <strong style="color:var(--tx)">52,000 realistic API call events</strong> across 90 days, 23 models, 7 providers, and 5 teams.<br><br>
+      Data is stored in your browser's IndexedDB — no server needed. Takes ~5 seconds.
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:20px">
+      <div style="background:var(--bg3);border-radius:8px;padding:10px;text-align:center"><div style="font-family:var(--mono);font-size:18px;color:var(--ac)">52K</div><div style="font-size:11px;color:var(--mu)">events</div></div>
+      <div style="background:var(--bg3);border-radius:8px;padding:10px;text-align:center"><div style="font-family:var(--mono);font-size:18px;color:var(--ac)">23</div><div style="font-size:11px;color:var(--mu)">models</div></div>
+      <div style="background:var(--bg3);border-radius:8px;padding:10px;text-align:center"><div style="font-family:var(--mono);font-size:18px;color:var(--ac)">90</div><div style="font-size:11px;color:var(--mu)">days</div></div>
+    </div>
+    <div id="seed-panel-content">
+      <button onclick="runSeed()" style="width:100%;background:var(--ac);color:#000;border:none;padding:13px;border-radius:9px;font-family:var(--mono);font-size:13px;font-weight:500;cursor:pointer">&#9654; Generate test data</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// CONFIG — paste your Supabase credentials
+// ═══════════════════════════════════════════════════
+const SUPABASE_URL  = "https://oyljzpvwdfktrkeotmon.supabase.co";
+const SUPABASE_ANON = "sb_publishable_ZCgWwpZv5XBR0AjiJ8I9ig_yZ-8XFWN";
+const AUTH_URL      = window.location.origin + "/auth.html";
+
+// Demo mode if Supabase not configured
+const SUPABASE_CONFIGURED = !SUPABASE_URL.startsWith("YOUR_");
+const sb = SUPABASE_CONFIGURED
+  ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON)
+  : null;
+
+// ── Auth guard ─────────────────────────────────────
+async function initAuth() {
+  if (!SUPABASE_CONFIGURED || !sb) return; // demo mode
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) {
+      window.location.replace(AUTH_URL);
+      return;
+    }
+    populateUser(session.user);
+  } catch(e) {
+    console.warn("[Vantage] Auth error, running in demo mode:", e.message);
+  }
+}
+
+function populateUser(user) {
+  const name   = user.user_metadata?.full_name || user.email?.split("@")[0] || "User";
+  const email  = user.email || "";
+  const initials = name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
+
+  document.getElementById("user-avatar").textContent  = initials;
+  document.getElementById("user-name").textContent    = name;
+  document.getElementById("user-email-full").textContent = email;
+  document.getElementById("user-email-short").textContent = name.split(" ")[0];
+
+  // Update org badge
+  const orgEl = document.querySelector(".tb-org-badge");
+  if (orgEl) orgEl.textContent = email.split("@")[1]?.split(".")[0] || "My Org";
+}
+
+// ── Sign out ───────────────────────────────────────
+
+function setDemoUser() {
+  document.getElementById("user-avatar").textContent       = "DM";
+  document.getElementById("user-name").textContent         = "Demo User";
+  document.getElementById("user-email-full").textContent   = "demo@vantage.ai";
+  document.getElementById("user-email-short").textContent  = "Demo";
+}
+
+async function signOut() {
+  if (SUPABASE_CONFIGURED) {
+    await sb.auth.signOut();
+    window.location.replace(AUTH_URL);
+  } else {
+    window.location.replace("/");
+  }
+}
+
+function goToApp() {
+  document.getElementById("user-dropdown").style.display = "none";
+}
+
+// ── User menu toggle ───────────────────────────────
+let menuOpen = false;
+function toggleUserMenu() {
+  const dd = document.getElementById("user-dropdown");
+  menuOpen = !menuOpen;
+  dd.style.display = menuOpen ? "block" : "none";
+}
+document.addEventListener("click", e => {
+  if (!document.getElementById("user-menu")?.contains(e.target)) {
+    document.getElementById("user-dropdown").style.display = "none";
+    menuOpen = false;
+  }
+});
+
+// ── Seed panel ─────────────────────────────────────
+function showSeedPanel() {
+  document.getElementById("seed-panel").style.display = "flex";
+}
+function hideSeedPanel() {
+  document.getElementById("seed-panel").style.display = "none";
+}
+async function runSeed() {
+  if (!window.vantageData) return;
+  const content = document.getElementById("seed-panel-content");
+  content.innerHTML = `<div id="seed-progress-wrap"></div>`;
+  await window.vantageData.seedWithUI("seed-progress-wrap", 90);
+  // After seeding, reload charts
+  setTimeout(() => { hideSeedPanel(); rebuildAll(); }, 1500);
+}
+
+// ── Check seed status on load ──────────────────────
+async function checkSeedStatus() {
+  if (!window.vantageData) return;
+  const status = await window.vantageData.status();
+  if (status.seeded) {
+    console.log(`[Vantage] ${status.eventCount.toLocaleString()} events in IndexedDB (seeded ${status.seededAt})`);
+  } else {
+    // Auto-show seed panel on first visit
+    setTimeout(showSeedPanel, 1200);
+  }
+}
+
+// ── Auth state changes ─────────────────────────────
+if (SUPABASE_CONFIGURED) {
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === "SIGNED_OUT") window.location.replace(AUTH_URL);
+    if (event === "SIGNED_IN" && session) populateUser(session.user);
+  });
+}
+
+// ── Init ───────────────────────────────────────────
+if (SUPABASE_CONFIGURED) { initAuth().then(() => checkSeedStatus()); } else { setDemoUser(); checkSeedStatus(); }
+</script>
+
+</body>
+</html>
