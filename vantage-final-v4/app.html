@@ -178,9 +178,93 @@ button{font-family:var(--sans);cursor:pointer}
   .kpi-grid{grid-template-columns:repeat(2,1fr)}
   .g2,.g3,.g21,.g12{grid-template-columns:1fr}
 }
+
+/* ── Command Palette ───────────────────────────────────────────────────── */
+#cmd-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:900;display:none;backdrop-filter:blur(4px)}
+#cmd-backdrop.open{display:flex;align-items:flex-start;justify-content:center;padding-top:120px}
+#cmd-box{background:var(--bg2);border:1px solid var(--b2);border-radius:14px;width:540px;max-width:92vw;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.6);animation:cmdSlide .15s ease}
+@keyframes cmdSlide{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
+#cmd-input-wrap{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--b1)}
+#cmd-search-icon{color:var(--mu);font-size:15px;flex-shrink:0}
+#cmd-input{flex:1;background:transparent;border:none;outline:none;font-size:14px;color:var(--tx);font-family:var(--sans)}
+#cmd-input::placeholder{color:var(--di)}
+#cmd-hint{font-family:var(--mono);font-size:10px;color:var(--di);flex-shrink:0}
+#cmd-results{max-height:360px;overflow-y:auto;padding:6px}
+.cmd-group-title{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--di);padding:8px 10px 4px}
+.cmd-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;transition:background .1s;font-size:13px}
+.cmd-item:hover,.cmd-item.sel{background:var(--ac2);color:var(--ac)}
+.cmd-item-ico{font-size:14px;width:20px;text-align:center;flex-shrink:0;color:var(--mu)}
+.cmd-item:hover .cmd-item-ico,.cmd-item.sel .cmd-item-ico{color:var(--ac)}
+.cmd-item-label{flex:1}
+.cmd-item-kbd{font-family:var(--mono);font-size:10px;color:var(--di);background:var(--bg3);padding:2px 6px;border-radius:4px;border:1px solid var(--b1)}
+#cmd-footer{display:flex;align-items:center;gap:16px;padding:8px 14px;border-top:1px solid var(--b1);font-family:var(--mono);font-size:10px;color:var(--di)}
+.cmd-key{background:var(--bg3);border:1px solid var(--b2);border-radius:4px;padding:1px 6px}
+
+/* ── Onboarding Banner ─────────────────────────────────────────────────── */
+#onboard-banner{background:linear-gradient(90deg,rgba(0,212,161,.07),rgba(0,152,255,.05));border-bottom:1px solid rgba(0,212,161,.12);padding:9px 20px;display:flex;align-items:center;gap:12px;font-size:12px;flex-shrink:0}
+#onboard-banner.hidden{display:none}
+.ob-steps{display:flex;align-items:center;gap:4px;flex:1;flex-wrap:wrap}
+.ob-step{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;font-family:var(--mono);font-size:10px;cursor:default;transition:all .2s}
+.ob-step.done{color:var(--ac);background:var(--ac2)}
+.ob-step.active{color:var(--tx);background:var(--bg3);border:1px solid var(--b2)}
+.ob-step.todo{color:var(--di)}
+.ob-num{width:14px;height:14px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;background:rgba(255,255,255,.08)}
+.ob-step.done .ob-num{background:var(--ac);color:#000;font-size:9px}
+#ob-dismiss{font-family:var(--mono);font-size:10px;color:var(--di);background:transparent;border:none;cursor:pointer;padding:4px 8px;border-radius:6px;transition:color .2s;flex-shrink:0}
+#ob-dismiss:hover{color:var(--mu)}
+
+/* ── Shortcuts Modal ───────────────────────────────────────────────────── */
+#sh-modal{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:900;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+#sh-modal.open{display:flex}
+#sh-box{background:var(--bg2);border:1px solid var(--b2);border-radius:14px;padding:24px;width:460px;max-width:92vw;box-shadow:0 24px 64px rgba(0,0,0,.6)}
+.sh-title{font-size:14px;font-weight:500;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between}
+.sh-close{background:var(--bg3);border:1px solid var(--b2);color:var(--mu);border-radius:6px;padding:3px 10px;cursor:pointer;font-size:12px}
+.sh-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.sh-row{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:7px;font-size:12px}
+.sh-keys{display:flex;gap:4px}
+.sh-key{background:var(--bg2);border:1px solid var(--b2);border-radius:4px;padding:2px 7px;font-family:var(--mono);font-size:11px}
 </style>
 </head>
 <body>
+
+<!-- COMMAND PALETTE -->
+<div id="cmd-backdrop" onclick="closeCmd()">
+  <div id="cmd-box" onclick="event.stopPropagation()">
+    <div id="cmd-input-wrap">
+      <span id="cmd-search-icon">⌕</span>
+      <input id="cmd-input" placeholder="Search views, models, actions..." autocomplete="off" oninput="filterCmd(this.value)" onkeydown="cmdKey(event)">
+      <span id="cmd-hint">ESC to close</span>
+    </div>
+    <div id="cmd-results"></div>
+    <div id="cmd-footer">
+      <span><span class="cmd-key">↑↓</span> navigate</span>
+      <span><span class="cmd-key">↵</span> select</span>
+      <span><span class="cmd-key">ESC</span> close</span>
+      <span style="margin-left:auto"><span class="cmd-key">⌘K</span> open</span>
+    </div>
+  </div>
+</div>
+
+<!-- SHORTCUTS MODAL -->
+<div id="sh-modal" onclick="this.classList.remove('open')">
+  <div id="sh-box" onclick="event.stopPropagation()">
+    <div class="sh-title">Keyboard Shortcuts <button class="sh-close" onclick="document.getElementById('sh-modal').classList.remove('open')">✕ close</button></div>
+    <div class="sh-grid">
+      <div class="sh-row"><span>Command palette</span><div class="sh-keys"><span class="sh-key">⌘</span><span class="sh-key">K</span></div></div>
+      <div class="sh-row"><span>This help</span><div class="sh-keys"><span class="sh-key">?</span></div></div>
+      <div class="sh-row"><span>Cost Intelligence</span><div class="sh-keys"><span class="sh-key">1</span></div></div>
+      <div class="sh-row"><span>Token Analytics</span><div class="sh-keys"><span class="sh-key">2</span></div></div>
+      <div class="sh-row"><span>Model Comparison</span><div class="sh-keys"><span class="sh-key">3</span></div></div>
+      <div class="sh-row"><span>Performance</span><div class="sh-keys"><span class="sh-key">4</span></div></div>
+      <div class="sh-row"><span>Quality & Eval</span><div class="sh-keys"><span class="sh-key">5</span></div></div>
+      <div class="sh-row"><span>AI Intelligence</span><div class="sh-keys"><span class="sh-key">6</span></div></div>
+      <div class="sh-row"><span>Reporting</span><div class="sh-keys"><span class="sh-key">7</span></div></div>
+      <div class="sh-row"><span>Security</span><div class="sh-keys"><span class="sh-key">8</span></div></div>
+      <div class="sh-row"><span>Developer</span><div class="sh-keys"><span class="sh-key">9</span></div></div>
+      <div class="sh-row"><span>Refresh data</span><div class="sh-keys"><span class="sh-key">R</span></div></div>
+    </div>
+  </div>
+</div>
 
 <!-- TOP BAR -->
 <div id="topbar">
@@ -198,7 +282,9 @@ button{font-family:var(--sans);cursor:pointer}
       <option value="90">Last 90 days</option>
     </select>
     <span id="api-status" class="tb-period" style="font-size:11px;padding:5px 10px;">Config: local</span>
+    <button class="tb-btn" onclick="openCmd()" title="Command palette (⌘K)" style="font-family:var(--mono);font-size:11px;gap:8px;min-width:160px;justify-content:flex-start;color:var(--mu)"><span>⌕</span><span>Search...</span><span style="margin-left:auto;background:var(--bg);border:1px solid var(--b1);border-radius:3px;padding:1px 5px;font-size:9px">⌘K</span></button>
     <button class="tb-btn" onclick="openSettings()">&#9881; Settings</button>
+    <button class="tb-btn" onclick="document.getElementById('sh-modal').classList.add('open')" title="Keyboard shortcuts (?)">?</button>
     <button class="tb-btn tb-notif">&#128276;<div class="tb-notif-dot"></div></button>
     <a href="/" class="tb-btn" style="color:var(--mu)">&#8592; Home</a>
       <button class="tb-btn" onclick="showSeedPanel()" title="Load test data" style="color:var(--am)">&#127806; Seed data</button>
@@ -219,6 +305,22 @@ button{font-family:var(--sans);cursor:pointer}
       </div>
     </div>
   </div>
+</div>
+
+<!-- ONBOARDING BANNER -->
+<div id="onboard-banner">
+  <span style="font-family:var(--mono);font-size:10px;color:var(--ac);flex-shrink:0">QUICK START</span>
+  <div class="ob-steps">
+    <div class="ob-step done"><span class="ob-num">✓</span> Create account</div>
+    <span style="color:var(--di);font-size:10px">›</span>
+    <div class="ob-step active"><span class="ob-num">2</span> Install SDK</div>
+    <span style="color:var(--di);font-size:10px">›</span>
+    <div class="ob-step todo"><span class="ob-num">3</span> Send first event</div>
+    <span style="color:var(--di);font-size:10px">›</span>
+    <div class="ob-step todo"><span class="ob-num">4</span> Set budget alert</div>
+  </div>
+  <a href="/docs.html" style="font-family:var(--mono);font-size:10px;color:var(--ac);text-decoration:none;flex-shrink:0;white-space:nowrap">View quickstart →</a>
+  <button id="ob-dismiss" onclick="document.getElementById('onboard-banner').classList.add('hidden');localStorage.setItem('ob_done','1')">✕ dismiss</button>
 </div>
 
 <!-- APP SHELL -->
@@ -1470,6 +1572,99 @@ if (SUPABASE_CONFIGURED) {
 
 // ── Init ───────────────────────────────────────────
 if (SUPABASE_CONFIGURED) { initAuth().then(() => checkSeedStatus()); } else { setDemoUser(); checkSeedStatus(); }
+
+// ── Onboarding banner ──────────────────────────────
+if (localStorage.getItem('ob_done')) {
+  document.getElementById('onboard-banner').classList.add('hidden');
+}
+
+// ── Command Palette ────────────────────────────────
+const CMD_ITEMS = [
+  { group:'Views', ico:'💰', label:'Cost Intelligence', action:()=>navTo('cost'), kbd:'1' },
+  { group:'Views', ico:'📊', label:'Token Analytics', action:()=>navTo('tokens'), kbd:'2' },
+  { group:'Views', ico:'⚖', label:'Model Comparison', action:()=>navTo('models'), kbd:'3' },
+  { group:'Views', ico:'⚡', label:'Performance & Latency', action:()=>navTo('perf'), kbd:'4' },
+  { group:'Views', ico:'🎯', label:'Quality & Evaluation', action:()=>navTo('quality'), kbd:'5' },
+  { group:'Views', ico:'🧠', label:'AI Intelligence Layer', action:()=>navTo('ai'), kbd:'6' },
+  { group:'Views', ico:'📈', label:'Enterprise Reporting', action:()=>navTo('reports'), kbd:'7' },
+  { group:'Views', ico:'🔒', label:'Security & Governance', action:()=>navTo('security'), kbd:'8' },
+  { group:'Views', ico:'🔧', label:'Developer Experience', action:()=>navTo('devx'), kbd:'9' },
+  { group:'Actions', ico:'🌱', label:'Load seed data', action:()=>{ closeCmd(); showSeedPanel(); } },
+  { group:'Actions', ico:'⚙️', label:'Open settings', action:()=>{ closeCmd(); openSettings(); } },
+  { group:'Actions', ico:'⌨️', label:'Keyboard shortcuts', action:()=>{ closeCmd(); document.getElementById('sh-modal').classList.add('open'); } },
+  { group:'Actions', ico:'🔄', label:'Refresh data', action:()=>{ closeCmd(); refreshData(); } },
+  { group:'Links', ico:'📄', label:'Documentation', action:()=>window.open('/docs.html','_blank') },
+  { group:'Links', ico:'🏠', label:'Back to homepage', action:()=>window.location='/' },
+];
+function navTo(view) {
+  closeCmd();
+  const btn = document.querySelector(`.sb-item[onclick*="nav('${view}'"]`);
+  if (btn) btn.click();
+}
+function refreshData() {
+  const period = document.getElementById('period-sel');
+  if (period) setPeriod(period.value);
+}
+
+let cmdSel = 0;
+let filteredItems = [...CMD_ITEMS];
+
+function openCmd() {
+  document.getElementById('cmd-backdrop').classList.add('open');
+  document.getElementById('cmd-input').value = '';
+  cmdSel = 0;
+  filteredItems = [...CMD_ITEMS];
+  renderCmd();
+  setTimeout(() => document.getElementById('cmd-input').focus(), 50);
+}
+function closeCmd() {
+  document.getElementById('cmd-backdrop').classList.remove('open');
+}
+function filterCmd(q) {
+  const lower = q.toLowerCase().trim();
+  filteredItems = lower ? CMD_ITEMS.filter(i => i.label.toLowerCase().includes(lower) || i.group.toLowerCase().includes(lower)) : [...CMD_ITEMS];
+  cmdSel = 0;
+  renderCmd();
+}
+function renderCmd() {
+  const el = document.getElementById('cmd-results');
+  if (!filteredItems.length) { el.innerHTML = '<div style="padding:20px;text-align:center;font-size:12px;color:var(--di)">No results</div>'; return; }
+  let html = '';
+  let lastGroup = '';
+  filteredItems.forEach((item, i) => {
+    if (item.group !== lastGroup) {
+      html += `<div class="cmd-group-title">${item.group}</div>`;
+      lastGroup = item.group;
+    }
+    const sel = i === cmdSel ? ' sel' : '';
+    const kbd = item.kbd ? `<span class="cmd-item-kbd">${item.kbd}</span>` : '';
+    html += `<div class="cmd-item${sel}" onclick="filteredItems[${i}].action()"><span class="cmd-item-ico">${item.ico}</span><span class="cmd-item-label">${item.label}</span>${kbd}</div>`;
+  });
+  el.innerHTML = html;
+}
+function cmdKey(e) {
+  if (e.key === 'Escape') { closeCmd(); return; }
+  if (e.key === 'ArrowDown') { e.preventDefault(); cmdSel = Math.min(cmdSel+1, filteredItems.length-1); renderCmd(); return; }
+  if (e.key === 'ArrowUp') { e.preventDefault(); cmdSel = Math.max(cmdSel-1, 0); renderCmd(); return; }
+  if (e.key === 'Enter') { e.preventDefault(); if (filteredItems[cmdSel]) filteredItems[cmdSel].action(); return; }
+}
+
+// ── Keyboard shortcuts ─────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+  const isCmdOpen = document.getElementById('cmd-backdrop').classList.contains('open');
+  // Open command palette
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); isCmdOpen ? closeCmd() : openCmd(); return; }
+  if (isCmdOpen) return;
+  // Shortcuts modal
+  if (e.key === '?') { document.getElementById('sh-modal').classList.toggle('open'); return; }
+  if (e.key === 'Escape') { document.getElementById('sh-modal').classList.remove('open'); return; }
+  // Number keys → views
+  const viewMap = { '1':'cost','2':'tokens','3':'models','4':'perf','5':'quality','6':'ai','7':'reports','8':'security','9':'devx' };
+  if (viewMap[e.key]) { navTo(viewMap[e.key]); return; }
+  // R → refresh
+  if (e.key === 'r' || e.key === 'R') { refreshData(); return; }
+});
 </script>
 
 </body>

@@ -166,16 +166,82 @@ footer{border-top:1px solid var(--border);padding:36px 48px;display:flex;align-i
 footer a{color:var(--muted);text-decoration:none;transition:color .2s}
 footer a:hover{color:var(--text)}
 
+/* HOW IT WORKS */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:60px;position:relative}
+.steps::before{content:'';position:absolute;top:28px;left:calc(16.6% + 20px);right:calc(16.6% + 20px);height:1px;background:linear-gradient(90deg,var(--accent),var(--blue));opacity:.3;pointer-events:none}
+.step{text-align:center;padding:32px 24px}
+.step-num{width:56px;height:56px;border-radius:50%;border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;color:var(--accent);margin:0 auto 20px;background:var(--bg2);position:relative;z-index:1}
+.step-num::before{content:'';position:absolute;inset:-1px;border-radius:50%;background:radial-gradient(circle,rgba(0,212,161,.15),transparent 70%)}
+.step-title{font-size:15px;font-weight:500;margin-bottom:8px}
+.step-desc{font-size:13px;color:var(--muted);line-height:1.6}
+
+/* TESTIMONIALS */
+.testi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:56px}
+.testi-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;display:flex;flex-direction:column;gap:14px;transition:border-color .2s}
+.testi-card:hover{border-color:var(--border2)}
+.testi-stars{color:var(--amber);font-size:12px;letter-spacing:2px}
+.testi-quote{font-size:14px;line-height:1.65;color:var(--text);flex:1}
+.testi-quote em{color:var(--accent);font-style:normal;font-weight:500}
+.testi-author{display:flex;align-items:center;gap:10px}
+.testi-avatar{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#000;flex-shrink:0}
+.testi-name{font-size:13px;font-weight:500}
+.testi-role{font-size:11px;color:var(--muted)}
+
+/* COMPARISON TABLE */
+.compare-wrap{margin-top:56px;border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.compare-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.compare-tbl th{padding:14px 20px;text-align:left;background:var(--bg2);font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)}
+.compare-tbl th:first-child{color:var(--text)}
+.compare-tbl th.vantage-col{color:var(--accent)}
+.compare-tbl td{padding:12px 20px;border-bottom:1px solid var(--border);vertical-align:middle}
+.compare-tbl tr:last-child td{border-bottom:none}
+.compare-tbl tr:hover td{background:rgba(255,255,255,.015)}
+.compare-tbl td:first-child{font-size:12px;color:var(--muted)}
+.compare-tbl td.vantage-col{background:rgba(0,212,161,.03)}
+.chk{color:var(--accent);font-size:14px}
+.cross{color:var(--dim);font-size:14px}
+.partial{color:var(--amber);font-size:12px;font-family:var(--mono)}
+
+/* TRUST BADGES */
+.trust-row{display:flex;align-items:center;justify-content:center;gap:32px;margin-top:60px;flex-wrap:wrap}
+.trust-badge{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:var(--muted);padding:8px 16px;border:1px solid var(--border);border-radius:8px;transition:border-color .2s}
+.trust-badge:hover{border-color:var(--border2)}
+.trust-badge span:first-child{font-size:16px}
+
+/* FAQ */
+.faq-list{margin-top:56px;display:flex;flex-direction:column;gap:2px}
+.faq-item{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--bg2)}
+.faq-q{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;cursor:pointer;font-size:14px;font-weight:500;user-select:none;transition:color .2s}
+.faq-q:hover{color:var(--accent)}
+.faq-arrow{color:var(--muted);font-size:16px;transition:transform .25s;flex-shrink:0}
+.faq-a{max-height:0;overflow:hidden;transition:max-height .3s ease,padding .3s ease}
+.faq-a-inner{padding:0 22px 18px;font-size:13px;color:var(--muted);line-height:1.7}
+.faq-item.open .faq-arrow{transform:rotate(45deg)}
+.faq-item.open .faq-a{max-height:200px}
+
+/* MOBILE NAV */
+.nav-hamburger{display:none;flex-direction:column;gap:4px;cursor:pointer;padding:4px}
+.nav-hamburger span{display:block;width:20px;height:1.5px;background:var(--text);transition:all .2s}
+.nav-mobile{display:none;position:fixed;inset:0;top:58px;background:var(--bg);z-index:99;padding:20px;flex-direction:column;gap:4px;border-top:1px solid var(--border)}
+.nav-mobile.open{display:flex}
+.nav-mobile a{padding:14px 16px;border-radius:8px;font-size:15px;color:var(--muted);border:1px solid transparent;transition:all .2s}
+.nav-mobile a:hover,.nav-mobile a:last-child{border-color:var(--border);color:var(--text)}
+.nav-mobile a:last-child{background:var(--accent);color:#000;text-align:center;font-weight:500;border-color:var(--accent);margin-top:8px}
+
 /* RESPONSIVE */
 @media(max-width:900px){
   nav{padding:16px 20px}
   .nav-links{display:none}
-  .feat-grid,.pricing-grid{grid-template-columns:1fr}
+  .nav-hamburger{display:flex}
+  .feat-grid,.pricing-grid,.steps,.testi-grid{grid-template-columns:1fr}
+  .steps::before{display:none}
   .stats-strip{grid-template-columns:repeat(2,1fr)}
   .integrations-grid{grid-template-columns:repeat(2,1fr)}
   .demo-body{grid-template-columns:1fr}
   .demo-sidebar{display:none}
   .kpi-row{grid-template-columns:repeat(2,1fr)}
+  .trust-row{gap:12px}
+  .compare-wrap{overflow-x:auto}
 }
 </style>
 </head>
@@ -187,11 +253,22 @@ footer a:hover{color:var(--text)}
     <a href="/calculator.html">Calculator</a>
     <a href="/app.html">Dashboard</a>
     <a href="/docs.html">Docs</a>
-    <a href="/signup.html">Pricing</a>
-    
+    <a href="#pricing">Pricing</a>
+    <a href="#faq">FAQ</a>
     <a href="/signup.html" class="nav-cta">Start free →</a>
   </div>
+  <div class="nav-hamburger" onclick="toggleMobileNav(this)" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </div>
 </nav>
+<div class="nav-mobile" id="navMobile">
+  <a href="/calculator.html">Calculator</a>
+  <a href="/app.html">Dashboard</a>
+  <a href="/docs.html">Docs</a>
+  <a href="#pricing" onclick="closeMobileNav()">Pricing</a>
+  <a href="#faq" onclick="closeMobileNav()">FAQ</a>
+  <a href="/signup.html">Start free →</a>
+</div>
 
 <!-- HERO -->
 <div class="hero">
@@ -225,6 +302,29 @@ footer a:hover{color:var(--text)}
   <div class="stat-item reveal"><div class="stat-num">67<span>%</span></div><div class="stat-lbl">of AI teams only find quality regressions after user complaints</div></div>
   <div class="stat-item reveal"><div class="stat-num"><span>$</span>0</div><div class="stat-lbl">to get started — full features, no credit card required</div></div>
 </div>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <div class="sec-label">// how it works</div>
+  <div class="sec-title">Up and running in <em>three steps</em></div>
+  <div class="steps">
+    <div class="step reveal">
+      <div class="step-num">01</div>
+      <div class="step-title">Install the SDK</div>
+      <div class="step-desc">One pip or npm install. Drop two lines into your existing code — no architecture changes, no new infrastructure to manage.</div>
+    </div>
+    <div class="step reveal">
+      <div class="step-num">02</div>
+      <div class="step-title">Every call is tracked</div>
+      <div class="step-desc">Vantage wraps your OpenAI and Anthropic clients transparently. Tokens, cost, latency, and quality are captured automatically in the background.</div>
+    </div>
+    <div class="step reveal">
+      <div class="step-num">03</div>
+      <div class="step-title">Cut costs, ship faster</div>
+      <div class="step-desc">See exactly where your AI budget goes. Route to cheaper models, compress wasteful prompts, and set budget alerts — all from one dashboard.</div>
+    </div>
+  </div>
+</section>
 
 <!-- FEATURES -->
 <section id="features">
@@ -417,6 +517,117 @@ response = client.chat.completions.<span class="c-func">create</span>(
   </div>
 </section>
 
+<!-- TESTIMONIALS -->
+<section id="testimonials" style="padding-top:0">
+  <div class="sec-label">// what teams say</div>
+  <div class="sec-title">Trusted by teams <em>shipping AI</em></div>
+  <div class="testi-grid">
+    <div class="testi-card reveal">
+      <div class="testi-stars">★★★★★</div>
+      <div class="testi-quote">"We had no idea 12% of our GPT-4o calls were going to a single endpoint that could have used Flash. <em>Vantage found it in the first hour.</em> Saved us $1,800/month instantly."</div>
+      <div class="testi-author">
+        <div class="testi-avatar" style="background:linear-gradient(135deg,#00d4a1,#0098ff)">JK</div>
+        <div><div class="testi-name">Jordan Kim</div><div class="testi-role">Engineering Lead · AI startup, Series A</div></div>
+      </div>
+    </div>
+    <div class="testi-card reveal">
+      <div class="testi-stars">★★★★★</div>
+      <div class="testi-quote">"My CFO asked me to justify our $40k/month Anthropic bill. <em>I sent her the Vantage exec dashboard link</em> and she approved next quarter's budget the same day. That's it."</div>
+      <div class="testi-author">
+        <div class="testi-avatar" style="background:linear-gradient(135deg,#a78bfa,#f97316)">MP</div>
+        <div><div class="testi-name">Meera Patel</div><div class="testi-role">CTO · Enterprise SaaS, 300 employees</div></div>
+      </div>
+    </div>
+    <div class="testi-card reveal">
+      <div class="testi-stars">★★★★★</div>
+      <div class="testi-quote">"The MCP integration with Cursor is <em>genuinely magical</em>. I just type 'how much did our RAG pipeline cost this week?' and Cursor answers with live data from Vantage."</div>
+      <div class="testi-author">
+        <div class="testi-avatar" style="background:linear-gradient(135deg,#f59e0b,#f87171)">AR</div>
+        <div><div class="testi-name">Alex Rivera</div><div class="testi-role">Senior ML Engineer · AI consultancy</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COMPARISON -->
+<section id="compare" style="padding-top:0">
+  <div class="sec-label">// vs the alternatives</div>
+  <div class="sec-title">Why teams choose <em>Vantage</em></div>
+  <div class="compare-wrap reveal">
+    <table class="compare-tbl">
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th class="vantage-col">✦ Vantage</th>
+          <th>Helicone</th>
+          <th>LangSmith</th>
+          <th>Datadog LLM</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Real-time cost dashboard</td><td class="vantage-col"><span class="chk">✓</span></td><td><span class="chk">✓</span></td><td><span class="partial">partial</span></td><td><span class="chk">✓</span></td></tr>
+        <tr><td>Cross-model pricing intelligence</td><td class="vantage-col"><span class="chk">✓</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td></tr>
+        <tr><td>Token efficiency scoring</td><td class="vantage-col"><span class="chk">✓</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td></tr>
+        <tr><td>Hallucination / quality scoring</td><td class="vantage-col"><span class="chk">✓</span></td><td><span class="cross">—</span></td><td><span class="chk">✓</span></td><td><span class="cross">—</span></td></tr>
+        <tr><td>MCP server (Cursor/Windsurf/Zed)</td><td class="vantage-col"><span class="chk">✓</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td></tr>
+        <tr><td>AI model auto-router</td><td class="vantage-col"><span class="chk">✓</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td></tr>
+        <tr><td>Budget alerts (Slack/email)</td><td class="vantage-col"><span class="chk">✓</span></td><td><span class="chk">✓</span></td><td><span class="partial">partial</span></td><td><span class="chk">✓</span></td></tr>
+        <tr><td>Exec ROI dashboard</td><td class="vantage-col"><span class="chk">✓</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="partial">partial</span></td></tr>
+        <tr><td>RBAC + audit logs + SOC2</td><td class="vantage-col"><span class="chk">✓</span></td><td><span class="partial">partial</span></td><td><span class="partial">partial</span></td><td><span class="chk">✓</span></td></tr>
+        <tr><td>Free tier</td><td class="vantage-col"><span class="chk">✓ generous</span></td><td><span class="chk">✓</span></td><td><span class="chk">✓</span></td><td><span class="cross">—</span></td></tr>
+        <tr><td>Team plan pricing</td><td class="vantage-col" style="color:var(--accent);font-family:var(--mono)">$99/mo</td><td style="font-family:var(--mono)">$80/mo</td><td style="font-family:var(--mono)">$39/mo</td><td style="font-family:var(--mono)">$15+/host</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- TRUST -->
+<section style="padding-top:0;text-align:center">
+  <div class="sec-label" style="text-align:center">// security & compliance</div>
+  <div class="sec-title" style="max-width:none;text-align:center">Built to <em>enterprise standards</em></div>
+  <div class="trust-row reveal">
+    <div class="trust-badge"><span>🔒</span> SOC2 Ready</div>
+    <div class="trust-badge"><span>🇪🇺</span> GDPR Compliant</div>
+    <div class="trust-badge"><span>🏥</span> HIPAA Ready</div>
+    <div class="trust-badge"><span>🔑</span> API Keys SHA-256</div>
+    <div class="trust-badge"><span>📋</span> Full Audit Logs</div>
+    <div class="trust-badge"><span>🌐</span> Self-Hostable</div>
+    <div class="trust-badge"><span>⚡</span> 99.9% Uptime</div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq" style="padding-top:60px">
+  <div class="sec-label">// faq</div>
+  <div class="sec-title">Common <em>questions</em></div>
+  <div class="faq-list reveal">
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">Does Vantage store my prompts and responses? <span class="faq-arrow">+</span></div>
+      <div class="faq-a"><div class="faq-a-inner">Vantage stores a short preview of your request and response (first 500 chars) to help you debug expensive or low-quality calls. You can disable this entirely in your SDK config. We never train models on your data, and you can request deletion at any time under GDPR.</div></div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">Does adding the Vantage SDK add latency to my calls? <span class="faq-arrow">+</span></div>
+      <div class="faq-a"><div class="faq-a-inner">No measurable latency is added. Vantage captures event data after your LLM call completes and sends it to our ingest API in a background thread. Your main request path is completely unaffected — zero added latency.</div></div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">What happens if the Vantage ingest API is down? <span class="faq-arrow">+</span></div>
+      <div class="faq-a"><div class="faq-a-inner">Your AI calls continue to work normally — Vantage is not in the critical path. Events are queued locally and retried when connectivity is restored. Your production traffic is never affected by Vantage availability.</div></div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">Which LLM providers and models are supported? <span class="faq-arrow">+</span></div>
+      <div class="faq-a"><div class="faq-a-inner">Vantage supports 23+ models across 7 providers: OpenAI (GPT-4o, o1, o3), Anthropic (Claude 3.5/4 family), Google (Gemini 1.5/2.0), Meta (Llama 3.x), Mistral, Cohere, and xAI (Grok). New models are added within 24 hours of launch.</div></div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">Can I self-host Vantage on my own infrastructure? <span class="faq-arrow">+</span></div>
+      <div class="faq-a"><div class="faq-a-inner">Yes. The Vantage server is open-source and deployable on Railway, Render, or any VPS in under 10 minutes. Enterprise customers get a Docker Compose package and Kubernetes Helm chart for air-gapped deployments where data never leaves your VPC.</div></div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">How does the free tier compare to paid plans? <span class="faq-arrow">+</span></div>
+      <div class="faq-a"><div class="faq-a-inner">The free tier gives you 10,000 requests/month, the core cost dashboard, 7-day log retention, and 1 user seat — no credit card required, forever. The Team plan ($99/mo) adds unlimited requests, cross-model pricing intelligence, efficiency scoring, budget alerts, team attribution, and up to 10 seats.</div></div>
+    </div>
+  </div>
+</section>
+
 <!-- CTA -->
 <div class="cta-section">
   <div class="cta-glow"></div>
@@ -490,6 +701,65 @@ document.querySelectorAll(".reveal").forEach((el,i) => {
   el.style.opacity="0"; el.style.transform="translateY(18px)";
   el.style.transition=`opacity 0.5s ${i*0.06}s ease, transform 0.5s ${i*0.06}s ease`;
   obs.observe(el);
+});
+
+// ── Animated stat counters ────────────────────────────────────────────────────
+function animateCount(el, target, suffix, decimals=0) {
+  const start = performance.now();
+  const duration = 1800;
+  const update = (now) => {
+    const progress = Math.min((now - start) / duration, 1);
+    const ease = 1 - Math.pow(1 - progress, 3);
+    const val = (target * ease).toFixed(decimals);
+    el.innerHTML = suffix === '$' ? `<span>${suffix}</span>${val}` : `${val}<span>${suffix}</span>`;
+    if (progress < 1) requestAnimationFrame(update);
+  };
+  requestAnimationFrame(update);
+}
+const statObs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      const nums = e.target.querySelectorAll('.stat-num');
+      nums.forEach(n => {
+        const txt = n.textContent;
+        if (txt.includes('34')) animateCount(n, 34, '%');
+        else if (txt.includes('8')) animateCount(n, 8, '×');
+        else if (txt.includes('67')) animateCount(n, 67, '%');
+        else if (txt.includes('$0')) { n.innerHTML = '<span>$</span>0'; }
+      });
+      statObs.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.5 });
+const statsEl = document.querySelector('.stats-strip');
+if (statsEl) statObs.observe(statsEl);
+
+// ── FAQ accordion ─────────────────────────────────────────────────────────────
+function toggleFaq(qEl) {
+  const item = qEl.closest('.faq-item');
+  const isOpen = item.classList.contains('open');
+  document.querySelectorAll('.faq-item.open').forEach(i => i.classList.remove('open'));
+  if (!isOpen) item.classList.add('open');
+}
+
+// ── Mobile nav ────────────────────────────────────────────────────────────────
+function toggleMobileNav(btn) {
+  const nav = document.getElementById('navMobile');
+  nav.classList.toggle('open');
+  const spans = btn.querySelectorAll('span');
+  if (nav.classList.contains('open')) {
+    spans[0].style.transform = 'rotate(45deg) translate(4px,4px)';
+    spans[1].style.opacity = '0';
+    spans[2].style.transform = 'rotate(-45deg) translate(4px,-4px)';
+  } else {
+    spans.forEach(s => { s.style.transform=''; s.style.opacity=''; });
+  }
+}
+function closeMobileNav() {
+  document.getElementById('navMobile').classList.remove('open');
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('nav') && !e.target.closest('#navMobile')) closeMobileNav();
 });
 </script>
 </body>
