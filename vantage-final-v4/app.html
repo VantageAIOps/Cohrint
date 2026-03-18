@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data:;">
 <title>Vantage AI — Enterprise Dashboard</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#00d4a1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Vantage AI">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -261,6 +267,7 @@ button{font-family:var(--sans);cursor:pointer}
       <div class="sh-row"><span>Reporting</span><div class="sh-keys"><span class="sh-key">7</span></div></div>
       <div class="sh-row"><span>Security</span><div class="sh-keys"><span class="sh-key">8</span></div></div>
       <div class="sh-row"><span>Developer</span><div class="sh-keys"><span class="sh-key">9</span></div></div>
+      <div class="sh-row"><span>Agent Traces</span><div class="sh-keys"><span class="sh-key">0</span></div></div>
       <div class="sh-row"><span>Refresh data</span><div class="sh-keys"><span class="sh-key">R</span></div></div>
     </div>
   </div>
@@ -336,6 +343,7 @@ button{font-family:var(--sans);cursor:pointer}
     <div class="sb-section">Intelligence</div>
     <button class="sb-item" onclick="nav('quality',this)"><span class="ico">&#127919;</span><span>Quality & Evaluation</span></button>
     <button class="sb-item" onclick="nav('ai',this)"><span class="ico">&#129504;</span><span>AI Intelligence Layer</span></button>
+    <button class="sb-item" onclick="nav('traces',this)"><span class="ico">&#128279;</span><span>Agent Traces</span></button>
     <div class="sb-section">Enterprise</div>
     <button class="sb-item" onclick="nav('reports',this)"><span class="ico">&#128202;</span><span>Enterprise Reporting</span></button>
     <button class="sb-item" onclick="nav('security',this)"><span class="ico">&#128274;</span><span>Security & Governance</span></button>
@@ -881,9 +889,80 @@ curl -X POST https://ingest.vantage.ai/v1/events \
           </table>
         </div>
         <div class="card card-p">
-          <div class="card-hdr"><span class="card-title">Live event stream</span><span class="tag tag-green" id="stream-status">LIVE</span></div>
-          <div id="event-stream" style="font-family:var(--mono);font-size:11px;height:220px;overflow-y:auto;background:var(--bg3);border-radius:var(--r);padding:10px;line-height:1.9"></div>
+          <div class="card-hdr">
+            <span class="card-title">Live event stream</span>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span id="sse-dot" style="width:7px;height:7px;border-radius:50%;background:var(--di);display:inline-block" title="SSE disconnected"></span>
+              <span class="tag tag-green" id="stream-status">CONNECTING</span>
+            </div>
+          </div>
+          <div id="event-stream" style="font-family:var(--mono);font-size:11px;height:220px;overflow-y:auto;background:var(--bg3);border-radius:var(--r);padding:10px;line-height:1.9">
+            <span style="color:var(--di)">Connecting to live stream…</span>
+          </div>
         </div>
+      </div>
+
+      <!-- Slack / Alerts config -->
+      <div class="card card-p mb">
+        <div class="card-hdr">
+          <span class="card-title">&#128276; Slack &amp; Teams Alerts</span>
+          <span class="tag tag-blue">NATIVE INTEGRATION</span>
+        </div>
+        <div class="g2" style="margin-bottom:14px">
+          <div>
+            <div class="section-label" style="margin-bottom:8px">Slack webhook URL</div>
+            <div style="display:flex;gap:8px">
+              <input class="input" id="slack-url" placeholder="https://hooks.slack.com/services/T.../B.../..." style="font-family:var(--mono);font-size:11px">
+              <button class="btn btn-primary" onclick="saveSlackWebhook()" style="white-space:nowrap">Save</button>
+              <button class="btn btn-ghost" onclick="testSlackWebhook()" style="white-space:nowrap">Test ↗</button>
+            </div>
+            <div style="margin-top:8px;font-size:11px;color:var(--mu)">Alerts fire when budget thresholds or anomalies are detected.</div>
+          </div>
+          <div>
+            <div class="section-label" style="margin-bottom:8px">Alert triggers</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer"><input type="checkbox" checked style="accent-color:var(--ac)"> Budget threshold exceeded (80%, 100%)</label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer"><input type="checkbox" checked style="accent-color:var(--ac)"> Cost anomaly spike detected</label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer"><input type="checkbox" style="accent-color:var(--ac)"> Webhook delivery failure</label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer"><input type="checkbox" style="accent-color:var(--ac)"> Daily cost summary digest</label>
+            </div>
+          </div>
+        </div>
+        <div id="slack-status" style="display:none"></div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         MODULE 10 — AGENT TRACES
+    ═══════════════════════════════════════════════════════════════════════ -->
+    <div class="view" id="view-traces">
+      <div class="view-title">&#128279; Agent Traces</div>
+      <div class="view-sub muted">Multi-step agent execution — visualise span timelines, costs per step, and identify slow/expensive nodes</div>
+
+      <div class="kpi-grid">
+        <div class="kpi"><div class="kpi-lbl">Traces today</div><div class="kpi-val">1,284</div><div class="kpi-ch dn">&#8679; +12% vs yesterday</div></div>
+        <div class="kpi"><div class="kpi-lbl">Avg trace cost</div><div class="kpi-val" style="color:var(--am)">$0.043</div><div class="kpi-ch flat">3.2 spans/trace avg</div></div>
+        <div class="kpi"><div class="kpi-lbl">P95 trace latency</div><div class="kpi-val">4.8s</div><div class="kpi-ch up">&#8679; +0.4s — investigate</div></div>
+        <div class="kpi"><div class="kpi-lbl">Failed traces</div><div class="kpi-val" style="color:var(--re)">17</div><div class="kpi-ch up">&#9888; 1.3% error rate</div></div>
+      </div>
+
+      <!-- Trace list + timeline viewer -->
+      <div class="g12 mb">
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Recent traces</span><span class="tag tag-gray">LAST 100</span></div>
+          <div id="trace-list" style="max-height:460px;overflow-y:auto"></div>
+        </div>
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Span timeline</span><span id="trace-selected-id" class="tag tag-blue" style="display:none">NONE</span></div>
+          <div id="trace-timeline" style="font-family:var(--mono);font-size:11px;min-height:320px;display:flex;align-items:center;justify-content:center;color:var(--di)">
+            Select a trace to view its span timeline
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-p">
+        <div class="card-hdr"><span class="card-title">Cost breakdown by span type</span></div>
+        <canvas id="traceSpanChart" height="120"></canvas>
       </div>
     </div>
 
@@ -1653,6 +1732,11 @@ if (SUPABASE_CONFIGURED) {
   });
 }
 
+// ── PWA Service Worker ─────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+
 // ── Init ───────────────────────────────────────────
 if (SUPABASE_CONFIGURED) { initAuth().then(() => checkSeedStatus()); } else { setDemoUser(); checkSeedStatus(); }
 
@@ -1672,6 +1756,7 @@ const CMD_ITEMS = [
   { group:'Views', ico:'📈', label:'Enterprise Reporting', action:()=>navTo('reports'), kbd:'7' },
   { group:'Views', ico:'🔒', label:'Security & Governance', action:()=>navTo('security'), kbd:'8' },
   { group:'Views', ico:'🔧', label:'Developer Experience', action:()=>navTo('devx'), kbd:'9' },
+  { group:'Views', ico:'🔗', label:'Agent Traces', action:()=>navTo('traces'), kbd:'0' },
   { group:'Actions', ico:'🌱', label:'Load seed data', action:()=>{ closeCmd(); showSeedPanel(); } },
   { group:'Actions', ico:'⚙️', label:'Open settings', action:()=>{ closeCmd(); openSettings(); } },
   { group:'Actions', ico:'⌨️', label:'Keyboard shortcuts', action:()=>{ closeCmd(); document.getElementById('sh-modal').classList.add('open'); } },
@@ -1732,6 +1817,243 @@ function cmdKey(e) {
   if (e.key === 'Enter') { e.preventDefault(); if (filteredItems[cmdSel]) filteredItems[cmdSel].action(); return; }
 }
 
+// ── SSE Live Stream ────────────────────────────────
+let _sseConn = null;
+let _sseRetry = 0;
+function connectSSE() {
+  const {apiBase, apiKey, org} = getConfig();
+  if (!apiBase || !org) return;
+  const url = `${apiBase}/v1/stream/${org}`;
+  const streamEl = document.getElementById('event-stream');
+  const dotEl    = document.getElementById('sse-dot');
+  const statusEl = document.getElementById('stream-status');
+  try {
+    if (_sseConn) { _sseConn.close(); _sseConn = null; }
+    const es = new EventSource(url + (apiKey ? `?token=${encodeURIComponent(apiKey)}` : ''));
+    _sseConn = es;
+    es.onopen = () => {
+      _sseRetry = 0;
+      dotEl.style.background = 'var(--ac)';
+      dotEl.style.boxShadow  = '0 0 6px var(--ac)';
+      statusEl.textContent   = 'LIVE';
+      statusEl.className     = 'tag tag-green';
+      if (streamEl.querySelector('span[style]')) streamEl.innerHTML = '';
+    };
+    es.onmessage = (ev) => {
+      if (ev.data === ':ping') return;
+      try {
+        const d = JSON.parse(ev.data);
+        const line = document.createElement('div');
+        const ts = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+        const cost = d.cost_total_usd != null ? ` · $${Number(d.cost_total_usd).toFixed(6)}` : '';
+        const tok  = d.total_tokens  != null ? ` · ${d.total_tokens} tok` : '';
+        line.innerHTML = `<span style="color:var(--di)">${ts}</span> <span style="color:var(--ac)">${d.provider||'?'}/${d.model||'?'}</span>${tok}${cost}`;
+        streamEl.appendChild(line);
+        if (streamEl.children.length > 200) streamEl.removeChild(streamEl.firstChild);
+        streamEl.scrollTop = streamEl.scrollHeight;
+      } catch(_) {}
+    };
+    es.onerror = () => {
+      dotEl.style.background = 'var(--re)';
+      dotEl.style.boxShadow  = 'none';
+      statusEl.textContent   = 'RECONNECTING';
+      statusEl.className     = 'tag tag-red';
+      es.close();
+      _sseConn = null;
+      _sseRetry = Math.min(_sseRetry + 1, 8);
+      setTimeout(connectSSE, Math.pow(2, _sseRetry) * 1000);
+    };
+  } catch(e) {
+    statusEl.textContent = 'DEMO MODE';
+    statusEl.className   = 'tag tag-gray';
+    _simulateLiveStream();
+  }
+}
+function _simulateLiveStream() {
+  const streamEl = document.getElementById('event-stream');
+  if (!streamEl) return;
+  const dotEl    = document.getElementById('sse-dot');
+  const statusEl = document.getElementById('stream-status');
+  dotEl.style.background = 'var(--am)';
+  dotEl.style.boxShadow  = '0 0 6px var(--am)';
+  statusEl.textContent   = 'DEMO';
+  statusEl.className     = 'tag tag-amber';
+  streamEl.innerHTML = '';
+  const models = ['gpt-4o','claude-sonnet-4-6','gemini-2.0-flash','gpt-4o-mini','llama-3.3-70b'];
+  const provs  = {
+    'gpt-4o':'openai','claude-sonnet-4-6':'anthropic','gemini-2.0-flash':'google',
+    'gpt-4o-mini':'openai','llama-3.3-70b':'meta'
+  };
+  function emit() {
+    const m = models[Math.floor(Math.random()*models.length)];
+    const tok = Math.floor(Math.random()*2000)+100;
+    const cost = (tok * 0.0000025).toFixed(6);
+    const ts = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const line = document.createElement('div');
+    line.innerHTML = `<span style="color:var(--di)">${ts}</span> <span style="color:var(--ac)">${provs[m]}/${m}</span> · ${tok} tok · $${cost}`;
+    streamEl.appendChild(line);
+    if (streamEl.children.length > 80) streamEl.removeChild(streamEl.firstChild);
+    streamEl.scrollTop = streamEl.scrollHeight;
+    setTimeout(emit, 800 + Math.random()*2400);
+  }
+  setTimeout(emit, 600);
+}
+
+// ── Slack webhook helpers ──────────────────────────
+function saveSlackWebhook() {
+  const url = document.getElementById('slack-url').value.trim();
+  const {apiBase, apiKey, org} = getConfig();
+  if (!url) { showSlackStatus('warn','Enter a Slack webhook URL first.'); return; }
+  if (!apiBase || !org) {
+    localStorage.setItem('slack_webhook_' + org, url);
+    showSlackStatus('ok', 'Saved locally (configure API key to sync with server).');
+    return;
+  }
+  fetch(`${apiBase}/v1/alerts/slack/${org}`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
+    body: JSON.stringify({webhook_url: url}),
+  }).then(r => r.ok
+    ? showSlackStatus('ok','Slack webhook saved successfully.')
+    : showSlackStatus('err','Server error — check your API key and org.')
+  ).catch(() => showSlackStatus('err','Could not reach server. Saved locally.'));
+  localStorage.setItem('slack_webhook_' + org, url);
+}
+function testSlackWebhook() {
+  const {apiBase, apiKey, org} = getConfig();
+  if (!apiBase || !org) { showSlackStatus('warn','Connect to a live backend first.'); return; }
+  fetch(`${apiBase}/v1/alerts/slack/${org}/test`, {
+    method: 'POST',
+    headers: {'Authorization':`Bearer ${apiKey}`},
+  }).then(r => r.ok
+    ? showSlackStatus('ok','Test message sent to Slack!')
+    : showSlackStatus('err','Test failed — check webhook URL.')
+  ).catch(() => showSlackStatus('err','Could not reach server.'));
+}
+function showSlackStatus(type, msg) {
+  const el = document.getElementById('slack-status');
+  const cls = type === 'ok' ? 'success-box' : type === 'warn' ? 'warn-box' : 'warn-box';
+  el.className = cls;
+  el.textContent = msg;
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 5000);
+}
+
+// ── Agent Trace View ───────────────────────────────
+const DEMO_TRACES = [
+  {id:'trc-001',name:'Support Bot',spans:4,cost:0.0412,latency:3820,status:'ok',ts:'14:32:01'},
+  {id:'trc-002',name:'RAG Pipeline',spans:7,cost:0.1240,latency:8410,status:'ok',ts:'14:31:47'},
+  {id:'trc-003',name:'Summariser',spans:2,cost:0.0082,latency:921,status:'ok',ts:'14:31:33'},
+  {id:'trc-004',name:'Code Review Agent',spans:5,cost:0.0891,latency:6230,status:'error',ts:'14:31:12'},
+  {id:'trc-005',name:'Doc Extractor',spans:3,cost:0.0245,latency:2140,status:'ok',ts:'14:30:58'},
+  {id:'trc-006',name:'Support Bot',spans:4,cost:0.0398,latency:3650,status:'ok',ts:'14:30:44'},
+  {id:'trc-007',name:'Email Classifier',spans:2,cost:0.0041,latency:480,status:'ok',ts:'14:30:29'},
+];
+const DEMO_SPANS = {
+  'trc-001': [
+    {name:'router',model:'gpt-4o-mini',dur:210,cost:0.0008,depth:0},
+    {name:'context_retrieval',model:'text-embedding-3-small',dur:380,cost:0.0001,depth:1},
+    {name:'answer_generation',model:'gpt-4o',dur:2940,cost:0.0389,depth:1},
+    {name:'safety_check',model:'claude-haiku-4-5',dur:290,cost:0.0014,depth:2},
+  ],
+  'trc-002': [
+    {name:'query_expand',model:'gpt-4o-mini',dur:180,cost:0.0006,depth:0},
+    {name:'embed_query',model:'text-embedding-3-small',dur:120,cost:0.0001,depth:1},
+    {name:'vector_search',model:null,dur:45,cost:0,depth:1},
+    {name:'rerank_chunks',model:'gpt-4o-mini',dur:340,cost:0.0019,depth:1},
+    {name:'synthesise',model:'claude-sonnet-4-6',dur:5800,cost:0.1120,depth:1},
+    {name:'citation_check',model:'gpt-4o-mini',dur:480,cost:0.0062,depth:2},
+    {name:'format_output',model:null,dur:32,cost:0,depth:2},
+  ],
+};
+function renderTraceList() {
+  const el = document.getElementById('trace-list');
+  if (!el) return;
+  el.innerHTML = DEMO_TRACES.map(t => `
+    <div onclick="showTrace('${t.id}')" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--b1);cursor:pointer;transition:background .1s" onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background='transparent'">
+      <span style="width:7px;height:7px;border-radius:50%;background:${t.status==='ok'?'var(--ac)':'var(--re)'};flex-shrink:0"></span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</div>
+        <div style="font-size:10px;color:var(--mu);font-family:var(--mono)">${t.spans} spans · ${t.latency}ms · $${t.cost.toFixed(4)}</div>
+      </div>
+      <span style="font-family:var(--mono);font-size:10px;color:var(--di)">${t.ts}</span>
+    </div>
+  `).join('');
+}
+function showTrace(id) {
+  const spans = DEMO_SPANS[id] || [];
+  const trace = DEMO_TRACES.find(t => t.id === id);
+  const el = document.getElementById('trace-timeline');
+  const idEl = document.getElementById('trace-selected-id');
+  idEl.textContent = id;
+  idEl.style.display = 'inline-flex';
+  if (!spans.length) {
+    el.innerHTML = '<div style="color:var(--mu);font-size:12px">No span data for this trace</div>';
+    return;
+  }
+  const totalDur = spans.reduce((s,sp) => s + sp.dur, 0);
+  el.innerHTML = spans.map(sp => {
+    const pct = Math.max(2, (sp.dur / Math.max(totalDur, 1)) * 100);
+    const indent = sp.depth * 16;
+    const modelTag = sp.model ? `<span style="color:var(--ac);margin-left:6px">${sp.model}</span>` : '';
+    return `
+      <div style="margin-bottom:10px;padding-left:${indent}px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          ${sp.depth > 0 ? `<span style="color:var(--di);font-size:10px">${'└'.repeat(sp.depth)}</span>` : ''}
+          <span style="font-size:11px;font-weight:500">${sp.name}</span>${modelTag}
+          <span style="margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--mu)">${sp.dur}ms${sp.cost > 0 ? ` · $${sp.cost.toFixed(4)}` : ''}</span>
+        </div>
+        <div style="height:6px;background:var(--bg3);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${sp.model ? 'var(--ac)' : 'var(--bl)'};border-radius:3px;transition:width .4s ease"></div>
+        </div>
+      </div>`;
+  }).join('');
+}
+function initTraceSpanChart() {
+  const ctx = document.getElementById('traceSpanChart');
+  if (!ctx || charts.traceSpan) return;
+  charts.traceSpan = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['LLM call','Embedding','Vector search','Tool call','Formatting'],
+      datasets: [{
+        label: 'Avg cost ($)',
+        data: [0.038, 0.001, 0, 0.012, 0],
+        backgroundColor: ['#00d4a1','#0098ff','#a78bfa','#f59e0b','#6b7b8a'],
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color:'#6b7b8a', font:{size:10} } },
+        y: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color:'#6b7b8a', font:{size:10} } },
+      }
+    }
+  });
+}
+
+// Patch nav() to init trace view on first load
+const _origNav = nav;
+function nav(view, btn) {
+  _origNav(view, btn);
+  if (view === 'traces') {
+    renderTraceList();
+    setTimeout(initTraceSpanChart, 100);
+  }
+}
+
+// ── Start SSE (or demo) on load ────────────────────
+(function initSSE() {
+  const {apiBase, org} = getConfig();
+  if (apiBase && org && apiBase !== 'https://vantage-ingest.onrender.com') {
+    connectSSE();
+  } else {
+    _simulateLiveStream();
+  }
+})();
+
 // ── Keyboard shortcuts ─────────────────────────────
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
@@ -1743,7 +2065,7 @@ document.addEventListener('keydown', e => {
   if (e.key === '?') { document.getElementById('sh-modal').classList.toggle('open'); return; }
   if (e.key === 'Escape') { document.getElementById('sh-modal').classList.remove('open'); return; }
   // Number keys → views
-  const viewMap = { '1':'cost','2':'tokens','3':'models','4':'perf','5':'quality','6':'ai','7':'reports','8':'security','9':'devx' };
+  const viewMap = { '1':'cost','2':'tokens','3':'models','4':'perf','5':'quality','6':'ai','7':'reports','8':'security','9':'devx','0':'traces' };
   if (viewMap[e.key]) { navTo(viewMap[e.key]); return; }
   // R → refresh
   if (e.key === 'r' || e.key === 'R') { refreshData(); return; }

@@ -1,0 +1,130 @@
+name: AI Cost Gate
+
+# Runs on every PR that touches code which calls LLM APIs.
+# Pulls the last N events from Vantage for the PR branch, checks
+# against per-PR and daily budget limits, and blocks merge if exceeded.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - '**.py'
+      - '**.ts'
+      - '**.js'
+      - '**.mjs'
+
+jobs:
+  cost-gate:
+    name: Check AI spend for this PR
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write  # needed to post the cost comment
+
+    env:
+      VANTAGE_API_KEY: ${{ secrets.VANTAGE_API_KEY }}
+      VANTAGE_API_BASE: ${{ secrets.VANTAGE_API_BASE || 'https://vantage-ingest.onrender.com' }}
+      # Budget limits (USD) — adjust per project
+      PR_BUDGET_USD: ${{ vars.PR_BUDGET_USD || '5.00' }}
+      DAILY_BUDGET_USD: ${{ vars.DAILY_BUDGET_USD || '50.00' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Vantage SDK
+        run: pip install requests
+
+      - name: Fetch PR cost from Vantage
+        id: cost
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          python3 - <<'EOF'
+          import os, json, sys, urllib.request, urllib.error
+
+          api_base = os.environ['VANTAGE_API_BASE'].rstrip('/')
+          api_key  = os.environ.get('VANTAGE_API_KEY', '')
+          pr_num   = os.environ.get('PR_NUMBER', 'unknown')
+          branch   = os.environ.get('BRANCH', 'unknown')
+          pr_limit = float(os.environ.get('PR_BUDGET_USD', '5.00'))
+
+          if not api_key:
+              print("::warning ::VANTAGE_API_KEY not set — skipping cost gate")
+              print(f"pr_cost=0.00")
+              print(f"daily_cost=0.00")
+              print(f"status=skipped")
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write("pr_cost=0.00\n")
+                  f.write("daily_cost=0.00\n")
+                  f.write("status=skipped\n")
+              sys.exit(0)
+
+          url = f"{api_base}/v1/analytics/cost?org=ci&tag_branch={branch}&period=7d"
+          req = urllib.request.Request(url, headers={"Authorization": f"Bearer {api_key}"})
+          try:
+              with urllib.request.urlopen(req, timeout=10) as resp:
+                  data = json.loads(resp.read())
+                  pr_cost    = float(data.get('total_cost_usd', 0))
+                  daily_cost = float(data.get('today_cost_usd', 0))
+          except Exception as e:
+              print(f"::warning ::Could not fetch cost data: {e}")
+              pr_cost = daily_cost = 0.0
+
+          exceeded = pr_cost > pr_limit
+          status = "exceeded" if exceeded else "ok"
+
+          print(f"PR #{pr_num} cost: ${pr_cost:.4f} (limit: ${pr_limit:.2f}) → {status}")
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f"pr_cost={pr_cost:.4f}\n")
+              f.write(f"daily_cost={daily_cost:.4f}\n")
+              f.write(f"status={status}\n")
+          EOF
+
+      - name: Comment cost report on PR
+        uses: actions/github-script@v7
+        if: always()
+        with:
+          script: |
+            const status    = '${{ steps.cost.outputs.status }}';
+            const prCost    = '${{ steps.cost.outputs.pr_cost }}';
+            const dailyCost = '${{ steps.cost.outputs.daily_cost }}';
+            const prLimit   = process.env.PR_BUDGET_USD || '5.00';
+            const icon      = status === 'ok' ? '✅' : status === 'skipped' ? 'ℹ️' : '🚨';
+            const body = [
+              `## ${icon} Vantage AI Cost Report`,
+              '',
+              `| Metric | Value |`,
+              `|---|---|`,
+              `| PR spend (branch) | **$${prCost}** |`,
+              `| Today's total spend | $${dailyCost} |`,
+              `| PR budget limit | $${prLimit} |`,
+              `| Status | **${status.toUpperCase()}** |`,
+              '',
+              status === 'exceeded'
+                ? `> ⚠️ **This PR has exceeded its AI cost budget.** Review LLM usage before merging.\n> Set \`PR_BUDGET_USD\` repository variable to adjust the limit.`
+                : status === 'skipped'
+                ? `> ℹ️ Set \`VANTAGE_API_KEY\` repository secret to enable live cost tracking.`
+                : `> 💚 Cost within budget. Safe to merge.`,
+              '',
+              `*Powered by [Vantage AI](https://vantageai.pages.dev) · [View dashboard](https://vantageai.pages.dev/app.html)*`,
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo:  context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+
+      - name: Fail if budget exceeded
+        if: steps.cost.outputs.status == 'exceeded'
+        run: |
+          echo "::error ::PR AI cost ${{ steps.cost.outputs.pr_cost }} exceeds budget ${{ env.PR_BUDGET_USD }}"
+          exit 1

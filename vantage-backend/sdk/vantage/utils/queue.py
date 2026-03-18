@@ -28,12 +28,20 @@ class EventQueue:
     def enqueue(self, event: VantageEvent) -> None:
         try:
             self._q.put_nowait(event)
+            qsize = self._q.qsize()
             if self.debug:
                 logger.debug("[vantage] %s | %s | %d tok | $%.6f",
                              event.provider, event.model,
                              event.usage.total_tokens, event.cost.total_cost_usd)
+            # Warn at 80% capacity before silent drops occur
+            if qsize >= 8_000 and qsize % 500 == 0:
+                logger.warning(
+                    "Vantage queue at %d/10000 — events will be dropped at capacity. "
+                    "Consider reducing flush_interval or batch_size.",
+                    qsize,
+                )
         except queue.Full:
-            logger.warning("Vantage queue full — event dropped")
+            logger.warning("Vantage queue full (10000) — event dropped")
 
     def flush_sync(self) -> None:
         batch: list[VantageEvent] = []

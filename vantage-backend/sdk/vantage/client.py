@@ -113,8 +113,16 @@ class VantageClient:
 
         try:
             self._queue.put_nowait(event)
+            # Warn early at 80% capacity (8000/10000) to give time to react
+            qsize = self._queue.qsize()
+            if qsize >= 8_000 and qsize % 500 == 0:
+                logger.warning(
+                    "[vantage] Queue at %d/10000 — flush_interval may be too slow; "
+                    "events will be dropped at capacity",
+                    qsize,
+                )
         except queue.Full:
-            logger.warning("[vantage] Queue full — dropping event")
+            logger.warning("[vantage] Queue full (10000) — dropping event silently")
 
         # Trigger async hallucination scoring if we have content
         if (
