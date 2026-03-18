@@ -1,0 +1,14 @@
+{
+  "recommendations": [
+    "cloudflare.cloudflare-vscode-extension",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "formulahendry.auto-rename-tag",
+    "bradlc.vscode-tailwindcss",
+    "github.vscode-github-actions",
+    "eamodio.gitlens",
+    "ms-vscode.live-server",
+    "streetsidesoftware.code-spell-checker",
+    "usernamehw.errorlens"
+  ]
+}

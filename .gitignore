@@ -29,8 +29,8 @@ Thumbs.db
 *.log
 npm-debug.log*
 
-# Editor
-.vscode/
+# Editor (personal settings excluded, shared config committed)
+.vscode/*.code-workspace
 .idea/
 
 # Wrangler

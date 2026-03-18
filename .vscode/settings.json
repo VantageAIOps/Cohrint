@@ -1,0 +1,41 @@
+{
+  "editor.formatOnSave": true,
+  "editor.tabSize": 2,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "[html]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.python",
+    "editor.tabSize": 4
+  },
+  "files.exclude": {
+    "**/.DS_Store": true,
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    "**/node_modules": true,
+    "**/.wrangler": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.wrangler": true,
+    "**/dist": true
+  },
+  "cloudflare.autoConfigure": true,
+  "liveServer.settings.root": "/vantage-final-v4",
+  "liveServer.settings.port": 5500,
+  "terminal.integrated.env.osx": {
+    "CLOUDFLARE_API_TOKEN": "${env:CLOUDFLARE_API_TOKEN}",
+    "CLOUDFLARE_ACCOUNT_ID": "${env:CLOUDFLARE_ACCOUNT_ID}"
+  },
+  "editor.rulers": [120],
+  "workbench.colorCustomizations": {
+    "activityBar.background": "#080c0f",
+    "sideBar.background": "#0d1318",
+    "statusBar.background": "#00d4a1",
+    "statusBar.foreground": "#000000"
+  }
+}

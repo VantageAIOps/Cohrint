@@ -1,0 +1,46 @@
+name: Deploy to Cloudflare Pages
+
+on:
+  push:
+    branches:
+      - main          # → production
+      - preview       # → preview environment
+    paths:
+      - 'vantage-final-v4/**'
+      - 'wrangler.toml'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:  # manual trigger from GitHub UI
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy VantageAI Frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Wrangler
+        run: npm install -g wrangler
+
+      - name: Determine branch
+        id: branch
+        run: echo "branch=${GITHUB_REF##*/}" >> $GITHUB_OUTPUT
+
+      - name: Deploy to Cloudflare Pages
+        run: |
+          wrangler pages deploy ./vantage-final-v4 \
+            --project-name=vantageai \
+            --branch=${{ steps.branch.outputs.branch }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Comment deployment URL
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: echo "✅ Deployed to production — https://vantageai.pages.dev"

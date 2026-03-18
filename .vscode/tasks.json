@@ -1,0 +1,78 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "☁️  CF: Deploy to Production",
+      "type": "shell",
+      "command": "wrangler pages deploy",
+      "group": { "kind": "build", "isDefault": true },
+      "presentation": {
+        "reveal": "always", "focus": true, "panel": "shared", "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🔍  CF: Preview Deploy",
+      "type": "shell",
+      "command": "wrangler pages deploy --branch=preview",
+      "presentation": {
+        "reveal": "always", "focus": true, "panel": "shared", "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🏠  CF: Local Dev Server (port 8788)",
+      "type": "shell",
+      "command": "wrangler pages dev --port=8788 --live-reload",
+      "presentation": {
+        "reveal": "always", "focus": true, "panel": "dedicated", "clear": true
+      },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "📋  CF: List Deployments",
+      "type": "shell",
+      "command": "wrangler pages deployment list",
+      "presentation": {
+        "reveal": "always", "focus": true, "panel": "shared", "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "📊  CF: Tail Logs",
+      "type": "shell",
+      "command": "wrangler pages deployment tail --format=pretty",
+      "presentation": {
+        "reveal": "always", "focus": true, "panel": "dedicated", "clear": true
+      },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "🔑  CF: Whoami",
+      "type": "shell",
+      "command": "wrangler whoami",
+      "presentation": {
+        "reveal": "always", "focus": true, "panel": "shared", "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🔐  CF: Login",
+      "type": "shell",
+      "command": "wrangler login",
+      "presentation": {
+        "reveal": "always", "focus": true, "panel": "shared", "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🌐  CF: Open Dashboard",
+      "type": "shell",
+      "command": "open https://dash.cloudflare.com/pages",
+      "presentation": { "reveal": "silent", "panel": "shared" },
+      "problemMatcher": []
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+name = "vantageai"
+compatibility_date = "2024-01-01"
+pages_build_output_dir = "./vantage-final-v4"
+
+# ── Environment variables (non-secret, commit-safe)
+[vars]
+ENVIRONMENT = "production"
+
+# ── Preview environment
+[env.preview.vars]
+ENVIRONMENT = "preview"

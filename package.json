@@ -1,0 +1,23 @@
+{
+  "name": "vantageai",
+  "version": "1.0.0",
+  "description": "VantageAI — AI Cost Intelligence Platform",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler pages dev --port=8788 --live-reload",
+    "deploy": "wrangler pages deploy",
+    "deploy:preview": "wrangler pages deploy --branch=preview",
+    "deploy:prod": "npm run deploy",
+    "logs": "wrangler pages deployment tail --format=pretty",
+    "deployments": "wrangler pages deployment list",
+    "login": "wrangler login",
+    "whoami": "wrangler whoami",
+    "check": "node -e \"const h=['index.html','app.html','auth.html','calculator.html','docs.html','signup.html'].map(f=>require('fs').existsSync('./vantage-final-v4/'+f));console.log('Files:',h.every(Boolean)?'✓ all present':'✗ missing files');\""
+  },
+  "devDependencies": {
+    "wrangler": "^3.101.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

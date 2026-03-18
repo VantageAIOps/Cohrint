@@ -1,0 +1,46 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "🏠 Local Dev (Cloudflare Pages)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "wrangler",
+        "pages",
+        "dev",
+        "./vantage-final-v4",
+        "--port=8788",
+        "--live-reload"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "🐍 Python Backend (FastAPI)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": [
+        "server.main:app",
+        "--reload",
+        "--host=0.0.0.0",
+        "--port=8000"
+      ],
+      "cwd": "${workspaceFolder}/vantage-backend",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/vantage-backend/.env"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "🚀 Full Stack (Frontend + Backend)",
+      "configurations": [
+        "🏠 Local Dev (Cloudflare Pages)",
+        "🐍 Python Backend (FastAPI)"
+      ],
+      "stopAll": true
+    }
+  ]
+}
