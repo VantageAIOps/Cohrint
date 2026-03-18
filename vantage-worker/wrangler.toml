@@ -1,0 +1,39 @@
+name            = "vantage-api"
+main            = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# ── D1 Database (events, orgs, config) ───────────────────────────────────────
+# After running `npm run db:create`, replace the placeholder IDs below.
+[[d1_databases]]
+binding      = "DB"
+database_name = "vantage-events"
+database_id  = "REPLACE_WITH_D1_DATABASE_ID"
+
+# ── KV Namespace (rate limiting, Slack configs, org cache) ───────────────────
+# After running `npm run kv:create`, replace the placeholder ID below.
+[[kv_namespaces]]
+binding = "KV"
+id      = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+# ── Environment variables (non-secret) ───────────────────────────────────────
+[vars]
+ENVIRONMENT        = "production"
+SUPABASE_URL       = "https://oyljzpvwdfktrkeotmon.supabase.co"
+ALLOWED_ORIGINS    = "https://vantageai.pages.dev,https://vantageai.aman-lpucse.workers.dev"
+RATE_LIMIT_RPM     = "1000"
+
+# ── Secrets (set via: wrangler secret put SECRET_NAME) ───────────────────────
+# SUPABASE_SERVICE_KEY — Supabase service role key (for server-side auth verify)
+# SUPABASE_ANON_KEY    — Supabase anon key
+
+# ── Routes — bind Worker to pages.dev subdomain API path ─────────────────────
+# Uncomment once custom domain is set up:
+# routes = [{ pattern = "api.vantageai.pages.dev/*", zone_name = "pages.dev" }]
+
+# ── Preview environment ───────────────────────────────────────────────────────
+[env.preview]
+name = "vantage-api-preview"
+[env.preview.vars]
+ENVIRONMENT     = "preview"
+ALLOWED_ORIGINS = "http://localhost:*,https://*.vantageai.pages.dev"
