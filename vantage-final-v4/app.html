@@ -1581,7 +1581,7 @@ function rebuildAll(){
   Object.values(charts).forEach(c=>c.destroy());
   charts={};
   // Reset inited flags
-  ["cost","tokens","models","perf","quality","ai","reports","security","devx"].forEach(v=>{window["inited_"+v]=false;});
+  ["cost","tokens","models","perf","quality","ai","reports","security","devx","traces"].forEach(v=>{window["inited_"+v]=false;});
   // Re-init active view
   const active=document.querySelector(".view.active");
   if(active){
@@ -1595,7 +1595,7 @@ init_cost(); window["inited_cost"]=true;
 </script>
 
 <!-- Seed data overlay panel -->
-<div id="seed-panel" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)" onclick="if(event.target===this)hideSeedPanel()">
+<div id="seed-panel" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(4px)" onclick="if(event.target===this)hideSeedPanel()">
   <div style="background:var(--bg2);border:1px solid var(--b2);border-radius:20px;padding:40px;width:100%;max-width:500px;margin:24px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
       <div style="font-size:18px;font-weight:500">&#127806; Seed test data</div>
@@ -1982,7 +1982,6 @@ function renderTraceList() {
 }
 function showTrace(id) {
   const spans = DEMO_SPANS[id] || [];
-  const trace = DEMO_TRACES.find(t => t.id === id);
   const el = document.getElementById('trace-timeline');
   const idEl = document.getElementById('trace-selected-id');
   idEl.textContent = id;
@@ -2034,15 +2033,11 @@ function initTraceSpanChart() {
   });
 }
 
-// Patch nav() to init trace view on first load
-const _origNav = nav;
-function nav(view, btn) {
-  _origNav(view, btn);
-  if (view === 'traces') {
-    renderTraceList();
-    setTimeout(initTraceSpanChart, 100);
-  }
-}
+// Register traces lazy-init (same pattern as all other views)
+window.init_traces = function() {
+  renderTraceList();
+  setTimeout(initTraceSpanChart, 100);
+};
 
 // ── Start SSE (or demo) on load ────────────────────
 (function initSSE() {

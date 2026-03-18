@@ -2,12 +2,15 @@
  * Vantage AI — Service Worker
  * Provides offline shell + cache-first for static assets.
  */
-const CACHE = 'vantage-v1';
+const CACHE = 'vantage-v2';
 const SHELL = [
   '/',
   '/index.html',
   '/app.html',
   '/docs.html',
+  '/calculator.html',
+  '/privacy.html',
+  '/terms.html',
   '/manifest.json',
   '/seed-data.js',
   '/vantage-models.js',

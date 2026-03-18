@@ -8,6 +8,10 @@
 <meta property="og:title" content="Vantage AI — AI Cost Intelligence">
 <meta property="og:description" content="One line of code. Full visibility into your AI spending.">
 <meta property="og:type" content="website">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#00d4a1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -643,8 +647,8 @@ response = client.chat.completions.<span class="c-func">create</span>(
     <a href="/docs.html">Docs</a>
     
     <a href="mailto:hello@vantage.ai">Contact</a>
-    <a href="/privacy">Privacy</a>
-    <a href="/terms">Terms</a>
+    <a href="/privacy.html">Privacy</a>
+    <a href="/terms.html">Terms</a>
   </div>
   <span style="color:var(--dim)">© 2026 Vantage AI</span>
 </footer>
@@ -761,6 +765,7 @@ function closeMobileNav() {
 document.addEventListener('click', e => {
   if (!e.target.closest('nav') && !e.target.closest('#navMobile')) closeMobileNav();
 });
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
 </script>
 </body>
 </html>
