@@ -1,5 +1,10 @@
 # Cloudflare Pages _redirects
-# Only simple 301 redirects for clean URLs — no 200 rewrites (they cause loops on workers.dev)
-/login        /auth.html    301
-/dashboard    /app.html     301
-/pricing      /signup.html  301
+# Clean URL aliases → actual .html files
+/login        /auth.html       301
+/dashboard    /app.html        301
+/pricing      /signup.html     301
+/calculator   /calculator.html 301
+/docs         /docs.html       301
+/signup       /signup.html     301
+/privacy      /privacy.html    301
+/terms        /terms.html      301
