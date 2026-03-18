@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Docs — Vantage AI</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#00d4a1">
+<link rel="canonical" href="https://vantageai.pages.dev/docs.html">
+<meta property="og:url" content="https://vantageai.pages.dev/docs.html">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -208,7 +212,7 @@ response = client.chat.completions.<span class="c-func">create</span>(
 <span class="c-keyword">const</span> openai = <span class="c-func">createOpenAIProxy</span>(<span class="c-keyword">new</span> <span class="c-var">OpenAI</span>());</pre></div>
 
 <div class="step-row"><div class="step-num">3</div><div class="step-body">Get your API key — free, no credit card</div></div>
-<p>Sign up at <a href="/signup.html" style="color:var(--accent)">app.vantage.ai</a> and copy your key from Settings → API Keys. Keys start with <code>vnt_</code>.</p>
+<p>Sign up at <a href="/signup.html" style="color:var(--accent)">vantageai.pages.dev</a> and copy your key from Settings → API Keys. Keys start with <code>vnt_</code>.</p>
 
 <div class="info-box">💡 <strong style="color:var(--text)">No key? No problem.</strong> Vantage silently skips logging if <code>api_key</code> is missing or invalid. Your app won't break — you just won't see data in the dashboard.</div>`,
 
@@ -542,7 +546,7 @@ vantage.<span class="c-func">tag</span>(<span class="c-string">"user_id"</span>,
 alerts: `
 <h1>Budget alerts</h1>
 <h2>Dashboard configuration</h2>
-<p>Configure alerts at <a href="/app.html" style="color:var(--accent)">app.vantage.ai/alerts</a> — no code required. Set thresholds by team, feature, or total org spend.</p>
+<p>Configure alerts at <a href="/app.html" style="color:var(--accent)">vantageai.pages.dev/app.html</a> — no code required. Set thresholds by team, feature, or total org spend.</p>
 <h2>Alert types</h2>
 <table class="api-table"><thead><tr><th>Type</th><th>Triggers when</th></tr></thead><tbody>
 <tr><td>Budget threshold</td><td>MTD spend exceeds X% of set budget</td></tr>
@@ -584,7 +588,7 @@ vantage.<span class="c-func">init</span>(<span class="c-var">api_key</span>=<spa
 api: `
 <h1>REST API</h1>
 <h2>Base URL</h2>
-<pre>https://ingest.vantage.ai</pre>
+<pre>https://vantage-ingest.onrender.com</pre>
 <h2>Authentication</h2>
 <pre>Authorization: Bearer vnt_your_key
 X-Vantage-Org: your_org_id</pre>
