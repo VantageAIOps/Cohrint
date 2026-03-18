@@ -303,31 +303,106 @@ message = claude.messages.<span class="c-func">create</span>(
 
 typescript: `
 <h1>TypeScript / JavaScript SDK</h1>
-<h2>Basic usage</h2>
-<pre><span class="c-keyword">import</span> { <span class="c-func">init</span>, <span class="c-func">createOpenAIProxy</span>, <span class="c-func">createAnthropicProxy</span> } <span class="c-keyword">from</span> <span class="c-string">"vantage-ai"</span>;
+<p>Full-featured SDK for Node.js 18+. Supports ESM and CommonJS. Zero required dependencies — provider packages are optional.</p>
+
+<h2>Install</h2>
+<pre>npm install vantage-ai          <span class="c-comment"># core SDK</span>
+npm install openai               <span class="c-comment"># if using OpenAI proxy</span>
+npm install @anthropic-ai/sdk    <span class="c-comment"># if using Anthropic proxy</span></pre>
+
+<h2>Quickstart — OpenAI</h2>
+<pre><span class="c-keyword">import</span> { <span class="c-func">init</span>, <span class="c-func">createOpenAIProxy</span> } <span class="c-keyword">from</span> <span class="c-string">"vantage-ai"</span>;
 <span class="c-keyword">import</span> <span class="c-var">OpenAI</span> <span class="c-keyword">from</span> <span class="c-string">"openai"</span>;
+
+<span class="c-comment">// 1. Initialise once at app startup</span>
+<span class="c-func">init</span>({ <span class="c-var">apiKey</span>: process.env.<span class="c-var">VANTAGE_API_KEY</span>! });
+
+<span class="c-comment">// 2. Wrap your existing client — no other changes</span>
+<span class="c-keyword">const</span> openai = <span class="c-func">createOpenAIProxy</span>(<span class="c-keyword">new</span> <span class="c-var">OpenAI</span>());
+
+<span class="c-comment">// 3. Use exactly as before</span>
+<span class="c-keyword">const</span> res = <span class="c-keyword">await</span> openai.chat.completions.<span class="c-func">create</span>({
+  <span class="c-var">model</span>: <span class="c-string">"gpt-4o"</span>,
+  <span class="c-var">messages</span>: [{ <span class="c-var">role</span>: <span class="c-string">"user"</span>, <span class="c-var">content</span>: <span class="c-string">"Hello!"</span> }],
+});
+<span class="c-comment">// ✓ Cost: $0.000110  ✓ Tokens: 12 in / 8 out  ✓ Latency: 423ms
+// ✓ Cheapest alternative: gemini-2.0-flash — save 94%</span></pre>
+
+<h2>Quickstart — Anthropic</h2>
+<pre><span class="c-keyword">import</span> { <span class="c-func">init</span>, <span class="c-func">createAnthropicProxy</span> } <span class="c-keyword">from</span> <span class="c-string">"vantage-ai"</span>;
 <span class="c-keyword">import</span> <span class="c-var">Anthropic</span> <span class="c-keyword">from</span> <span class="c-string">"@anthropic-ai/sdk"</span>;
 
-<span class="c-func">init</span>({
-  <span class="c-var">apiKey</span>: process.env.<span class="c-var">VANTAGE_API_KEY</span>!,
-  <span class="c-var">environment</span>: process.env.<span class="c-var">NODE_ENV</span> ?? <span class="c-string">"development"</span>,
-  <span class="c-var">debug</span>: process.env.<span class="c-var">NODE_ENV</span> !== <span class="c-string">"production"</span>,
+<span class="c-func">init</span>({ <span class="c-var">apiKey</span>: process.env.<span class="c-var">VANTAGE_API_KEY</span>! });
+<span class="c-keyword">const</span> claude = <span class="c-func">createAnthropicProxy</span>(<span class="c-keyword">new</span> <span class="c-var">Anthropic</span>());
+
+<span class="c-keyword">const</span> msg = <span class="c-keyword">await</span> claude.messages.<span class="c-func">create</span>({
+  <span class="c-var">model</span>: <span class="c-string">"claude-sonnet-4-6"</span>,
+  <span class="c-var">max_tokens</span>: <span class="c-num">1024</span>,
+  <span class="c-var">system</span>: <span class="c-string">"You are a helpful assistant."</span>,
+  <span class="c-var">messages</span>: [{ <span class="c-var">role</span>: <span class="c-string">"user"</span>, <span class="c-var">content</span>: <span class="c-string">"Summarise this report."</span> }],
+});</pre>
+
+<h2>Streaming support</h2>
+<pre><span class="c-comment">// Streaming works transparently — tokens and TTFT captured automatically</span>
+<span class="c-keyword">const</span> stream = <span class="c-keyword">await</span> openai.chat.completions.<span class="c-func">create</span>({
+  <span class="c-var">model</span>: <span class="c-string">"gpt-4o"</span>,
+  <span class="c-var">messages</span>: [{ <span class="c-var">role</span>: <span class="c-string">"user"</span>, <span class="c-var">content</span>: <span class="c-string">"Write a haiku."</span> }],
+  <span class="c-var">stream</span>: <span class="c-keyword">true</span>,
 });
+<span class="c-keyword">for await</span> (<span class="c-keyword">const</span> chunk <span class="c-keyword">of</span> stream) {
+  process.stdout.<span class="c-func">write</span>(chunk.choices[<span class="c-num">0</span>]?.delta?.content ?? <span class="c-string">""</span>);
+}
+<span class="c-comment">// ✓ TTFT, total latency, and token cost all captured</span></pre>
 
-<span class="c-keyword">const</span> openai  = <span class="c-func">createOpenAIProxy</span>(<span class="c-keyword">new</span> <span class="c-var">OpenAI</span>());
-<span class="c-keyword">const</span> claude  = <span class="c-func">createAnthropicProxy</span>(<span class="c-keyword">new</span> <span class="c-var">Anthropic</span>());
+<h2>Context tagging with trace()</h2>
+<pre><span class="c-keyword">import</span> { <span class="c-func">trace</span> } <span class="c-keyword">from</span> <span class="c-string">"vantage-ai"</span>;
 
-<span class="c-comment">// Identical API to the original clients</span>
-<span class="c-keyword">const</span> res = <span class="c-keyword">await</span> openai.chat.completions.<span class="c-func">create</span>({ ... });</pre>
+<span class="c-comment">// Wrap any async block — all AI calls inside inherit this context</span>
+<span class="c-keyword">await</span> <span class="c-func">trace</span>({
+  <span class="c-var">userId</span>: <span class="c-string">"user_123"</span>,
+  <span class="c-var">feature</span>: <span class="c-string">"summariser"</span>,
+  <span class="c-var">project</span>: <span class="c-string">"support-bot"</span>,
+  <span class="c-var">team</span>: <span class="c-string">"product"</span>,
+}, <span class="c-keyword">async</span> () => {
+  <span class="c-keyword">const</span> result = <span class="c-keyword">await</span> openai.chat.completions.<span class="c-func">create</span>({ ... });
+  <span class="c-comment">// Cost attributed to userId + feature + team in dashboard</span>
+});</pre>
+
+<h2>Full init options</h2>
+<pre><span class="c-func">init</span>({
+  <span class="c-var">apiKey</span>:       <span class="c-string">"vnt_your_key"</span>,        <span class="c-comment">// required</span>
+  <span class="c-var">org</span>:          <span class="c-string">"your_org_id"</span>,         <span class="c-comment">// optional — parsed from key if omitted</span>
+  <span class="c-var">environment</span>:  <span class="c-string">"production"</span>,          <span class="c-comment">// default: "production"</span>
+  <span class="c-var">team</span>:         <span class="c-string">"platform"</span>,            <span class="c-comment">// default team tag</span>
+  <span class="c-var">project</span>:      <span class="c-string">"my-app"</span>,              <span class="c-comment">// default project tag</span>
+  <span class="c-var">ingestUrl</span>:    <span class="c-string">"https://ingest.vantage.ai"</span>,
+  <span class="c-var">flushInterval</span>: <span class="c-num">2</span>,                   <span class="c-comment">// seconds between auto-flush</span>
+  <span class="c-var">batchSize</span>:    <span class="c-num">50</span>,                    <span class="c-comment">// events per HTTP request</span>
+  <span class="c-var">debug</span>:        <span class="c-keyword">false</span>,                 <span class="c-comment">// log events to console</span>
+});</pre>
 
 <h2>Pricing utilities</h2>
-<pre><span class="c-keyword">import</span> { <span class="c-func">getAllCostsForUsage</span>, <span class="c-func">calculateCost</span> } <span class="c-keyword">from</span> <span class="c-string">"vantage-ai"</span>;
+<pre><span class="c-keyword">import</span> { <span class="c-func">calculateCost</span>, <span class="c-func">findCheapest</span>, <span class="c-var">PRICES</span> } <span class="c-keyword">from</span> <span class="c-string">"vantage-ai"</span>;
 
-<span class="c-comment">// Compare all models for your usage</span>
-<span class="c-keyword">const</span> results = <span class="c-func">getAllCostsForUsage</span>(<span class="c-num">10000</span>, <span class="c-num">2000</span>);
-results.slice(<span class="c-num">0</span>,<span class="c-num">5</span>).<span class="c-func">forEach</span>(r =>
-  console.<span class="c-func">log</span>(<span class="c-string">\`\${r.model}: $\${r.totalCost.toFixed(4)}\`</span>)
-);</pre>`,
+<span class="c-comment">// Cost for a specific model + token count</span>
+<span class="c-keyword">const</span> cost = <span class="c-func">calculateCost</span>(<span class="c-string">"gpt-4o"</span>, <span class="c-num">10_000</span>, <span class="c-num">2_000</span>);
+console.<span class="c-func">log</span>(cost.totalCostUsd); <span class="c-comment">// → 0.045</span>
+
+<span class="c-comment">// Find cheapest alternative for same token count</span>
+<span class="c-keyword">const</span> alt = <span class="c-func">findCheapest</span>(<span class="c-string">"gpt-4o"</span>, <span class="c-num">10_000</span>, <span class="c-num">2_000</span>);
+console.<span class="c-func">log</span>(<span class="c-string">\`Switch to \${alt.model} → save \${((cost.totalCostUsd - alt.costUsd) / cost.totalCostUsd * 100).toFixed(0)}%\`</span>);
+
+<span class="c-comment">// All 23 model prices</span>
+console.<span class="c-func">log</span>(<span class="c-var">PRICES</span>[<span class="c-string">"claude-sonnet-4-6"</span>]); <span class="c-comment">// → { provider: "anthropic", input: 3, output: 15, ... }</span></pre>
+
+<h2>Graceful shutdown</h2>
+<pre><span class="c-keyword">import</span> { <span class="c-func">shutdown</span> } <span class="c-keyword">from</span> <span class="c-string">"vantage-ai"</span>;
+
+<span class="c-comment">// Flush remaining events before process exits</span>
+process.<span class="c-func">on</span>(<span class="c-string">"SIGTERM"</span>, <span class="c-keyword">async</span> () => {
+  <span class="c-func">shutdown</span>();  <span class="c-comment">// flushes queue and stops background timer</span>
+  process.<span class="c-func">exit</span>(<span class="c-num">0</span>);
+});</pre>`,
 
 mcp: `
 <h1>MCP Server</h1>

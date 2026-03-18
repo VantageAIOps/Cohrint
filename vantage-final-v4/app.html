@@ -747,42 +747,124 @@ button{font-family:var(--sans);cursor:pointer}
 
       <div class="g2">
         <div class="card card-p">
-          <div class="card-hdr"><span class="card-title">Quickstart — Python</span><div class="toggle"><button class="toggle-btn active" onclick="sdkTab('py',this)">Python</button><button class="toggle-btn" onclick="sdkTab('ts',this)">TypeScript</button><button class="toggle-btn" onclick="sdkTab('curl',this)">cURL</button></div></div>
-          <div id="sdk-py" class="code-block" style="font-size:11px">
-<span class="c-cm"># Install</span>
-pip install vantage-ai[openai]
+          <div class="card-hdr">
+            <span class="card-title">SDK Quickstart</span>
+            <div class="toggle">
+              <button class="toggle-btn active" onclick="sdkTab('py',this)">Python</button>
+              <button class="toggle-btn" onclick="sdkTab('ts-oai',this)">TS · OpenAI</button>
+              <button class="toggle-btn" onclick="sdkTab('ts-ant',this)">TS · Anthropic</button>
+              <button class="toggle-btn" onclick="sdkTab('ts-trace',this)">TS · Trace</button>
+              <button class="toggle-btn" onclick="sdkTab('curl',this)">cURL</button>
+            </div>
+          </div>
 
-<span class="c-cm"># Usage — 2 line change</span>
+          <!-- Python -->
+          <div id="sdk-py" class="code-block" style="font-size:11px">
+<span class="c-cm"># 1. Install</span>
+pip install vantage-ai[openai]          <span class="c-cm"># or [anthropic]</span>
+
+<span class="c-cm"># 2. Wrap your client (2 line change)</span>
 <span class="c-kw">import</span> vantage
 <span class="c-kw">from</span> vantage.proxy.openai_proxy <span class="c-kw">import</span> OpenAI
 
-vantage.<span class="c-fn">init</span>(<span class="c-str">"vnt_acme_xxxxxxxxxxxx"</span>)
+vantage.<span class="c-fn">init</span>(api_key=<span class="c-str">"vnt_your_key"</span>)
 client = <span class="c-fn">OpenAI</span>(api_key=<span class="c-str">"sk-..."</span>)
 
-<span class="c-cm"># Identical API — Vantage wraps transparently</span>
+<span class="c-cm"># 3. Use exactly as before</span>
 response = client.chat.completions.<span class="c-fn">create</span>(
     model=<span class="c-str">"gpt-4o"</span>,
     messages=[{<span class="c-str">"role"</span>: <span class="c-str">"user"</span>, <span class="c-str">"content"</span>: <span class="c-str">"Hello"</span>}]
 )
-<span class="c-cm"># ✓ Cost: $0.000110 | Tokens: 12+8 | Latency: 423ms</span></div>
-          <div id="sdk-ts" class="code-block" style="display:none;font-size:11px">
-<span class="c-cm">// Install</span>
+<span class="c-cm"># ✓ Cost: $0.000110  ✓ Tokens: 12+8  ✓ Latency: 423ms
+# ✓ Cheapest alt: gemini-2.0-flash — save 94%</span></div>
+
+          <!-- TypeScript · OpenAI -->
+          <div id="sdk-ts-oai" class="code-block" style="display:none;font-size:11px">
+<span class="c-cm">// 1. Install</span>
 npm install vantage-ai openai
 
-<span class="c-cm">// Usage</span>
+<span class="c-cm">// 2. Init once at startup</span>
 <span class="c-kw">import</span> { init, createOpenAIProxy } <span class="c-kw">from</span> <span class="c-str">"vantage-ai"</span>;
 <span class="c-kw">import</span> OpenAI <span class="c-kw">from</span> <span class="c-str">"openai"</span>;
 
-<span class="c-fn">init</span>({ apiKey: <span class="c-str">"vnt_acme_xxxxxxxxxxxx"</span> });
+<span class="c-fn">init</span>({ apiKey: process.env.<span class="c-fn">VANTAGE_API_KEY</span> });
+
+<span class="c-cm">// 3. Wrap your client — identical API</span>
 <span class="c-kw">const</span> openai = <span class="c-fn">createOpenAIProxy</span>(<span class="c-kw">new</span> <span class="c-fn">OpenAI</span>());
 
-<span class="c-kw">const</span> res = <span class="c-kw">await</span> openai.chat.completions.<span class="c-fn">create</span>({ ... });</div>
+<span class="c-kw">const</span> res = <span class="c-kw">await</span> openai.chat.completions.<span class="c-fn">create</span>({
+  model: <span class="c-str">"gpt-4o"</span>,
+  messages: [{ role: <span class="c-str">"user"</span>, content: <span class="c-str">"Hello!"</span> }],
+});
+<span class="c-cm">// ✓ Streaming also works — pass stream: true as usual</span></div>
+
+          <!-- TypeScript · Anthropic -->
+          <div id="sdk-ts-ant" class="code-block" style="display:none;font-size:11px">
+<span class="c-cm">// 1. Install</span>
+npm install vantage-ai @anthropic-ai/sdk
+
+<span class="c-kw">import</span> { init, createAnthropicProxy } <span class="c-kw">from</span> <span class="c-str">"vantage-ai"</span>;
+<span class="c-kw">import</span> Anthropic <span class="c-kw">from</span> <span class="c-str">"@anthropic-ai/sdk"</span>;
+
+<span class="c-fn">init</span>({ apiKey: process.env.<span class="c-fn">VANTAGE_API_KEY</span> });
+<span class="c-kw">const</span> claude = <span class="c-fn">createAnthropicProxy</span>(<span class="c-kw">new</span> <span class="c-fn">Anthropic</span>());
+
+<span class="c-kw">const</span> msg = <span class="c-kw">await</span> claude.messages.<span class="c-fn">create</span>({
+  model: <span class="c-str">"claude-sonnet-4-6"</span>,
+  max_tokens: <span class="c-num">1024</span>,
+  system: <span class="c-str">"You are a helpful assistant."</span>,
+  messages: [{ role: <span class="c-str">"user"</span>, content: <span class="c-str">"Summarise this."</span> }],
+});
+<span class="c-cm">// ✓ Cache tokens, TTFT, and cost all captured automatically</span></div>
+
+          <!-- TypeScript · Trace context -->
+          <div id="sdk-ts-trace" class="code-block" style="display:none;font-size:11px">
+<span class="c-cm">// Attribute costs to users, features, and teams</span>
+<span class="c-kw">import</span> { trace } <span class="c-kw">from</span> <span class="c-str">"vantage-ai"</span>;
+
+<span class="c-kw">await</span> <span class="c-fn">trace</span>({
+  userId:  <span class="c-str">"user_123"</span>,
+  feature: <span class="c-str">"summariser"</span>,
+  project: <span class="c-str">"support-bot"</span>,
+  team:    <span class="c-str">"product"</span>,
+}, <span class="c-kw">async</span> () => {
+  <span class="c-cm">// All AI calls inside inherit this context</span>
+  <span class="c-kw">const</span> res = <span class="c-kw">await</span> openai.chat.completions.<span class="c-fn">create</span>({ <span class="c-cm">...</span> });
+  <span class="c-cm">// → cost attributed to userId + feature + team in dashboard</span>
+});
+
+<span class="c-cm">// Pricing utilities — no API call needed</span>
+<span class="c-kw">import</span> { calculateCost, findCheapest } <span class="c-kw">from</span> <span class="c-str">"vantage-ai"</span>;
+
+<span class="c-kw">const</span> cost = <span class="c-fn">calculateCost</span>(<span class="c-str">"gpt-4o"</span>, <span class="c-num">10_000</span>, <span class="c-num">2_000</span>);
+<span class="c-kw">const</span> alt  = <span class="c-fn">findCheapest</span>(<span class="c-str">"gpt-4o"</span>, <span class="c-num">10_000</span>, <span class="c-num">2_000</span>);
+console.<span class="c-fn">log</span>(`Save ${((cost.totalCostUsd - alt.costUsd) / cost.totalCostUsd * 100).<span class="c-fn">toFixed</span>(0)}% with ${alt.model}`);</div>
+
+          <!-- cURL -->
           <div id="sdk-curl" class="code-block" style="display:none;font-size:11px">
-<span class="c-cm"># Ingest events directly</span>
+<span class="c-cm"># Ingest events directly via REST</span>
 curl -X POST https://ingest.vantage.ai/v1/events \
-  -H <span class="c-str">"Authorization: Bearer vnt_acme_xxx"</span> \
+  -H <span class="c-str">"Authorization: Bearer vnt_your_key"</span> \
   -H <span class="c-str">"Content-Type: application/json"</span> \
-  -d <span class="c-str">'{"events": [...]}'</span></div>
+  -d <span class="c-str">'{"events": [{
+    "event_id": "abc-123",
+    "provider": "openai",
+    "model": "gpt-4o",
+    "prompt_tokens": 500,
+    "completion_tokens": 120,
+    "latency_ms": 843,
+    "cost_total_usd": 0.00245,
+    "team": "product",
+    "feature": "summariser"
+  }]}'</span></div>
+
+          <div style="margin-top:10px;display:flex;align-items:center;gap:10px">
+            <a href="/docs.html" style="font-family:var(--mono);font-size:10px;color:var(--ac);text-decoration:none">Full SDK docs →</a>
+            <span style="color:var(--di);font-size:10px">·</span>
+            <a href="https://github.com/Amanjain98/VantageAI/tree/main/vantage-js-sdk" target="_blank" style="font-family:var(--mono);font-size:10px;color:var(--mu);text-decoration:none">GitHub source ↗</a>
+            <span style="color:var(--di);font-size:10px">·</span>
+            <a href="https://github.com/Amanjain98/VantageAI/tree/main/vantage-backend/sdk" target="_blank" style="font-family:var(--mono);font-size:10px;color:var(--mu);text-decoration:none">Python SDK ↗</a>
+          </div>
         </div>
         <div class="card card-p">
           <div class="card-hdr"><span class="card-title">Integration health</span></div>
@@ -1404,10 +1486,11 @@ window.init_devx=function(){
 };
 
 window.sdkTab=function(tab,el){
-  ["py","ts","curl"].forEach(t=>{
-    document.getElementById("sdk-"+t).style.display=t===tab?"block":"none";
+  ["py","ts-oai","ts-ant","ts-trace","curl"].forEach(t=>{
+    const el2=document.getElementById("sdk-"+t);
+    if(el2) el2.style.display=t===tab?"block":"none";
   });
-  document.querySelectorAll(".toggle-btn").forEach(b=>b.classList.remove("active"));
+  el.closest(".toggle").querySelectorAll(".toggle-btn").forEach(b=>b.classList.remove("active"));
   el.classList.add("active");
 };
 
