@@ -29,7 +29,7 @@ class VantageClient:
         project:              str   = "",
         environment:          str   = "production",
         agent:                str   = "",
-        ingest_url:           str   = "https://ingest.vantage.ai/v1/events",
+        ingest_url:           str   = "https://vantage-api.aman-lpucse.workers.dev/v1/events",
         anthropic_key:        str   = "",
         enable_hallucination: bool  = True,
         flush_interval:       float = 2.0,

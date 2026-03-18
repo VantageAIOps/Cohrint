@@ -43,4 +43,4 @@ jobs:
 
       - name: Comment deployment URL
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: echo "✅ Deployed to production — https://vantageai.pages.dev"
+        run: echo "✅ Deployed to production — https://vantageaiops.com"

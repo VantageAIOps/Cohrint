@@ -53,7 +53,7 @@ export async function authMiddleware(
         'INSERT OR IGNORE INTO orgs (id, api_key_hash, name, plan) VALUES (?, ?, ?, ?)'
       ).bind(orgId, hash, orgId, 'free').run();
     } else {
-      return c.json({ error: 'API key not found. Sign up at vantageai.pages.dev' }, 401);
+      return c.json({ error: 'API key not found. Sign up at vantageaiops.com' }, 401);
     }
   }
 

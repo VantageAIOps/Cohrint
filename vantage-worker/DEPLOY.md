@@ -53,9 +53,9 @@ Your Worker will be live at:
 
 ## 7. Update frontend API base
 After deploying, paste your Worker URL into the dashboard Settings:
-- Open `https://vantageai.pages.dev/app.html`
+- Open `https://vantageaiops.com/app.html`
 - Click ⚙ Settings
 - Set API Base to your Worker URL
 
 Or set it via URL param:
-`https://vantageai.pages.dev/app.html?api_base=https://vantage-api.YOUR-ACCOUNT.workers.dev`
+`https://vantageaiops.com/app.html?api_base=https://vantage-api.YOUR-ACCOUNT.workers.dev`

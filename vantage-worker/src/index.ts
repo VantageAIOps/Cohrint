@@ -5,7 +5,7 @@
  *   Workers  — globally distributed API (this file)
  *   D1       — SQLite events + org config (binding: DB)
  *   KV       — rate limiting + SSE pub/sub + alert throttling (binding: KV)
- *   Pages    — frontend at vantageai.pages.dev
+ *   Pages    — frontend at vantageaiops.com
  *
  * Endpoints:
  *   GET  /health
@@ -56,7 +56,7 @@ app.route('/v1/alerts',    alerts);
 // ── 404 fallback ──────────────────────────────────────────────────────────────
 app.notFound((c) => c.json({
   error: 'Not found',
-  docs:  'https://vantageai.pages.dev/docs.html',
+  docs:  'https://vantageaiops.com/docs.html',
 }, 404));
 
 // ── Global error handler ──────────────────────────────────────────────────────

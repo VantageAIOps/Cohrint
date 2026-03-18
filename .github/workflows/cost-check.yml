@@ -22,7 +22,7 @@ jobs:
 
     env:
       VANTAGE_API_KEY: ${{ secrets.VANTAGE_API_KEY }}
-      VANTAGE_API_BASE: ${{ secrets.VANTAGE_API_BASE || 'https://vantage-ingest.onrender.com' }}
+      VANTAGE_API_BASE: ${{ secrets.VANTAGE_API_BASE || 'https://vantage-api.aman-lpucse.workers.dev' }}
       # Budget limits (USD) — adjust per project
       PR_BUDGET_USD: ${{ vars.PR_BUDGET_USD || '5.00' }}
       DAILY_BUDGET_USD: ${{ vars.DAILY_BUDGET_USD || '50.00' }}
@@ -113,7 +113,7 @@ jobs:
                 ? `> ℹ️ Set \`VANTAGE_API_KEY\` repository secret to enable live cost tracking.`
                 : `> 💚 Cost within budget. Safe to merge.`,
               '',
-              `*Powered by [Vantage AI](https://vantageai.pages.dev) · [View dashboard](https://vantageai.pages.dev/app.html)*`,
+              `*Powered by [Vantage AI](https://vantageaiops.com) · [View dashboard](https://vantageaiops.com/app.html)*`,
             ].join('\n');
 
             await github.rest.issues.createComment({

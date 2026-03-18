@@ -1,0 +1,24 @@
+{
+  "name": "vantage-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for VantageAI — track LLM costs and query analytics from any AI coding assistant",
+  "private": false,
+  "main": "dist/index.js",
+  "bin": {
+    "vantage-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": ["mcp", "llm", "cost", "analytics", "vantage", "ai", "openai", "anthropic"],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0"
+  }
+}

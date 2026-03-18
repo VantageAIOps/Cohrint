@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "VantageAI SDK — AI cost intelligence for TypeScript and JavaScript",
   "keywords": ["ai", "llm", "openai", "anthropic", "cost", "observability", "tokens"],
-  "homepage": "https://vantageai.pages.dev",
+  "homepage": "https://vantageaiops.com",
   "repository": {
     "type": "git",
     "url": "https://github.com/Amanjain98/VantageAI"

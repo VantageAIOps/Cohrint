@@ -8,32 +8,33 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding      = "DB"
 database_name = "vantage-events"
-database_id  = "REPLACE_WITH_D1_DATABASE_ID"
+database_id  = "a1301c2a-19bf-4fa3-8321-bba5e497de10"
 
 # ── KV Namespace (rate limiting, Slack configs, org cache) ───────────────────
 # After running `npm run kv:create`, replace the placeholder ID below.
 [[kv_namespaces]]
 binding = "KV"
-id      = "REPLACE_WITH_KV_NAMESPACE_ID"
+id      = "65b5609ad5b747c9b416632a19529f24"
+preview_id = "65b5609ad5b747c9b416632a19529f24"
 
 # ── Environment variables (non-secret) ───────────────────────────────────────
 [vars]
 ENVIRONMENT        = "production"
 SUPABASE_URL       = "https://oyljzpvwdfktrkeotmon.supabase.co"
-ALLOWED_ORIGINS    = "https://vantageai.pages.dev,https://vantageai.aman-lpucse.workers.dev"
+ALLOWED_ORIGINS    = "https://vantageaiops.com,https://www.vantageaiops.com,https://vantageai.pages.dev,https://vantageai.aman-lpucse.workers.dev"
 RATE_LIMIT_RPM     = "1000"
 
 # ── Secrets (set via: wrangler secret put SECRET_NAME) ───────────────────────
 # SUPABASE_SERVICE_KEY — Supabase service role key (for server-side auth verify)
 # SUPABASE_ANON_KEY    — Supabase anon key
 
-# ── Routes — bind Worker to pages.dev subdomain API path ─────────────────────
-# Uncomment once custom domain is set up:
-# routes = [{ pattern = "api.vantageai.pages.dev/*", zone_name = "pages.dev" }]
+# ── Custom domain — point api.vantageaiops.com → this Worker ─────────────────
+# After adding vantageaiops.com to Cloudflare, uncomment:
+# routes = [{ pattern = "api.vantageaiops.com/*", zone_name = "vantageaiops.com" }]
 
 # ── Preview environment ───────────────────────────────────────────────────────
 [env.preview]
 name = "vantage-api-preview"
 [env.preview.vars]
 ENVIRONMENT     = "preview"
-ALLOWED_ORIGINS = "http://localhost:*,https://*.vantageai.pages.dev"
+ALLOWED_ORIGINS = "http://localhost:*,https://*.vantageaiops.com"

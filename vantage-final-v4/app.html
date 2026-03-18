@@ -11,8 +11,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Vantage AI">
-<link rel="canonical" href="https://vantageai.pages.dev/app.html">
-<meta property="og:url" content="https://vantageai.pages.dev/app.html">
+<link rel="canonical" href="https://vantageaiops.com/app.html">
+<meta property="og:url" content="https://vantageaiops.com/app.html">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -853,7 +853,7 @@ console.<span class="c-fn">log</span>(`Save ${((cost.totalCostUsd - alt.costUsd)
           <!-- cURL -->
           <div id="sdk-curl" class="code-block" style="display:none;font-size:11px">
 <span class="c-cm"># Ingest events directly via REST</span>
-curl -X POST https://vantage-ingest.onrender.com/v1/events \
+curl -X POST https://api.vantageaiops.com/v1/events \
   -H <span class="c-str">"Authorization: Bearer vnt_your_key"</span> \
   -H <span class="c-str">"Content-Type: application/json"</span> \
   -d <span class="c-str">'{"events": [{
@@ -1004,7 +1004,7 @@ function parseOrgFromKey(key){
 }
 function getConfig(){
   const params = new URLSearchParams(window.location.search);
-  const apiBase = (params.get("api_base") || localStorage.getItem("vantage_api_base") || "https://vantage-ingest.onrender.com").replace(/\/+$/g, "");
+  const apiBase = (params.get("api_base") || localStorage.getItem("vantage_api_base") || "https://api.vantageaiops.com").replace(/\/+$/g, "");
   const apiKey  = params.get("api_key") || localStorage.getItem("vantage_api_key") || "";
   const org     = params.get("org") || localStorage.getItem("vantage_org") || parseOrgFromKey(apiKey) || "acme";
   return {apiBase, apiKey, org};
@@ -1667,7 +1667,7 @@ function populateUser(user) {
 function setDemoUser() {
   document.getElementById("user-avatar").textContent       = "DM";
   document.getElementById("user-name").textContent         = "Demo User";
-  document.getElementById("user-email-full").textContent   = "demo@vantageai.pages.dev";
+  document.getElementById("user-email-full").textContent   = "demo@vantageaiops.com";
   document.getElementById("user-email-short").textContent  = "Demo";
 }
 
@@ -2044,7 +2044,7 @@ window.init_traces = function() {
 // ── Start SSE (or demo) on load ────────────────────
 (function initSSE() {
   const {apiBase, org} = getConfig();
-  if (apiBase && org && apiBase !== 'https://vantage-ingest.onrender.com') {
+  if (apiBase && org && apiBase !== 'https://api.vantageaiops.com') {
     connectSSE();
   } else {
     _simulateLiveStream();

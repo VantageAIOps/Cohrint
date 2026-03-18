@@ -229,7 +229,7 @@ It calls the backend REST APIs (`/v1/kpis`, `/v1/timeseries`, etc.) using an API
 
 ### Connect the UI to your backend
 
-1. Deploy the backend (e.g., Render, Railway) and note its base URL (e.g. `https://vantage-ingest.onrender.com`).
+1. The backend is deployed to Cloudflare Workers at `https://vantage-api.aman-lpucse.workers.dev`.
 2. Open `vantage-final-v4/app.html` in a browser and click **Settings**.
 3. Enter:
    - **Backend API base URL**: your backend URL (no trailing slash).

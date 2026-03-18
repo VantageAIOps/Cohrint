@@ -12,7 +12,7 @@ _config: dict = {}
 
 
 def init(api_key: str, *, org: str = "", team: str = "", environment: str = "production",
-         ingest_url: str = "https://ingest.vantage.ai", flush_interval: float = 2.0,
+         ingest_url: str = "https://vantage-api.aman-lpucse.workers.dev", flush_interval: float = 2.0,
          batch_size: int = 50, debug: bool = False) -> None:
     global _queue, _config
     if debug:

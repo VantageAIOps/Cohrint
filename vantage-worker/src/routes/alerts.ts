@@ -128,7 +128,7 @@ export async function maybeSendBudgetAlert(
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `${emoji} *Budget Alert — ${Math.round(pct)}% used*\nOrg *${orgId}* has spent *$${mtdCost.toFixed(2)}* of *$${budgetUsd.toFixed(2)}* this month.\n<https://vantageai.pages.dev/app.html|View dashboard →>`,
+        text: `${emoji} *Budget Alert — ${Math.round(pct)}% used*\nOrg *${orgId}* has spent *$${mtdCost.toFixed(2)}* of *$${budgetUsd.toFixed(2)}* this month.\n<https://vantageaiops.com/app.html|View dashboard →>`,
       },
     }],
   });
