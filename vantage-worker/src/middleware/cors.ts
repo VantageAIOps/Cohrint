@@ -1,7 +1,7 @@
 import { Context, Next } from 'hono';
 import { Bindings } from '../types';
 
-export async function corsMiddleware(c: Context<{ Bindings: Bindings }>, next: Next) {
+export async function corsMiddleware(c: Context<{ Bindings: Bindings }>, next: Next): Promise<void | Response> {
   const origin = c.req.header('Origin') ?? '';
   const allowed = (c.env.ALLOWED_ORIGINS ?? '').split(',').map(s => s.trim());
 
@@ -26,7 +26,6 @@ export async function corsMiddleware(c: Context<{ Bindings: Bindings }>, next: N
   }
 
   await next();
-
   c.res.headers.set('Access-Control-Allow-Origin', corsOrigin);
   c.res.headers.set('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Vantage-Org');
   c.res.headers.set('Vary', 'Origin');

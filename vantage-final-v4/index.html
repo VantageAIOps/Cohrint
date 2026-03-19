@@ -3,17 +3,125 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Vantage AI — Know exactly what your AI costs</title>
-<meta name="description" content="Token tracking, model pricing comparison, efficiency scoring and budget alerts for developers and organisations using AI APIs.">
-<meta property="og:title" content="Vantage AI — AI Cost Intelligence">
-<meta property="og:description" content="One line of code. Full visibility into your AI spending.">
+<title>VantageAI — LLM Cost Tracking & AI API Cost Monitoring</title>
+<meta name="description" content="Track, analyse and reduce your LLM API costs in real time. One line of code gives you full visibility into OpenAI, Anthropic, Google and Mistral spending — with budget alerts and model comparison built in.">
+<meta name="keywords" content="LLM cost tracking, AI API cost monitoring, OpenAI cost tracker, Claude API pricing, GPT-4 cost calculator, AI spending dashboard, token cost analytics, LLM observability, AI budget alerts, model pricing comparison">
+<meta name="author" content="VantageAI">
+<meta name="robots" content="index, follow">
+
+<!-- Open Graph -->
 <meta property="og:type" content="website">
+<meta property="og:site_name" content="VantageAI">
+<meta property="og:title" content="VantageAI — LLM Cost Tracking & AI API Monitoring">
+<meta property="og:description" content="One line of code. Full visibility into your AI spending. Track OpenAI, Anthropic, Google and Mistral costs with budget alerts, model comparison and team breakdowns.">
 <meta property="og:url" content="https://vantageaiops.com">
+<meta property="og:image" content="https://vantageaiops.com/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="VantageAI dashboard showing LLM cost analytics">
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="VantageAI — LLM Cost Tracking & AI API Monitoring">
+<meta name="twitter:description" content="One line of code. Full visibility into your AI spending. Budget alerts, model comparison, team breakdowns.">
+<meta name="twitter:image" content="https://vantageaiops.com/og-image.png">
+
+<!-- Canonical & PWA -->
 <link rel="canonical" href="https://vantageaiops.com">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#00d4a1">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
+
+<!-- JSON-LD: SoftwareApplication -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "VantageAI",
+  "url": "https://vantageaiops.com",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "Web, iOS, Android",
+  "description": "LLM cost tracking and AI API cost monitoring platform. Track OpenAI, Anthropic, Google and Mistral spending with budget alerts, model comparison and real-time analytics.",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  },
+  "featureList": [
+    "LLM cost tracking",
+    "AI API cost monitoring",
+    "Real-time budget alerts",
+    "Model pricing comparison",
+    "Team cost breakdowns",
+    "Agent trace analytics",
+    "CI/CD cost gate",
+    "Slack alerts"
+  ],
+  "screenshot": "https://vantageaiops.com/og-image.png",
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": "4.9",
+    "ratingCount": "38"
+  }
+}
+</script>
+
+<!-- JSON-LD: Organization -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "VantageAI",
+  "url": "https://vantageaiops.com",
+  "logo": "https://vantageaiops.com/og-image.png",
+  "sameAs": [
+    "https://github.com/amanjain/vantageai"
+  ]
+}
+</script>
+
+<!-- JSON-LD: FAQPage -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How do I track OpenAI API costs?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Install the VantageAI SDK with one line: pip install vantage-ai. Wrap your OpenAI client with createOpenAIProxy() and every call is automatically tracked with cost, tokens, latency and model details."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which LLM providers does VantageAI support?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "VantageAI supports OpenAI, Anthropic (Claude), Google (Gemini), Mistral, Cohere, Meta (Llama) and any OpenAI-compatible API endpoint."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is VantageAI free?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. VantageAI is free to get started with no credit card required. The dashboard, SDK and API are all free for individual developers and small teams."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How does VantageAI compare LLM pricing?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "VantageAI includes a real-time model pricing calculator that compares costs across GPT-4o, Claude 3.5 Sonnet, Gemini 1.5 Pro, Llama 3 and 30+ other models based on your exact token usage."
+      }
+    }
+  ]
+}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>

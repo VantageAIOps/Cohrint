@@ -30,7 +30,7 @@ export class VantageClient {
 
     this.queue = new EventQueue(
       opts.apiKey,
-      opts.ingestUrl ?? "https://vantage-api.aman-lpucse.workers.dev",
+      opts.ingestUrl ?? "https://api.vantageaiops.com",
       (opts.flushInterval ?? 2) * 1000,
       opts.batchSize ?? 50,
       this.debug

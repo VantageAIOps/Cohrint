@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+# Block dashboard app (requires auth, no SEO value)
+Disallow: /app.html
+
+# Sitemap
+Sitemap: https://vantageaiops.com/sitemap.xml

@@ -1,5 +1,5 @@
 # VantageAI — Product Strategy & Future Roadmap
-**Version 1.0 · March 2026**
+**Version 1.1 · March 2026**
 
 ---
 
@@ -28,7 +28,11 @@ VantageAI is an **AI cost intelligence and observability platform** that gives e
 - 9 product modules spanning cost, efficiency, quality, security, and enterprise governance
 - Support for 23+ models across 7 providers (OpenAI, Anthropic, Google, Meta, Mistral, Cohere, xAI)
 - MCP server integration with all major AI coding tools (Cursor, Windsurf, Claude Code, Zed, JetBrains, VS Code)
-- Python SDK with proxy wrappers for OpenAI and Anthropic
+- **Python SDK (`vantageaiops`)** v0.3.0 live on PyPI — proxy wrappers for OpenAI and Anthropic, `trace()`, `tag()`, `flush()`
+- **TypeScript/JavaScript SDK (`vantageaiops`)** — npm package with OpenAI + Anthropic proxies, streaming support, `trace()`
+- **Team management** — org member invites with email delivery, role-based access (owner/admin/member/viewer), API key rotation
+- **Org budget management** — set monthly budget in dashboard, shown on KPI cards
+- **API key recovery** — forgot-key email flow via `POST /v1/auth/recover`
 - Hallucination scoring via LLM-as-judge (Claude Opus 4.6)
 - Three-tier pricing: Free → Team ($99/mo) → Enterprise (custom)
 
@@ -157,18 +161,23 @@ AI spending by enterprises is growing at 40–60% YoY. With that growth comes an
 
 ### 5.2 Critical Gaps to Address
 
-| Gap | Priority | Impact |
-|---|---|---|
-| No TypeScript/JS SDK (only Python) | P0 | Blocks 40% of potential users |
-| No real-time dashboard updates (polling-based) | P0 | Makes dashboards feel stale |
-| No multi-agent trace visualization | P1 | Agentic AI is the fastest-growing use case |
-| No streaming response tracking | P1 | Streaming is the dominant UX pattern |
-| No Slack/Teams native app | P1 | Budget alerts need richer delivery |
-| No mobile app | P2 | Execs want to check spend on phone |
-| No API rate limiting on ingest | P1 | Security + abuse risk |
-| No OpenTelemetry support | P1 | Enterprise requirement for observability standardization |
-| No CI/CD integration (GitHub Actions, etc.) | P2 | Shift-left cost awareness |
-| Event queue silently drops at 10k | P1 | Silent data loss is unacceptable |
+| Gap | Priority | Impact | Status |
+|---|---|---|---|
+| No TypeScript/JS SDK (only Python) | P0 | Blocks 40% of potential users | ✅ **Shipped** — `vantageaiops` npm package |
+| Python SDK module was named `vantage` (conflicts) | P0 | Import errors for users | ✅ **Shipped** — renamed to `vantageaiops` v0.3.0 |
+| No email on member invite | P0 | Members couldn't receive their API keys | ✅ **Shipped** — Resend-powered invite emails |
+| No API key rotation | P0 | Security risk if key is leaked | ✅ **Shipped** — `POST /v1/auth/rotate` + per-member rotate |
+| No forgot-key recovery | P0 | Locked-out users had no recovery path | ✅ **Shipped** — `POST /v1/auth/recover` email flow |
+| Org budget not editable in dashboard | P1 | Admins had to use raw API | ✅ **Shipped** — `PATCH /v1/admin/org` + UI budget field |
+| No real-time dashboard updates (polling-based) | P0 | Makes dashboards feel stale | Open |
+| No multi-agent trace visualization | P1 | Agentic AI is the fastest-growing use case | Open |
+| No streaming response tracking | P1 | Streaming is the dominant UX pattern | Open |
+| No Slack/Teams native app | P1 | Budget alerts need richer delivery | Open |
+| No mobile app | P2 | Execs want to check spend on phone | Open |
+| No API rate limiting on ingest | P1 | Security + abuse risk | Open |
+| No OpenTelemetry support | P1 | Enterprise requirement for observability standardization | Open |
+| No CI/CD integration (GitHub Actions, etc.) | P2 | Shift-left cost awareness | Open |
+| Event queue silently drops at 10k | P1 | Silent data loss is unacceptable | Open |
 
 ---
 
@@ -178,10 +187,10 @@ AI spending by enterprises is growing at 40–60% YoY. With that growth comes an
 
 **Goal**: Fix critical gaps, solidify product-market fit.
 
-#### 6.1 TypeScript/Node.js SDK
+#### 6.1 TypeScript/Node.js SDK ✅ Shipped
 - Full SDK parity with Python (proxy wrappers, event queue, background flush)
-- npm package: `vantage-ai`
-- Works with OpenAI Node SDK, Anthropic SDK, LangChain JS, Vercel AI SDK
+- npm package: `vantageaiops`
+- Works with OpenAI Node SDK, Anthropic SDK
 - Automatic streaming response token counting
 
 #### 6.2 Real-Time Dashboard
@@ -631,5 +640,5 @@ High-impact, low-effort improvements to prioritize immediately:
 ---
 
 *Document maintained by: VantageAI Product Team*
-*Last updated: March 2026*
+*Last updated: 19 March 2026 (v1.1 — reflects 5 shipped gaps: TS SDK, Python rename, email invites, key rotation, key recovery)*
 *Next review: June 2026*

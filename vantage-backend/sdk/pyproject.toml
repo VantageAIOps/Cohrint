@@ -1,13 +1,13 @@
 [build-system]
 requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
-name = "vantage-ai"
-version = "0.2.0"
-description = "AI cost intelligence — token tracking, hallucination scoring, efficiency analysis for OpenAI, Anthropic, Google and AI agents"
+name = "vantageaiops"
+version = "0.3.0"
+description = "LLM cost tracking and AI API monitoring — token tracking, budget alerts and efficiency analysis for OpenAI, Anthropic, Google and AI agents"
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
 requires-python = ">=3.10"
 keywords = ["ai", "llm", "openai", "anthropic", "observability", "cost", "tokens", "hallucination"]
 classifiers = [
@@ -57,7 +57,7 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["vantage*"]
+include = ["vantageaiops*"]
 
 [tool.ruff]
 line-length = 100

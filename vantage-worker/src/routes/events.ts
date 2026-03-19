@@ -6,6 +6,20 @@ const events = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 events.use('*', authMiddleware);
 
+// Block viewer-role keys from ingesting events
+events.use('/', async (c, next) => {
+  if (c.req.method !== 'GET' && c.get('role') === 'viewer') {
+    return c.json({ error: 'Viewer keys are read-only and cannot ingest events' }, 403);
+  }
+  return await next();
+});
+events.use('/batch', async (c, next) => {
+  if (c.get('role') === 'viewer') {
+    return c.json({ error: 'Viewer keys are read-only and cannot ingest events' }, 403);
+  }
+  return await next();
+});
+
 // ── POST /v1/events — ingest a single event ───────────────────────────────────
 events.post('/', async (c) => {
   const orgId = c.get('orgId');
@@ -112,7 +126,7 @@ function buildInsertStmt(
     ev.event_id, orgId, ev.provider ?? '', ev.model ?? '',
     ev.prompt_tokens ?? 0, ev.completion_tokens ?? 0,
     ev.cache_tokens ?? 0, totalTokens,
-    ev.cost_total_usd ?? 0, ev.latency_ms ?? 0,
+    ev.total_cost_usd ?? ev.cost_total_usd ?? 0, ev.latency_ms ?? 0,
     ev.team ?? null, ev.project ?? null, ev.user_id ?? null,
     ev.feature ?? null, ev.endpoint ?? null,
     ev.environment ?? 'production',
@@ -137,7 +151,7 @@ async function broadcastEvent(kv: KVNamespace, orgId: string, ev: EventIn) {
     provider: ev.provider,
     model:    ev.model,
     total_tokens: ev.total_tokens ?? ((ev.prompt_tokens ?? 0) + (ev.completion_tokens ?? 0)),
-    cost_total_usd: ev.cost_total_usd,
+    cost_total_usd: ev.total_cost_usd ?? ev.cost_total_usd,
     latency_ms: ev.latency_ms,
     team: ev.team,
     ts: Date.now(),

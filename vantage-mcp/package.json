@@ -1,11 +1,11 @@
 {
-  "name": "vantage-mcp",
-  "version": "1.0.0",
-  "description": "MCP server for VantageAI — track LLM costs and query analytics from any AI coding assistant",
+  "name": "vantageaiops-mcp",
+  "version": "1.0.2",
+  "description": "MCP server for VantageAI — track LLM costs and query analytics from Claude Desktop, Cursor, Windsurf, VS Code and more",
   "private": false,
   "main": "dist/index.js",
   "bin": {
-    "vantage-mcp": "dist/index.js"
+    "vantageaiops-mcp": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
@@ -13,12 +13,17 @@
     "start": "node dist/index.js",
     "prepublishOnly": "npm run build"
   },
-  "keywords": ["mcp", "llm", "cost", "analytics", "vantage", "ai", "openai", "anthropic"],
+  "keywords": ["mcp", "model-context-protocol", "llm", "cost", "analytics", "vantage", "ai", "openai", "anthropic", "claude", "cursor", "windsurf"],
+  "homepage": "https://vantageaiops.com",
+  "repository": { "type": "git", "url": "https://github.com/Amanjain98/VantageAI" },
+  "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0"
   },
   "devDependencies": {
     "typescript": "^5.4.0",
     "@types/node": "^20.0.0"
-  }
+  },
+  "files": ["dist", "README.md"],
+  "engines": { "node": ">=18.0.0" }
 }

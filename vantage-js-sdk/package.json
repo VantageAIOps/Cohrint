@@ -1,8 +1,8 @@
 {
-  "name": "vantage-ai",
+  "name": "vantageaiops",
   "version": "1.0.0",
-  "description": "VantageAI SDK — AI cost intelligence for TypeScript and JavaScript",
-  "keywords": ["ai", "llm", "openai", "anthropic", "cost", "observability", "tokens"],
+  "description": "LLM cost tracking and AI API monitoring SDK for TypeScript and JavaScript — track OpenAI, Anthropic, Google and Mistral spending",
+  "keywords": ["ai", "llm", "openai", "anthropic", "cost", "observability", "tokens", "cost-tracking", "llm-monitoring"],
   "homepage": "https://vantageaiops.com",
   "repository": {
     "type": "git",
@@ -15,9 +15,9 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "require": "./dist/index.cjs",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.cjs"
     }
   },
   "files": ["dist"],

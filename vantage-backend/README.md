@@ -410,7 +410,7 @@ This approach keeps schema changes versioned, reviewable, and consistent across 
 ```
 vantage-backend/
 │
-├── sdk/                          pip install vantage-ai
+├── sdk/                          pip install vantageaiops
 │   ├── pyproject.toml
 │   └── vantage/
 │       ├── __init__.py           vantage.init(), vantage.tag()

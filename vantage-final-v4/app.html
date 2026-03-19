@@ -4,15 +4,25 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <!-- CSP managed via _headers for Cloudflare Pages -->
-<title>Vantage AI — Enterprise Dashboard</title>
+<title>VantageAI — LLM Cost Analytics Dashboard</title>
+<meta name="description" content="VantageAI dashboard — real-time LLM cost analytics, budget alerts, model comparison and agent trace viewer.">
+<meta name="robots" content="noindex, follow">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#00d4a1">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Vantage AI">
+<meta name="apple-mobile-web-app-title" content="VantageAI">
 <link rel="canonical" href="https://vantageaiops.com/app.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="VantageAI">
+<meta property="og:title" content="VantageAI — LLM Cost Analytics Dashboard">
+<meta property="og:description" content="Real-time LLM cost analytics, budget alerts, model comparison and agent trace viewer.">
 <meta property="og:url" content="https://vantageaiops.com/app.html">
+<meta property="og:image" content="https://vantageaiops.com/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="VantageAI — LLM Cost Analytics Dashboard">
+<meta name="twitter:image" content="https://vantageaiops.com/og-image.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -349,6 +359,7 @@ button{font-family:var(--sans);cursor:pointer}
     <div class="sb-section">Enterprise</div>
     <button class="sb-item" onclick="nav('reports',this)"><span class="ico">&#128202;</span><span>Enterprise Reporting</span></button>
     <button class="sb-item" onclick="nav('security',this)"><span class="ico">&#128274;</span><span>Security & Governance</span></button>
+    <button class="sb-item" id="sb-members" onclick="nav('members',this)"><span class="ico">&#128101;</span><span>Team Members</span></button>
     <div class="sb-section">Platform</div>
     <button class="sb-item" onclick="nav('devx',this)"><span class="ico">&#128295;</span><span>Developer Experience</span><span class="sb-badge">3</span></button>
     <div class="sb-bottom">
@@ -771,7 +782,7 @@ button{font-family:var(--sans);cursor:pointer}
           <!-- Python -->
           <div id="sdk-py" class="code-block" style="font-size:11px">
 <span class="c-cm"># 1. Install</span>
-pip install vantage-ai[openai]          <span class="c-cm"># or [anthropic]</span>
+pip install vantageaiops[openai]          <span class="c-cm"># or [anthropic]</span>
 
 <span class="c-cm"># 2. Wrap your client (2 line change)</span>
 <span class="c-kw">import</span> vantage
@@ -791,7 +802,7 @@ response = client.chat.completions.<span class="c-fn">create</span>(
           <!-- TypeScript · OpenAI -->
           <div id="sdk-ts-oai" class="code-block" style="display:none;font-size:11px">
 <span class="c-cm">// 1. Install</span>
-npm install vantage-ai openai
+npm install vantageaiops openai
 
 <span class="c-cm">// 2. Init once at startup</span>
 <span class="c-kw">import</span> { init, createOpenAIProxy } <span class="c-kw">from</span> <span class="c-str">"vantage-ai"</span>;
@@ -811,7 +822,7 @@ npm install vantage-ai openai
           <!-- TypeScript · Anthropic -->
           <div id="sdk-ts-ant" class="code-block" style="display:none;font-size:11px">
 <span class="c-cm">// 1. Install</span>
-npm install vantage-ai @anthropic-ai/sdk
+npm install vantageaiops @anthropic-ai/sdk
 
 <span class="c-kw">import</span> { init, createAnthropicProxy } <span class="c-kw">from</span> <span class="c-str">"vantage-ai"</span>;
 <span class="c-kw">import</span> Anthropic <span class="c-kw">from</span> <span class="c-str">"@anthropic-ai/sdk"</span>;
@@ -968,8 +979,99 @@ curl -X POST https://api.vantageaiops.com/v1/events \
       </div>
     </div>
 
+    <!-- ════════════════════════════════════════════════════════════════════
+         TEAM MEMBERS VIEW
+    ═══════════════════════════════════════════════════════════════════════ -->
+    <div class="view" id="view-members">
+      <div class="view-title">&#128101; Team Members</div>
+      <div class="view-sub muted">Manage member keys, roles and team budgets</div>
+
+      <!-- Org overview KPIs -->
+      <div class="g3 mb" id="members-kpis">
+        <div class="kpi"><div class="kpi-lbl">Members</div><div class="kpi-val" id="mk-count">—</div></div>
+        <div class="kpi"><div class="kpi-lbl">MTD Spend</div><div class="kpi-val" id="mk-mtd">—</div></div>
+        <div class="kpi"><div class="kpi-lbl">Budget</div><div class="kpi-val" id="mk-budget">—</div></div>
+      </div>
+
+      <div class="g12">
+
+        <!-- Member list -->
+        <div class="card card-p">
+          <div class="card-hdr">
+            <span class="card-title">Members</span>
+            <button class="btn btn-primary" onclick="openInviteModal()" id="invite-btn" style="display:none">+ Invite</button>
+          </div>
+          <div id="members-list-wrap" class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr><th>Email</th><th>Name</th><th>Role</th><th>Scope</th><th>Key hint</th><th></th></tr></thead>
+              <tbody id="members-tbody"><tr><td colspan="6" style="color:var(--mu);text-align:center;padding:20px">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Team budgets -->
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Team budgets</span></div>
+          <div id="team-budgets-wrap">
+            <table class="tbl">
+              <thead><tr><th>Team</th><th>Spend (MTD)</th><th>Budget</th><th>% used</th><th></th></tr></thead>
+              <tbody id="budgets-tbody"><tr><td colspan="5" style="color:var(--mu);text-align:center;padding:20px">Loading…</td></tr></tbody>
+            </table>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:8px">
+            <input id="budget-team-input" class="input" placeholder="Team name (e.g. backend)" style="flex:1">
+            <input id="budget-usd-input" class="input" placeholder="$" type="number" min="0" style="width:90px">
+            <button class="btn btn-primary" onclick="setTeamBudget()">Set</button>
+          </div>
+
+          <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--b1)">
+            <div style="font-size:11px;color:var(--mu);margin-bottom:8px">Org-level monthly budget</div>
+            <div style="display:flex;gap:8px">
+              <input id="org-budget-input" class="input" placeholder="$ total org budget" type="number" min="0" style="flex:1">
+              <button class="btn btn-primary" onclick="setOrgBudget()">Update</button>
+              <button class="btn btn-ghost" onclick="openRotateOwnerModal()" title="Rotate your owner API key">🔄 Rotate key</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /view-members -->
+
   </div><!-- /main -->
 </div><!-- /shell -->
+
+<!-- INVITE MEMBER MODAL -->
+<div id="invite-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:800;backdrop-filter:blur(4px);align-items:center;justify-content:center">
+  <div style="background:var(--bg2);border:1px solid var(--b2);border-radius:14px;padding:28px;width:440px;max-width:92vw;box-shadow:0 24px 64px rgba(0,0,0,.6)">
+    <div style="font-size:14px;font-weight:500;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center">
+      Invite member
+      <button onclick="closeInviteModal()" style="background:var(--bg3);border:1px solid var(--b2);color:var(--mu);border-radius:6px;padding:3px 10px;cursor:pointer;font-size:12px">✕</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div><label style="font-size:11px;color:var(--mu);display:block;margin-bottom:4px">Email *</label><input id="inv-email" class="input" placeholder="alice@company.com"></div>
+      <div><label style="font-size:11px;color:var(--mu);display:block;margin-bottom:4px">Name</label><input id="inv-name" class="input" placeholder="Alice"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><label style="font-size:11px;color:var(--mu);display:block;margin-bottom:4px">Role</label>
+          <select id="inv-role" class="select" style="width:100%">
+            <option value="member">member</option>
+            <option value="admin">admin</option>
+            <option value="viewer">viewer</option>
+          </select>
+        </div>
+        <div><label style="font-size:11px;color:var(--mu);display:block;margin-bottom:4px">Scope team (optional)</label><input id="inv-scope" class="input" placeholder="backend"></div>
+      </div>
+      <button class="btn btn-primary" onclick="submitInvite()" style="width:100%;justify-content:center;margin-top:4px">Generate key &amp; invite</button>
+    </div>
+    <div id="inv-result" style="display:none;margin-top:16px;background:var(--bg3);border:1px solid var(--b2);border-radius:var(--r);padding:14px">
+      <div style="font-size:11px;color:var(--ac);margin-bottom:6px">API key generated — shown once only:</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <code id="inv-key" style="font-size:11px;flex:1;word-break:break-all;color:var(--tx)"></code>
+        <button onclick="copyKey()" class="btn btn-ghost" style="font-size:11px;padding:5px 10px;flex-shrink:0">Copy</button>
+      </div>
+      <div class="warn-box" style="margin-top:10px;font-size:11px">Share this key with the member. It won't be shown again.</div>
+    </div>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="seed-data.js"></script>
@@ -1066,9 +1168,160 @@ function nav(id, el) {
   document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
   el.classList.add("active");
   document.getElementById("view-"+id).classList.add("active");
+  if(id==="members") loadMembersView();
   // Lazy init charts for that view
   if(!window["init_"+id]) return;
   if(!window["inited_"+id]){window["init_"+id]();window["inited_"+id]=true;}
+}
+
+/* ── Team Members view ──────────────────────────────────────────────────── */
+let _memberRole = "owner"; // updated after real API call
+
+async function loadMembersView() {
+  const {apiKey} = getConfig();
+  if(!apiKey) {
+    document.getElementById("members-tbody").innerHTML = `<tr><td colspan="6" style="color:var(--mu);text-align:center;padding:20px">Connect your API key in Settings to manage members.</td></tr>`;
+    return;
+  }
+
+  try {
+    // Load org overview (admin/owner only)
+    const overview = await apiFetch("/v1/admin/overview");
+    document.getElementById("mk-count").textContent  = overview.members?.length ?? "—";
+    document.getElementById("mk-mtd").textContent    = "$"+(overview.org?.mtd_cost_usd??0).toFixed(2);
+    document.getElementById("mk-budget").textContent = overview.org?.budget_usd ? "$"+overview.org.budget_usd.toFixed(2) : "Not set";
+
+    // Show invite button for admin/owner
+    document.getElementById("invite-btn").style.display = "inline-flex";
+
+    // Render member rows
+    const members = overview.members ?? [];
+    const roleColors = {owner:"tag-green",admin:"tag-blue",member:"tag-amber",viewer:"tag-gray"};
+    document.getElementById("members-tbody").innerHTML = members.length === 0
+      ? `<tr><td colspan="6" style="color:var(--mu);text-align:center;padding:20px">No members yet. Click "+ Invite" to add your first team member.</td></tr>`
+      : members.map(m => `
+        <tr>
+          <td>${m.email}</td>
+          <td style="color:var(--mu)">${m.name||"—"}</td>
+          <td><span class="tag ${roleColors[m.role]||"tag-gray"}">${m.role}</span></td>
+          <td style="font-family:var(--mono);font-size:11px">${m.scope_team||<span style="color:var(--mu)">all teams</span>}</td>
+          <td style="font-family:var(--mono);font-size:10px;color:var(--mu)">${m.api_key_hint||"—"}</td>
+          <td style="display:flex;gap:4px">
+            <button onclick="rotateMemberKey('${m.id}','${m.email}')" class="btn btn-ghost" style="font-size:10px;padding:3px 8px" title="Generate a new key (old one revoked)">Rotate</button>
+            <button onclick="revokeMember('${m.id}','${m.email}')" class="btn btn-danger" style="font-size:10px;padding:3px 8px">Revoke</button>
+          </td>
+        </tr>`).join("");
+
+    // Render team budgets
+    const teams = overview.teams ?? [];
+    document.getElementById("budgets-tbody").innerHTML = teams.length === 0
+      ? `<tr><td colspan="5" style="color:var(--mu);text-align:center;padding:20px">No team data yet.</td></tr>`
+      : teams.map(t => {
+          const pct = t.budget_pct;
+          const barColor = pct >= 100 ? "var(--re)" : pct >= 80 ? "var(--am)" : "var(--ac)";
+          return `<tr>
+            <td style="font-family:var(--mono);font-size:12px">${t.team}</td>
+            <td style="font-family:var(--mono);font-size:12px">$${Number(t.cost_usd).toFixed(4)}</td>
+            <td style="font-family:var(--mono);font-size:12px">${t.budget_usd ? "$"+t.budget_usd.toFixed(2) : "—"}</td>
+            <td>
+              ${t.budget_usd ? `<div style="display:flex;align-items:center;gap:6px">
+                <div class="bar-wrap" style="width:80px"><div class="bar-fill" style="width:${Math.min(pct,100)}%;background:${barColor}"></div></div>
+                <span style="font-family:var(--mono);font-size:10px;color:${barColor}">${pct?.toFixed(1)}%</span>
+              </div>` : "—"}
+            </td>
+            <td><button onclick="deleteTeamBudget('${t.team}')" class="btn btn-ghost" style="font-size:10px;padding:3px 8px">Remove</button></td>
+          </tr>`;
+        }).join("");
+
+  } catch(e) {
+    // Likely a member key (not admin) — show read-only view
+    document.getElementById("members-tbody").innerHTML = `<tr><td colspan="6" style="color:var(--mu);text-align:center;padding:20px">Admin or owner key required to manage members.</td></tr>`;
+    document.getElementById("budgets-tbody").innerHTML = `<tr><td colspan="5" style="color:var(--mu);text-align:center;padding:20px">—</td></tr>`;
+  }
+}
+
+async function revokeMember(id, email) {
+  if(!confirm(`Revoke key for ${email}? This cannot be undone.`)) return;
+  await apiFetch(`/v1/auth/members/${id}`, {method:"DELETE"});
+  loadMembersView();
+}
+
+async function rotateMemberKey(id, email) {
+  if(!confirm(`Rotate key for ${email}?\nTheir old key stops working immediately. A new key will be generated and emailed to them (if email is configured).`)) return;
+  const result = await apiFetch(`/v1/auth/members/${id}/rotate`, {method:"POST"});
+  const msg = result.email_sent
+    ? `New key emailed to ${email}.`
+    : `New key (store securely):\n\n${result.api_key}`;
+  alert(msg);
+  loadMembersView();
+}
+
+async function setOrgBudget() {
+  const usd = parseFloat(document.getElementById("org-budget-input").value);
+  if(isNaN(usd) || usd < 0) return alert("Enter a valid budget amount.");
+  await apiFetch("/v1/admin/org", {method:"PATCH", body: JSON.stringify({budget_usd: usd})});
+  document.getElementById("org-budget-input").value = "";
+  loadMembersView();
+}
+
+async function openRotateOwnerModal() {
+  if(!confirm("Rotate your owner API key?\n\nYour current key will stop working immediately. Update it in all your services.")) return;
+  const result = await apiFetch("/v1/auth/rotate", {method:"POST"});
+  const newKey = result.api_key;
+  // Update localStorage so dashboard keeps working
+  localStorage.setItem("vantage_api_key", newKey);
+  alert(`New owner key:\n\n${newKey}\n\nIt has been saved in this browser. Update it everywhere else.`);
+  loadMembersView();
+}
+
+async function deleteTeamBudget(team) {
+  if(!confirm(`Remove budget for team "${team}"?`)) return;
+  await apiFetch(`/v1/admin/team-budgets/${team}`, {method:"DELETE"});
+  loadMembersView();
+}
+
+async function setTeamBudget() {
+  const team = document.getElementById("budget-team-input").value.trim();
+  const usd  = parseFloat(document.getElementById("budget-usd-input").value);
+  if(!team || isNaN(usd) || usd < 0) return alert("Enter a valid team name and budget amount.");
+  await apiFetch(`/v1/admin/team-budgets/${encodeURIComponent(team)}`, {
+    method:"PUT",
+    body: JSON.stringify({budget_usd: usd}),
+  });
+  document.getElementById("budget-team-input").value = "";
+  document.getElementById("budget-usd-input").value  = "";
+  loadMembersView();
+}
+
+function openInviteModal() {
+  const m = document.getElementById("invite-modal");
+  m.style.display = "flex";
+  document.getElementById("inv-result").style.display = "none";
+  document.getElementById("inv-email").value = "";
+  document.getElementById("inv-name").value  = "";
+  document.getElementById("inv-scope").value = "";
+}
+function closeInviteModal() { document.getElementById("invite-modal").style.display = "none"; }
+
+async function submitInvite() {
+  const email = document.getElementById("inv-email").value.trim();
+  const name  = document.getElementById("inv-name").value.trim();
+  const role  = document.getElementById("inv-role").value;
+  const scope = document.getElementById("inv-scope").value.trim() || undefined;
+  if(!email) return alert("Email is required.");
+  const result = await apiFetch("/v1/auth/members", {
+    method:"POST",
+    body: JSON.stringify({email, name, role, scope_team: scope}),
+  });
+  document.getElementById("inv-key").textContent = result.api_key || "Error";
+  document.getElementById("inv-result").style.display = "block";
+  loadMembersView();
+}
+
+function copyKey() {
+  const key = document.getElementById("inv-key").textContent;
+  navigator.clipboard?.writeText(key);
+  alert("Key copied to clipboard.");
 }
 
 function setPeriod(v){

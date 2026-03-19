@@ -1,6 +1,9 @@
-# vantage-mcp
+# vantageaiops-mcp
 
 MCP server for [VantageAI](https://vantageaiops.com) — track LLM costs and query analytics directly from your AI coding assistant.
+
+[![npm](https://img.shields.io/npm/v/vantageaiops-mcp)](https://www.npmjs.com/package/vantageaiops-mcp)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
 ## Tools
 
@@ -19,11 +22,11 @@ MCP server for [VantageAI](https://vantageaiops.com) — track LLM costs and que
 
 ### 1. Get your API key
 
-Go to [vantageaiops.com/app.html](https://vantageaiops.com/app.html) → Settings → copy your `vnt_...` key.
+Sign up free at [vantageaiops.com/signup.html](https://vantageaiops.com/signup.html) — your `vnt_...` key is generated instantly.
 
 ### 2. Add to your coding assistant
 
-Pick your platform below and paste the config.
+Pick your platform. All configs use `npx vantageaiops-mcp` — no local install needed.
 
 ---
 
@@ -35,34 +38,32 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
 {
   "mcpServers": {
     "vantage": {
-      "command": "node",
-      "args": ["/absolute/path/to/vantage-mcp/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "vantageaiops-mcp"],
       "env": {
-        "VANTAGE_API_KEY": "vnt_your_key_here",
-        "VANTAGE_ORG": "your_org"
+        "VANTAGE_API_KEY": "vnt_your_key_here"
       }
     }
   }
 }
 ```
 
-Restart Claude Desktop. You'll see VantageAI tools available in the tool picker.
+Restart Claude Desktop. VantageAI tools appear in the tool picker automatically.
 
 ---
 
 ## Cursor
 
-Edit `~/.cursor/mcp.json` (or open Cursor → Settings → MCP):
+Edit `~/.cursor/mcp.json` (or Cursor → Settings → MCP):
 
 ```json
 {
   "mcpServers": {
     "vantage": {
-      "command": "node",
-      "args": ["/absolute/path/to/vantage-mcp/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "vantageaiops-mcp"],
       "env": {
-        "VANTAGE_API_KEY": "vnt_your_key_here",
-        "VANTAGE_ORG": "your_org"
+        "VANTAGE_API_KEY": "vnt_your_key_here"
       }
     }
   }
@@ -79,11 +80,10 @@ Edit `~/.codeium/windsurf/mcp_config.json`:
 {
   "mcpServers": {
     "vantage": {
-      "command": "node",
-      "args": ["/absolute/path/to/vantage-mcp/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "vantageaiops-mcp"],
       "env": {
-        "VANTAGE_API_KEY": "vnt_your_key_here",
-        "VANTAGE_ORG": "your_org"
+        "VANTAGE_API_KEY": "vnt_your_key_here"
       }
     }
   }
@@ -101,11 +101,10 @@ Add to `.vscode/mcp.json` in your project root (VS Code 1.99+):
   "servers": {
     "vantage": {
       "type": "stdio",
-      "command": "node",
-      "args": ["/absolute/path/to/vantage-mcp/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "vantageaiops-mcp"],
       "env": {
-        "VANTAGE_API_KEY": "vnt_your_key_here",
-        "VANTAGE_ORG": "your_org"
+        "VANTAGE_API_KEY": "vnt_your_key_here"
       }
     }
   }
@@ -121,11 +120,10 @@ Open Cline → MCP Servers → Add Server → paste:
 ```json
 {
   "vantage": {
-    "command": "node",
-    "args": ["/absolute/path/to/vantage-mcp/dist/index.js"],
+    "command": "npx",
+    "args": ["-y", "vantageaiops-mcp"],
     "env": {
-      "VANTAGE_API_KEY": "vnt_your_key_here",
-      "VANTAGE_ORG": "your_org"
+      "VANTAGE_API_KEY": "vnt_your_key_here"
     }
   }
 }
@@ -142,11 +140,10 @@ Add to your Zed `settings.json`:
   "context_servers": {
     "vantage": {
       "command": {
-        "path": "node",
-        "args": ["/absolute/path/to/vantage-mcp/dist/index.js"],
+        "path": "npx",
+        "args": ["-y", "vantageaiops-mcp"],
         "env": {
-          "VANTAGE_API_KEY": "vnt_your_key_here",
-          "VANTAGE_ORG": "your_org"
+          "VANTAGE_API_KEY": "vnt_your_key_here"
         }
       }
     }
@@ -160,7 +157,7 @@ Add to your Zed `settings.json`:
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `VANTAGE_API_KEY` | ✅ | — | Your `vnt_...` API key |
+| `VANTAGE_API_KEY` | ✅ | — | Your `vnt_...` API key from [signup](https://vantageaiops.com/signup.html) |
 | `VANTAGE_ORG` | No | parsed from key | Org ID override |
 | `VANTAGE_API_BASE` | No | `https://api.vantageaiops.com` | Custom API base URL |
 
@@ -168,7 +165,7 @@ Add to your Zed `settings.json`:
 
 ## Example usage in chat
 
-Once connected, you can ask your assistant:
+Once connected, ask your assistant:
 
 - *"How much have we spent on LLMs this month?"* → `get_summary`
 - *"Which model is costing us the most?"* → `get_model_breakdown`
@@ -176,11 +173,11 @@ Once connected, you can ask your assistant:
 - *"Show me recent agent traces"* → `get_traces`
 - *"Track this call: gpt-4o, 500 prompt tokens, 120 completion tokens, $0.003"* → `track_llm_call`
 
-## Local development
+---
 
-```bash
-cd vantage-mcp
-npm install
-npm run build        # compile TypeScript
-npm start            # run server (stdin/stdout MCP protocol)
-```
+## Links
+
+- [Dashboard](https://vantageaiops.com/app.html)
+- [Docs](https://vantageaiops.com/docs.html)
+- [Python SDK](https://pypi.org/project/vantageaiops/)
+- [JavaScript SDK](https://www.npmjs.com/package/vantageaiops)

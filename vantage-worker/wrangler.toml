@@ -27,6 +27,8 @@ RATE_LIMIT_RPM     = "1000"
 # ── Secrets (set via: wrangler secret put SECRET_NAME) ───────────────────────
 # SUPABASE_SERVICE_KEY — Supabase service role key (for server-side auth verify)
 # SUPABASE_ANON_KEY    — Supabase anon key
+# RESEND_API_KEY       — Resend API key for transactional email (member invites, key recovery)
+#                        Get free key at resend.com — 3,000 emails/month free
 
 # ── Custom domain — point api.vantageaiops.com → this Worker ─────────────────
 # After adding vantageaiops.com to Cloudflare, uncomment:

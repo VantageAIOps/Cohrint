@@ -72,6 +72,30 @@ CREATE TABLE IF NOT EXISTS alert_configs (
   updated_at   INTEGER NOT NULL DEFAULT (unixepoch())
 );
 
+-- Org members — each gets their own scoped API key
+CREATE TABLE IF NOT EXISTS org_members (
+  id            TEXT PRIMARY KEY,
+  org_id        TEXT NOT NULL REFERENCES orgs(id),
+  email         TEXT NOT NULL,
+  name          TEXT,
+  role          TEXT NOT NULL DEFAULT 'member',  -- admin | member | viewer
+  api_key_hash  TEXT UNIQUE NOT NULL,
+  api_key_hint  TEXT,
+  scope_team    TEXT,    -- NULL = see all; 'backend' = scoped to that team only
+  created_at    INTEGER NOT NULL DEFAULT (unixepoch()),
+  UNIQUE(org_id, email)
+);
+CREATE INDEX IF NOT EXISTS idx_members_org ON org_members (org_id);
+
+-- Per-team budgets (used in admin overview)
+CREATE TABLE IF NOT EXISTS team_budgets (
+  org_id     TEXT NOT NULL REFERENCES orgs(id),
+  team       TEXT NOT NULL,
+  budget_usd REAL NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  PRIMARY KEY (org_id, team)
+);
+
 -- Budget alerts log (avoid duplicate fires)
 CREATE TABLE IF NOT EXISTS alert_log (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,

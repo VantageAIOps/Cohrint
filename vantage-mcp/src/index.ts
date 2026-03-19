@@ -182,12 +182,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           ``,
           `| Metric | Value |`,
           `|--------|-------|`,
-          `| MTD Spend | $${Number(data.mtd_cost ?? 0).toFixed(2)} |`,
-          `| Today | $${Number(data.today_cost ?? 0).toFixed(2)} |`,
-          `| Requests | ${Number(data.total_requests ?? 0).toLocaleString()} |`,
+          `| MTD Spend | $${Number(data.mtd_cost_usd ?? 0).toFixed(4)} |`,
+          `| Today | $${Number(data.today_cost_usd ?? 0).toFixed(4)} |`,
+          `| Requests | ${Number(data.today_requests ?? 0).toLocaleString()} |`,
           `| Avg Latency | ${Number(data.avg_latency_ms ?? 0).toFixed(0)}ms |`,
-          `| Top Model | ${data.top_model ?? 'N/A'} |`,
-          `| Budget Used | ${data.budget_pct != null ? `${Number(data.budget_pct).toFixed(1)}%` : 'No budget set'} |`,
+          `| Budget Used | ${Number(data.budget_pct ?? 0) > 0 ? `${Number(data.budget_pct).toFixed(1)}%` : 'No budget set'} |`,
           ``,
           `🔗 [View dashboard](https://vantageaiops.com/app.html)`,
         ];
@@ -195,15 +194,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'get_kpis': {
-        const data = await api('/v1/analytics/kpis') as Record<string, unknown>[];
-        const rows = data.map((r) =>
-          `| ${r.label} | ${r.value} | ${r.delta != null ? (Number(r.delta) >= 0 ? `+${r.delta}` : r.delta) : '—'} |`
-        );
+        const data = await api('/v1/analytics/kpis') as Record<string, unknown>;
+        const rows = [
+          `| Total Cost (MTD) | $${Number(data.total_cost_usd ?? 0).toFixed(4)} |`,
+          `| Total Tokens | ${Number(data.total_tokens ?? 0).toLocaleString()} |`,
+          `| Total Requests | ${Number(data.total_requests ?? 0).toLocaleString()} |`,
+          `| Avg Latency | ${Number(data.avg_latency_ms ?? 0).toFixed(0)}ms |`,
+          `| Efficiency Score | ${data.efficiency_score ?? 'N/A'} |`,
+          `| Streaming Requests | ${Number(data.streaming_requests ?? 0).toLocaleString()} |`,
+        ];
         const text = [
           `📈 **KPIs** (org: ${ORG})`,
           ``,
-          `| Metric | Value | Δ |`,
-          `|--------|-------|---|`,
+          `| Metric | Value |`,
+          `|--------|-------|`,
           ...rows,
         ].join('\n');
         return { content: [{ type: 'text', text }] };
@@ -211,32 +215,34 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_model_breakdown': {
         const days = args?.days ?? 30;
-        const data = await api(`/v1/analytics/models?days=${days}`) as Record<string, unknown>[];
-        const rows = data.map((r) =>
-          `| ${r.model} | $${Number(r.total_cost).toFixed(4)} | ${Number(r.requests).toLocaleString()} | ${Number(r.avg_latency_ms ?? 0).toFixed(0)}ms |`
+        const resp = await api(`/v1/analytics/models?period=${days}`) as { models: Record<string, unknown>[] };
+        const models = resp.models ?? [];
+        const rows = models.map((r) =>
+          `| ${r.model} | ${r.provider} | $${Number(r.cost_usd).toFixed(4)} | ${Number(r.requests).toLocaleString()} | ${Number(r.avg_latency_ms ?? 0).toFixed(0)}ms |`
         );
         const text = [
           `🤖 **Model Breakdown** (last ${days} days)`,
           ``,
-          `| Model | Cost | Requests | Avg Latency |`,
-          `|-------|------|----------|-------------|`,
-          ...rows,
+          `| Model | Provider | Cost | Requests | Avg Latency |`,
+          `|-------|----------|------|----------|-------------|`,
+          ...(rows.length ? rows : ['| No data yet | | | | |']),
         ].join('\n');
         return { content: [{ type: 'text', text }] };
       }
 
       case 'get_team_breakdown': {
         const days = args?.days ?? 30;
-        const data = await api(`/v1/analytics/teams?days=${days}`) as Record<string, unknown>[];
-        const rows = data.map((r) =>
-          `| ${r.team || '(untagged)'} | $${Number(r.total_cost).toFixed(4)} | ${Number(r.requests).toLocaleString()} |`
+        const resp = await api(`/v1/analytics/teams?period=${days}`) as { teams: Record<string, unknown>[] };
+        const teams = resp.teams ?? [];
+        const rows = teams.map((r) =>
+          `| ${r.team || '(untagged)'} | $${Number(r.cost_usd).toFixed(4)} | ${Number(r.requests).toLocaleString()} |`
         );
         const text = [
           `👥 **Team Breakdown** (last ${days} days)`,
           ``,
           `| Team | Cost | Requests |`,
           `|------|------|----------|`,
-          ...rows,
+          ...(rows.length ? rows : ['| No data yet | | |']),
         ].join('\n');
         return { content: [{ type: 'text', text }] };
       }
@@ -244,7 +250,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'check_budget': {
         const data = await api('/v1/analytics/summary') as Record<string, unknown>;
         const pct = Number(data.budget_pct ?? 0);
-        const mtd = Number(data.mtd_cost ?? 0);
+        const mtd = Number(data.mtd_cost_usd ?? 0);
         const budget = Number(data.budget_usd ?? 0);
         const status = budget === 0 ? '⚪ No budget set'
           : pct >= 100 ? '🚨 OVER BUDGET'
@@ -267,35 +273,44 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_traces': {
         const limit = Math.min(Number(args?.limit ?? 10), 50);
-        const data = await api(`/v1/analytics/traces?limit=${limit}`) as Record<string, unknown>[];
-        if (!data.length) {
+        const resp = await api(`/v1/analytics/traces`) as { traces: Record<string, unknown>[] };
+        const traces = (resp.traces ?? []).slice(0, limit);
+        if (!traces.length) {
           return { content: [{ type: 'text', text: 'No traces found. Make sure to pass `trace_id` when calling `track_llm_call`.' }] };
         }
-        const rows = data.map((t) =>
-          `| ${String(t.trace_id).slice(0, 16)}… | ${t.span_count} spans | $${Number(t.total_cost).toFixed(4)} | ${t.root_model ?? 'N/A'} |`
+        const rows = traces.map((t) =>
+          `| ${String(t.trace_id).slice(0, 16)}… | ${t.spans} spans | $${Number(t.cost ?? 0).toFixed(4)} | ${t.name ?? 'N/A'} |`
         );
         const text = [
-          `🔍 **Recent Agent Traces** (last ${limit})`,
+          `🔍 **Recent Agent Traces** (last ${traces.length})`,
           ``,
-          `| Trace ID | Spans | Total Cost | Root Model |`,
-          `|----------|-------|------------|------------|`,
+          `| Trace ID | Spans | Total Cost | Agent |`,
+          `|----------|-------|------------|-------|`,
           ...rows,
         ].join('\n');
         return { content: [{ type: 'text', text }] };
       }
 
       case 'get_cost_gate': {
-        const period = args?.period ?? 'today';
-        const data = await api(`/v1/analytics/cost?period=${period}`) as Record<string, unknown>;
-        const passed = data.within_budget as boolean;
+        const periodArg = String(args?.period ?? 'today');
+        const days = periodArg === 'today' ? 1 : periodArg === 'week' ? 7 : 30;
+        const [costData, summary] = await Promise.all([
+          api(`/v1/analytics/cost?period=${days}`) as Promise<Record<string, number>>,
+          api('/v1/analytics/summary') as Promise<Record<string, number>>,
+        ]);
+        const spend = periodArg === 'today'
+          ? Number((costData as Record<string, number>).today_cost_usd ?? 0)
+          : Number((costData as Record<string, number>).total_cost_usd ?? 0);
+        const budget = Number((summary as Record<string, number>).budget_usd ?? 0);
+        const passed = budget === 0 || spend <= budget;
         const text = [
           `🚦 **CI Cost Gate** — ${passed ? '✅ PASSED' : '❌ FAILED'}`,
           ``,
           `| | |`,
           `|-|-|`,
-          `| Period | ${period} |`,
-          `| Spend | $${Number(data.cost ?? 0).toFixed(4)} |`,
-          `| Budget | $${Number(data.budget ?? 0).toFixed(2)} |`,
+          `| Period | ${periodArg} |`,
+          `| Spend | $${spend.toFixed(4)} |`,
+          `| Budget | ${budget ? `$${budget.toFixed(2)}` : 'Not set'} |`,
           `| Status | ${passed ? 'Within budget' : '**Over budget — block merge**'} |`,
         ].join('\n');
         return { content: [{ type: 'text', text }] };

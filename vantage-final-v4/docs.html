@@ -2,11 +2,40 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Docs — Vantage AI</title>
+<title>Docs — VantageAI LLM Cost Tracking SDK & API Reference</title>
+<meta name="description" content="Integration guides, SDK reference and REST API docs for VantageAI. Add LLM cost tracking to Python or JavaScript in under 2 minutes. Supports OpenAI, Anthropic, Google, Mistral and more.">
+<meta name="keywords" content="LLM cost tracking SDK, AI API monitoring docs, OpenAI cost tracking Python, Anthropic cost tracker, LLM observability SDK, token tracking API">
+<meta name="robots" content="index, follow">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="VantageAI">
+<meta property="og:title" content="VantageAI Docs — LLM Cost Tracking SDK & API Reference">
+<meta property="og:description" content="Add LLM cost tracking to your app in 2 minutes. Python and JavaScript SDKs with full OpenAI, Anthropic, Google and Mistral support.">
+<meta property="og:url" content="https://vantageaiops.com/docs.html">
+<meta property="og:image" content="https://vantageaiops.com/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="VantageAI Docs — LLM Cost Tracking SDK & API Reference">
+<meta name="twitter:description" content="Add LLM cost tracking to your app in 2 minutes. Python and JavaScript SDKs.">
+<meta name="twitter:image" content="https://vantageaiops.com/og-image.png">
+<link rel="canonical" href="https://vantageaiops.com/docs.html">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#00d4a1">
-<link rel="canonical" href="https://vantageaiops.com/docs.html">
-<meta property="og:url" content="https://vantageaiops.com/docs.html">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "VantageAI SDK & API Documentation",
+  "description": "Integration guides and API reference for VantageAI LLM cost tracking. Supports Python, JavaScript, OpenAI, Anthropic, Google and Mistral.",
+  "url": "https://vantageaiops.com/docs.html",
+  "publisher": { "@type": "Organization", "name": "VantageAI", "url": "https://vantageaiops.com" },
+  "breadcrumb": {
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://vantageaiops.com" },
+      { "@type": "ListItem", "position": 2, "name": "Docs", "item": "https://vantageaiops.com/docs.html" }
+    ]
+  }
+}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -149,8 +178,7 @@ pre{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;pad
     <div class="docs-nav-sec">Features</div>
     <a class="docs-nav-item" onclick="show('tagging',this)">Cost attribution tags</a>
     <a class="docs-nav-item" onclick="show('alerts',this)">Budget alerts</a>
-    <a class="docs-nav-item" onclick="show('clickhouse',this)">ClickHouse setup</a>
-    <a class="docs-nav-item" onclick="show('selfhost',this)">Self-hosting</a>
+    <a class="docs-nav-item" onclick="show('members',this)">Team members</a>
 
     <div class="docs-nav-sec">Reference</div>
     <a class="docs-nav-item" onclick="show('api',this)">REST API</a>
@@ -178,10 +206,10 @@ quickstart: `
 
 <div class="step-row"><div class="step-num">1</div><div class="step-body">Install the SDK for your language</div></div>
 <div class="tab-row"><div class="tab active" onclick="switchTab('qs',this,'qs-py')">Python</div><div class="tab" onclick="switchTab('qs',this,'qs-ts')">TypeScript</div></div>
-<div id="qs-py" class="tab-content active"><pre>pip install vantage-ai[openai]       # OpenAI support
-pip install vantage-ai[anthropic]    # Anthropic support
-pip install vantage-ai[all]          # Everything</pre></div>
-<div id="qs-ts" class="tab-content"><pre>npm install vantage-ai               # TypeScript / Node.js</pre></div>
+<div id="qs-py" class="tab-content active"><pre>pip install vantageaiops[openai]       # OpenAI support
+pip install vantageaiops[anthropic]    # Anthropic support
+pip install vantageaiops[all]          # Everything</pre></div>
+<div id="qs-ts" class="tab-content"><pre>npm install vantageaiops               # TypeScript / Node.js</pre></div>
 
 <div class="step-row"><div class="step-num">2</div><div class="step-body">Add two lines to your existing code</div></div>
 <div class="tab-row"><div class="tab active" onclick="switchTab('qs2',this,'qs2-py')">Python</div><div class="tab" onclick="switchTab('qs2',this,'qs2-ts')">TypeScript</div></div>
@@ -189,8 +217,8 @@ pip install vantage-ai[all]          # Everything</pre></div>
 <span class="c-keyword">from</span> openai <span class="c-keyword">import</span> <span class="c-var">OpenAI</span>
 
 <span class="c-comment"># After — add these 2 lines</span>
-<span class="c-keyword">import</span> vantage
-<span class="c-keyword">from</span> vantage.proxy.openai_proxy <span class="c-keyword">import</span> <span class="c-var">OpenAI</span>
+<span class="c-keyword">import</span> vantageaiops <span class="c-keyword">as</span> vantage
+<span class="c-keyword">from</span> vantageaiops.proxy.openai_proxy <span class="c-keyword">import</span> <span class="c-var">OpenAI</span>
 
 vantage.<span class="c-func">init</span>(<span class="c-var">api_key</span>=<span class="c-string">"vnt_your_key"</span>)
 client = <span class="c-var">OpenAI</span>(<span class="c-var">api_key</span>=<span class="c-string">"sk-..."</span>)   <span class="c-comment"># identical to before</span>
@@ -205,7 +233,7 @@ response = client.chat.completions.<span class="c-func">create</span>(
 <span class="c-keyword">import</span> <span class="c-var">OpenAI</span> <span class="c-keyword">from</span> <span class="c-string">"openai"</span>;
 
 <span class="c-comment">// After — add these 2 lines</span>
-<span class="c-keyword">import</span> { <span class="c-func">init</span>, <span class="c-func">createOpenAIProxy</span> } <span class="c-keyword">from</span> <span class="c-string">"vantage-ai"</span>;
+<span class="c-keyword">import</span> { <span class="c-func">init</span>, <span class="c-func">createOpenAIProxy</span> } <span class="c-keyword">from</span> <span class="c-string">"vantageaiops"</span>;
 <span class="c-keyword">import</span> <span class="c-var">OpenAI</span> <span class="c-keyword">from</span> <span class="c-string">"openai"</span>;
 
 <span class="c-func">init</span>({ <span class="c-var">apiKey</span>: <span class="c-string">"vnt_your_key"</span> });
@@ -220,27 +248,22 @@ install: `
 <h1>Installation</h1>
 <h2>Python</h2>
 <p>The Python SDK has zero required dependencies. Provider packages are optional extras.</p>
-<pre>pip install vantage-ai            # core only (no dependencies)
-pip install vantage-ai[openai]    # + OpenAI proxy
-pip install vantage-ai[anthropic] # + Anthropic proxy
-pip install vantage-ai[server]    # + FastAPI ingest server
-pip install vantage-ai[all]       # everything</pre>
+<pre>pip install vantageaiops            # core only (no dependencies)
+pip install vantageaiops[openai]    # + OpenAI proxy
+pip install vantageaiops[anthropic] # + Anthropic proxy
+pip install vantageaiops[server]    # + FastAPI ingest server
+pip install vantageaiops[all]       # everything</pre>
 <p>Requires Python 3.10+.</p>
 
 <h2>TypeScript / JavaScript</h2>
-<pre>npm install vantage-ai            # ESM + CJS, works in Node 18+
+<pre>npm install vantageaiops            # ESM + CJS, works in Node 18+
 # peer deps (install whichever you use)
 npm install openai                # OpenAI proxy
 npm install @anthropic-ai/sdk     # Anthropic proxy</pre>
 
 <h2>MCP server (for editors)</h2>
-<pre>npm install -g vantage-ai-mcp     # global install
-# or run without installing:
-npx vantage-ai-mcp</pre>
-
-<h2>VS Code extension</h2>
-<p>Search <strong>Vantage AI</strong> in the Extensions marketplace, or:</p>
-<pre>code --install-extension vantage-ai.vantage-ai</pre>`,
+<pre><span class="c-comment"># No install needed — run directly with npx:</span>
+npx -y vantageaiops-mcp</pre>`,
 
 concepts: `
 <h1>Core concepts</h1>
@@ -269,8 +292,8 @@ concepts: `
 python: `
 <h1>Python SDK</h1>
 <h2>OpenAI proxy</h2>
-<pre><span class="c-keyword">import</span> vantage
-<span class="c-keyword">from</span> vantage.proxy.openai_proxy <span class="c-keyword">import</span> <span class="c-var">OpenAI</span>
+<pre><span class="c-keyword">import</span> vantageaiops <span class="c-keyword">as</span> vantage
+<span class="c-keyword">from</span> vantageaiops.proxy.openai_proxy <span class="c-keyword">import</span> <span class="c-var">OpenAI</span>
 
 vantage.<span class="c-func">init</span>(<span class="c-var">api_key</span>=<span class="c-string">"vnt_your_key"</span>, <span class="c-var">environment</span>=<span class="c-string">"production"</span>)
 client = <span class="c-var">OpenAI</span>(<span class="c-var">api_key</span>=<span class="c-string">"sk-..."</span>)
@@ -287,7 +310,7 @@ response = client.chat.completions.<span class="c-func">create</span>(
         <span class="c-func">print</span>(chunk.choices[<span class="c-num">0</span>].delta.content, end=<span class="c-string">""</span>)</pre>
 
 <h2>Anthropic proxy</h2>
-<pre><span class="c-keyword">from</span> vantage.proxy.anthropic_proxy <span class="c-keyword">import</span> <span class="c-var">Anthropic</span>
+<pre><span class="c-keyword">from</span> vantageaiops.proxy.anthropic_proxy <span class="c-keyword">import</span> <span class="c-var">Anthropic</span>
 
 claude = <span class="c-var">Anthropic</span>(<span class="c-var">api_key</span>=<span class="c-string">"sk-ant-..."</span>)
 message = claude.messages.<span class="c-func">create</span>(
@@ -310,12 +333,12 @@ typescript: `
 <p>Full-featured SDK for Node.js 18+. Supports ESM and CommonJS. Zero required dependencies — provider packages are optional.</p>
 
 <h2>Install</h2>
-<pre>npm install vantage-ai          <span class="c-comment"># core SDK</span>
+<pre>npm install vantageaiops          <span class="c-comment"># core SDK</span>
 npm install openai               <span class="c-comment"># if using OpenAI proxy</span>
 npm install @anthropic-ai/sdk    <span class="c-comment"># if using Anthropic proxy</span></pre>
 
 <h2>Quickstart — OpenAI</h2>
-<pre><span class="c-keyword">import</span> { <span class="c-func">init</span>, <span class="c-func">createOpenAIProxy</span> } <span class="c-keyword">from</span> <span class="c-string">"vantage-ai"</span>;
+<pre><span class="c-keyword">import</span> { <span class="c-func">init</span>, <span class="c-func">createOpenAIProxy</span> } <span class="c-keyword">from</span> <span class="c-string">"vantageaiops"</span>;
 <span class="c-keyword">import</span> <span class="c-var">OpenAI</span> <span class="c-keyword">from</span> <span class="c-string">"openai"</span>;
 
 <span class="c-comment">// 1. Initialise once at app startup</span>
@@ -333,7 +356,7 @@ npm install @anthropic-ai/sdk    <span class="c-comment"># if using Anthropic pr
 // ✓ Cheapest alternative: gemini-2.0-flash — save 94%</span></pre>
 
 <h2>Quickstart — Anthropic</h2>
-<pre><span class="c-keyword">import</span> { <span class="c-func">init</span>, <span class="c-func">createAnthropicProxy</span> } <span class="c-keyword">from</span> <span class="c-string">"vantage-ai"</span>;
+<pre><span class="c-keyword">import</span> { <span class="c-func">init</span>, <span class="c-func">createAnthropicProxy</span> } <span class="c-keyword">from</span> <span class="c-string">"vantageaiops"</span>;
 <span class="c-keyword">import</span> <span class="c-var">Anthropic</span> <span class="c-keyword">from</span> <span class="c-string">"@anthropic-ai/sdk"</span>;
 
 <span class="c-func">init</span>({ <span class="c-var">apiKey</span>: process.env.<span class="c-var">VANTAGE_API_KEY</span>! });
@@ -359,7 +382,7 @@ npm install @anthropic-ai/sdk    <span class="c-comment"># if using Anthropic pr
 <span class="c-comment">// ✓ TTFT, total latency, and token cost all captured</span></pre>
 
 <h2>Context tagging with trace()</h2>
-<pre><span class="c-keyword">import</span> { <span class="c-func">trace</span> } <span class="c-keyword">from</span> <span class="c-string">"vantage-ai"</span>;
+<pre><span class="c-keyword">import</span> { <span class="c-func">trace</span> } <span class="c-keyword">from</span> <span class="c-string">"vantageaiops"</span>;
 
 <span class="c-comment">// Wrap any async block — all AI calls inside inherit this context</span>
 <span class="c-keyword">await</span> <span class="c-func">trace</span>({
@@ -386,7 +409,7 @@ npm install @anthropic-ai/sdk    <span class="c-comment"># if using Anthropic pr
 });</pre>
 
 <h2>Pricing utilities</h2>
-<pre><span class="c-keyword">import</span> { <span class="c-func">calculateCost</span>, <span class="c-func">findCheapest</span>, <span class="c-var">PRICES</span> } <span class="c-keyword">from</span> <span class="c-string">"vantage-ai"</span>;
+<pre><span class="c-keyword">import</span> { <span class="c-func">calculateCost</span>, <span class="c-func">findCheapest</span>, <span class="c-var">PRICES</span> } <span class="c-keyword">from</span> <span class="c-string">"vantageaiops"</span>;
 
 <span class="c-comment">// Cost for a specific model + token count</span>
 <span class="c-keyword">const</span> cost = <span class="c-func">calculateCost</span>(<span class="c-string">"gpt-4o"</span>, <span class="c-num">10_000</span>, <span class="c-num">2_000</span>);
@@ -400,7 +423,7 @@ console.<span class="c-func">log</span>(<span class="c-string">\`Switch to \${al
 console.<span class="c-func">log</span>(<span class="c-var">PRICES</span>[<span class="c-string">"claude-sonnet-4-6"</span>]); <span class="c-comment">// → { provider: "anthropic", input: 3, output: 15, ... }</span></pre>
 
 <h2>Graceful shutdown</h2>
-<pre><span class="c-keyword">import</span> { <span class="c-func">shutdown</span> } <span class="c-keyword">from</span> <span class="c-string">"vantage-ai"</span>;
+<pre><span class="c-keyword">import</span> { <span class="c-func">shutdown</span> } <span class="c-keyword">from</span> <span class="c-string">"vantageaiops"</span>;
 
 <span class="c-comment">// Flush remaining events before process exits</span>
 process.<span class="c-func">on</span>(<span class="c-string">"SIGTERM"</span>, <span class="c-keyword">async</span> () => {
@@ -410,76 +433,70 @@ process.<span class="c-func">on</span>(<span class="c-string">"SIGTERM"</span>, 
 
 mcp: `
 <h1>MCP Server</h1>
-<p>The Vantage MCP server connects any MCP-compatible AI coding assistant to your live usage data. Once connected, you can ask your AI questions about costs directly in chat.</p>
+<p>The Vantage MCP server connects any MCP-compatible AI coding assistant to your live usage data. Once connected, you can ask your AI questions about costs directly in chat — no copy-pasting needed.</p>
 
-<h2>Install</h2>
-<pre>npm install -g vantage-ai-mcp</pre>
+<h2>No install required</h2>
+<p>All editors use <code>npx</code>. The server runs on-demand from the npm registry:</p>
+<pre>npx -y vantageaiops-mcp</pre>
 
 <h2>Available tools</h2>
 <table class="api-table"><thead><tr><th>Tool</th><th>What it answers</th></tr></thead><tbody>
-<tr><td><code>get_usage_summary</code></td><td>"How much did I spend on AI this week?"</td></tr>
-<tr><td><code>get_cost_breakdown</code></td><td>"Which team / feature is most expensive?"</td></tr>
-<tr><td><code>get_savings_opportunities</code></td><td>"Where can I cut costs without losing quality?"</td></tr>
-<tr><td><code>compare_models</code></td><td>"What's cheapest for 5k in + 1k out tokens?"</td></tr>
-<tr><td><code>get_token_efficiency</code></td><td>"Which prompts are bloated?"</td></tr>
-<tr><td><code>get_budget_status</code></td><td>"Will I blow my AI budget this month?"</td></tr>
-<tr><td><code>get_model_pricing</code></td><td>"What does GPT-4o cost per million tokens?"</td></tr>
+<tr><td><code>track_llm_call</code></td><td>Log any LLM call — tokens, cost, latency, model, team</td></tr>
+<tr><td><code>get_summary</code></td><td>"How much have we spent on AI this month?"</td></tr>
+<tr><td><code>get_kpis</code></td><td>Full KPI table — cost, tokens, requests, latency, efficiency</td></tr>
+<tr><td><code>get_model_breakdown</code></td><td>"Which model is costing us the most?"</td></tr>
+<tr><td><code>get_team_breakdown</code></td><td>"Which team drives the most spend?" (chargeback)</td></tr>
+<tr><td><code>check_budget</code></td><td>"Are we within our AI budget?"</td></tr>
+<tr><td><code>get_traces</code></td><td>"Show me recent agent traces and their cost"</td></tr>
+<tr><td><code>get_cost_gate</code></td><td>CI/CD gate — pass/fail vs monthly budget</td></tr>
 </tbody></table>`,
 
 cursor: `
 <h1>Cursor</h1>
 <h2>Setup (2 minutes)</h2>
-<div class="step-row"><div class="step-num">1</div><div class="step-body">Install the MCP server globally: <code>npm install -g vantage-ai-mcp</code></div></div>
-<div class="step-row"><div class="step-num">2</div><div class="step-body">Create or edit <code>~/.cursor/mcp.json</code>:</div></div>
-<pre>{
-  <span class="c-string">"mcpServers"</span>: {
-    <span class="c-string">"vantage"</span>: {
-      <span class="c-string">"command"</span>: <span class="c-string">"vantage-mcp"</span>,
-      <span class="c-string">"env"</span>: {
-        <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"vnt_your_key"</span>,
-        <span class="c-string">"VANTAGE_ORG_ID"</span>: <span class="c-string">"your_org_id"</span>
-      }
-    }
-  }
-}</pre>
-<div class="step-row"><div class="step-num">3</div><div class="step-body">Restart Cursor. The Vantage tools appear in Cursor's tool list.</div></div>
-<h2>Example prompts</h2>
-<pre><span class="c-comment">In Cursor chat:</span>
-How much have I spent on AI this week?
-Which model is cheapest for my summarisation workflow?
-Show me the requests wasting the most tokens
-What's my projected month-end AI spend?
-Compare GPT-4o vs Gemini Flash for 10k input + 2k output tokens</pre>`,
-
-windsurf: `
-<h1>Windsurf</h1>
+<div class="step-row"><div class="step-num">1</div><div class="step-body">Edit <code>~/.cursor/mcp.json</code> (Cursor → Settings → MCP):</div></div>
 <pre>{
   <span class="c-string">"mcpServers"</span>: {
     <span class="c-string">"vantage"</span>: {
       <span class="c-string">"command"</span>: <span class="c-string">"npx"</span>,
-      <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"vantage-ai-mcp"</span>],
-      <span class="c-string">"env"</span>: {
-        <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"vnt_your_key"</span>,
-        <span class="c-string">"VANTAGE_ORG_ID"</span>: <span class="c-string">"your_org_id"</span>
-      }
+      <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"vantageaiops-mcp"</span>],
+      <span class="c-string">"env"</span>: { <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"vnt_your_key"</span> }
     }
   }
 }</pre>
-<p>Save to <code>~/.codeium/windsurf/mcp_config.json</code> and restart Windsurf. Cascade will have access to all Vantage tools.</p>`,
+<div class="step-row"><div class="step-num">2</div><div class="step-body">Restart Cursor. VantageAI tools appear automatically in the tool list.</div></div>
+<h2>Example prompts</h2>
+<pre><span class="c-comment">In Cursor chat:</span>
+How much have we spent on AI this month?
+Which model is costing us the most?
+Are we within our AI budget?
+Show me recent agent traces
+Track this call: gpt-4o, 500 prompt, 120 completion tokens, $0.003</pre>`,
+
+windsurf: `
+<h1>Windsurf</h1>
+<p>Edit <code>~/.codeium/windsurf/mcp_config.json</code>:</p>
+<pre>{
+  <span class="c-string">"mcpServers"</span>: {
+    <span class="c-string">"vantage"</span>: {
+      <span class="c-string">"command"</span>: <span class="c-string">"npx"</span>,
+      <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"vantageaiops-mcp"</span>],
+      <span class="c-string">"env"</span>: { <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"vnt_your_key"</span> }
+    }
+  }
+}</pre>
+<p>Restart Windsurf. Cascade will have access to all VantageAI tools.</p>`,
 
 claudecode: `
 <h1>Claude Code</h1>
-<p>Claude Code supports MCP natively. Add to your project's <code>.mcp.json</code> (or <code>~/.mcp.json</code> for global):</p>
+<p>Claude Code supports MCP natively. Add to your project's <code>.mcp.json</code> (or <code>~/.claude/mcp.json</code> for global):</p>
 <pre>{
   <span class="c-string">"mcpServers"</span>: {
     <span class="c-string">"vantage"</span>: {
       <span class="c-string">"type"</span>: <span class="c-string">"stdio"</span>,
       <span class="c-string">"command"</span>: <span class="c-string">"npx"</span>,
-      <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"vantage-ai-mcp"</span>],
-      <span class="c-string">"env"</span>: {
-        <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"vnt_your_key"</span>,
-        <span class="c-string">"VANTAGE_ORG_ID"</span>: <span class="c-string">"your_org_id"</span>
-      }
+      <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"vantageaiops-mcp"</span>],
+      <span class="c-string">"env"</span>: { <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"vnt_your_key"</span> }
     }
   }
 }</pre>`,
@@ -501,14 +518,17 @@ zed: `
 <pre>{
   <span class="c-string">"context_servers"</span>: {
     <span class="c-string">"vantage"</span>: {
-      <span class="c-string">"command"</span>: { <span class="c-string">"path"</span>: <span class="c-string">"npx"</span>, <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"vantage-ai-mcp"</span>],
-        <span class="c-string">"env"</span>: { <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"vnt_your_key"</span>, <span class="c-string">"VANTAGE_ORG_ID"</span>: <span class="c-string">"your_org"</span> } }
+      <span class="c-string">"command"</span>: {
+        <span class="c-string">"path"</span>: <span class="c-string">"npx"</span>,
+        <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"vantageaiops-mcp"</span>],
+        <span class="c-string">"env"</span>: { <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"vnt_your_key"</span> }
+      }
     }
   }
 }</pre>
 <h2>JetBrains</h2>
 <p>Settings → Tools → AI Assistant → Model Context Protocol → Add server:</p>
-<p>Command: <code>vantage-mcp</code> · Env: <code>VANTAGE_API_KEY=vnt_your_key</code></p>`,
+<p>Command: <code>npx -y vantageaiops-mcp</code> · Env: <code>VANTAGE_API_KEY=vnt_your_key</code></p>`,
 
 tagging: `
 <h1>Cost attribution tags</h1>
@@ -533,7 +553,7 @@ vantage.<span class="c-func">tag</span>(<span class="c-string">"user_id"</span>,
 
 <span class="c-keyword">with</span> <span class="c-func">vantage_feature</span>(<span class="c-string">"doc_summary"</span>, team=<span class="c-string">"content"</span>):
     response = client.chat.completions.<span class="c-func">create</span>(...)</pre></div>
-<div id="tag-ts" class="tab-content"><pre><span class="c-keyword">import</span> { <span class="c-func">tag</span>, <span class="c-func">getClient</span> } <span class="c-keyword">from</span> <span class="c-string">"vantage-ai"</span>;
+<div id="tag-ts" class="tab-content"><pre><span class="c-keyword">import</span> { <span class="c-func">tag</span>, <span class="c-func">getClient</span> } <span class="c-keyword">from</span> <span class="c-string">"vantageaiops"</span>;
 
 <span class="c-func">tag</span>(<span class="c-string">"feature"</span>, <span class="c-string">"chat"</span>);
 <span class="c-func">tag</span>(<span class="c-string">"team"</span>, <span class="c-string">"product"</span>);
@@ -563,7 +583,7 @@ clickhouse: `
 <div class="step-row"><div class="step-num">1</div><div class="step-body">Sign up at <a href="https://clickhouse.cloud" style="color:var(--accent)">clickhouse.cloud</a> → New service → Development tier (free)</div></div>
 <div class="step-row"><div class="step-num">2</div><div class="step-body">Note hostname, username (default), password</div></div>
 <div class="step-row"><div class="step-num">3</div><div class="step-body">Create the schema:</div></div>
-<pre><span class="c-keyword">from</span> vantage.storage.clickhouse <span class="c-keyword">import</span> <span class="c-var">ClickHouseStorage</span>
+<pre><span class="c-keyword">from</span> vantageaiops.storage.clickhouse <span class="c-keyword">import</span> <span class="c-var">ClickHouseStorage</span>
 storage = <span class="c-var">ClickHouseStorage</span>(
     <span class="c-var">host</span>=<span class="c-string">"your-service.clickhouse.cloud"</span>,
     <span class="c-var">password</span>=<span class="c-string">"your-password"</span>
@@ -590,27 +610,131 @@ api: `
 <h2>Base URL</h2>
 <pre>https://api.vantageaiops.com</pre>
 <h2>Authentication</h2>
-<pre>Authorization: Bearer vnt_your_key
-X-Vantage-Org: your_org_id</pre>
-<h2>POST /v1/events</h2>
-<p>Ingest a batch of events. Called automatically by the SDK — you rarely need this directly.</p>
-<h2>GET /v1/stats/:org_id</h2>
-<p>Returns cost_by_day, cost_by_model, savings_opportunities, mtd totals.</p>
-<pre>GET /v1/stats/acmecorp?days=30</pre>
-<h2>GET /health</h2>
-<p>Returns <code>{"status":"ok","clickhouse":"connected"}</code>.</p>`,
+<pre>Authorization: Bearer vnt_your_key</pre>
+<p>All endpoints except <code>POST /v1/auth/signup</code> require a Bearer token. The org is inferred from your key — no separate org header needed.</p>
+
+<h2>Ingest</h2>
+<table class="api-table"><thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>POST</code></td><td><code>/v1/events</code></td><td>Ingest a single LLM event</td></tr>
+<tr><td><code>POST</code></td><td><code>/v1/events/batch</code></td><td>Ingest up to 500 events in one request</td></tr>
+<tr><td><code>PATCH</code></td><td><code>/v1/events/:id/scores</code></td><td>Attach quality scores to an event async</td></tr>
+</tbody></table>
+
+<h2>Analytics</h2>
+<p>All analytics endpoints accept an optional <code>?period=N</code> query param (days, default 30, max 365). Member keys with a <code>scope_team</code> automatically see only their team's data.</p>
+<table class="api-table"><thead><tr><th>Method</th><th>Path</th><th>Returns</th></tr></thead><tbody>
+<tr><td><code>GET</code></td><td><code>/v1/analytics/summary</code></td><td>Today spend, MTD spend, session cost, budget %</td></tr>
+<tr><td><code>GET</code></td><td><code>/v1/analytics/kpis</code></td><td>Total cost, tokens, requests, avg latency, efficiency</td></tr>
+<tr><td><code>GET</code></td><td><code>/v1/analytics/timeseries</code></td><td>Daily cost + token + request series</td></tr>
+<tr><td><code>GET</code></td><td><code>/v1/analytics/models</code></td><td>Cost + usage breakdown per model</td></tr>
+<tr><td><code>GET</code></td><td><code>/v1/analytics/teams</code></td><td>Cost + usage per team tag, with budgets</td></tr>
+<tr><td><code>GET</code></td><td><code>/v1/analytics/traces</code></td><td>Recent agent traces with span count + cost</td></tr>
+<tr><td><code>GET</code></td><td><code>/v1/analytics/cost</code></td><td>Period cost summary (for CI gates)</td></tr>
+</tbody></table>
+
+<h2>Account</h2>
+<table class="api-table"><thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>POST</code></td><td><code>/v1/auth/signup</code></td><td>Create account, returns <code>vnt_…</code> key (public)</td></tr>
+<tr><td><code>POST</code></td><td><code>/v1/auth/members</code></td><td>Invite member — generates scoped API key (admin)</td></tr>
+<tr><td><code>GET</code></td><td><code>/v1/auth/members</code></td><td>List all members (admin)</td></tr>
+<tr><td><code>PATCH</code></td><td><code>/v1/auth/members/:id</code></td><td>Update member role or scope_team (admin)</td></tr>
+<tr><td><code>DELETE</code></td><td><code>/v1/auth/members/:id</code></td><td>Revoke member key (admin)</td></tr>
+</tbody></table>
+
+<h2>Admin</h2>
+<table class="api-table"><thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>GET</code></td><td><code>/v1/admin/overview</code></td><td>Org totals + all teams + member list</td></tr>
+<tr><td><code>GET</code></td><td><code>/v1/admin/members/:id/usage</code></td><td>Usage stats for one member</td></tr>
+<tr><td><code>GET</code></td><td><code>/v1/admin/team-budgets</code></td><td>List all team budgets</td></tr>
+<tr><td><code>PUT</code></td><td><code>/v1/admin/team-budgets/:team</code></td><td>Set or update a team budget</td></tr>
+<tr><td><code>DELETE</code></td><td><code>/v1/admin/team-budgets/:team</code></td><td>Remove a team budget</td></tr>
+</tbody></table>
+
+<h2>Example: invite a member</h2>
+<pre>curl -X POST https://api.vantageaiops.com/v1/auth/members \\
+  -H "Authorization: Bearer vnt_your_owner_key" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "email": "alice@acme.com",
+    "name": "Alice",
+    "role": "member",
+    "scope_team": "backend"
+  }'
+
+<span class="c-comment"># Response — key shown once, store securely:</span>
+{
+  "ok": true,
+  "member_id": "abc123",
+  "api_key": "vnt_acme_...",   <span class="c-comment">// ← share this with Alice</span>
+  "role": "member",
+  "scope_team": "backend"
+}</pre>`,
 
 "mcp-tools": `
 <h1>MCP tools reference</h1>
 <table class="api-table"><thead><tr><th>Tool name</th><th>Parameters</th><th>Returns</th></tr></thead><tbody>
-<tr><td><code>get_usage_summary</code></td><td><code>days</code> (1–365, default 30)</td><td>Total spend, tokens, top models</td></tr>
-<tr><td><code>get_cost_breakdown</code></td><td><code>days</code>, <code>groupBy</code> (model|provider|feature|team)</td><td>Cost per group, ranked</td></tr>
-<tr><td><code>get_savings_opportunities</code></td><td><code>days</code></td><td>Model-switch recommendations with savings</td></tr>
-<tr><td><code>compare_models</code></td><td><code>promptTokens</code>, <code>completionTokens</code>, <code>topN</code></td><td>Cost across all models, sorted</td></tr>
-<tr><td><code>get_token_efficiency</code></td><td><code>days</code>, <code>limit</code></td><td>System prompt waste, expensive requests</td></tr>
-<tr><td><code>get_budget_status</code></td><td>none</td><td>MTD spend, daily rate, projected total</td></tr>
-<tr><td><code>get_model_pricing</code></td><td><code>model</code> (optional)</td><td>Live prices for one model or all</td></tr>
-</tbody></table>`
+<tr><td><code>track_llm_call</code></td><td><code>model</code>, <code>provider</code>, <code>prompt_tokens</code>, <code>completion_tokens</code>, <code>total_cost_usd</code>, <code>latency_ms</code>, <code>team</code>, <code>trace_id</code>, <code>tags</code></td><td>Confirmation with cost summary</td></tr>
+<tr><td><code>get_summary</code></td><td>none</td><td>MTD spend, today spend, requests, budget %</td></tr>
+<tr><td><code>get_kpis</code></td><td>none</td><td>Full KPI table — cost, tokens, latency, efficiency</td></tr>
+<tr><td><code>get_model_breakdown</code></td><td><code>days</code> (default 30)</td><td>Cost + usage per model, ranked</td></tr>
+<tr><td><code>get_team_breakdown</code></td><td><code>days</code> (default 30)</td><td>Cost + usage per team, with budget status</td></tr>
+<tr><td><code>check_budget</code></td><td>none</td><td>Budget %, remaining, over/under status</td></tr>
+<tr><td><code>get_traces</code></td><td><code>limit</code> (default 10, max 50)</td><td>Recent agent traces — spans, cost, agent name</td></tr>
+<tr><td><code>get_cost_gate</code></td><td><code>period</code>: today | week | month</td><td>PASSED / FAILED vs org budget</td></tr>
+</tbody></table>`,
+
+members: `
+<h1>Team members</h1>
+<p>Each team member gets their own <code>vnt_…</code> API key. Member keys can be scoped to a specific team — they will only see and ingest events for that team.</p>
+
+<h2>Roles</h2>
+<table class="api-table"><thead><tr><th>Role</th><th>Ingest events</th><th>Read analytics</th><th>Manage members</th></tr></thead><tbody>
+<tr><td><code>owner</code></td><td>✅ All teams</td><td>✅ All teams</td><td>✅</td></tr>
+<tr><td><code>admin</code></td><td>✅ All teams</td><td>✅ All teams</td><td>✅</td></tr>
+<tr><td><code>member</code></td><td>✅ Scoped team</td><td>✅ Scoped team</td><td>❌</td></tr>
+<tr><td><code>viewer</code></td><td>❌ Read-only</td><td>✅ Scoped team</td><td>❌</td></tr>
+</tbody></table>
+
+<h2>Invite a member (API)</h2>
+<pre><span class="c-comment"># POST /v1/auth/members — admin or owner key required</span>
+curl -X POST https://api.vantageaiops.com/v1/auth/members \\
+  -H "Authorization: Bearer vnt_your_owner_key" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "email": "alice@acme.com",
+    "name": "Alice",
+    "role": "member",
+    "scope_team": "backend"   <span class="c-comment"># optional — omit to see all teams</span>
+  }'</pre>
+
+<div class="warn-box">⚠️ <strong style="color:var(--text)">Key shown once only.</strong> Store the returned <code>api_key</code> securely and share it with the member. It cannot be retrieved again — only revoked and re-issued.</div>
+
+<h2>List members</h2>
+<pre>GET /v1/auth/members
+Authorization: Bearer vnt_your_owner_key</pre>
+
+<h2>Update role or scope</h2>
+<pre>PATCH /v1/auth/members/:id
+{ "role": "admin" }            <span class="c-comment"># promote to admin</span>
+{ "scope_team": "frontend" }   <span class="c-comment"># change scope</span>
+{ "scope_team": null }         <span class="c-comment"># remove scope (see all)</span></pre>
+
+<h2>Revoke a key</h2>
+<pre>DELETE /v1/auth/members/:id</pre>
+<p>The key stops working immediately. Issue a new invite to replace it.</p>
+
+<h2>Team budgets</h2>
+<pre><span class="c-comment"># Set a $50/month budget for the backend team</span>
+curl -X PUT https://api.vantageaiops.com/v1/admin/team-budgets/backend \\
+  -H "Authorization: Bearer vnt_your_owner_key" \\
+  -H "Content-Type: application/json" \\
+  -d '{"budget_usd": 50}'
+
+<span class="c-comment"># List all team budgets</span>
+GET /v1/admin/team-budgets
+
+<span class="c-comment"># Full org overview — all teams + budgets + members</span>
+GET /v1/admin/overview</pre>`
 };
 
 function switchTab(group, el, targetId) {

@@ -109,8 +109,9 @@ function wrapCreate(originalCreate: AnyFn, client: VantageClient) {
 export function createOpenAIProxy<T extends object>(openaiClient: T, vantageClient: VantageClient): T {
   const original = (openaiClient as Record<string, unknown>);
 
+  const completions = ((original["chat"] as Record<string, unknown>)?.["completions"]) as Record<string, unknown> | undefined;
   const wrappedCreate = wrapCreate(
-    (original["chat"] as Record<string, unknown>)?.["completions"]?.["create"] as AnyFn,
+    completions?.["create"] as AnyFn,
     vantageClient
   );
 

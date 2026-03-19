@@ -12,10 +12,16 @@ export type Bindings = {
   SUPABASE_SERVICE_KEY: string;
   ALLOWED_ORIGINS:     string;
   RATE_LIMIT_RPM:      string;
+  // Optional — set via: wrangler secret put RESEND_API_KEY
+  RESEND_API_KEY?:     string;
+  FROM_EMAIL?:         string;   // defaults to noreply@vantageaiops.com
 };
 
 export type Variables = {
-  orgId: string;
+  orgId:     string;
+  role:      string;        // 'owner' | 'admin' | 'member' | 'viewer'
+  scopeTeam: string | null; // null = see all; 'backend' = scoped to that team
+  memberId:  string | null; // null when using the org owner key
 };
 
 // Inbound event from SDK
@@ -27,7 +33,8 @@ export interface EventIn {
   completion_tokens?: number;
   cache_tokens?:      number;
   total_tokens?:      number;
-  cost_total_usd?:    number;
+  total_cost_usd?:    number;   // preferred field name
+  cost_total_usd?:    number;   // legacy alias
   latency_ms?:        number;
   team?:              string;
   project?:           string;
