@@ -32,25 +32,32 @@ a{color:#00d4a1;text-decoration:none}
   <div class="meta">Last updated: March 2026</div>
 
   <h2>1. What we collect</h2>
-  <p>Vantage AI collects API usage metadata (token counts, model names, latency, cost estimates) that you send through the SDK. We do not store the content of your prompts or responses by default. Only statistical event data is retained.</p>
+  <p>VantageAI collects API usage metadata that you send through the SDK — token counts, model names, latency measurements, and cost estimates. We do not store the content of your prompts or model responses. Only statistical event data is retained.</p>
+  <p>We also collect your email address and organisation name when you sign up, for account identification and transactional email (e.g. API key recovery).</p>
 
   <h2>2. How we use data</h2>
-  <p>Usage data is used solely to provide the Vantage dashboard — cost tracking, analytics, and alerts. We do not sell data to third parties or use it to train AI models.</p>
+  <p>Usage data is used solely to provide the VantageAI dashboard — cost tracking, analytics, budget alerts, and team reporting. We do not sell your data to third parties or use it to train AI models.</p>
 
   <h2>3. Data storage</h2>
-  <p>Events are stored in a PostgreSQL database hosted by Supabase. Data is encrypted at rest and in transit. You may delete your data at any time from the dashboard settings.</p>
+  <p>Events are stored in Cloudflare D1 (SQLite on Cloudflare's global network). All data is encrypted at rest and in transit via TLS. Your API key hash is stored using SHA-256 — the plaintext key is never stored and is shown only once at signup.</p>
 
   <h2>4. Authentication</h2>
-  <p>We use Supabase Auth with optional Google OAuth. We store your email address for account identification. Passwords are never stored in plaintext.</p>
+  <p>VantageAI uses API key authentication. Your key is hashed on arrival and never stored in plain text. There are no passwords. Key recovery is available via a one-time email to your registered address.</p>
 
-  <h2>5. Cookies</h2>
-  <p>Vantage uses localStorage and sessionStorage for authentication tokens and dashboard preferences. No third-party advertising cookies are set.</p>
+  <h2>5. Cookies &amp; local storage</h2>
+  <p>The dashboard uses <code>localStorage</code> to persist your API key and preferences in your browser. No third-party advertising cookies are set. No tracking pixels or analytics SDKs are loaded.</p>
 
   <h2>6. Data retention</h2>
-  <p>Events are retained per your plan: Free (30 days), Starter (90 days), Team (1 year), Enterprise (custom). You may export or delete your data at any time.</p>
+  <p>Events are retained per your plan: Free (30 days), Team (1 year), Enterprise (custom). You may request deletion of your account and all associated data at any time by emailing <a href="mailto:support@vantageaiops.com">support@vantageaiops.com</a>.</p>
 
-  <h2>7. Contact</h2>
-  <p>For privacy questions, open an issue at <a href="https://github.com/Amanjain98/VantageAI/issues">github.com/Amanjain98/VantageAI</a>.</p>
+  <h2>7. Third-party services</h2>
+  <p>VantageAI uses <a href="https://resend.com" target="_blank" rel="noopener">Resend</a> to deliver transactional emails (key recovery, team invites). Your email address is passed to Resend solely for this purpose and is not used for marketing.</p>
+
+  <h2>8. Your rights</h2>
+  <p>Under GDPR and similar laws, you have the right to access, correct, export, or erase your personal data. To exercise these rights, email <a href="mailto:support@vantageaiops.com">support@vantageaiops.com</a>.</p>
+
+  <h2>9. Contact</h2>
+  <p>Privacy questions? Email <a href="mailto:support@vantageaiops.com">support@vantageaiops.com</a>.</p>
 </div>
 </body>
 </html>

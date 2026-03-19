@@ -241,6 +241,47 @@ button{font-family:var(--sans);cursor:pointer}
 .sh-row{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:7px;font-size:12px}
 .sh-keys{display:flex;gap:4px}
 .sh-key{background:var(--bg2);border:1px solid var(--b2);border-radius:4px;padding:2px 7px;font-family:var(--mono);font-size:11px}
+
+/* ── Free-tier upgrade banner ──────────────────────────────────────────── */
+#upgrade-banner{background:linear-gradient(90deg,rgba(245,158,11,.08),rgba(249,115,22,.06));border-bottom:1px solid rgba(245,158,11,.2);padding:9px 20px;display:none;align-items:center;gap:12px;font-size:12px;flex-shrink:0}
+#upgrade-banner.show{display:flex}
+#upgrade-banner.urgent{background:linear-gradient(90deg,rgba(248,113,113,.1),rgba(249,115,22,.08));border-bottom-color:rgba(248,113,113,.25)}
+.ub-icon{font-size:14px;flex-shrink:0}
+.ub-text{flex:1;color:var(--tx)}
+.ub-bar-wrap{width:120px;height:4px;background:rgba(255,255,255,.08);border-radius:2px;flex-shrink:0}
+.ub-bar{height:4px;border-radius:2px;background:var(--am);transition:width .4s}
+.ub-bar.urgent{background:var(--re)}
+.ub-pct{font-family:var(--mono);font-size:10px;color:var(--am);min-width:32px;text-align:right}
+.ub-pct.urgent{color:var(--re)}
+.ub-cta{background:var(--am);color:#000;border:none;border-radius:6px;padding:5px 14px;font-family:var(--mono);font-size:11px;font-weight:500;cursor:pointer;white-space:nowrap;transition:opacity .2s;flex-shrink:0}
+.ub-cta:hover{opacity:.85}
+.ub-cta.urgent{background:var(--re);color:#fff}
+
+/* ── Upgrade modal ─────────────────────────────────────────────────────── */
+#upgrade-modal{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:999;display:none;align-items:center;justify-content:center;backdrop-filter:blur(8px)}
+#upgrade-modal.open{display:flex}
+.um-box{background:var(--bg2);border:1px solid var(--b2);border-radius:20px;padding:40px;width:520px;max-width:94vw;box-shadow:0 40px 80px rgba(0,0,0,.7);text-align:center}
+.um-icon{font-size:44px;margin-bottom:12px}
+.um-title{font-size:24px;font-weight:500;margin-bottom:8px}
+.um-sub{font-size:14px;color:var(--mu);margin-bottom:28px;line-height:1.6}
+.um-plans{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:28px;text-align:left}
+.um-plan{background:var(--bg3);border:1px solid var(--b1);border-radius:12px;padding:18px}
+.um-plan.featured{border-color:var(--ac);background:rgba(0,212,161,.05)}
+.um-plan-name{font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--mu);margin-bottom:6px}
+.um-plan-price{font-size:28px;font-weight:500;margin-bottom:4px}
+.um-plan-price span{font-size:13px;color:var(--mu)}
+.um-plan-feats{font-size:12px;color:var(--mu);line-height:2}
+.um-plan-feats li{list-style:none;padding-left:0}
+.um-plan-feats li::before{content:'✓ ';color:var(--ac)}
+.um-cta-row{display:flex;gap:10px;justify-content:center}
+.um-btn{padding:12px 32px;border-radius:9px;font-family:var(--mono);font-size:13px;font-weight:500;cursor:pointer;transition:opacity .2s;border:none}
+.um-btn-primary{background:var(--ac);color:#000}
+.um-btn-secondary{background:transparent;color:var(--mu);border:1px solid var(--b2)!important}
+.um-btn:hover{opacity:.85}
+.um-limit-bar{background:var(--bg3);border-radius:8px;padding:12px 16px;margin-bottom:20px;display:flex;align-items:center;gap:12px}
+.um-limit-fill-wrap{flex:1;height:6px;background:rgba(255,255,255,.08);border-radius:3px}
+.um-limit-fill{height:6px;border-radius:3px;background:var(--re)}
+.um-limit-txt{font-family:var(--mono);font-size:11px;color:var(--re);white-space:nowrap}
 </style>
 </head>
 <body>
@@ -340,6 +381,53 @@ button{font-family:var(--sans);cursor:pointer}
   </div>
   <a href="/docs.html" style="font-family:var(--mono);font-size:10px;color:var(--ac);text-decoration:none;flex-shrink:0;white-space:nowrap">View quickstart →</a>
   <button id="ob-dismiss" onclick="document.getElementById('onboard-banner').classList.add('hidden');localStorage.setItem('ob_done','1')">✕ dismiss</button>
+</div>
+
+<!-- FREE TIER UPGRADE BANNER -->
+<div id="upgrade-banner">
+  <span class="ub-icon">⚡</span>
+  <span class="ub-text" id="ub-text">You're approaching your free tier limit.</span>
+  <div class="ub-bar-wrap"><div class="ub-bar" id="ub-bar" style="width:0%"></div></div>
+  <span class="ub-pct" id="ub-pct">0%</span>
+  <button class="ub-cta" id="ub-cta" onclick="openUpgradeModal()">Upgrade →</button>
+</div>
+
+<!-- UPGRADE MODAL -->
+<div id="upgrade-modal">
+  <div class="um-box">
+    <div class="um-icon">🚀</div>
+    <div class="um-title">You've hit your free limit</div>
+    <div class="um-sub">Your org has used all <strong style="color:var(--tx)">10,000</strong> free events this month.<br>Upgrade to Team to keep tracking — unlimited events, all features.</div>
+    <div class="um-limit-bar">
+      <div class="um-limit-fill-wrap"><div class="um-limit-fill" id="um-fill" style="width:100%"></div></div>
+      <span class="um-limit-txt" id="um-limit-txt">10,000 / 10,000 events</span>
+    </div>
+    <div class="um-plans">
+      <div class="um-plan">
+        <div class="um-plan-name">FREE</div>
+        <div class="um-plan-price">$0<span> / mo</span></div>
+        <ul class="um-plan-feats">
+          <li>10,000 events / month</li>
+          <li>30-day data retention</li>
+          <li>1 user</li>
+        </ul>
+      </div>
+      <div class="um-plan featured">
+        <div class="um-plan-name">TEAM — MOST POPULAR</div>
+        <div class="um-plan-price">$99<span> / mo</span></div>
+        <ul class="um-plan-feats">
+          <li>Unlimited events</li>
+          <li>1-year data retention</li>
+          <li>Up to 10 team members</li>
+          <li>Budget alerts &amp; reports</li>
+        </ul>
+      </div>
+    </div>
+    <div class="um-cta-row">
+      <a href="https://vantageaiops.com/#pricing" target="_blank" class="um-btn um-btn-primary" style="text-decoration:none">Upgrade to Team →</a>
+      <button class="um-btn um-btn-secondary" onclick="closeUpgradeModal()">Maybe later</button>
+    </div>
+  </div>
 </div>
 
 <!-- APP SHELL -->
@@ -1994,10 +2082,75 @@ if ('serviceWorker' in navigator) {
 
 // ── Init ───────────────────────────────────────────
 if (SUPABASE_CONFIGURED) { initAuth().then(() => checkSeedStatus()); } else { setDemoUser(); checkSeedStatus(); }
+checkPlanUsage();
 
 // ── Onboarding banner ──────────────────────────────
 if (localStorage.getItem('ob_done')) {
   document.getElementById('onboard-banner').classList.add('hidden');
+}
+
+// ── Free-tier upgrade banner & modal ───────────────
+const FREE_LIMIT = 10_000;
+const WARN_AT    = 0.8; // show banner at 80%
+
+function showUpgradeBanner(used, limit) {
+  const pct     = Math.min(Math.round(used / limit * 100), 100);
+  const urgent  = pct >= 100;
+  const banner  = document.getElementById('upgrade-banner');
+  const bar     = document.getElementById('ub-bar');
+  const pctEl   = document.getElementById('ub-pct');
+  const textEl  = document.getElementById('ub-text');
+  const ctaEl   = document.getElementById('ub-cta');
+
+  bar.style.width = pct + '%';
+  pctEl.textContent = pct + '%';
+  if (urgent) {
+    banner.classList.add('urgent');
+    bar.classList.add('urgent');
+    pctEl.classList.add('urgent');
+    textEl.textContent = `Free tier limit reached — ${used.toLocaleString()} / ${limit.toLocaleString()} events used. New events are blocked.`;
+    ctaEl.classList.add('urgent');
+    ctaEl.textContent = 'Upgrade now →';
+  } else {
+    textEl.textContent = `Free tier: ${used.toLocaleString()} / ${limit.toLocaleString()} events used this month (${pct}%).`;
+  }
+  banner.classList.add('show');
+}
+
+function openUpgradeModal() {
+  document.getElementById('upgrade-modal').classList.add('open');
+}
+function closeUpgradeModal() {
+  document.getElementById('upgrade-modal').classList.remove('open');
+}
+document.getElementById('upgrade-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeUpgradeModal();
+});
+
+async function checkPlanUsage() {
+  const {apiKey} = getConfig();
+  if (!apiKey) return;
+  try {
+    const ov = await apiFetch('/v1/admin/overview');
+    const org = ov?.org;
+    if (!org || org.plan !== 'free') return; // paid plan — no banner
+    const used  = org.events_this_month ?? 0;
+    const limit = org.events_limit ?? FREE_LIMIT;
+    const pct   = used / limit;
+    if (pct >= WARN_AT) {
+      showUpgradeBanner(used, limit);
+      // Sidebar plan badge
+      const planEl = document.querySelector('.sb-uplan');
+      if (planEl) planEl.textContent = 'FREE PLAN';
+    }
+    if (pct >= 1) {
+      // Update limit bar in modal
+      document.getElementById('um-limit-txt').textContent = `${used.toLocaleString()} / ${limit.toLocaleString()} events`;
+      openUpgradeModal();
+    }
+  } catch(e) {
+    // Non-admin key — skip silently
+  }
 }
 
 // ── Command Palette ────────────────────────────────

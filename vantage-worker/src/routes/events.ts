@@ -20,12 +20,42 @@ events.use('/batch', async (c, next) => {
   return await next();
 });
 
+// ── Free-tier event limit helper ──────────────────────────────────────────────
+const FREE_TIER_LIMIT = 10_000;
+
+async function checkFreeTierLimit(db: D1Database, orgId: string, adding = 1): Promise<{ blocked: boolean; used: number }> {
+  const row = await db.prepare(`
+    SELECT o.plan,
+           COALESCE((
+             SELECT COUNT(*) FROM events
+             WHERE org_id = o.id
+               AND created_at >= strftime('%s', 'now', 'start of month')
+           ), 0) AS mtd_count
+    FROM orgs o WHERE o.id = ?
+  `).bind(orgId).first<{ plan: string; mtd_count: number }>();
+
+  if (!row || row.plan !== 'free') return { blocked: false, used: row?.mtd_count ?? 0 };
+  const used = Number(row.mtd_count);
+  return { blocked: used + adding > FREE_TIER_LIMIT, used };
+}
+
 // ── POST /v1/events — ingest a single event ───────────────────────────────────
 events.post('/', async (c) => {
   const orgId = c.get('orgId');
   let body: EventIn;
   try { body = await c.req.json<EventIn>(); }
   catch { return c.json({ error: 'Invalid JSON body' }, 400); }
+
+  const { blocked, used } = await checkFreeTierLimit(c.env.DB, orgId, 1);
+  if (blocked) {
+    return c.json({
+      error: 'Free tier limit reached',
+      message: `Your org has used ${used.toLocaleString()} / ${FREE_TIER_LIMIT.toLocaleString()} free events this month. Upgrade to Team plan to continue tracking.`,
+      upgrade_url: 'https://vantageaiops.com/signup.html',
+      events_used: used,
+      events_limit: FREE_TIER_LIMIT,
+    }, 429);
+  }
 
   const result = await insertEvent(c.env.DB, orgId, body);
   if (!result.success) return c.json({ error: 'Failed to insert event' }, 500);
@@ -48,6 +78,17 @@ events.post('/batch', async (c) => {
   }
   if (body.events.length > 500) {
     return c.json({ error: 'Batch size exceeds maximum of 500 events' }, 400);
+  }
+
+  const { blocked, used } = await checkFreeTierLimit(c.env.DB, orgId, body.events.length);
+  if (blocked) {
+    return c.json({
+      error: 'Free tier limit reached',
+      message: `Your org has used ${used.toLocaleString()} / ${FREE_TIER_LIMIT.toLocaleString()} free events this month. Upgrade to Team plan to continue tracking.`,
+      upgrade_url: 'https://vantageaiops.com/signup.html',
+      events_used: used,
+      events_limit: FREE_TIER_LIMIT,
+    }, 429);
   }
 
   // Bulk insert using D1 batch API

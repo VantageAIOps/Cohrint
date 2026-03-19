@@ -11,7 +11,6 @@ admin.get('/overview', async (c) => {
   const orgId  = c.get('orgId');
   const period = Math.min(parseInt(c.req.query('period') ?? '30', 10), 365);
   const since  = Math.floor(Date.now() / 1000) - period * 86_400;
-  const month  = Math.floor(Date.now() / 1000) - 30 * 86_400;
 
   // Org-level totals
   const orgRow = await c.env.DB.prepare(`
@@ -24,9 +23,11 @@ admin.get('/overview', async (c) => {
   `).bind(orgId, since).first<Record<string, number>>();
 
   const mtd = await c.env.DB.prepare(`
-    SELECT COALESCE(SUM(cost_usd), 0) AS mtd_cost_usd
-    FROM events WHERE org_id = ? AND created_at >= ?
-  `).bind(orgId, month).first<{ mtd_cost_usd: number }>();
+    SELECT
+      COALESCE(SUM(cost_usd), 0) AS mtd_cost_usd,
+      COUNT(*) AS mtd_event_count
+    FROM events WHERE org_id = ? AND created_at >= strftime('%s', 'now', 'start of month')
+  `).bind(orgId).first<{ mtd_cost_usd: number; mtd_event_count: number }>();
 
   const org = await c.env.DB.prepare(
     'SELECT budget_usd, plan, name, email FROM orgs WHERE id = ?'
@@ -65,15 +66,20 @@ admin.get('/overview', async (c) => {
     ? Math.round(((mtd?.mtd_cost_usd ?? 0) / org.budget_usd) * 100)
     : 0;
 
+  const eventsThisMonth = mtd?.mtd_event_count ?? 0;
+  const eventsLimit     = (org?.plan ?? 'free') === 'free' ? 10_000 : null;
+
   return c.json({
     org: {
-      id:         orgId,
-      name:       org?.name,
-      email:      org?.email,
-      plan:       org?.plan ?? 'free',
-      budget_usd: org?.budget_usd ?? 0,
-      budget_pct: budgetPct,
-      mtd_cost_usd: mtd?.mtd_cost_usd ?? 0,
+      id:               orgId,
+      name:             org?.name,
+      email:            org?.email,
+      plan:             org?.plan ?? 'free',
+      budget_usd:       org?.budget_usd ?? 0,
+      budget_pct:       budgetPct,
+      mtd_cost_usd:     mtd?.mtd_cost_usd ?? 0,
+      events_this_month: eventsThisMonth,
+      events_limit:     eventsLimit,
     },
     totals:  orgRow ?? {},
     teams,
