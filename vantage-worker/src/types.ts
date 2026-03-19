@@ -8,8 +8,6 @@ export type Bindings = {
   KV:  KVNamespace;
   // Env vars
   ENVIRONMENT:         string;
-  SUPABASE_URL:        string;
-  SUPABASE_SERVICE_KEY: string;
   ALLOWED_ORIGINS:     string;
   RATE_LIMIT_RPM:      string;
   // Optional — set via: wrangler secret put RESEND_API_KEY

@@ -225,15 +225,18 @@ async function doSignup() {
     _apiKey = data.api_key;
     document.getElementById('key-display').textContent = data.api_key;
     document.getElementById('key-inline').textContent  = data.api_key.slice(0, 20) + '…';
-    document.getElementById('dashboard-link').href     = data.dashboard;
+    document.getElementById('dashboard-link').href     = '/app.html';
 
     document.getElementById('form-state').style.display    = 'none';
     document.getElementById('success-state').style.display = 'block';
 
-    // Persist so app.html auto-loads
-    localStorage.setItem('vantage_api_key',  data.api_key);
-    localStorage.setItem('vantage_org',      data.org_id);
-    localStorage.setItem('vantage_api_base', 'https://api.vantageaiops.com');
+    // Create a server-side session so the user is auto-logged-in
+    await fetch(`${API}/v1/auth/session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ api_key: data.api_key }),
+    });
 
   } catch {
     showErr('Network error — please check your connection and try again.');

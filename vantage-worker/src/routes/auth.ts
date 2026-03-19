@@ -266,6 +266,121 @@ auth.post('/members/:id/rotate', authMiddleware, adminOnly, async (c) => {
   });
 });
 
+// ── POST /v1/auth/session — exchange API key for a session cookie ─────────────
+// Public — no authMiddleware. Caller sends { api_key }; we validate, create
+// a 30-day session row in D1, and set an HTTP-only cookie.
+auth.post('/session', async (c) => {
+  let body: { api_key?: string };
+  try { body = await c.req.json(); }
+  catch { return c.json({ error: 'Invalid JSON body' }, 400); }
+
+  const apiKey = (body.api_key ?? '').trim();
+  if (!apiKey.startsWith('vnt_')) {
+    return c.json({ error: 'Invalid API key format — must start with vnt_' }, 400);
+  }
+
+  const hash = await sha256hex(apiKey);
+
+  // Resolve org + role from orgs or org_members table
+  let orgId: string;
+  let role: string;
+  let memberId: string | null = null;
+
+  const org = await c.env.DB.prepare(
+    'SELECT id FROM orgs WHERE api_key_hash = ?'
+  ).bind(hash).first<{ id: string }>();
+
+  if (org) {
+    orgId = org.id;
+    role  = 'owner';
+  } else {
+    const member = await c.env.DB.prepare(
+      'SELECT id, org_id, role FROM org_members WHERE api_key_hash = ?'
+    ).bind(hash).first<{ id: string; org_id: string; role: string }>();
+
+    if (!member) {
+      return c.json({ error: 'Invalid API key' }, 401);
+    }
+    orgId    = member.org_id;
+    role     = member.role;
+    memberId = member.id;
+  }
+
+  // Generate a 64-char session token
+  const tokenBytes = new Uint8Array(32);
+  crypto.getRandomValues(tokenBytes);
+  const token = Array.from(tokenBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+
+  const expiresAt = Math.floor(Date.now() / 1000) + 30 * 86_400; // 30 days
+
+  await c.env.DB.prepare(`
+    INSERT INTO sessions (token, org_id, role, member_id, expires_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).bind(token, orgId, role, memberId, expiresAt).run();
+
+  // Set HTTP-only cookie
+  const isProd = (c.env.ENVIRONMENT ?? 'production') === 'production';
+  const cookieParts = [
+    `vantage_session=${token}`,
+    `Path=/`,
+    `HttpOnly`,
+    `SameSite=Lax`,
+    `Max-Age=${30 * 86_400}`,
+  ];
+  if (isProd) cookieParts.push(`Secure`, `Domain=vantageaiops.com`);
+
+  const res = c.json({ ok: true, org_id: orgId, role, expires_at: expiresAt });
+  (await res).headers.set('Set-Cookie', cookieParts.join('; '));
+  return res;
+});
+
+// ── GET /v1/auth/session — return current session info ───────────────────────
+auth.get('/session', authMiddleware, async (c) => {
+  const orgId    = c.get('orgId');
+  const role     = c.get('role');
+  const memberId = c.get('memberId');
+
+  const org = await c.env.DB.prepare(
+    'SELECT name, email, plan, budget_usd FROM orgs WHERE id = ?'
+  ).bind(orgId).first<{ name: string; email: string; plan: string; budget_usd: number }>();
+
+  let memberInfo: { name: string | null; email: string | null } | null = null;
+  if (memberId) {
+    memberInfo = await c.env.DB.prepare(
+      'SELECT name, email FROM org_members WHERE id = ?'
+    ).bind(memberId).first<{ name: string | null; email: string | null }>() ?? null;
+  }
+
+  return c.json({
+    authenticated: true,
+    org_id:   orgId,
+    role,
+    member_id: memberId,
+    org: {
+      name:       org?.name,
+      email:      org?.email,
+      plan:       org?.plan ?? 'free',
+      budget_usd: org?.budget_usd ?? 0,
+    },
+    member: memberInfo,
+  });
+});
+
+// ── DELETE /v1/auth/session — logout, destroy session cookie ─────────────────
+auth.delete('/session', async (c) => {
+  const cookieHeader = c.req.header('Cookie') ?? '';
+  const token = cookieHeader.split(';').map(s => s.trim())
+    .find(s => s.startsWith('vantage_session='))?.split('=')[1];
+
+  if (token) {
+    await c.env.DB.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
+  }
+
+  const res = c.json({ ok: true });
+  (await res).headers.set('Set-Cookie', 'vantage_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax');
+  return res;
+});
+
 // ── POST /v1/auth/rotate — rotate the org owner key ──────────────────────────
 auth.post('/rotate', authMiddleware, async (c) => {
   const orgId = c.get('orgId');

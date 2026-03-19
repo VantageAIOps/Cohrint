@@ -120,11 +120,16 @@ footer a:hover{color:var(--mu)}
 <script>
 const API = 'https://api.vantageaiops.com';
 
-// Already signed in → go straight to dashboard
-if (localStorage.getItem('vantage_api_key')) {
-  const dest = new URLSearchParams(window.location.search).get('next') || '/app.html';
-  window.location.replace(dest);
-}
+// Already signed in? Check server session
+(async () => {
+  try {
+    const res = await fetch(`${API}/v1/auth/session`, { credentials: 'include' });
+    if (res.ok) {
+      const dest = new URLSearchParams(window.location.search).get('next') || '/app.html';
+      window.location.replace(dest);
+    }
+  } catch { /* not signed in, continue */ }
+})();
 
 function showRecover() {
   document.getElementById('signin-box').style.display = 'none';
@@ -153,34 +158,28 @@ async function doSignIn() {
   btn.textContent = 'Verifying…';
 
   try {
-    const res = await fetch(`${API}/v1/admin/overview`, {
-      headers: { 'Authorization': `Bearer ${key}` }
+    const res = await fetch(`${API}/v1/auth/session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ api_key: key }),
     });
-    if (res.status === 401 || res.status === 403) {
+    if (res.status === 401 || res.status === 400) {
       throw new Error('invalid');
     }
-    storeAndRedirect(key);
+    if (!res.ok) throw new Error('server');
+    const next = new URLSearchParams(window.location.search).get('next') || '/app.html';
+    window.location.replace(next);
   } catch(e) {
+    btn.disabled = false;
+    btn.textContent = 'Sign in →';
     if (e.message === 'invalid') {
-      btn.disabled = false;
-      btn.textContent = 'Sign in →';
       err.textContent = 'Invalid API key. Use "Recover via email" if you\'ve lost it.';
-      err.style.display = 'block';
     } else {
-      // Network error but key format valid — trust the user
-      storeAndRedirect(key);
+      err.textContent = 'Network error — please try again.';
     }
+    err.style.display = 'block';
   }
-}
-
-function storeAndRedirect(key) {
-  const parts = key.split('_');
-  const org   = parts.length >= 3 ? parts[1] : 'org';
-  localStorage.setItem('vantage_api_key',  key);
-  localStorage.setItem('vantage_org',      org);
-  localStorage.setItem('vantage_api_base', API);
-  const next = new URLSearchParams(window.location.search).get('next') || '/app.html';
-  window.location.replace(next);
 }
 
 async function doRecover() {

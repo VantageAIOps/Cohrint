@@ -96,6 +96,17 @@ CREATE TABLE IF NOT EXISTS team_budgets (
   PRIMARY KEY (org_id, team)
 );
 
+-- Server-side sessions (replaces localStorage auth)
+CREATE TABLE IF NOT EXISTS sessions (
+  token      TEXT PRIMARY KEY,          -- 64-char cryptographically random hex
+  org_id     TEXT NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+  role       TEXT NOT NULL DEFAULT 'owner',
+  member_id  TEXT,                      -- null for org owner sessions
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  expires_at INTEGER NOT NULL           -- unixepoch() + 2592000 (30 days)
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_org ON sessions (org_id);
+
 -- Budget alerts log (avoid duplicate fires)
 CREATE TABLE IF NOT EXISTS alert_log (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,

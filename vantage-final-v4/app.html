@@ -1266,31 +1266,27 @@ let charts = {};
 
 /**
  * Backend integration helpers
- * - config is stored in localStorage and/or query params
- * - API key is passed as Bearer token (or X-API-Key in future)
+ * - Auth is via HTTP-only session cookie (set by POST /v1/auth/session)
+ * - All API calls use credentials:'include' to send the cookie automatically
  */
+const API_BASE = 'https://api.vantageaiops.com';
+
+// session cache populated by initKeyAuth()
+let _session = null;
+
 function parseOrgFromKey(key){
   if(!key) return "";
   const m = key.match(/^vnt_([^_]+)_/);
   return m ? m[1] : "";
 }
 function getConfig(){
-  const params = new URLSearchParams(window.location.search);
-  const apiBase = (params.get("api_base") || localStorage.getItem("vantage_api_base") || "https://api.vantageaiops.com").replace(/\/+$/g, "");
-  const apiKey  = params.get("api_key") || localStorage.getItem("vantage_api_key") || "";
-  const org     = params.get("org") || localStorage.getItem("vantage_org") || parseOrgFromKey(apiKey) || "acme";
-  return {apiBase, apiKey, org};
-}
-function saveConfig({apiBase, apiKey, org}){
-  localStorage.setItem("vantage_api_base", apiBase);
-  localStorage.setItem("vantage_api_key", apiKey);
-  localStorage.setItem("vantage_org", org);
+  const org = _session?.org_id || 'org';
+  return { apiBase: API_BASE, org };
 }
 async function apiFetch(path, opts={}){
-  const {apiBase, apiKey} = getConfig();
   const headers = {"Content-Type":"application/json", ...opts.headers};
-  if(apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
-  const res = await fetch(`${apiBase}${path}`, {...opts, headers});
+  const res = await fetch(`${API_BASE}${path}`, {...opts, headers, credentials: 'include'});
+  if(res.status === 401) { window.location.replace('/auth.html'); return; }
   if(!res.ok) throw new Error(`API request failed ${res.status} ${res.statusText}`);
   return res.json();
 }
@@ -1304,21 +1300,9 @@ async function loadTimeseries(org, days){
 }
 
 function updateStatus(){
-  const cfg = getConfig();
   const el = document.getElementById("api-status");
   if(!el) return;
-  const keyState = cfg.apiKey ? "connected" : "no API key";
-  el.textContent = `API: ${cfg.apiBase} (${keyState})`;
-}
-
-function openSettings(){
-  const cfg = getConfig();
-  const apiBase = prompt("Backend API base URL:", cfg.apiBase) || cfg.apiBase;
-  const apiKey = prompt("Vantage API key (vnt_...):", cfg.apiKey) || cfg.apiKey;
-  const org = prompt("Org ID (used in /v1/kpis/:org):", cfg.org) || cfg.org;
-  saveConfig({apiBase, apiKey, org});
-  updateStatus();
-  alert("Settings saved. Reload the page for best results.");
+  el.textContent = `API: ${API_BASE} (${_session ? 'connected' : 'no session'})`;
 }
 
 function rnd(min,max){return Math.random()*(max-min)+min}
@@ -1348,9 +1332,8 @@ function nav(id, el) {
 let _memberRole = "owner"; // updated after real API call
 
 async function loadMembersView() {
-  const {apiKey} = getConfig();
-  if(!apiKey) {
-    document.getElementById("members-tbody").innerHTML = `<tr><td colspan="6" style="color:var(--mu);text-align:center;padding:20px">Connect your API key in Settings to manage members.</td></tr>`;
+  if (!_session) {
+    document.getElementById("members-tbody").innerHTML = `<tr><td colspan="6" style="color:var(--mu);text-align:center;padding:20px">Sign in to manage members.</td></tr>`;
     return;
   }
 
@@ -1438,9 +1421,14 @@ async function openRotateOwnerModal() {
   if(!confirm("Rotate your owner API key?\n\nYour current key will stop working immediately. Update it in all your services.")) return;
   const result = await apiFetch("/v1/auth/rotate", {method:"POST"});
   const newKey = result.api_key;
-  // Update localStorage so dashboard keeps working
-  localStorage.setItem("vantage_api_key", newKey);
-  alert(`New owner key:\n\n${newKey}\n\nIt has been saved in this browser. Update it everywhere else.`);
+  // Refresh session with the new key so the dashboard stays authenticated
+  await fetch(`${API_BASE}/v1/auth/session`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ api_key: newKey }),
+  });
+  alert(`New owner key:\n\n${newKey}\n\nCopy it and update it everywhere else. Your session has been refreshed.`);
   loadMembersView();
 }
 
@@ -1521,7 +1509,7 @@ function barDs(data,color){return{data,backgroundColor:data.map((_,i)=>i===data.
    MODULE 1 — COST INTELLIGENCE
 ═══════════════════════════════════════════════════════════════════════════ */
 async function init_cost(){
-  const cfg = getConfig();
+  const cfg = getConfig(); // returns {apiBase, org} from session
   const kpis = await loadKpis(cfg.org, period);
   const ts = (await loadTimeseries(cfg.org, period))?.series || [];
 
@@ -2042,31 +2030,39 @@ init_cost(); window["inited_cost"]=true;
 </div>
 
 <script>
-// ── API Key Auth ────────────────────────────────────
-function initKeyAuth() {
-  const key = localStorage.getItem('vantage_api_key');
-  if (!key) {
-    window.location.replace('/signup.html');
+// ── Session Auth ─────────────────────────────────────
+async function initKeyAuth() {
+  try {
+    const res = await fetch(`${API_BASE}/v1/auth/session`, { credentials: 'include' });
+    if (!res.ok) {
+      window.location.replace('/auth.html?next=' + encodeURIComponent(window.location.pathname));
+      return false;
+    }
+    _session = await res.json();
+    populateUserFromSession(_session);
+    return true;
+  } catch {
+    window.location.replace('/auth.html?next=' + encodeURIComponent(window.location.pathname));
     return false;
   }
-  populateUserFromKey(key);
-  return true;
 }
 
-function populateUserFromKey(key) {
-  const orgId    = parseOrgFromKey(key) || 'org';
+function populateUserFromSession(sess) {
+  const orgId    = sess?.org_id || sess?.org?.name || 'org';
   const initials = orgId.slice(0, 2).toUpperCase();
+  const email    = sess?.org?.email || sess?.member?.email || '';
+  const plan     = sess?.org?.plan || 'free';
   document.getElementById('user-avatar').textContent        = initials;
-  document.getElementById('user-name').textContent          = orgId;
-  document.getElementById('user-email-full').textContent    = key.slice(0, 20) + '…';
+  document.getElementById('user-name').textContent          = sess?.org?.name || orgId;
+  document.getElementById('user-email-full').textContent    = email || orgId;
   document.getElementById('user-email-short').textContent   = orgId;
   const planEl = document.querySelector('.sb-uplan');
-  if (planEl) planEl.textContent = 'FREE PLAN';
+  if (planEl) planEl.textContent = plan.toUpperCase() + ' PLAN';
 }
 
-function signOut() {
-  ['vantage_api_key','vantage_org','vantage_api_base','ob_done'].forEach(k => localStorage.removeItem(k));
-  window.location.replace('/signup.html');
+async function signOut() {
+  await fetch(`${API_BASE}/v1/auth/session`, { method: 'DELETE', credentials: 'include' });
+  window.location.replace('/auth.html');
 }
 
 function goToApp() {
@@ -2097,11 +2093,12 @@ document.addEventListener('click', e => {
 
 // ── Settings modal ────────────────────────────────────
 function openSettings() {
-  const cfg = getConfig();
-  document.getElementById('sm-key-input').value  = cfg.apiKey || '';
-  document.getElementById('sm-base-input').value = cfg.apiBase || 'https://api.vantageaiops.com';
-  document.getElementById('sm-org-val').textContent   = cfg.org || '—';
-  document.getElementById('sm-plan-val').textContent  = localStorage.getItem('vantage_plan') || 'Free';
+  const org  = _session?.org_id || '—';
+  const plan = _session?.org?.plan || 'free';
+  document.getElementById('sm-key-input').value       = '';
+  document.getElementById('sm-base-input').value      = API_BASE;
+  document.getElementById('sm-org-val').textContent   = org;
+  document.getElementById('sm-plan-val').textContent  = plan.charAt(0).toUpperCase() + plan.slice(1);
   document.getElementById('settings-modal').classList.add('open');
 }
 function closeSettings() {
@@ -2110,16 +2107,22 @@ function closeSettings() {
 document.getElementById('settings-modal').addEventListener('click', function(e) {
   if (e.target === this) closeSettings();
 });
-function saveSettings() {
-  const key  = document.getElementById('sm-key-input').value.trim();
-  const base = document.getElementById('sm-base-input').value.trim() || 'https://api.vantageaiops.com';
-  const org  = key ? (parseOrgFromKey(key) || getConfig().org) : getConfig().org;
-  if (key) {
-    saveConfig({ apiBase: base, apiKey: key, org });
-    populateUserFromKey(key);
-    document.getElementById('sm-org-val').textContent = org;
-    checkPlanUsage();
-    updateStatus();
+async function saveSettings() {
+  const key = document.getElementById('sm-key-input').value.trim();
+  if (key && key.startsWith('vnt_')) {
+    // Switch to a different API key — create a new session
+    const res = await fetch(`${API_BASE}/v1/auth/session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ api_key: key }),
+    });
+    if (res.ok) {
+      _session = await fetch(`${API_BASE}/v1/auth/session`, { credentials: 'include' }).then(r => r.json());
+      populateUserFromSession(_session);
+      checkPlanUsage();
+      updateStatus();
+    }
   }
   closeSettings();
 }
@@ -2205,14 +2208,14 @@ if ('serviceWorker' in navigator) {
 }
 
 // ── Init ──────────────────────────────────────────────
-initKeyAuth();
-checkSeedStatus();
-checkPlanUsage();
-
-// ── Onboarding banner ──────────────────────────────
-if (localStorage.getItem('ob_done')) {
-  document.getElementById('onboard-banner').classList.add('hidden');
-}
+(async () => {
+  const ok = await initKeyAuth();
+  if (!ok) return;
+  checkSeedStatus();
+  checkPlanUsage();
+  // Start SSE live stream now that session is available
+  if (_session?.org_id) connectSSE(); else _simulateLiveStream();
+})();
 
 // ── Free-tier upgrade banner & modal ───────────────
 const FREE_LIMIT = 10_000;
@@ -2253,8 +2256,6 @@ document.getElementById('upgrade-modal').addEventListener('click', function(e) {
 });
 
 async function checkPlanUsage() {
-  const {apiKey} = getConfig();
-  if (!apiKey) return;
   try {
     const ov = await apiFetch('/v1/admin/overview');
     const org = ov?.org;
@@ -2354,15 +2355,15 @@ function cmdKey(e) {
 let _sseConn = null;
 let _sseRetry = 0;
 function connectSSE() {
-  const {apiBase, apiKey, org} = getConfig();
-  if (!apiBase || !org) return;
-  const url = `${apiBase}/v1/stream/${org}`;
+  const org = _session?.org_id;
+  if (!org) return;
+  const url = `${API_BASE}/v1/stream/${org}`;
   const streamEl = document.getElementById('event-stream');
   const dotEl    = document.getElementById('sse-dot');
   const statusEl = document.getElementById('stream-status');
   try {
     if (_sseConn) { _sseConn.close(); _sseConn = null; }
-    const es = new EventSource(url + (apiKey ? `?token=${encodeURIComponent(apiKey)}` : ''));
+    const es = new EventSource(url);
     _sseConn = es;
     es.onopen = () => {
       _sseRetry = 0;
@@ -2435,29 +2436,25 @@ function _simulateLiveStream() {
 // ── Slack webhook helpers ──────────────────────────
 function saveSlackWebhook() {
   const url = document.getElementById('slack-url').value.trim();
-  const {apiBase, apiKey, org} = getConfig();
+  const org = _session?.org_id;
   if (!url) { showSlackStatus('warn','Enter a Slack webhook URL first.'); return; }
-  if (!apiBase || !org) {
-    localStorage.setItem('slack_webhook_' + org, url);
-    showSlackStatus('ok', 'Saved locally (configure API key to sync with server).');
-    return;
-  }
-  fetch(`${apiBase}/v1/alerts/slack/${org}`, {
+  if (!org) { showSlackStatus('warn','Not authenticated — please sign in.'); return; }
+  fetch(`${API_BASE}/v1/alerts/slack/${org}`, {
     method: 'POST',
-    headers: {'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
+    headers: {'Content-Type':'application/json'},
+    credentials: 'include',
     body: JSON.stringify({webhook_url: url}),
   }).then(r => r.ok
     ? showSlackStatus('ok','Slack webhook saved successfully.')
-    : showSlackStatus('err','Server error — check your API key and org.')
-  ).catch(() => showSlackStatus('err','Could not reach server. Saved locally.'));
-  localStorage.setItem('slack_webhook_' + org, url);
+    : showSlackStatus('err','Server error — try again.')
+  ).catch(() => showSlackStatus('err','Could not reach server.'));
 }
 function testSlackWebhook() {
-  const {apiBase, apiKey, org} = getConfig();
-  if (!apiBase || !org) { showSlackStatus('warn','Connect to a live backend first.'); return; }
-  fetch(`${apiBase}/v1/alerts/slack/${org}/test`, {
+  const org = _session?.org_id;
+  if (!org) { showSlackStatus('warn','Not authenticated — please sign in.'); return; }
+  fetch(`${API_BASE}/v1/alerts/slack/${org}/test`, {
     method: 'POST',
-    headers: {'Authorization':`Bearer ${apiKey}`},
+    credentials: 'include',
   }).then(r => r.ok
     ? showSlackStatus('ok','Test message sent to Slack!')
     : showSlackStatus('err','Test failed — check webhook URL.')
@@ -2572,15 +2569,8 @@ window.init_traces = function() {
   setTimeout(initTraceSpanChart, 100);
 };
 
-// ── Start SSE (or demo) on load ────────────────────
-(function initSSE() {
-  const {apiBase, org} = getConfig();
-  if (apiBase && org && apiBase !== 'https://api.vantageaiops.com') {
-    connectSSE();
-  } else {
-    _simulateLiveStream();
-  }
-})();
+// ── Start SSE after session loads ──────────────────
+// (called from initKeyAuth success path via checkSeedStatus)
 
 // ── Keyboard shortcuts ─────────────────────────────
 document.addEventListener('keydown', e => {

@@ -17,15 +17,58 @@ async function checkRateLimit(kv: KVNamespace, orgId: string, limitRpm: number):
   return true;
 }
 
+// ── Cookie parser helper ──────────────────────────────────────────────────────
+function parseCookie(header: string, name: string): string | null {
+  for (const part of header.split(';')) {
+    const [k, v] = part.trim().split('=');
+    if (k === name) return v ?? null;
+  }
+  return null;
+}
+
 // ── Auth middleware ───────────────────────────────────────────────────────────
-// Key format: vnt_{orgId}_{randomHex}
 // Lookup order:
-//   1. orgs table         → role = 'owner', scopeTeam = null
-//   2. org_members table  → role = member.role, scopeTeam = member.scope_team
+//   1. Session cookie (vantage_session)  → dashboard UI
+//   2. Authorization: Bearer vnt_...     → SDK / API
 export async function authMiddleware(
   c: Context<{ Bindings: Bindings; Variables: Variables }>,
   next: Next,
 ) {
+  // ── 1. Session cookie auth ────────────────────────────────────────────────
+  const cookieHeader = c.req.header('Cookie') ?? '';
+  const sessionToken = parseCookie(cookieHeader, 'vantage_session');
+
+  if (sessionToken) {
+    const session = await c.env.DB.prepare(
+      'SELECT org_id, role, member_id FROM sessions WHERE token = ? AND expires_at > unixepoch()'
+    ).bind(sessionToken).first<{ org_id: string; role: string; member_id: string | null }>();
+
+    if (session) {
+      let scopeTeam: string | null = null;
+      if (session.member_id) {
+        const m = await c.env.DB.prepare(
+          'SELECT scope_team FROM org_members WHERE id = ?'
+        ).bind(session.member_id).first<{ scope_team: string | null }>();
+        scopeTeam = m?.scope_team ?? null;
+      }
+      c.set('orgId',     session.org_id);
+      c.set('role',      session.role);
+      c.set('scopeTeam', scopeTeam);
+      c.set('memberId',  session.member_id);
+
+      const rpm     = parseInt(c.env.RATE_LIMIT_RPM ?? '1000', 10);
+      const allowed = await checkRateLimit(c.env.KV, session.org_id, rpm);
+      if (!allowed) {
+        const retryAt = Math.ceil(Date.now() / 60_000) * 60;
+        c.header('Retry-After', String(retryAt - Math.floor(Date.now() / 1000)));
+        return c.json({ error: 'Rate limit exceeded', retry_after: retryAt }, 429);
+      }
+      return await next();
+    }
+    // Expired / invalid session — fall through to API key check
+  }
+
+  // ── 2. Bearer API key auth ────────────────────────────────────────────────
   const authHeader = c.req.header('Authorization') ?? '';
   const apiKey = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
 
@@ -33,8 +76,8 @@ export async function authMiddleware(
     return c.json({ error: 'Missing or invalid API key. Expected: Bearer vnt_...' }, 401);
   }
 
-  const parts  = apiKey.split('_');
-  const orgId  = parts.length >= 3 ? parts[1] : '';
+  const parts = apiKey.split('_');
+  const orgId = parts.length >= 3 ? parts[1] : '';
 
   if (!orgId) {
     return c.json({ error: 'Malformed API key — cannot extract org ID' }, 401);
@@ -42,7 +85,7 @@ export async function authMiddleware(
 
   const hash = await sha256hex(apiKey);
 
-  // 1. Check owner key (orgs table)
+  // 2a. Check owner key (orgs table)
   const org = await c.env.DB.prepare(
     'SELECT id, plan FROM orgs WHERE api_key_hash = ?'
   ).bind(hash).first<{ id: string; plan: string }>();
@@ -53,7 +96,7 @@ export async function authMiddleware(
     c.set('scopeTeam', null);
     c.set('memberId',  null);
   } else {
-    // 2. Check member key (org_members table)
+    // 2b. Check member key (org_members table)
     const member = await c.env.DB.prepare(
       'SELECT id, org_id, role, scope_team FROM org_members WHERE api_key_hash = ?'
     ).bind(hash).first<{ id: string; org_id: string; role: string; scope_team: string | null }>();
@@ -61,7 +104,6 @@ export async function authMiddleware(
     if (!member) {
       const isDevKey = c.env.ENVIRONMENT !== 'production';
       if (isDevKey) {
-        // Dev convenience: auto-provision org on first use
         await c.env.DB.prepare(
           'INSERT OR IGNORE INTO orgs (id, api_key_hash, name, plan) VALUES (?, ?, ?, ?)'
         ).bind(orgId, hash, orgId, 'free').run();

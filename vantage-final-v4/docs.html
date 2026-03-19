@@ -760,20 +760,27 @@ function show(id, el) {
 // Init with quickstart
 document.getElementById("docs-content").innerHTML = DOCS.quickstart;
 
-// ── Auth gate — redirect to sign-in if no API key ──
-(function() {
-  const key = localStorage.getItem('vantage_api_key');
-  if (!key) {
-    window.location.replace('/auth.html?next=' + encodeURIComponent(window.location.href));
-  } else {
-    // Pre-fill any "vnt_your_key" placeholders with the actual key
-    const hint = key.slice(0, 20) + '…';
+// ── Auth gate — redirect to sign-in if no active session ──
+(async function() {
+  try {
+    const res = await fetch('https://api.vantageaiops.com/v1/auth/session', {
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      window.location.replace('/auth.html?next=' + encodeURIComponent(window.location.href));
+      return;
+    }
+    // Optionally pre-fill org ID hint in code blocks
+    const sess = await res.json();
+    const orgHint = `vnt_${sess.org_id}_…`;
     document.querySelectorAll('pre, code').forEach(el => {
       if (el.textContent.includes('vnt_your_key')) {
         el.innerHTML = el.innerHTML.replace(/vnt_your_key/g,
-          `<span style="color:var(--accent)">${key.slice(0,28)}…</span>`);
+          `<span style="color:var(--accent)">${orgHint}</span>`);
       }
     });
+  } catch {
+    window.location.replace('/auth.html?next=' + encodeURIComponent(window.location.href));
   }
 })();
 </script>
