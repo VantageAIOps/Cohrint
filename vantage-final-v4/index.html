@@ -368,8 +368,8 @@ footer a:hover{color:var(--text)}
     <a href="/docs.html">Docs</a>
     <a href="#pricing">Pricing</a>
     <a href="#faq">FAQ</a>
-    <a href="/auth" id="nav-signin" style="font-size:13px;color:var(--muted);text-decoration:none;transition:color .2s">Sign in</a>
-    <a href="/signup" class="nav-cta" id="nav-cta">Sign up free →</a>
+    <a href="/auth" id="nav-signin" style="font-size:13px;color:var(--muted);text-decoration:none;transition:color .2s;opacity:0">Sign in</a>
+    <a href="/signup" class="nav-cta" id="nav-cta" style="opacity:0">Sign up free →</a>
   </div>
   <div class="nav-hamburger" onclick="toggleMobileNav(this)" aria-label="Menu">
     <span></span><span></span><span></span>
@@ -380,8 +380,8 @@ footer a:hover{color:var(--text)}
   <a href="/docs.html">Docs</a>
   <a href="#pricing" onclick="closeMobileNav()">Pricing</a>
   <a href="#faq" onclick="closeMobileNav()">FAQ</a>
-  <a href="/auth" id="nav-signin-mob">Sign in</a>
-  <a href="/signup" id="nav-cta-mob">Sign up free →</a>
+  <a href="/auth" id="nav-signin-mob" style="opacity:0">Sign in</a>
+  <a href="/signup" id="nav-cta-mob" style="opacity:0">Sign up free →</a>
 </div>
 
 <!-- HERO -->
@@ -859,19 +859,24 @@ function toggleFaq(qEl) {
 // ── Mobile nav ────────────────────────────────────────────────────────────────
 // Swap nav to "Dashboard →" if user already has an active session
 (async () => {
+  const signin    = document.getElementById('nav-signin');
+  const cta       = document.getElementById('nav-cta');
+  const signinMob = document.getElementById('nav-signin-mob');
+  const ctaMob    = document.getElementById('nav-cta-mob');
   try {
     const res = await fetch('https://api.vantageaiops.com/v1/auth/session', { credentials: 'include' });
     if (res.ok) {
-      const signin    = document.getElementById('nav-signin');
-      const cta       = document.getElementById('nav-cta');
-      const signinMob = document.getElementById('nav-signin-mob');
-      const ctaMob    = document.getElementById('nav-cta-mob');
       if (signin)    { signin.textContent = 'Dashboard'; signin.href = '/app'; }
       if (cta)       { cta.textContent    = 'Go to dashboard →'; cta.href = '/app'; }
       if (signinMob) { signinMob.textContent = 'Dashboard'; signinMob.href = '/app'; }
       if (ctaMob)    { ctaMob.textContent    = 'Go to dashboard →'; ctaMob.href = '/app'; }
     }
   } catch { /* offline or not logged in — keep defaults */ }
+  // Reveal nav auth buttons only after state is known — prevents flash
+  if (signin)    signin.style.opacity    = '1';
+  if (cta)       cta.style.opacity       = '1';
+  if (signinMob) signinMob.style.opacity = '1';
+  if (ctaMob)    ctaMob.style.opacity    = '1';
 })();
 
 function toggleMobileNav(btn) {
