@@ -57,6 +57,15 @@ events.post('/', async (c) => {
     }, 429);
   }
 
+  // Accept 'id' as alias for 'event_id'
+  const r = body as Record<string, unknown>;
+  if (!body.event_id && r.id) {
+    (body as Record<string, unknown>).event_id = r.id;
+  }
+  if (!body.event_id) {
+    return c.json({ error: 'event_id is required' }, 400);
+  }
+
   const result = await insertEvent(c.env.DB, orgId, body);
   if (!result.success) return c.json({ error: 'Failed to insert event' }, 500);
 
@@ -146,8 +155,20 @@ function buildInsertStmt(
   sdkLang?: string,
   sdkVer?: string,
 ): D1PreparedStatement {
-  const totalTokens = ev.total_tokens
-    ?? ((ev.prompt_tokens ?? 0) + (ev.completion_tokens ?? 0));
+  // Accept both canonical field names and SDK-prefixed aliases
+  // SDK sends: usage_prompt_tokens, cost_total_cost_usd, etc.
+  // REST clients may send: prompt_tokens, total_cost_usd, cost_usd, etc.
+  const r = ev as Record<string, unknown>;
+
+  const eventId        = ev.event_id ?? r.id as string | undefined;
+  const promptTokens   = ev.prompt_tokens   ?? r.usage_prompt_tokens   as number ?? 0;
+  const completionTok  = ev.completion_tokens ?? r.usage_completion_tokens as number ?? 0;
+  const cacheTok       = ev.cache_tokens    ?? r.usage_cached_tokens   as number ?? r.cache_tokens as number ?? 0;
+  const totalTokens    = ev.total_tokens    ?? r.usage_total_tokens    as number ?? (promptTokens + completionTok);
+  const costUsd        = ev.total_cost_usd  ?? ev.cost_total_usd       ??
+                         r.cost_total_cost_usd as number ?? r.cost_usd as number ?? 0;
+  const latencyMs      = ev.latency_ms      ?? r.latency_ms            as number ?? 0;
+  const tagsValue      = ev.tags ?? (r.tags as Record<string, string> | undefined);
 
   const ts = ev.timestamp
     ? Math.floor(new Date(ev.timestamp).getTime() / 1000)
@@ -164,17 +185,17 @@ function buildInsertStmt(
       tags, sdk_language, sdk_version, created_at
     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).bind(
-    ev.event_id, orgId, ev.provider ?? '', ev.model ?? '',
-    ev.prompt_tokens ?? 0, ev.completion_tokens ?? 0,
-    ev.cache_tokens ?? 0, totalTokens,
-    ev.total_cost_usd ?? ev.cost_total_usd ?? 0, ev.latency_ms ?? 0,
+    eventId, orgId, ev.provider ?? '', ev.model ?? '',
+    promptTokens, completionTok,
+    cacheTok, totalTokens,
+    costUsd, latencyMs,
     ev.team ?? null, ev.project ?? null, ev.user_id ?? null,
     ev.feature ?? null, ev.endpoint ?? null,
     ev.environment ?? 'production',
     ev.is_streaming ? 1 : 0, ev.stream_chunks ?? 0,
     ev.trace_id ?? null, ev.parent_event_id ?? null,
     ev.agent_name ?? null, ev.span_depth ?? 0,
-    ev.tags ? JSON.stringify(ev.tags) : null,
+    tagsValue ? JSON.stringify(tagsValue) : null,
     ev.sdk_language ?? sdkLang ?? null,
     ev.sdk_version  ?? sdkVer  ?? null,
     ts,
