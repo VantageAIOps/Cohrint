@@ -1,11 +1,6 @@
 # Cloudflare Pages _redirects
-# Clean URL aliases → actual .html files
+# NOTE: Pages auto-serves /foo from foo.html — only alias DIFFERENT paths here
 /login        /auth.html       301
 /signin       /auth.html       301
 /dashboard    /app.html        301
 /pricing      /signup.html     301
-/calculator   /calculator.html 301
-/docs         /docs.html       301
-/signup       /signup.html     301
-/privacy      /privacy.html    301
-/terms        /terms.html      301
