@@ -76,7 +76,16 @@ app.notFound((c) => c.json({
 // ── Global error handler ──────────────────────────────────────────────────────
 app.onError((err, c) => {
   console.error('[vantage-worker]', err);
-  return c.json({ error: 'Internal server error' }, 500);
+  const origin  = c.req.header('Origin') ?? '';
+  const allowed = (c.env.ALLOWED_ORIGINS ?? '').split(',').map(s => s.trim());
+  const isAllowed = allowed.includes('*') || allowed.includes(origin) ||
+    allowed.some(p => p.endsWith('*') && origin.startsWith(p.slice(0, -1)));
+  const corsOrigin = isAllowed ? origin : (allowed[0] ?? '*');
+  return c.json({ error: 'Internal server error' }, 500, {
+    'Access-Control-Allow-Origin':      corsOrigin,
+    'Access-Control-Allow-Credentials': 'true',
+    'Vary': 'Origin',
+  });
 });
 
 export default app;

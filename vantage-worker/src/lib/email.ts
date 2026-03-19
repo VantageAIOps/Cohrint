@@ -20,15 +20,19 @@ export async function sendEmail(
 
   const from = 'VantageAI <noreply@vantageaiops.com>';
 
-  await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${resendKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ from, to: opts.to, subject: opts.subject, html: opts.html }),
-  });
-  // fire-and-forget — don't block the response on email delivery
+  try {
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ from, to: opts.to, subject: opts.subject, html: opts.html }),
+    });
+  } catch {
+    // Resend unreachable — log and continue, never crash the Worker
+    console.warn('[vantage] sendEmail failed — Resend unreachable');
+  }
 }
 
 // ── Email templates ───────────────────────────────────────────────────────────

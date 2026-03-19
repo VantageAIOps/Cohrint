@@ -7,7 +7,9 @@
 CREATE TABLE IF NOT EXISTS orgs (
   id            TEXT PRIMARY KEY,
   api_key_hash  TEXT UNIQUE NOT NULL,  -- SHA-256 hex of the raw key
+  api_key_hint  TEXT,                  -- first 12 chars, shown in recovery email
   name          TEXT,
+  email         TEXT UNIQUE,           -- owner email, used for key recovery
   plan          TEXT NOT NULL DEFAULT 'free',  -- free | starter | team | enterprise
   budget_usd    REAL NOT NULL DEFAULT 0,
   created_at    INTEGER NOT NULL DEFAULT (unixepoch())
