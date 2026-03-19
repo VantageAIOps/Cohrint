@@ -228,6 +228,40 @@ document.getElementById('inp-key').addEventListener('keydown', e => {
 document.getElementById('inp-email').addEventListener('keydown', e => {
   if (e.key === 'Enter') doRecover();
 });
+
+// ── Handle ?recovered_key= and ?recovery_error= from redeem endpoint ─────────
+(function() {
+  const params  = new URLSearchParams(window.location.search);
+  const newKey  = params.get('recovered_key');
+  const errCode = params.get('recovery_error');
+
+  if (newKey) {
+    document.getElementById('inp-key').value = newKey;
+
+    const banner = document.createElement('div');
+    banner.style.cssText = 'background:rgba(0,212,161,.08);border:1px solid rgba(0,212,161,.25);border-radius:10px;padding:14px 16px;margin-bottom:16px';
+    banner.innerHTML = `
+      <div style="font-weight:600;margin-bottom:8px;color:var(--ac);font-size:13px">✓ New API key generated</div>
+      <div style="font-family:var(--mono);font-size:11px;background:var(--bg3);border:1px solid var(--b2);border-radius:6px;padding:8px 10px;word-break:break-all;margin-bottom:8px;color:var(--tx)">${newKey}</div>
+      <div style="font-size:11px;color:var(--mu)">⚠ Copy this key now — it won't be shown again. Then click Sign in below.</div>
+    `;
+    const box = document.getElementById('signin-box');
+    box.insertBefore(banner, box.querySelector('.box-header'));
+    window.history.replaceState({}, '', '/auth');
+  }
+
+  if (errCode) {
+    const msgs = {
+      expired:       'Recovery link has expired (1-hour limit). Please request a new one.',
+      missing_token: 'Invalid recovery link.',
+      invalid:       'Recovery link is invalid or already used.',
+    };
+    const err = document.getElementById('signin-err');
+    err.textContent = msgs[errCode] || 'Recovery failed — please try again.';
+    err.style.display = 'block';
+    window.history.replaceState({}, '', '/auth');
+  }
+})();
 </script>
 </body>
 </html>

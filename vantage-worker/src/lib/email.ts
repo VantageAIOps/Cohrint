@@ -18,19 +18,31 @@ export async function sendEmail(
 ): Promise<void> {
   if (!resendKey) return; // silently skip if not configured
 
-  const from = 'VantageAI <noreply@vantageaiops.com>';
+  const headers = {
+    'Authorization': `Bearer ${resendKey}`,
+    'Content-Type': 'application/json',
+  };
+
+  // Try custom domain first; fall back to Resend shared domain if not yet verified
+  const senders = [
+    'VantageAI <noreply@vantageaiops.com>',
+    'VantageAI <onboarding@resend.dev>',
+  ];
 
   try {
-    await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${resendKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ from, to: opts.to, subject: opts.subject, html: opts.html }),
-    });
+    for (const from of senders) {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ from, to: opts.to, subject: opts.subject, html: opts.html }),
+      });
+      if (res.ok) return; // sent successfully
+      const body = await res.json() as { name?: string };
+      // Only retry with fallback sender on domain-not-verified error
+      if (body.name !== 'validation_error') return;
+      console.warn('[vantage] sendEmail: custom domain not verified — retrying with shared sender');
+    }
   } catch {
-    // Resend unreachable — log and continue, never crash the Worker
     console.warn('[vantage] sendEmail failed — Resend unreachable');
   }
 }
@@ -84,11 +96,11 @@ export function memberInviteEmail(opts: {
 }
 
 export function keyRecoveryEmail(opts: {
-  orgId:    string;
-  orgName:  string;
-  keyHint:  string;
-  isOwner:  boolean;
-  memberHint?: string;
+  orgId:      string;
+  orgName:    string;
+  keyHint:    string;
+  isOwner:    boolean;
+  redeemUrl?: string;  // one-time link to rotate key (owner only)
 }): { subject: string; html: string } {
   return {
     subject: 'VantageAI — API key recovery',
@@ -100,26 +112,33 @@ export function keyRecoveryEmail(opts: {
   </p>
 
   <div style="background:#f4f4f4;border-radius:8px;padding:16px;margin-bottom:16px">
-    <div style="font-size:11px;color:#888;margin-bottom:4px">Key hint</div>
+    <div style="font-size:11px;color:#888;margin-bottom:4px">Current key hint</div>
     <code style="font-size:14px">${opts.keyHint}</code>
   </div>
 
-  <p style="color:#555;font-size:14px">Your API key cannot be retrieved — it is stored as a one-way hash for security.</p>
-
+  ${opts.isOwner && opts.redeemUrl ? `
+  <div style="background:#e8fdf5;border:1px solid #00d4a1;border-radius:8px;padding:16px;margin-bottom:20px">
+    <p style="margin:0 0 12px;font-size:14px;color:#111">
+      <strong>Click below to get a new API key instantly.</strong><br>
+      Your old key will be revoked and a new one issued — you'll be signed in automatically.
+    </p>
+    <a href="${opts.redeemUrl}" style="display:inline-block;background:#00d4a1;color:#000;padding:11px 22px;border-radius:7px;text-decoration:none;font-weight:600;font-size:14px">
+      Get a new API key →
+    </a>
+    <p style="margin:12px 0 0;font-size:11px;color:#888">This link expires in 1 hour and can only be used once.</p>
+  </div>
+  ` : `
   <p style="color:#555;font-size:14px">
     <strong>To get a new key:</strong><br>
-    ${opts.isOwner
-      ? `Sign in to the dashboard and go to <strong>Settings → Rotate API key</strong>, or ask your team admin.`
-      : `Ask your org admin to revoke and re-issue your member key.`
-    }
+    Ask your org admin to revoke and re-issue your member key.
   </p>
-
-  <a href="https://vantageaiops.com/app.html" style="display:inline-block;background:#00d4a1;color:#000;padding:11px 22px;border-radius:7px;text-decoration:none;font-weight:600;font-size:14px;margin-bottom:20px">
-    Open Dashboard →
+  <a href="https://vantageaiops.com/auth" style="display:inline-block;background:#00d4a1;color:#000;padding:11px 22px;border-radius:7px;text-decoration:none;font-weight:600;font-size:14px;margin-bottom:20px">
+    Sign in →
   </a>
+  `}
 
   <div style="font-size:12px;color:#aaa;border-top:1px solid #eee;padding-top:16px;margin-top:8px">
-    If you didn't request this, you can safely ignore this email.
+    If you didn't request this, you can safely ignore this email. Your key remains unchanged unless you click the link above.
   </div>
 </div>`,
   };

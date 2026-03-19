@@ -84,11 +84,18 @@ auth.post('/recover', async (c) => {
   ).bind(email).first<{ id: string; name: string; api_key_hint: string }>();
 
   if (org) {
+    // Generate a one-time recovery token (1-hour TTL) so user can get a new key directly
+    const token   = randomHex(24);
+    const kvKey   = `recover:${token}`;
+    await c.env.KV.put(kvKey, JSON.stringify({ orgId: org.id, type: 'owner' }), { expirationTtl: 3600 });
+    const redeemUrl = `https://api.vantageaiops.com/v1/auth/recover/redeem?token=${token}`;
+
     const { subject, html } = keyRecoveryEmail({
-      orgId:   org.id,
-      orgName: org.name || org.id,
-      keyHint: org.api_key_hint || 'vnt_...',
-      isOwner: true,
+      orgId:      org.id,
+      orgName:    org.name || org.id,
+      keyHint:    org.api_key_hint || 'vnt_...',
+      isOwner:    true,
+      redeemUrl,
     });
     await sendEmail(c.env.RESEND_API_KEY, { to: email, subject, html });
   } else {
@@ -109,6 +116,40 @@ auth.post('/recover', async (c) => {
   }
 
   return c.json({ ok: true, message: 'If an account exists for this email, recovery instructions have been sent.' });
+});
+
+// ── GET /v1/auth/recover/redeem — validates one-time token, rotates key ───────
+auth.get('/recover/redeem', async (c) => {
+  const token = c.req.query('token') ?? '';
+  const SITE  = 'https://vantageaiops.com';
+
+  if (!token) {
+    return c.redirect(`${SITE}/auth?recovery_error=missing_token`);
+  }
+
+  const raw = await c.env.KV.get(`recover:${token}`);
+  if (!raw) {
+    return c.redirect(`${SITE}/auth?recovery_error=expired`);
+  }
+
+  let payload: { orgId: string; type: string };
+  try { payload = JSON.parse(raw); }
+  catch { return c.redirect(`${SITE}/auth?recovery_error=invalid`); }
+
+  // Invalidate token immediately (one-time use)
+  await c.env.KV.delete(`recover:${token}`);
+
+  // Rotate the org owner key
+  const newKey  = `vnt_${payload.orgId}_${randomHex(16)}`;
+  const keyHash = await sha256hex(newKey);
+  const keyHint = `${newKey.slice(0, 12)}...`;
+
+  await c.env.DB.prepare(
+    'UPDATE orgs SET api_key_hash = ?, api_key_hint = ? WHERE id = ?'
+  ).bind(keyHash, keyHint, payload.orgId).run();
+
+  // Redirect to auth page with new key pre-filled for immediate sign-in
+  return c.redirect(`${SITE}/auth?recovered_key=${encodeURIComponent(newKey)}`);
 });
 
 // ── All member endpoints require auth ─────────────────────────────────────────
