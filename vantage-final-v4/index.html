@@ -863,20 +863,28 @@ function toggleFaq(qEl) {
   const cta       = document.getElementById('nav-cta');
   const signinMob = document.getElementById('nav-signin-mob');
   const ctaMob    = document.getElementById('nav-cta-mob');
+  // Always reveal buttons — use a 3s timeout so a slow API never keeps them hidden
+  const revealNav = () => {
+    if (signin)    signin.style.opacity    = '1';
+    if (cta)       cta.style.opacity       = '1';
+    if (signinMob) signinMob.style.opacity = '1';
+    if (ctaMob)    ctaMob.style.opacity    = '1';
+  };
+  const timer = setTimeout(revealNav, 3000); // fallback: always show within 3s
   try {
-    const res = await fetch('https://api.vantageaiops.com/v1/auth/session', { credentials: 'include' });
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), 2500); // abort fetch after 2.5s
+    const res = await fetch('https://api.vantageaiops.com/v1/auth/session',
+      { credentials: 'include', signal: ctrl.signal });
     if (res.ok) {
-      if (signin)    { signin.textContent = 'Dashboard'; signin.href = '/app'; }
-      if (cta)       { cta.textContent    = 'Go to dashboard →'; cta.href = '/app'; }
-      if (signinMob) { signinMob.textContent = 'Dashboard'; signinMob.href = '/app'; }
-      if (ctaMob)    { ctaMob.textContent    = 'Go to dashboard →'; ctaMob.href = '/app'; }
+      if (signin)    { signin.textContent = 'Dashboard'; signin.href = '/app.html'; }
+      if (cta)       { cta.textContent    = 'Go to dashboard →'; cta.href = '/app.html'; }
+      if (signinMob) { signinMob.textContent = 'Dashboard'; signinMob.href = '/app.html'; }
+      if (ctaMob)    { ctaMob.textContent    = 'Go to dashboard →'; ctaMob.href = '/app.html'; }
     }
-  } catch { /* offline or not logged in — keep defaults */ }
-  // Reveal nav auth buttons only after state is known — prevents flash
-  if (signin)    signin.style.opacity    = '1';
-  if (cta)       cta.style.opacity       = '1';
-  if (signinMob) signinMob.style.opacity = '1';
-  if (ctaMob)    ctaMob.style.opacity    = '1';
+  } catch { /* offline, timed out, or not logged in — keep Sign in / Sign up defaults */ }
+  clearTimeout(timer);
+  revealNav();
 })();
 
 function toggleMobileNav(btn) {

@@ -6,7 +6,7 @@
 
 /app.html
   Cache-Control: no-cache, no-store, must-revalidate
-  Content-Security-Policy: default-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co https://*.workers.dev wss://*.supabase.co; img-src 'self' data:; worker-src 'self';
+  Content-Security-Policy: default-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; connect-src 'self' https://api.vantageaiops.com wss://api.vantageaiops.com https://*.supabase.co https://*.workers.dev wss://*.supabase.co; img-src 'self' data:; worker-src 'self';
 
 /index.html
   Cache-Control: no-cache, no-store, must-revalidate
