@@ -62,7 +62,10 @@ footer a:hover{color:var(--mu)}
 <body>
 <nav>
   <a href="/" class="logo"><span class="dot"></span>VANTAGEAI</a>
-  <a href="/" class="back-link">← Back to home</a>
+  <div style="display:flex;align-items:center;gap:12px">
+    <a href="/" class="back-link">← Home</a>
+    <a href="/signup" style="background:var(--ac);color:#000;font-family:var(--mono);font-size:12px;font-weight:500;padding:7px 16px;border-radius:8px;text-decoration:none;letter-spacing:.04em">Create account →</a>
+  </div>
 </nav>
 
 <div class="page">
@@ -90,8 +93,9 @@ footer a:hover{color:var(--mu)}
 
     <button class="ghost-btn" onclick="showRecover()">Forgot your key? Recover via email</button>
 
-    <div class="signup-link">
-      New here? <a href="/signup.html">Create a free account →</a>
+    <div style="margin-top:20px;background:rgba(0,212,161,.05);border:1px solid rgba(0,212,161,.15);border-radius:10px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <span style="font-size:13px;color:var(--mu)">Don't have an account?</span>
+      <a href="/signup" style="background:var(--ac);color:#000;font-family:var(--mono);font-size:12px;font-weight:500;padding:7px 14px;border-radius:7px;text-decoration:none;white-space:nowrap">Create free account →</a>
     </div>
   </div>
 
