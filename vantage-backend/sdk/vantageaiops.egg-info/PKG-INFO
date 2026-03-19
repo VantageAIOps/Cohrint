@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: vantageaiops
-Version: 0.3.0
+Version: 0.3.1
 Summary: LLM cost tracking and AI API monitoring — token tracking, budget alerts and efficiency analysis for OpenAI, Anthropic, Google and AI agents
 License-Expression: MIT
 Keywords: ai,llm,openai,anthropic,observability,cost,tokens,hallucination

@@ -7,7 +7,7 @@ import json, logging, queue, threading, time, urllib.error, urllib.request
 from vantageaiops.models.event import VantageEvent
 
 logger = logging.getLogger("vantage.queue")
-SDK_VERSION = "1.0.0"
+SDK_VERSION = "0.3.1"
 
 
 class EventQueue:
@@ -67,9 +67,12 @@ class EventQueue:
             "sdk_version": SDK_VERSION,
         }).encode()
         req = urllib.request.Request(
-            f"{self.ingest_url}/v1/events", data=payload, method="POST",
-            headers={"Content-Type": "application/json",
-                     "Authorization": f"Bearer {self.api_key}"},
+            f"{self.ingest_url}/v1/events/batch", data=payload, method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.api_key}",
+                "User-Agent": f"vantageaiops-python/{SDK_VERSION}",
+            },
         )
         try:
             with urllib.request.urlopen(req, timeout=5) as r:
