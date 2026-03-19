@@ -174,7 +174,8 @@ async function doSignIn() {
       throw new Error('invalid');
     }
     if (!res.ok) throw new Error('server');
-    const next = new URLSearchParams(window.location.search).get('next') || '/app.html';
+    const raw = new URLSearchParams(window.location.search).get('next') || '/app.html';
+    const next = raw.startsWith('/auth') ? '/app.html' : raw;
     window.location.replace(next);
   } catch(e) {
     btn.disabled = false;
