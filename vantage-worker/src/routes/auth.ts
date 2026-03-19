@@ -351,6 +351,14 @@ auth.get('/session', authMiddleware, async (c) => {
     ).bind(memberId).first<{ name: string | null; email: string | null }>() ?? null;
   }
 
+  // Generate a short-lived SSE token (32 hex chars = 16 random bytes)
+  const sseTokenBytes = new Uint8Array(16);
+  crypto.getRandomValues(sseTokenBytes);
+  const sseToken = Array.from(sseTokenBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+
+  // Store in KV with 120-second TTL — one-time use, consumed by stream.ts
+  await c.env.KV.put(`sse:${orgId}:${sseToken}`, '1', { expirationTtl: 120 });
+
   return c.json({
     authenticated: true,
     org_id:   orgId,
@@ -363,6 +371,8 @@ auth.get('/session', authMiddleware, async (c) => {
       budget_usd: org?.budget_usd ?? 0,
     },
     member: memberInfo,
+    sse_token: sseToken,
+    sse_url:   `https://api.vantageaiops.com/v1/stream/${orgId}?sse_token=${sseToken}`,
   });
 });
 

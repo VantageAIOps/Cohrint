@@ -21,8 +21,22 @@ stream.get('/:orgId', async (c) => {
   const orgId = c.req.param('orgId');
 
   // Auth via query param (EventSource API can't set headers)
-  const token = c.req.query('token') ?? '';
-  if (!token.startsWith('vnt_')) {
+  // Accept either:
+  //   ?sse_token=<short-lived 32-hex token>  — browser/dashboard (session-based auth)
+  //   ?token=vnt_...                          — SDK / direct API callers
+  const sseToken = c.req.query('sse_token') ?? '';
+  const token    = c.req.query('token') ?? '';
+
+  if (sseToken) {
+    // Look up short-lived token in KV; delete on use (one-time)
+    const val = await c.env.KV.get(`sse:${orgId}:${sseToken}`);
+    if (!val) {
+      return c.json({ error: 'Invalid or expired sse_token' }, 401);
+    }
+    await c.env.KV.delete(`sse:${orgId}:${sseToken}`);
+  } else if (token.startsWith('vnt_')) {
+    // Legacy bearer token — SDK compatibility, accept as-is
+  } else {
     return c.json({ error: 'Missing token query param' }, 401);
   }
 

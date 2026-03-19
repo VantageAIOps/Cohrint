@@ -233,11 +233,17 @@ response = client.chat.completions.<span class="c-func">create</span>(
 <span class="c-keyword">import</span> <span class="c-var">OpenAI</span> <span class="c-keyword">from</span> <span class="c-string">"openai"</span>;
 
 <span class="c-comment">// After — add these 2 lines</span>
-<span class="c-keyword">import</span> { <span class="c-func">init</span>, <span class="c-func">createOpenAIProxy</span> } <span class="c-keyword">from</span> <span class="c-string">"vantageaiops"</span>;
+<span class="c-keyword">import</span> * <span class="c-keyword">as</span> <span class="c-var">vantage</span> <span class="c-keyword">from</span> <span class="c-string">"vantageaiops"</span>;
 <span class="c-keyword">import</span> <span class="c-var">OpenAI</span> <span class="c-keyword">from</span> <span class="c-string">"openai"</span>;
 
-<span class="c-func">init</span>({ <span class="c-var">apiKey</span>: <span class="c-string">"vnt_your_key"</span> });
-<span class="c-keyword">const</span> openai = <span class="c-func">createOpenAIProxy</span>(<span class="c-keyword">new</span> <span class="c-var">OpenAI</span>());</pre></div>
+<span class="c-var">vantage</span>.<span class="c-func">init</span>({ <span class="c-var">apiKey</span>: <span class="c-string">"vnt_your_key"</span> });
+<span class="c-keyword">const</span> openai = <span class="c-var">vantage</span>.<span class="c-func">createOpenAIProxy</span>(<span class="c-keyword">new</span> <span class="c-var">OpenAI</span>(), <span class="c-var">vantage</span>.<span class="c-func">getClient</span>());
+
+<span class="c-comment">// All calls to openai.chat.completions.create(...) are now tracked automatically</span>
+<span class="c-keyword">const</span> res = <span class="c-keyword">await</span> openai.chat.completions.<span class="c-func">create</span>({
+  <span class="c-var">model</span>: <span class="c-string">"gpt-4o"</span>,
+  <span class="c-var">messages</span>: [{ <span class="c-var">role</span>: <span class="c-string">"user"</span>, <span class="c-var">content</span>: <span class="c-string">"Hello!"</span> }],
+});</pre></div>
 
 <div class="step-row"><div class="step-num">3</div><div class="step-body">Get your API key — free, no credit card</div></div>
 <p>Sign up at <a href="/signup.html" style="color:var(--accent)">vantageaiops.com</a> and copy your key from Settings → API Keys. Keys start with <code>vnt_</code>.</p>
@@ -338,14 +344,14 @@ npm install openai               <span class="c-comment"># if using OpenAI proxy
 npm install @anthropic-ai/sdk    <span class="c-comment"># if using Anthropic proxy</span></pre>
 
 <h2>Quickstart — OpenAI</h2>
-<pre><span class="c-keyword">import</span> { <span class="c-func">init</span>, <span class="c-func">createOpenAIProxy</span> } <span class="c-keyword">from</span> <span class="c-string">"vantageaiops"</span>;
+<pre><span class="c-keyword">import</span> * <span class="c-keyword">as</span> <span class="c-var">vantage</span> <span class="c-keyword">from</span> <span class="c-string">"vantageaiops"</span>;
 <span class="c-keyword">import</span> <span class="c-var">OpenAI</span> <span class="c-keyword">from</span> <span class="c-string">"openai"</span>;
 
 <span class="c-comment">// 1. Initialise once at app startup</span>
-<span class="c-func">init</span>({ <span class="c-var">apiKey</span>: process.env.<span class="c-var">VANTAGE_API_KEY</span>! });
+<span class="c-var">vantage</span>.<span class="c-func">init</span>({ <span class="c-var">apiKey</span>: process.env.<span class="c-var">VANTAGE_API_KEY</span>! });
 
 <span class="c-comment">// 2. Wrap your existing client — no other changes</span>
-<span class="c-keyword">const</span> openai = <span class="c-func">createOpenAIProxy</span>(<span class="c-keyword">new</span> <span class="c-var">OpenAI</span>());
+<span class="c-keyword">const</span> openai = <span class="c-var">vantage</span>.<span class="c-func">createOpenAIProxy</span>(<span class="c-keyword">new</span> <span class="c-var">OpenAI</span>(), <span class="c-var">vantage</span>.<span class="c-func">getClient</span>());
 
 <span class="c-comment">// 3. Use exactly as before</span>
 <span class="c-keyword">const</span> res = <span class="c-keyword">await</span> openai.chat.completions.<span class="c-func">create</span>({
@@ -356,11 +362,11 @@ npm install @anthropic-ai/sdk    <span class="c-comment"># if using Anthropic pr
 // ✓ Cheapest alternative: gemini-2.0-flash — save 94%</span></pre>
 
 <h2>Quickstart — Anthropic</h2>
-<pre><span class="c-keyword">import</span> { <span class="c-func">init</span>, <span class="c-func">createAnthropicProxy</span> } <span class="c-keyword">from</span> <span class="c-string">"vantageaiops"</span>;
+<pre><span class="c-keyword">import</span> * <span class="c-keyword">as</span> <span class="c-var">vantage</span> <span class="c-keyword">from</span> <span class="c-string">"vantageaiops"</span>;
 <span class="c-keyword">import</span> <span class="c-var">Anthropic</span> <span class="c-keyword">from</span> <span class="c-string">"@anthropic-ai/sdk"</span>;
 
-<span class="c-func">init</span>({ <span class="c-var">apiKey</span>: process.env.<span class="c-var">VANTAGE_API_KEY</span>! });
-<span class="c-keyword">const</span> claude = <span class="c-func">createAnthropicProxy</span>(<span class="c-keyword">new</span> <span class="c-var">Anthropic</span>());
+<span class="c-var">vantage</span>.<span class="c-func">init</span>({ <span class="c-var">apiKey</span>: process.env.<span class="c-var">VANTAGE_API_KEY</span>! });
+<span class="c-keyword">const</span> claude = <span class="c-var">vantage</span>.<span class="c-func">createAnthropicProxy</span>(<span class="c-keyword">new</span> <span class="c-var">Anthropic</span>(), <span class="c-var">vantage</span>.<span class="c-func">getClient</span>());
 
 <span class="c-keyword">const</span> msg = <span class="c-keyword">await</span> claude.messages.<span class="c-func">create</span>({
   <span class="c-var">model</span>: <span class="c-string">"claude-sonnet-4-6"</span>,
@@ -381,10 +387,13 @@ npm install @anthropic-ai/sdk    <span class="c-comment"># if using Anthropic pr
 }
 <span class="c-comment">// ✓ TTFT, total latency, and token cost all captured</span></pre>
 
-<h2>Context tagging with trace()</h2>
+<h2>Universal / manual tracking with trace()</h2>
 <pre><span class="c-keyword">import</span> { <span class="c-func">trace</span> } <span class="c-keyword">from</span> <span class="c-string">"vantageaiops"</span>;
 
-<span class="c-comment">// Wrap any async block — all AI calls inside inherit this context</span>
+<span class="c-comment">// Wrap any async LLM call — tracked even without a proxy</span>
+<span class="c-keyword">const</span> result = <span class="c-keyword">await</span> <span class="c-func">trace</span>(myLLMCall, { <span class="c-var">apiKey</span>: <span class="c-string">"vnt_yourorg_..."</span> });
+
+<span class="c-comment">// Or wrap an async block to tag all AI calls inside with context</span>
 <span class="c-keyword">await</span> <span class="c-func">trace</span>({
   <span class="c-var">userId</span>: <span class="c-string">"user_123"</span>,
   <span class="c-var">feature</span>: <span class="c-string">"summariser"</span>,

@@ -2355,9 +2355,10 @@ function cmdKey(e) {
 let _sseConn = null;
 let _sseRetry = 0;
 function connectSSE() {
-  const org = _session?.org_id;
-  if (!org) return;
-  const url = `${API_BASE}/v1/stream/${org}`;
+  const org      = _session?.org_id;
+  const sseToken = _session?.sse_token;
+  if (!org || !sseToken) return;
+  const url = `${API_BASE}/v1/stream/${org}?sse_token=${sseToken}`;
   const streamEl = document.getElementById('event-stream');
   const dotEl    = document.getElementById('sse-dot');
   const statusEl = document.getElementById('stream-status');
@@ -2395,7 +2396,14 @@ function connectSSE() {
       es.close();
       _sseConn = null;
       _sseRetry = Math.min(_sseRetry + 1, 8);
-      setTimeout(connectSSE, Math.pow(2, _sseRetry) * 1000);
+      // Fetch a fresh session (and new sse_token) before reconnecting
+      setTimeout(async () => {
+        try {
+          const r = await fetch(`${API_BASE}/v1/auth/session`, { credentials: 'include' });
+          if (r.ok) { const s = await r.json(); if (s.sse_token) _session = { ..._session, ...s }; }
+        } catch(_) {}
+        connectSSE();
+      }, Math.pow(2, _sseRetry) * 1000);
     };
   } catch(e) {
     statusEl.textContent = 'DEMO MODE';

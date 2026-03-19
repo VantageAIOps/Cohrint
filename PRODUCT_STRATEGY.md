@@ -29,7 +29,8 @@ VantageAI is an **AI cost intelligence and observability platform** that gives e
 - Support for 23+ models across 7 providers (OpenAI, Anthropic, Google, Meta, Mistral, Cohere, xAI)
 - MCP server integration with all major AI coding tools (Cursor, Windsurf, Claude Code, Zed, JetBrains, VS Code)
 - **Python SDK (`vantageaiops`)** v0.3.0 live on PyPI — proxy wrappers for OpenAI and Anthropic, `trace()`, `tag()`, `flush()`
-- **TypeScript/JavaScript SDK (`vantageaiops`)** — npm package with OpenAI + Anthropic proxies, streaming support, `trace()`
+- **TypeScript/JavaScript SDK (`vantageaiops`)** v1.0.0 live on npm — OpenAI proxy, Anthropic proxy, universal `trace()`, streaming support, pricing utilities
+- **Real-time dashboard** — SSE stream via `GET /v1/stream/:orgId` pushes live events every 2s; client auto-reconnects with exponential backoff; short-lived `sse_token` handles session-based auth
 - **Team management** — org member invites with email delivery, role-based access (owner/admin/member/viewer), API key rotation
 - **Org budget management** — set monthly budget in dashboard, shown on KPI cards
 - **API key recovery** — forgot-key email flow via `POST /v1/auth/recover`
@@ -169,7 +170,7 @@ AI spending by enterprises is growing at 40–60% YoY. With that growth comes an
 | No API key rotation | P0 | Security risk if key is leaked | ✅ **Shipped** — `POST /v1/auth/rotate` + per-member rotate |
 | No forgot-key recovery | P0 | Locked-out users had no recovery path | ✅ **Shipped** — `POST /v1/auth/recover` email flow |
 | Org budget not editable in dashboard | P1 | Admins had to use raw API | ✅ **Shipped** — `PATCH /v1/admin/org` + UI budget field |
-| No real-time dashboard updates (polling-based) | P0 | Makes dashboards feel stale | Open |
+| No real-time dashboard updates (polling-based) | P0 | Makes dashboards feel stale | ✅ **Shipped** — SSE stream via `GET /v1/stream/:orgId`, polls KV every 2s, client auto-reconnects |
 | No multi-agent trace visualization | P1 | Agentic AI is the fastest-growing use case | Open |
 | No streaming response tracking | P1 | Streaming is the dominant UX pattern | Open |
 | No Slack/Teams native app | P1 | Budget alerts need richer delivery | Open |
@@ -640,5 +641,5 @@ High-impact, low-effort improvements to prioritize immediately:
 ---
 
 *Document maintained by: VantageAI Product Team*
-*Last updated: 19 March 2026 (v1.1 — reflects 5 shipped gaps: TS SDK, Python rename, email invites, key rotation, key recovery)*
+*Last updated: 19 March 2026 (v1.2 — reflects 7 shipped gaps: TS SDK v1.0.0 on npm, Python rename, email invites, key rotation, key recovery, real-time SSE dashboard)*
 *Next review: June 2026*
