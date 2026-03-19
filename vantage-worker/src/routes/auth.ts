@@ -118,7 +118,10 @@ auth.post('/recover', async (c) => {
   return c.json({ ok: true, message: 'If an account exists for this email, recovery instructions have been sent.' });
 });
 
-// ── GET /v1/auth/recover/redeem — validates one-time token, rotates key ───────
+// ── GET /v1/auth/recover/redeem — confirmation page (token NOT consumed here)
+// Link scanners (Gmail, Outlook Safe Links) only follow GETs — they would
+// consume a single-use token. So GET just checks the token is valid and
+// redirects to a confirmation page. Only the subsequent POST actually rotates.
 auth.get('/recover/redeem', async (c) => {
   const token = c.req.query('token') ?? '';
   const SITE  = 'https://vantageaiops.com';
@@ -127,16 +130,35 @@ auth.get('/recover/redeem', async (c) => {
     return c.redirect(`${SITE}/auth?recovery_error=missing_token`);
   }
 
+  // Peek at the token (don't delete it yet)
   const raw = await c.env.KV.get(`recover:${token}`);
   if (!raw) {
     return c.redirect(`${SITE}/auth?recovery_error=expired`);
   }
 
+  // Send to confirmation page — token still intact, ready for POST
+  return c.redirect(`${SITE}/auth?confirm_token=${encodeURIComponent(token)}`);
+});
+
+// ── POST /v1/auth/recover/redeem — actually rotates the key (safe from scanners)
+auth.post('/recover/redeem', async (c) => {
+  const SITE = 'https://vantageaiops.com';
+  let token = '';
+  try {
+    const body = await c.req.json() as { token?: string };
+    token = (body.token ?? '').trim();
+  } catch { /* fall through to error */ }
+
+  if (!token) return c.json({ error: 'token is required' }, 400);
+
+  const raw = await c.env.KV.get(`recover:${token}`);
+  if (!raw) return c.json({ error: 'expired' }, 410);
+
   let payload: { orgId: string; type: string };
   try { payload = JSON.parse(raw); }
-  catch { return c.redirect(`${SITE}/auth?recovery_error=invalid`); }
+  catch { return c.json({ error: 'invalid' }, 400); }
 
-  // Invalidate token immediately (one-time use)
+  // Consume the token immediately (single-use)
   await c.env.KV.delete(`recover:${token}`);
 
   // Rotate the org owner key
@@ -148,8 +170,7 @@ auth.get('/recover/redeem', async (c) => {
     'UPDATE orgs SET api_key_hash = ?, api_key_hint = ? WHERE id = ?'
   ).bind(keyHash, keyHint, payload.orgId).run();
 
-  // Redirect to auth page with new key pre-filled for immediate sign-in
-  return c.redirect(`${SITE}/auth?recovered_key=${encodeURIComponent(newKey)}`);
+  return c.json({ ok: true, api_key: newKey, hint: keyHint });
 });
 
 // ── All member endpoints require auth ─────────────────────────────────────────

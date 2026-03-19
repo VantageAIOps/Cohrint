@@ -229,32 +229,58 @@ document.getElementById('inp-email').addEventListener('keydown', e => {
   if (e.key === 'Enter') doRecover();
 });
 
-// ── Handle ?recovered_key= and ?recovery_error= from redeem endpoint ─────────
+// ── Handle recovery redirect params ──────────────────────────────────────────
 (function() {
-  const params  = new URLSearchParams(window.location.search);
-  const newKey  = params.get('recovered_key');
-  const errCode = params.get('recovery_error');
+  const params       = new URLSearchParams(window.location.search);
+  const newKey       = params.get('recovered_key');
+  const errCode      = params.get('recovery_error');
+  const confirmToken = params.get('confirm_token');
 
+  // Step 2 — show new key + prefill sign-in
   if (newKey) {
     document.getElementById('inp-key').value = newKey;
-
     const banner = document.createElement('div');
     banner.style.cssText = 'background:rgba(0,212,161,.08);border:1px solid rgba(0,212,161,.25);border-radius:10px;padding:14px 16px;margin-bottom:16px';
     banner.innerHTML = `
       <div style="font-weight:600;margin-bottom:8px;color:var(--ac);font-size:13px">✓ New API key generated</div>
       <div style="font-family:var(--mono);font-size:11px;background:var(--bg3);border:1px solid var(--b2);border-radius:6px;padding:8px 10px;word-break:break-all;margin-bottom:8px;color:var(--tx)">${newKey}</div>
-      <div style="font-size:11px;color:var(--mu)">⚠ Copy this key now — it won't be shown again. Then click Sign in below.</div>
+      <div style="font-size:11px;color:var(--mu)">⚠ Copy this key now — it won\'t be shown again. Then click Sign in below.</div>
     `;
     const box = document.getElementById('signin-box');
     box.insertBefore(banner, box.querySelector('.box-header'));
     window.history.replaceState({}, '', '/auth');
+    return;
   }
 
+  // Step 1 — confirmation page (token not yet consumed)
+  if (confirmToken) {
+    window.history.replaceState({}, '', '/auth');
+    // Hide normal sign-in box, show confirmation UI
+    document.getElementById('signin-box').style.display = 'none';
+    const box = document.getElementById('recover-box');
+    box.style.display = 'block';
+    box.innerHTML = `
+      <div class="box-header">
+        <h1>Confirm key<br><em>rotation</em></h1>
+        <p>Clicking below will revoke your current key and issue a brand-new one.</p>
+      </div>
+      <div style="background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:12px 14px;font-size:13px;color:var(--am);margin-bottom:20px">
+        ⚠ Your existing API key will stop working immediately.
+      </div>
+      <button class="submit-btn" id="confirm-btn" onclick="redeemToken()">Generate my new API key →</button>
+      <div class="err-msg error" id="confirm-err" style="margin-top:12px"></div>
+      <button class="ghost-btn" style="margin-top:10px" onclick="window.location='/auth'">← Cancel</button>
+    `;
+    window._recoverToken = confirmToken;
+    return;
+  }
+
+  // Error from redeem
   if (errCode) {
     const msgs = {
-      expired:       'Recovery link has expired (1-hour limit). Please request a new one.',
+      expired:       'Recovery link has expired (1-hour limit). Please request a new one below.',
       missing_token: 'Invalid recovery link.',
-      invalid:       'Recovery link is invalid or already used.',
+      invalid:       'Recovery link is invalid or already used. Please request a new one.',
     };
     const err = document.getElementById('signin-err');
     err.textContent = msgs[errCode] || 'Recovery failed — please try again.';
@@ -262,6 +288,43 @@ document.getElementById('inp-email').addEventListener('keydown', e => {
     window.history.replaceState({}, '', '/auth');
   }
 })();
+
+async function redeemToken() {
+  const btn = document.getElementById('confirm-btn');
+  const err = document.getElementById('confirm-err');
+  btn.disabled = true;
+  btn.textContent = 'Generating…';
+  try {
+    const res = await fetch(`${API}/v1/auth/recover/redeem`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: window._recoverToken }),
+    });
+    if (res.status === 410) throw new Error('expired');
+    if (!res.ok) throw new Error('server');
+    const data = await res.json();
+    // Show the new key in the sign-in box
+    document.getElementById('recover-box').style.display = 'none';
+    document.getElementById('signin-box').style.display = 'block';
+    document.getElementById('inp-key').value = data.api_key;
+    const banner = document.createElement('div');
+    banner.style.cssText = 'background:rgba(0,212,161,.08);border:1px solid rgba(0,212,161,.25);border-radius:10px;padding:14px 16px;margin-bottom:16px';
+    banner.innerHTML = `
+      <div style="font-weight:600;margin-bottom:8px;color:var(--ac);font-size:13px">✓ New API key generated</div>
+      <div style="font-family:var(--mono);font-size:11px;background:var(--bg3);border:1px solid var(--b2);border-radius:6px;padding:8px 10px;word-break:break-all;margin-bottom:8px;color:var(--tx)">${data.api_key}</div>
+      <div style="font-size:11px;color:var(--mu)">⚠ Copy this key now — it won\'t be shown again. Then click Sign in below.</div>
+    `;
+    const signinBox = document.getElementById('signin-box');
+    signinBox.insertBefore(banner, signinBox.querySelector('.box-header'));
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = 'Generate my new API key →';
+    err.textContent = e.message === 'expired'
+      ? 'This recovery link has expired. Please request a new recovery email.'
+      : 'Something went wrong — please try again.';
+    err.style.display = 'block';
+  }
+}
 </script>
 </body>
 </html>
