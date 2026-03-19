@@ -1286,7 +1286,7 @@ function getConfig(){
 async function apiFetch(path, opts={}){
   const headers = {"Content-Type":"application/json", ...opts.headers};
   const res = await fetch(`${API_BASE}${path}`, {...opts, headers, credentials: 'include'});
-  if(res.status === 401) { window.location.replace('/auth.html'); return; }
+  if(res.status === 401) { window.location.replace('/auth.html?next=' + encodeURIComponent(window.location.pathname)); return; }
   if(!res.ok) throw new Error(`API request failed ${res.status} ${res.statusText}`);
   return res.json();
 }
@@ -2032,19 +2032,23 @@ init_cost(); window["inited_cost"]=true;
 <script>
 // ── Session Auth ─────────────────────────────────────
 async function initKeyAuth() {
+  // Only catch auth/network errors — DOM errors in populateUserFromSession
+  // must NOT trigger a redirect (that causes an infinite auth ↔ app loop).
+  let res;
   try {
-    const res = await fetch(`${API_BASE}/v1/auth/session`, { credentials: 'include' });
-    if (!res.ok) {
-      window.location.replace('/auth.html?next=' + encodeURIComponent(window.location.pathname));
-      return false;
-    }
-    _session = await res.json();
-    populateUserFromSession(_session);
-    return true;
+    res = await fetch(`${API_BASE}/v1/auth/session`, { credentials: 'include' });
   } catch {
+    // Network error — stay put and show an offline indicator rather than looping
+    console.warn('[vantage] Could not reach auth API — offline?');
+    return false;
+  }
+  if (!res.ok) {
     window.location.replace('/auth.html?next=' + encodeURIComponent(window.location.pathname));
     return false;
   }
+  _session = await res.json();
+  populateUserFromSession(_session);
+  return true;
 }
 
 function populateUserFromSession(sess) {

@@ -125,10 +125,12 @@ const API = 'https://api.vantageaiops.com';
   try {
     const res = await fetch(`${API}/v1/auth/session`, { credentials: 'include' });
     if (res.ok) {
-      const dest = new URLSearchParams(window.location.search).get('next') || '/app.html';
+      const raw  = new URLSearchParams(window.location.search).get('next') || '/app.html';
+      // Guard against redirect loops — never send back to /auth
+      const dest = raw.startsWith('/auth') ? '/app.html' : raw;
       window.location.replace(dest);
     }
-  } catch { /* not signed in, continue */ }
+  } catch { /* not signed in, show form */ }
 })();
 
 function showRecover() {
