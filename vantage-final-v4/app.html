@@ -242,6 +242,43 @@ button{font-family:var(--sans);cursor:pointer}
 .sh-keys{display:flex;gap:4px}
 .sh-key{background:var(--bg2);border:1px solid var(--b2);border-radius:4px;padding:2px 7px;font-family:var(--mono);font-size:11px}
 
+/* ── Settings modal ────────────────────────────────────────────────────── */
+#settings-modal{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:998;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+#settings-modal.open{display:flex}
+.sm-box{background:var(--bg2);border:1px solid var(--b2);border-radius:18px;padding:32px;width:460px;max-width:94vw;box-shadow:0 32px 64px rgba(0,0,0,.6)}
+.sm-title{font-size:16px;font-weight:500;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between}
+.sm-close{background:var(--bg3);border:1px solid var(--b2);color:var(--mu);border-radius:6px;padding:3px 10px;cursor:pointer;font-size:12px;font-family:var(--mono)}
+.sm-section{margin-top:18px;padding-top:18px;border-top:1px solid var(--b1)}
+.sm-label{font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--mu);margin-bottom:7px}
+.sm-row{display:flex;align-items:center;gap:8px}
+.sm-val{flex:1;font-family:var(--mono);font-size:12px;background:var(--bg3);border:1px solid var(--b1);border-radius:7px;padding:9px 12px;color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sm-val input{background:transparent;border:none;outline:none;width:100%;font-family:var(--mono);font-size:12px;color:var(--tx)}
+.sm-copy-btn{background:rgba(0,212,161,.1);border:1px solid rgba(0,212,161,.2);color:var(--ac);padding:7px 12px;border-radius:6px;font-family:var(--mono);font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.sm-copy-btn:hover{background:rgba(0,212,161,.18)}
+.sm-save-btn{width:100%;padding:11px;background:var(--ac);color:#000;border:none;border-radius:9px;font-family:var(--mono);font-size:12px;font-weight:500;cursor:pointer;margin-top:18px;transition:opacity .2s}
+.sm-save-btn:hover{opacity:.85}
+.sm-signout-btn{width:100%;padding:10px;background:transparent;color:var(--re);border:1px solid rgba(248,113,113,.2);border-radius:9px;font-family:var(--mono);font-size:12px;cursor:pointer;margin-top:8px;transition:border-color .2s}
+.sm-signout-btn:hover{border-color:var(--re)}
+
+/* ── Notifications dropdown ─────────────────────────────────────────────── */
+#notif-wrap{position:relative}
+#notif-dropdown{position:absolute;right:0;top:calc(100% + 8px);width:320px;background:var(--bg2);border:1px solid var(--b2);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.5);z-index:300;display:none}
+#notif-dropdown.open{display:block}
+.nd-header{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:1px solid var(--b1)}
+.nd-title{font-size:13px;font-weight:500}
+.nd-mark{font-family:var(--mono);font-size:10px;color:var(--mu);cursor:pointer;border:none;background:transparent;transition:color .2s}
+.nd-mark:hover{color:var(--ac)}
+.nd-list{max-height:320px;overflow-y:auto}
+.nd-item{display:flex;gap:10px;padding:12px 16px;border-bottom:1px solid var(--b1);transition:background .15s;cursor:default}
+.nd-item:hover{background:rgba(255,255,255,.02)}
+.nd-item:last-child{border-bottom:none}
+.nd-ico{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:1px}
+.nd-body{flex:1;min-width:0}
+.nd-name{font-size:12px;font-weight:500;margin-bottom:2px}
+.nd-desc{font-size:11px;color:var(--mu);line-height:1.4}
+.nd-time{font-family:var(--mono);font-size:9px;color:var(--di);white-space:nowrap;padding-top:2px}
+.nd-empty{padding:32px 16px;text-align:center;color:var(--mu);font-size:13px}
+
 /* ── Free-tier upgrade banner ──────────────────────────────────────────── */
 #upgrade-banner{background:linear-gradient(90deg,rgba(245,158,11,.08),rgba(249,115,22,.06));border-bottom:1px solid rgba(245,158,11,.2);padding:9px 20px;display:none;align-items:center;gap:12px;font-size:12px;flex-shrink:0}
 #upgrade-banner.show{display:flex}
@@ -345,7 +382,16 @@ button{font-family:var(--sans);cursor:pointer}
     <button class="tb-btn" onclick="openCmd()" title="Command palette (⌘K)" style="font-family:var(--mono);font-size:11px;gap:8px;min-width:160px;justify-content:flex-start;color:var(--mu)"><span>⌕</span><span>Search...</span><span style="margin-left:auto;background:var(--bg);border:1px solid var(--b1);border-radius:3px;padding:1px 5px;font-size:9px">⌘K</span></button>
     <button class="tb-btn" onclick="openSettings()">&#9881; Settings</button>
     <button class="tb-btn" onclick="document.getElementById('sh-modal').classList.add('open')" title="Keyboard shortcuts (?)">?</button>
-    <button class="tb-btn tb-notif">&#128276;<div class="tb-notif-dot"></div></button>
+    <div id="notif-wrap">
+      <button class="tb-btn tb-notif" onclick="toggleNotifications()" id="notif-btn">&#128276;<div class="tb-notif-dot" id="notif-dot"></div></button>
+      <div id="notif-dropdown">
+        <div class="nd-header">
+          <span class="nd-title">Notifications</span>
+          <button class="nd-mark" onclick="markAllRead()">Mark all read</button>
+        </div>
+        <div class="nd-list" id="nd-list"><div class="nd-empty">Loading…</div></div>
+      </div>
+    </div>
     <a href="/" class="tb-btn" style="color:var(--mu)">&#8592; Home</a>
       <button class="tb-btn" onclick="showSeedPanel()" title="Load test data" style="color:var(--am)">&#127806; Seed data</button>
     <div id="user-menu" style="position:relative">
@@ -381,6 +427,43 @@ button{font-family:var(--sans);cursor:pointer}
   </div>
   <a href="/docs.html" style="font-family:var(--mono);font-size:10px;color:var(--ac);text-decoration:none;flex-shrink:0;white-space:nowrap">View quickstart →</a>
   <button id="ob-dismiss" onclick="document.getElementById('onboard-banner').classList.add('hidden');localStorage.setItem('ob_done','1')">✕ dismiss</button>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div id="settings-modal">
+  <div class="sm-box">
+    <div class="sm-title">
+      ⚙ Settings
+      <button class="sm-close" onclick="closeSettings()">✕ close</button>
+    </div>
+    <div>
+      <div class="sm-label">API KEY</div>
+      <div class="sm-row">
+        <div class="sm-val"><input type="text" id="sm-key-input" placeholder="vnt_..." autocomplete="off" spellcheck="false"></div>
+        <button class="sm-copy-btn" onclick="copySettingsVal('sm-key-input')">Copy</button>
+      </div>
+      <div style="font-size:11px;color:var(--mu);margin-top:5px">Paste a new key here to switch accounts.</div>
+    </div>
+    <div class="sm-section">
+      <div class="sm-label">ORG ID</div>
+      <div class="sm-row">
+        <div class="sm-val" id="sm-org-val">—</div>
+        <button class="sm-copy-btn" onclick="copySettingsText('sm-org-val')">Copy</button>
+      </div>
+    </div>
+    <div class="sm-section">
+      <div class="sm-label">PLAN</div>
+      <div class="sm-val" id="sm-plan-val" style="color:var(--ac)">Free</div>
+    </div>
+    <div class="sm-section">
+      <div class="sm-label">API BASE URL</div>
+      <div class="sm-row">
+        <div class="sm-val"><input type="text" id="sm-base-input" placeholder="https://api.vantageaiops.com" spellcheck="false"></div>
+      </div>
+    </div>
+    <button class="sm-save-btn" onclick="saveSettings()">Save changes</button>
+    <button class="sm-signout-btn" onclick="signOut()">Sign out — clear session</button>
+  </div>
 </div>
 
 <!-- FREE TIER UPGRADE BANNER -->
@@ -1161,7 +1244,6 @@ curl -X POST https://api.vantageaiops.com/v1/events \
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="seed-data.js"></script>
 <script src="vantage-models.js"></script>
 <script>
@@ -1960,128 +2042,171 @@ init_cost(); window["inited_cost"]=true;
 </div>
 
 <script>
-// ═══════════════════════════════════════════════════
-// CONFIG — paste your Supabase credentials
-// ═══════════════════════════════════════════════════
-const SUPABASE_URL  = "https://oyljzpvwdfktrkeotmon.supabase.co";
-const SUPABASE_ANON = "sb_publishable_ZCgWwpZv5XBR0AjiJ8I9ig_yZ-8XFWN";
-const AUTH_URL      = window.location.origin + "/auth.html";
-
-// Demo mode if Supabase not configured
-const SUPABASE_CONFIGURED = !SUPABASE_URL.startsWith("YOUR_");
-const sb = SUPABASE_CONFIGURED
-  ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON)
-  : null;
-
-// ── Auth guard ─────────────────────────────────────
-async function initAuth() {
-  if (!SUPABASE_CONFIGURED || !sb) return; // demo mode
-  try {
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session) {
-      window.location.replace(AUTH_URL);
-      return;
-    }
-    populateUser(session.user);
-  } catch(e) {
-    console.warn("[Vantage] Auth error, running in demo mode:", e.message);
+// ── API Key Auth ────────────────────────────────────
+function initKeyAuth() {
+  const key = localStorage.getItem('vantage_api_key');
+  if (!key) {
+    window.location.replace('/signup.html');
+    return false;
   }
+  populateUserFromKey(key);
+  return true;
 }
 
-function populateUser(user) {
-  const name   = user.user_metadata?.full_name || user.email?.split("@")[0] || "User";
-  const email  = user.email || "";
-  const initials = name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
-
-  document.getElementById("user-avatar").textContent  = initials;
-  document.getElementById("user-name").textContent    = name;
-  document.getElementById("user-email-full").textContent = email;
-  document.getElementById("user-email-short").textContent = name.split(" ")[0];
-
-  // Update org badge
-  const orgEl = document.querySelector(".tb-org-badge");
-  if (orgEl) orgEl.textContent = email.split("@")[1]?.split(".")[0] || "My Org";
+function populateUserFromKey(key) {
+  const orgId    = parseOrgFromKey(key) || 'org';
+  const initials = orgId.slice(0, 2).toUpperCase();
+  document.getElementById('user-avatar').textContent        = initials;
+  document.getElementById('user-name').textContent          = orgId;
+  document.getElementById('user-email-full').textContent    = key.slice(0, 20) + '…';
+  document.getElementById('user-email-short').textContent   = orgId;
+  const planEl = document.querySelector('.sb-uplan');
+  if (planEl) planEl.textContent = 'FREE PLAN';
 }
 
-// ── Sign out ───────────────────────────────────────
-
-function setDemoUser() {
-  document.getElementById("user-avatar").textContent       = "DM";
-  document.getElementById("user-name").textContent         = "Demo User";
-  document.getElementById("user-email-full").textContent   = "demo@vantageaiops.com";
-  document.getElementById("user-email-short").textContent  = "Demo";
-}
-
-async function signOut() {
-  if (SUPABASE_CONFIGURED) {
-    await sb.auth.signOut();
-    window.location.replace(AUTH_URL);
-  } else {
-    window.location.replace("/");
-  }
+function signOut() {
+  ['vantage_api_key','vantage_org','vantage_api_base','ob_done'].forEach(k => localStorage.removeItem(k));
+  window.location.replace('/signup.html');
 }
 
 function goToApp() {
-  document.getElementById("user-dropdown").style.display = "none";
+  document.getElementById('user-dropdown').style.display = 'none';
 }
 
-// ── User menu toggle ───────────────────────────────
+// ── User menu toggle ─────────────────────────────────
 let menuOpen = false;
 function toggleUserMenu() {
-  const dd = document.getElementById("user-dropdown");
+  const dd = document.getElementById('user-dropdown');
   menuOpen = !menuOpen;
-  dd.style.display = menuOpen ? "block" : "none";
+  dd.style.display = menuOpen ? 'block' : 'none';
 }
-document.addEventListener("click", e => {
-  if (!document.getElementById("user-menu")?.contains(e.target)) {
-    document.getElementById("user-dropdown").style.display = "none";
+document.addEventListener('click', e => {
+  if (!document.getElementById('user-menu')?.contains(e.target)) {
+    document.getElementById('user-dropdown').style.display = 'none';
     menuOpen = false;
+  }
+  if (!document.getElementById('notif-wrap')?.contains(e.target)) {
+    document.getElementById('notif-dropdown')?.classList.remove('open');
+    notifOpen = false;
+  }
+  if (!document.getElementById('settings-modal')?.contains(e.target) &&
+      !e.target.closest('[onclick*="openSettings"]')) {
+    // don't close if clicking inside modal
   }
 });
 
-// ── Seed panel ─────────────────────────────────────
-function showSeedPanel() {
-  document.getElementById("seed-panel").style.display = "flex";
+// ── Settings modal ────────────────────────────────────
+function openSettings() {
+  const cfg = getConfig();
+  document.getElementById('sm-key-input').value  = cfg.apiKey || '';
+  document.getElementById('sm-base-input').value = cfg.apiBase || 'https://api.vantageaiops.com';
+  document.getElementById('sm-org-val').textContent   = cfg.org || '—';
+  document.getElementById('sm-plan-val').textContent  = localStorage.getItem('vantage_plan') || 'Free';
+  document.getElementById('settings-modal').classList.add('open');
 }
-function hideSeedPanel() {
-  document.getElementById("seed-panel").style.display = "none";
+function closeSettings() {
+  document.getElementById('settings-modal').classList.remove('open');
 }
-async function runSeed() {
-  if (!window.vantageData) return;
-  const content = document.getElementById("seed-panel-content");
-  content.innerHTML = `<div id="seed-progress-wrap"></div>`;
-  await window.vantageData.seedWithUI("seed-progress-wrap", 90);
-  // After seeding, reload charts
-  setTimeout(() => { hideSeedPanel(); rebuildAll(); }, 1500);
+document.getElementById('settings-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeSettings();
+});
+function saveSettings() {
+  const key  = document.getElementById('sm-key-input').value.trim();
+  const base = document.getElementById('sm-base-input').value.trim() || 'https://api.vantageaiops.com';
+  const org  = key ? (parseOrgFromKey(key) || getConfig().org) : getConfig().org;
+  if (key) {
+    saveConfig({ apiBase: base, apiKey: key, org });
+    populateUserFromKey(key);
+    document.getElementById('sm-org-val').textContent = org;
+    checkPlanUsage();
+    updateStatus();
+  }
+  closeSettings();
+}
+function copySettingsVal(inputId) {
+  const v = document.getElementById(inputId)?.value;
+  if (v) navigator.clipboard.writeText(v).catch(()=>{});
+}
+function copySettingsText(elId) {
+  const v = document.getElementById(elId)?.textContent;
+  if (v && v !== '—') navigator.clipboard.writeText(v).catch(()=>{});
 }
 
-// ── Check seed status on load ──────────────────────
+// ── Notifications ─────────────────────────────────────
+let notifOpen = false;
+function toggleNotifications() {
+  const dd = document.getElementById('notif-dropdown');
+  notifOpen = !notifOpen;
+  dd.classList.toggle('open', notifOpen);
+  if (notifOpen) loadNotifications();
+}
+async function loadNotifications() {
+  const list = document.getElementById('nd-list');
+  list.innerHTML = '<div class="nd-empty">Loading…</div>';
+  try {
+    const ov  = await apiFetch('/v1/admin/overview');
+    const org   = ov?.org || {};
+    const teams = ov?.teams || [];
+    const items = [];
+
+    if (org.plan === 'free' && org.events_limit) {
+      const pct = Math.round(org.events_this_month / org.events_limit * 100);
+      if (pct >= 80) items.push({ ico:'⚡', bg:'var(--re2)', name:'Free tier usage',
+        desc:`${(org.events_this_month||0).toLocaleString()} / ${org.events_limit.toLocaleString()} events this month (${pct}%)`, time:'now' });
+    }
+    if (org.budget_usd > 0 && org.budget_pct >= 80) {
+      items.push({ ico:'⚠️', bg:'var(--am2)', name:'Org budget alert',
+        desc:`MTD spend is ${org.budget_pct}% of your $${org.budget_usd} budget`, time:'now' });
+    }
+    teams.filter(t => t.budget_usd > 0 && t.budget_pct >= 90).forEach(t => {
+      items.push({ ico:'🔴', bg:'var(--re2)', name:`Team "${t.team}" budget`,
+        desc:`${Number(t.budget_pct).toFixed(0)}% of $${t.budget_usd} budget`, time:'today' });
+    });
+
+    const dot = document.getElementById('notif-dot');
+    if (dot) dot.style.display = items.length > 0 ? 'block' : 'none';
+
+    list.innerHTML = items.length === 0
+      ? '<div class="nd-empty">✓ No alerts — all budgets healthy</div>'
+      : items.map(n => `<div class="nd-item">
+          <div class="nd-ico" style="background:${n.bg}">${n.ico}</div>
+          <div class="nd-body"><div class="nd-name">${n.name}</div><div class="nd-desc">${n.desc}</div></div>
+          <span class="nd-time">${n.time}</span>
+        </div>`).join('');
+  } catch {
+    list.innerHTML = '<div class="nd-empty">Connect your API key to see alerts</div>';
+  }
+}
+function markAllRead() {
+  const dot = document.getElementById('notif-dot');
+  if (dot) dot.style.display = 'none';
+  document.getElementById('nd-list').innerHTML = '<div class="nd-empty">✓ All caught up</div>';
+}
+
+// ── Seed panel ────────────────────────────────────────
+function showSeedPanel() { document.getElementById('seed-panel').style.display = 'flex'; }
+function hideSeedPanel()  { document.getElementById('seed-panel').style.display = 'none'; }
+async function runSeed() {
+  if (!window.vantageData) return;
+  const content = document.getElementById('seed-panel-content');
+  content.innerHTML = `<div id="seed-progress-wrap"></div>`;
+  await window.vantageData.seedWithUI('seed-progress-wrap', 90);
+  setTimeout(() => { hideSeedPanel(); rebuildAll(); }, 1500);
+}
 async function checkSeedStatus() {
   if (!window.vantageData) return;
   const status = await window.vantageData.status();
-  if (status.seeded) {
-    console.log(`[Vantage] ${status.eventCount.toLocaleString()} events in IndexedDB (seeded ${status.seededAt})`);
-  } else {
-    // Auto-show seed panel on first visit
-    setTimeout(showSeedPanel, 1200);
-  }
+  if (!status.seeded) setTimeout(showSeedPanel, 1200);
 }
 
-// ── Auth state changes ─────────────────────────────
-if (SUPABASE_CONFIGURED) {
-  sb.auth.onAuthStateChange((event, session) => {
-    if (event === "SIGNED_OUT") window.location.replace(AUTH_URL);
-    if (event === "SIGNED_IN" && session) populateUser(session.user);
-  });
-}
-
-// ── PWA Service Worker ─────────────────────────────
+// ── PWA ───────────────────────────────────────────────
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
 
-// ── Init ───────────────────────────────────────────
-if (SUPABASE_CONFIGURED) { initAuth().then(() => checkSeedStatus()); } else { setDemoUser(); checkSeedStatus(); }
+// ── Init ──────────────────────────────────────────────
+initKeyAuth();
+checkSeedStatus();
 checkPlanUsage();
 
 // ── Onboarding banner ──────────────────────────────
