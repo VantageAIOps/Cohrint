@@ -30,6 +30,7 @@ Developer notes:
     18 SSE Streaming   — live stream, reconnect, SSE delivery
     19 New User        — full onboarding E2E (landing → first event)
     20 Stress/Load     — 500-event bursts, 50 concurrent signups
+    21 Nav Bug-Fix     — all sidebar buttons, account/settings, CSP (Mar 2026)
 
   Flags:
     --fast          skip tests 09, 10, 20 (load/stress)
@@ -99,6 +100,7 @@ SUITE_FILES_EXTENDED = [
     ("18", "test_18_sse_streaming.py",       "SSE Live Stream"),
     ("19", "test_19_new_user_onboarding.py", "New User Onboarding E2E"),
     ("20", "test_20_stress_load.py",         "Stress & Load (burst, concurrent)"),
+    ("21", "test_21_nav_fixes.py",           "Nav & Bug-Fix Verification (Mar 2026)"),
 ]
 
 SUITE_FILES = SUITE_FILES_ORIGINAL + SUITE_FILES_EXTENDED

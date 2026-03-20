@@ -179,6 +179,30 @@ def collect_console_errors(page):
             if m.type == "error" else None)
     return errors
 
+# Noise patterns that should NOT count as test failures
+_KNOWN_NOISE = (
+    # Cloudflare Pages auto-injects this beacon; old CSP versions blocked it
+    "cloudflareinsights.com",
+    "beacon.min.js",
+    # Auth pages probing session on load — 401 is expected when not signed in
+    "401",
+    # Browser extension interference (seen in some CI environments)
+    "extension://",
+)
+
+def collect_critical_errors(page):
+    """
+    Like collect_console_errors but filters known-noise messages.
+    Use this instead of collect_console_errors for 'no JS errors' assertions.
+    Returns (all_errors_list, critical_errors_list).
+    """
+    all_errors = collect_console_errors(page)
+
+    def is_noise(msg):
+        return any(n in msg for n in _KNOWN_NOISE)
+
+    return all_errors, [e for e in all_errors if not is_noise(e)]
+
 def signin_ui(page, api_key: str, timeout=15_000):
     """
     Navigate to /auth and sign in using the given API key via the UI.
