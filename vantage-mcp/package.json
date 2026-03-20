@@ -13,17 +13,39 @@
     "start": "node dist/index.js",
     "prepublishOnly": "npm run build"
   },
-  "keywords": ["mcp", "model-context-protocol", "llm", "cost", "analytics", "vantage", "ai", "openai", "anthropic", "claude", "cursor", "windsurf"],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "llm",
+    "cost",
+    "analytics",
+    "vantage",
+    "ai",
+    "openai",
+    "anthropic",
+    "claude",
+    "cursor",
+    "windsurf"
+  ],
   "homepage": "https://vantageaiops.com",
-  "repository": { "type": "git", "url": "https://github.com/Amanjain98/VantageAI" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Amanjain98/VantageAI"
+  },
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0"
   },
   "devDependencies": {
+    "@types/node": "^20.0.0",
     "typescript": "^5.4.0",
-    "@types/node": "^20.0.0"
+    "wrangler": "^4.76.0"
   },
-  "files": ["dist", "README.md"],
-  "engines": { "node": ">=18.0.0" }
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }

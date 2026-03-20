@@ -1,0 +1,113 @@
+name: Full Repository Backup
+
+# Mirrors the entire VantageAI repo (all branches, tags, history)
+# to the backup repo: Amanjain98/Vantage-AI
+#
+# Runs:
+#   - After every push to main (production deploy)
+#   - Daily at 03:00 UTC
+#   - Manually via workflow_dispatch
+#
+# Required secret: BACKUP_REPO_TOKEN
+#   A GitHub PAT (classic) with repo scope on Amanjain98/Vantage-AI
+#   → Settings > Secrets > BACKUP_REPO_TOKEN
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  BACKUP_REPO: https://github.com/Amanjain98/Vantage-AI.git
+
+on:
+  push:
+    branches:
+      - main           # backup after every production push
+  schedule:
+    - cron: '0 3 * * *'    # daily at 03:00 UTC
+  workflow_dispatch:        # manual trigger anytime
+
+jobs:
+  mirror-backup:
+    name: Mirror to Vantage-AI backup repo
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Clone source repo as bare mirror
+        run: |
+          git clone --mirror \
+            https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/Amanjain98/VantageAI.git \
+            repo-mirror
+          echo "✅ Source cloned (mirror) — branches: $(cd repo-mirror && git branch | wc -l)"
+
+      - name: Verify backup repo is reachable
+        env:
+          BACKUP_REPO_TOKEN: ${{ secrets.BACKUP_REPO_TOKEN }}
+        run: |
+          if [ -z "$BACKUP_REPO_TOKEN" ]; then
+            echo "⚠️  BACKUP_REPO_TOKEN secret not set — skipping mirror push"
+            echo "    Add a PAT with repo scope to Settings > Secrets > BACKUP_REPO_TOKEN"
+            exit 0
+          fi
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: token ${BACKUP_REPO_TOKEN}" \
+            https://api.github.com/repos/Amanjain98/Vantage-AI)
+          echo "Backup repo API status: $STATUS"
+          [ "$STATUS" = "200" ] && echo "✅ Backup repo reachable" || \
+            { echo "❌ Cannot reach backup repo (status $STATUS)"; exit 1; }
+
+      - name: Push mirror to backup repo
+        env:
+          BACKUP_REPO_TOKEN: ${{ secrets.BACKUP_REPO_TOKEN }}
+        run: |
+          if [ -z "$BACKUP_REPO_TOKEN" ]; then exit 0; fi
+          cd repo-mirror
+          git remote set-url origin \
+            https://x-access-token:${BACKUP_REPO_TOKEN}@github.com/Amanjain98/Vantage-AI.git
+          git push --mirror --force 2>&1 | tail -20
+          echo "✅ Mirror push complete"
+
+      - name: Generate backup summary
+        if: always()
+        run: |
+          echo "## Repository Backup — $(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -d repo-mirror ]; then
+            cd repo-mirror
+            BRANCHES=$(git branch | wc -l | tr -d ' ')
+            TAGS=$(git tag | wc -l | tr -d ' ')
+            COMMITS=$(git log --all --oneline | wc -l | tr -d ' ')
+            echo "| Item | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Branches | $BRANCHES |" >> $GITHUB_STEP_SUMMARY
+            echo "| Tags | $TAGS |" >> $GITHUB_STEP_SUMMARY
+            echo "| Total commits | $COMMITS |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "**Backup destination:** \`Amanjain98/Vantage-AI\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by:** \`${{ github.event_name }}\`" >> $GITHUB_STEP_SUMMARY
+
+  # Secondary backup: upload a ZIP archive as a GitHub release artifact
+  archive-backup:
+    name: Create ZIP archive backup
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Only on schedule or manual dispatch (not every push — would be too many artifacts)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0    # full history
+
+      - name: Create dated archive
+        run: |
+          DATE=$(date -u '+%Y%m%d-%H%M')
+          git archive --format=zip --output="vantageai-backup-${DATE}.zip" HEAD
+          echo "Archive size: $(du -sh vantageai-backup-${DATE}.zip | cut -f1)"
+          echo "DATE=${DATE}" >> $GITHUB_ENV
+
+      - name: Upload archive artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vantageai-backup-${{ env.DATE }}
+          path: vantageai-backup-*.zip
+          retention-days: 30    # keep 30 days of ZIP backups

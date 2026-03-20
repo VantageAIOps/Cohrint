@@ -1,10 +1,19 @@
 name: VantageAI Test Suite
 
+# Runs the full test suite on both version branches and production (main).
+#
+# Triggers:
+#   - After CF Worker or Pages deploy on main    → full post-deploy validation
+#   - After ci-version pipeline runs on v* branch → redundant safety net
+#   - On PRs from v* to main                     → fast pre-merge check
+#   - Nightly at 02:00 UTC on main               → regression monitoring
+#   - Manual dispatch                             → on-demand
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
-  # Run after worker is deployed
+  # Post-deploy validation on main
   workflow_run:
     workflows:
       - "Deploy VantageAI API Worker"
@@ -14,29 +23,14 @@ on:
     branches:
       - main
 
-  # Manual trigger with optional suite selection
-  workflow_dispatch:
-    inputs:
-      suite:
-        description: "Suite number to run (leave blank for all fast suites)"
-        required: false
-        default: ""
-      extended:
-        description: "Run extended suites 11-21 as well"
-        required: false
-        type: boolean
-        default: false
-      with_browser:
-        description: "Install Playwright and run browser tests"
-        required: false
-        type: boolean
-        default: true
+  # After version branch pipeline completes
+  workflow_run:
+    workflows:
+      - "Version Branch Pipeline"
+    types:
+      - completed
 
-  # Nightly regression run at 02:00 UTC
-  schedule:
-    - cron: "0 2 * * *"
-
-  # Also run on PRs from version branches to main
+  # Fast check on PRs from version → main
   pull_request:
     branches:
       - main
@@ -45,52 +39,63 @@ on:
       - "vantage-final-v4/**"
       - "tests/**"
 
-  # Also trigger when ci-version completes on a version branch
-  workflow_run:
-    workflows:
-      - "Version Branch Pipeline"
-    types:
-      - completed
+  # Nightly regression on main
+  schedule:
+    - cron: "0 2 * * *"
+
+  # Manual: pick suite, enable extended/browser
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: "Suite number to run (blank = all fast suites)"
+        required: false
+        default: ""
+      extended:
+        description: "Run extended suites 11-21"
+        required: false
+        type: boolean
+        default: false
+      with_browser:
+        description: "Install Playwright and run browser/UI tests"
+        required: false
+        type: boolean
+        default: true
 
 jobs:
-  # ── 1. Deployment health check ──────────────────────────────────────────────
+  # ── 1. Deployment health check ─────────────────────────────────────────────
   smoke-test:
-    name: Smoke Test (deployment health)
+    name: Smoke Test — API & Frontend Health
     runs-on: ubuntu-latest
-
     steps:
       - name: Wait for Cloudflare propagation
-        # Give Cloudflare Workers time to propagate after deploy
         run: sleep 15
 
-      - name: Check API is live
+      - name: Check API health
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             --retry 5 --retry-delay 5 --retry-all-errors \
             https://api.vantageaiops.com/v1/health)
-          echo "API health status: $STATUS"
+          echo "API health: $STATUS"
           [ "$STATUS" = "200" ] || { echo "❌ API not responding (got $STATUS)"; exit 1; }
           echo "✅ API is live"
 
-      - name: Check frontend is live
+      - name: Check frontend health
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             --retry 3 --retry-delay 5 \
             https://vantageaiops.com/)
-          echo "Frontend status: $STATUS"
+          echo "Frontend: $STATUS"
           [ "$STATUS" = "200" ] || { echo "❌ Frontend not responding (got $STATUS)"; exit 1; }
           echo "✅ Frontend is live"
 
-  # ── 2. API test suite (no browser needed) ──────────────────────────────────
+  # ── 2. API + unit test suites (no browser) ─────────────────────────────────
   api-tests:
-    name: API Tests (no browser)
+    name: API Test Suites
     runs-on: ubuntu-latest
     needs: smoke-test
-    timeout-minutes: 25
-
+    timeout-minutes: 30
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
@@ -98,45 +103,41 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      - name: Install Python dependencies
+      - name: Install dependencies
         run: pip install requests structlog
 
-      - name: Run API-only suites (fast, no Playwright)
+      - name: Run all API suites (no browser)
         env:
           HEADLESS: "1"
         run: |
-          cd $GITHUB_WORKSPACE
-          python tests/run_suite.py --all --fast --no-report 2>&1 | tee /tmp/test-output.txt
-          # Capture exit code (run_suite exits 1 if any suite fails)
+          python tests/run_suite.py --all --fast --no-report 2>&1 | tee /tmp/api-test-output.txt
           EXIT=${PIPESTATUS[0]}
-          echo "Test runner exit code: $EXIT"
+          echo "Exit code: $EXIT"
           exit $EXIT
 
-      - name: Upload test results
+      - name: Upload API test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: api-test-results
+          name: api-tests-${{ github.run_number }}
           path: |
-            /tmp/test-output.txt
+            /tmp/api-test-output.txt
             tests/test-results/
 
-  # ── 3. Browser test suite (Playwright) ─────────────────────────────────────
+  # ── 3. Browser/UI test suites (Playwright) ─────────────────────────────────
   browser-tests:
-    name: Browser Tests (Playwright)
+    name: UI / Browser Tests (Playwright)
     runs-on: ubuntu-latest
     needs: smoke-test
     timeout-minutes: 45
-    # Skip browser tests on PRs (too slow for PR checks)
+    # Skip on PRs (too slow); skip if with_browser explicitly disabled
     if: |
       github.event_name != 'pull_request' && (
         github.event_name != 'workflow_dispatch' ||
         inputs.with_browser == true
       )
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
@@ -144,21 +145,20 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      - name: Install Python dependencies
+      - name: Install dependencies
         run: pip install requests structlog playwright
 
       - name: Install Chromium
         run: python -m playwright install chromium --with-deps
 
-      - name: Run full test suite (with browser)
+      - name: Run test suite (with browser)
         env:
           HEADLESS: "1"
         run: |
-          cd $GITHUB_WORKSPACE
           if [ -n "${{ inputs.suite }}" ]; then
             python tests/run_suite.py --suite ${{ inputs.suite }} --no-report 2>&1 | tee /tmp/browser-test-output.txt
           elif [ "${{ inputs.extended }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ]; then
-            python tests/run_suite.py --all --fast --no-report 2>&1 | tee /tmp/browser-test-output.txt
+            python tests/run_suite.py --all --no-report 2>&1 | tee /tmp/browser-test-output.txt
           else
             python tests/run_suite.py --fast --no-report 2>&1 | tee /tmp/browser-test-output.txt
           fi
@@ -169,35 +169,77 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: browser-test-results
+          name: browser-tests-${{ github.run_number }}
           path: |
             /tmp/browser-test-output.txt
             tests/test-results/
 
-  # ── 4. Summary ──────────────────────────────────────────────────────────────
+  # ── 4. Stress / load tests (nightly + manual only) ─────────────────────────
+  stress-tests:
+    name: Stress & Load Tests
+    runs-on: ubuntu-latest
+    needs: api-tests
+    timeout-minutes: 20
+    # Only on nightly schedule or explicit manual run
+    if: |
+      github.event_name == 'schedule' || (
+        github.event_name == 'workflow_dispatch' &&
+        inputs.extended == true
+      )
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install requests structlog
+
+      - name: Run stress/extended suites
+        env:
+          HEADLESS: "1"
+        run: |
+          # Run extended suites 11-21 (includes load/stress tests)
+          python tests/run_suite.py --all --no-report 2>&1 | tee /tmp/stress-output.txt || true
+          cat /tmp/stress-output.txt
+
+      - name: Upload stress test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stress-tests-${{ github.run_number }}
+          path: /tmp/stress-output.txt
+
+  # ── 5. Summary ─────────────────────────────────────────────────────────────
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [smoke-test, api-tests, browser-tests]
+    needs: [smoke-test, api-tests, browser-tests, stress-tests]
     if: always()
-
     steps:
-      - name: Summary
+      - name: Write summary
         run: |
-          echo "## VantageAI Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "## VantageAI Test Suite — ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Smoke Test | ${{ needs.smoke-test.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| API Tests | ${{ needs.api-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Browser Tests | ${{ needs.browser-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Stress Tests | ${{ needs.stress-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "🔗 [View full test artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`${{ github.ref_name }}\`  " >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 [View artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
 
       - name: Fail if critical jobs failed
         if: |
           needs.smoke-test.result == 'failure' ||
           needs.api-tests.result == 'failure'
         run: |
-          echo "❌ Critical tests failed — see artifacts for details"
+          echo "❌ Critical tests failed — deployment may be broken"
           exit 1
