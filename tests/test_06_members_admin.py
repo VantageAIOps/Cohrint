@@ -141,6 +141,8 @@ if MEMBER_ID:
             chk("1.12 Rotated key is new (different from original)",
                 new_key and new_key != MEMBER_KEY and new_key.startswith("vnt_"),
                 f"new={new_key[:20] if new_key else 'None'}")
+            if new_key:
+                MEMBER_KEY = new_key  # keep MEMBER_KEY current for section 2 tests
     except Exception as e:
         fail("1.11 Rotate member key failed", str(e))
 

@@ -6,11 +6,13 @@ const analytics = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 analytics.use('*', authMiddleware);
 
-// ── Scope helper — appends "AND team = ?" when member has a team scope ────────
+// ── Scope helper — appends "AND e.team = ?" when member has a team scope ──────
+// Always qualify with table alias "e" to avoid ambiguity when other joined
+// tables (e.g. team_budgets) also have a "team" column.
 function teamScope(scopeTeam: string | null): { clause: string; args: unknown[] } {
   return scopeTeam
-    ? { clause: ' AND team = ?', args: [scopeTeam] }
-    : { clause: '',              args: [] };
+    ? { clause: ' AND e.team = ?', args: [scopeTeam] }
+    : { clause: '',                args: [] };
 }
 
 // ── GET /v1/analytics/summary ─────────────────────────────────────────────────
