@@ -58,9 +58,9 @@ events.post('/', async (c) => {
   }
 
   // Accept 'id' as alias for 'event_id'
-  const r = body as Record<string, unknown>;
+  const r = body as unknown as Record<string, unknown>;
   if (!body.event_id && r.id) {
-    (body as Record<string, unknown>).event_id = r.id;
+    (body as unknown as Record<string, unknown>).event_id = r.id;
   }
   if (!body.event_id) {
     return c.json({ error: 'event_id is required' }, 400);
@@ -158,7 +158,7 @@ function buildInsertStmt(
   // Accept both canonical field names and SDK-prefixed aliases
   // SDK sends: usage_prompt_tokens, cost_total_cost_usd, etc.
   // REST clients may send: prompt_tokens, total_cost_usd, cost_usd, etc.
-  const r = ev as Record<string, unknown>;
+  const r = ev as unknown as Record<string, unknown>;
 
   const eventId        = ev.event_id ?? r.id as string | undefined;
   const promptTokens   = ev.prompt_tokens   ?? r.usage_prompt_tokens   as number ?? 0;

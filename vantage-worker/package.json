@@ -4,8 +4,9 @@
   "description": "VantageAI ingest + analytics API — Cloudflare Worker",
   "private": true,
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "dev": "wrangler dev --env=\"\"",
+    "deploy": "wrangler deploy --env=\"\"",
+    "typecheck": "tsc --noEmit",
     "types": "wrangler types",
     "db:create": "wrangler d1 create vantage-events",
     "db:migrate": "wrangler d1 execute vantage-events --file=schema.sql",

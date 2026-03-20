@@ -1,4 +1,4 @@
-name            = "vantage-api"
+name            = "vantageai-api"
 main            = "src/index.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
@@ -20,23 +20,21 @@ preview_id = "65b5609ad5b747c9b416632a19529f24"
 # ── Environment variables (non-secret) ───────────────────────────────────────
 [vars]
 ENVIRONMENT        = "production"
-SUPABASE_URL       = "https://oyljzpvwdfktrkeotmon.supabase.co"
-ALLOWED_ORIGINS    = "https://vantageaiops.com,https://www.vantageaiops.com,https://vantageai.pages.dev,https://vantageai.aman-lpucse.workers.dev"
+ALLOWED_ORIGINS    = "https://vantageaiops.com,https://www.vantageaiops.com,https://vantageai.pages.dev"
 RATE_LIMIT_RPM     = "1000"
 
 # ── Secrets (set via: wrangler secret put SECRET_NAME) ───────────────────────
-# SUPABASE_SERVICE_KEY — Supabase service role key (for server-side auth verify)
-# SUPABASE_ANON_KEY    — Supabase anon key
-# RESEND_API_KEY       — Resend API key for transactional email (member invites, key recovery)
-#                        Get free key at resend.com — 3,000 emails/month free
+# RESEND_API_KEY   — Resend API key for email (member invites, key recovery)
+#                    Get a free key at resend.com — 3,000 emails/month
 
-# ── Custom domain — point api.vantageaiops.com → this Worker ─────────────────
-# After adding vantageaiops.com to Cloudflare, uncomment:
+# ── Custom domain — api.vantageaiops.com → this Worker ───────────────────────
+# Configured in Cloudflare dashboard: Workers & Pages → vantageai-api → Settings → Domains
+# Or uncomment:
 # routes = [{ pattern = "api.vantageaiops.com/*", zone_name = "vantageaiops.com" }]
 
 # ── Preview environment ───────────────────────────────────────────────────────
 [env.preview]
-name = "vantage-api-preview"
+name = "vantageai-api-preview"
 [env.preview.vars]
 ENVIRONMENT     = "preview"
-ALLOWED_ORIGINS = "http://localhost:*,https://*.vantageaiops.com"
+ALLOWED_ORIGINS = "http://localhost:*,https://*.vantageaiops.com,https://vantageai.pages.dev"

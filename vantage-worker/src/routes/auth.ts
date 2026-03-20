@@ -142,7 +142,6 @@ auth.get('/recover/redeem', async (c) => {
 
 // ── POST /v1/auth/recover/redeem — actually rotates the key (safe from scanners)
 auth.post('/recover/redeem', async (c) => {
-  const SITE = 'https://vantageaiops.com';
   let token = '';
   try {
     const body = await c.req.json() as { token?: string };

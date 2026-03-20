@@ -98,7 +98,7 @@ jobs:
             const prLimit   = process.env.PR_BUDGET_USD || '5.00';
             const icon      = status === 'ok' ? '✅' : status === 'skipped' ? 'ℹ️' : '🚨';
             const body = [
-              `## ${icon} Vantage AI Cost Report`,
+              `## ${icon} VantageAI Cost Report`,
               '',
               `| Metric | Value |`,
               `|---|---|`,
@@ -113,7 +113,7 @@ jobs:
                 ? `> ℹ️ Set \`VANTAGE_API_KEY\` repository secret to enable live cost tracking.`
                 : `> 💚 Cost within budget. Safe to merge.`,
               '',
-              `*Powered by [Vantage AI](https://vantageaiops.com) · [View dashboard](https://vantageaiops.com/app.html)*`,
+              `*Powered by [VantageAI](https://vantageaiops.com) · [View dashboard](https://vantageaiops.com/app.html)*`,
             ].join('\n');
 
             await github.rest.issues.createComment({

@@ -25,8 +25,15 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Wrangler
-        run: npm install -g wrangler
+      - name: Install dependencies (for wrangler)
+        run: npm ci
+
+      - name: Verify required files exist
+        run: |
+          for f in index.html app.html auth.html signup.html docs.html calculator.html sw.js manifest.json _headers _redirects; do
+            [ -f "vantage-final-v4/$f" ] || { echo "❌ Missing: vantage-final-v4/$f"; exit 1; }
+          done
+          echo "✅ All required files present"
 
       - name: Determine branch
         id: branch
@@ -34,13 +41,13 @@ jobs:
 
       - name: Deploy to Cloudflare Pages
         run: |
-          wrangler pages deploy ./vantage-final-v4 \
+          npx wrangler pages deploy ./vantage-final-v4 \
             --project-name=vantageai \
             --branch=${{ steps.branch.outputs.branch }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Comment deployment URL
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: echo "✅ Deployed to production — https://vantageaiops.com"
+      - name: Confirm deployment
+        if: github.ref == 'refs/heads/main'
+        run: echo "✅ Frontend deployed — https://vantageaiops.com"
