@@ -155,38 +155,32 @@ try:
         # ── 3. UI Controls ─────────────────────────────────────────────────
         section("3. UI controls — settings, user menu, command palette")
 
-        # 3.1 Settings modal opens
+        # 3.1 Settings view opens (Settings is now a sidebar view, not a modal)
         try:
-            settings_btn = page.locator("[onclick*='openSettings'], .tb-btn[title='Settings'], .tb-btn:has-text('⚙')")
-            if settings_btn.count() == 0:
-                settings_btn = page.locator(".tb-btn").nth(1)
-            if settings_btn.count() > 0:
-                settings_btn.first.click()
+            sb_settings = page.locator("#sb-settings")
+            if sb_settings.count() > 0:
+                sb_settings.first.click()
                 page.wait_for_timeout(800)
-                modal_open = page.locator("#settings-modal.open").count() > 0
-                chk("3.1  Settings modal opens", modal_open,
-                    "modal has class 'open' after clicking settings button")
+                settings_active = page.locator("#view-settings.active").count() > 0
+                chk("3.1  Settings sidebar view becomes active",
+                    settings_active, "#view-settings did not get .active class")
 
-                if modal_open:
-                    # 3.2 Settings modal shows org ID
-                    org_val = page.locator("#sm-org-val").inner_text() if \
-                        page.locator("#sm-org-val").count() > 0 else ""
-                    chk("3.2  Settings modal shows org ID",
+                if settings_active:
+                    # 3.2 Settings view shows org ID
+                    org_val = page.locator("#set-org-val, #sm-org-val").inner_text() if \
+                        page.locator("#set-org-val, #sm-org-val").count() > 0 else ""
+                    chk("3.2  Settings view shows org ID",
                         len(org_val.strip()) > 0, f"org_val='{org_val}'")
 
                     # 3.3 API base URL shown
-                    api_base = page.locator("#sm-base-input").get_attribute("value") or ""
-                    chk("3.3  Settings modal shows API base URL",
+                    api_base = page.locator("#set-base-input, #sm-base-input").get_attribute("value") or ""
+                    chk("3.3  Settings view shows API base URL",
                         "vantageaiops.com" in api_base or len(api_base) > 5,
                         f"api_base='{api_base}'")
-
-                    # Close settings by pressing Escape
-                    page.keyboard.press("Escape")
-                    page.wait_for_timeout(400)
             else:
-                warn("3.1  Settings button not found in topbar")
+                warn("3.1  #sb-settings button not found in sidebar")
         except Exception as e:
-            warn(f"3.1  Settings modal test inconclusive: {e}")
+            warn(f"3.1  Settings view test inconclusive: {e}")
 
         # 3.4 User menu opens
         try:
@@ -207,7 +201,7 @@ try:
 
         # 3.5 Period selector changes period
         try:
-            period_sel = page.locator(".tb-period")
+            period_sel = page.locator("#period-sel")
             if period_sel.count() > 0:
                 period_sel.select_option("7")
                 page.wait_for_timeout(1_000)
@@ -231,12 +225,13 @@ try:
         except Exception as e:
             warn(f"3.6  Command palette test inconclusive: {e}")
 
-        # 3.7 Home link exists (user report: confusing ← Home button)
+        # 3.7 Home link (informational — removed from topbar by design)
         home_link = page.locator("a[href='/'], a[href='/'i], a:has-text('Home')")
-        chk("3.7  ← Home link present in topbar (by design — document location if confusing)",
-            home_link.count() > 0)
         if home_link.count() > 0:
+            warn("3.7  ← Home link present in topbar (may be confusing to users — consider removing)")
             info(f"     Home link text: '{home_link.first.inner_text()}' href='{home_link.first.get_attribute('href')}'")
+        else:
+            ok("3.7  ← Home link removed from topbar (design decision)")
 
         # ── 4. Data loading ────────────────────────────────────────────────
         section("4. Data loading — KPIs, analytics")

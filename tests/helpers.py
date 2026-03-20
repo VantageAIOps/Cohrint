@@ -168,10 +168,56 @@ def make_browser_ctx(playwright, viewport=(1280, 800)):
     page = ctx.new_page()
     return browser, ctx, page
 
+# Noise patterns that should NOT count as test failures
+_KNOWN_NOISE = (
+    # Cloudflare Pages auto-injects this beacon; old CSP versions blocked it
+    "cloudflareinsights.com",
+    "beacon.min.js",
+    # Auth pages probing session on load — 401 is expected when not signed in
+    "status of 401",
+    "401 ()",
+    # Browser extension interference (seen in some CI environments)
+    "extension://",
+)
+
+
+def _is_noise(msg: str) -> bool:
+    return any(n in msg for n in _KNOWN_NOISE)
+
+
 def collect_console_errors(page):
     """
     Attach a console-error listener to a Playwright page.
     Returns a list that fills as errors arrive.
+    Known noise (Cloudflare beacon CSP blocks, expected 401s) is filtered
+    automatically so 'len(errors) == 0' assertions pass on clean pages.
+    Use collect_all_errors() if you need the raw unfiltered list.
+    """
+    all_errors = []
+    page.on("pageerror", lambda e: all_errors.append(f"JS: {e}"))
+    page.on("console", lambda m: all_errors.append(f"console.{m.type}: {m.text}")
+            if m.type == "error" else None)
+
+    # Return a live-filtered view backed by the same list
+    class _FilteredList(list):
+        """Proxy that reads from all_errors but only exposes non-noise entries."""
+        def __len__(self):
+            return sum(1 for e in all_errors if not _is_noise(e))
+        def __iter__(self):
+            return (e for e in all_errors if not _is_noise(e))
+        def __getitem__(self, idx):
+            return [e for e in all_errors if not _is_noise(e)][idx]
+        @property
+        def _all(self):
+            return all_errors
+
+    return _FilteredList()
+
+
+def collect_all_errors(page):
+    """
+    Like collect_console_errors but returns every error including known noise.
+    Use for debugging or when you intentionally want to see all console errors.
     """
     errors = []
     page.on("pageerror", lambda e: errors.append(f"JS: {e}"))
@@ -179,29 +225,18 @@ def collect_console_errors(page):
             if m.type == "error" else None)
     return errors
 
-# Noise patterns that should NOT count as test failures
-_KNOWN_NOISE = (
-    # Cloudflare Pages auto-injects this beacon; old CSP versions blocked it
-    "cloudflareinsights.com",
-    "beacon.min.js",
-    # Auth pages probing session on load — 401 is expected when not signed in
-    "401",
-    # Browser extension interference (seen in some CI environments)
-    "extension://",
-)
 
 def collect_critical_errors(page):
     """
-    Like collect_console_errors but filters known-noise messages.
-    Use this instead of collect_console_errors for 'no JS errors' assertions.
-    Returns (all_errors_list, critical_errors_list).
+    Attach listeners and return (all_errors_list, critical_errors_list).
+    critical_errors filters out known noise (beacon, expected 401s).
+    Use this when you need both lists (e.g. for informational logging + assertions).
     """
-    all_errors = collect_console_errors(page)
-
-    def is_noise(msg):
-        return any(n in msg for n in _KNOWN_NOISE)
-
-    return all_errors, [e for e in all_errors if not is_noise(e)]
+    all_errors = []
+    page.on("pageerror", lambda e: all_errors.append(f"JS: {e}"))
+    page.on("console", lambda m: all_errors.append(f"console.{m.type}: {m.text}")
+            if m.type == "error" else None)
+    return all_errors, [e for e in all_errors if not _is_noise(e)]
 
 def signin_ui(page, api_key: str, timeout=15_000):
     """
