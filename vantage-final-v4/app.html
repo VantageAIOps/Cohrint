@@ -1549,7 +1549,7 @@ async function loadMembersView() {
           <td>${m.email}</td>
           <td style="color:var(--mu)">${m.name||"—"}</td>
           <td><span class="tag ${roleColors[m.role]||"tag-gray"}">${m.role}</span></td>
-          <td style="font-family:var(--mono);font-size:11px">${m.scope_team||<span style="color:var(--mu)">all teams</span>}</td>
+          <td style="font-family:var(--mono);font-size:11px">${m.scope_team||'<span style="color:var(--mu)">all teams</span>'}</td>
           <td style="font-family:var(--mono);font-size:10px;color:var(--mu)">${m.api_key_hint||"—"}</td>
           <td style="display:flex;gap:4px">
             <button onclick="rotateMemberKey('${m.id}','${m.email}')" class="btn btn-ghost" style="font-size:10px;padding:3px 8px" title="Generate a new key (old one revoked)">Rotate</button>
