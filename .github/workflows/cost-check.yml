@@ -1,5 +1,8 @@
 name: AI Cost Gate
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 # Runs on every PR that touches code which calls LLM APIs.
 # Pulls the last N events from Vantage for the PR branch, checks
 # against per-PR and daily budget limits, and blocks merge if exceeded.
@@ -20,7 +23,6 @@ jobs:
     permissions:
       pull-requests: write  # needed to post the cost comment
     env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       VANTAGE_API_KEY: ${{ secrets.VANTAGE_API_KEY }}
       VANTAGE_API_BASE: ${{ secrets.VANTAGE_API_BASE || 'https://api.vantageaiops.com' }}
       # Budget limits (USD) — adjust per project
