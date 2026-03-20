@@ -87,8 +87,13 @@ auth.post('/recover', async (c) => {
     // Generate a one-time recovery token (1-hour TTL) so user can get a new key directly
     const token   = randomHex(24);
     const kvKey   = `recover:${token}`;
-    await c.env.KV.put(kvKey, JSON.stringify({ orgId: org.id, type: 'owner' }), { expirationTtl: 3600 });
-    const redeemUrl = `https://api.vantageaiops.com/v1/auth/recover/redeem?token=${token}`;
+    let redeemUrl = '';
+    try {
+      await c.env.KV.put(kvKey, JSON.stringify({ orgId: org.id, type: 'owner' }), { expirationTtl: 3600 });
+      redeemUrl = `https://api.vantageaiops.com/v1/auth/recover/redeem?token=${token}`;
+    } catch {
+      // KV unavailable — email still sent without one-click redeem link
+    }
 
     const { subject, html } = keyRecoveryEmail({
       orgId:      org.id,
