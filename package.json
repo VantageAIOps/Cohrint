@@ -12,7 +12,11 @@
     "deployments": "wrangler pages deployment list",
     "login": "wrangler login",
     "whoami": "wrangler whoami",
-    "check": "node -e \"const h=['index.html','app.html','auth.html','calculator.html','docs.html','signup.html'].map(f=>require('fs').existsSync('./vantage-final-v4/'+f));console.log('Files:',h.every(Boolean)?'✓ all present':'✗ missing files');\""
+    "check": "node -e \"const h=['index.html','app.html','auth.html','calculator.html','docs.html','signup.html'].map(f=>require('fs').existsSync('./vantage-final-v4/'+f));console.log('Files:',h.every(Boolean)?'✓ all present':'✗ missing files');\"",
+    "test": "python3 tests/run_suite.py --fast --no-report",
+    "test:all": "python3 tests/run_suite.py --all --fast --no-report",
+    "test:ci": "HEADLESS=1 python3 tests/run_suite.py --fast --no-report",
+    "test:smoke": "curl -sf https://api.vantageaiops.com/v1/health | python3 -c \"import sys,json;d=json.load(sys.stdin);print('API:',d.get('status','ok'))\" && curl -sf -o /dev/null -w 'Frontend: HTTP %{http_code}\\n' https://vantageaiops.com/"
   },
   "devDependencies": {
     "wrangler": "^3.101.0"

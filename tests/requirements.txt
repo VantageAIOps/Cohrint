@@ -1,0 +1,9 @@
+# VantageAI test suite dependencies
+# Install: pip install -r tests/requirements.txt
+# For browser tests: python -m playwright install chromium
+
+requests>=2.31.0
+structlog>=23.0.0
+
+# Optional — only needed for Playwright browser tests (suites 04, 11-13, 16, 18-19, 21)
+# playwright>=1.40.0

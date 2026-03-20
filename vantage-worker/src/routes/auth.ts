@@ -79,45 +79,52 @@ auth.post('/recover', async (c) => {
   if (!email) return c.json({ error: 'email is required' }, 400);
 
   // Always return 200 — don't leak whether email exists
-  const org = await c.env.DB.prepare(
-    'SELECT id, name, api_key_hint FROM orgs WHERE email = ?'
-  ).bind(email).first<{ id: string; name: string; api_key_hint: string }>();
+  // Wrap entire lookup+send in try/catch so a D1 schema/connectivity issue
+  // never turns into a 500 (recovery endpoint must be resilient).
+  try {
+    const org = await c.env.DB.prepare(
+      'SELECT id, name, api_key_hint FROM orgs WHERE email = ?'
+    ).bind(email).first<{ id: string; name: string; api_key_hint: string }>();
 
-  if (org) {
-    // Generate a one-time recovery token (1-hour TTL) so user can get a new key directly
-    const token   = randomHex(24);
-    const kvKey   = `recover:${token}`;
-    let redeemUrl = '';
-    try {
-      await c.env.KV.put(kvKey, JSON.stringify({ orgId: org.id, type: 'owner' }), { expirationTtl: 3600 });
-      redeemUrl = `https://api.vantageaiops.com/v1/auth/recover/redeem?token=${token}`;
-    } catch {
-      // KV unavailable — email still sent without one-click redeem link
-    }
+    if (org) {
+      // Generate a one-time recovery token (1-hour TTL) so user can get a new key directly
+      const token   = randomHex(24);
+      const kvKey   = `recover:${token}`;
+      let redeemUrl = '';
+      try {
+        await c.env.KV.put(kvKey, JSON.stringify({ orgId: org.id, type: 'owner' }), { expirationTtl: 3600 });
+        redeemUrl = `https://api.vantageaiops.com/v1/auth/recover/redeem?token=${token}`;
+      } catch {
+        // KV unavailable — email still sent without one-click redeem link
+      }
 
-    const { subject, html } = keyRecoveryEmail({
-      orgId:      org.id,
-      orgName:    org.name || org.id,
-      keyHint:    org.api_key_hint || 'vnt_...',
-      isOwner:    true,
-      redeemUrl,
-    });
-    await sendEmail(c.env.RESEND_API_KEY, { to: email, subject, html });
-  } else {
-    // Check org_members table
-    const member = await c.env.DB.prepare(
-      'SELECT m.id, m.org_id, m.api_key_hint, o.name AS org_name FROM org_members m JOIN orgs o ON o.id = m.org_id WHERE m.email = ?'
-    ).bind(email).first<{ id: string; org_id: string; api_key_hint: string; org_name: string }>();
-
-    if (member) {
       const { subject, html } = keyRecoveryEmail({
-        orgId:   member.org_id,
-        orgName: member.org_name || member.org_id,
-        keyHint: member.api_key_hint || 'vnt_...',
-        isOwner: false,
+        orgId:      org.id,
+        orgName:    org.name || org.id,
+        keyHint:    org.api_key_hint || 'vnt_...',
+        isOwner:    true,
+        redeemUrl,
       });
       await sendEmail(c.env.RESEND_API_KEY, { to: email, subject, html });
+    } else {
+      // Check org_members table
+      const member = await c.env.DB.prepare(
+        'SELECT m.id, m.org_id, m.api_key_hint, o.name AS org_name FROM org_members m JOIN orgs o ON o.id = m.org_id WHERE m.email = ?'
+      ).bind(email).first<{ id: string; org_id: string; api_key_hint: string; org_name: string }>();
+
+      if (member) {
+        const { subject, html } = keyRecoveryEmail({
+          orgId:   member.org_id,
+          orgName: member.org_name || member.org_id,
+          keyHint: member.api_key_hint || 'vnt_...',
+          isOwner: false,
+        });
+        await sendEmail(c.env.RESEND_API_KEY, { to: email, subject, html });
+      }
     }
+  } catch (err) {
+    console.error('[recover] D1/email error — returning 200 to avoid leaking info', err);
+    // Still return 200 — don't expose internal errors to caller
   }
 
   return c.json({ ok: true, message: 'If an account exists for this email, recovery instructions have been sent.' });
