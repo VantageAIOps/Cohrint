@@ -19,10 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write  # needed to post the cost comment
-
     env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       VANTAGE_API_KEY: ${{ secrets.VANTAGE_API_KEY }}
-      VANTAGE_API_BASE: ${{ secrets.VANTAGE_API_BASE || 'https://vantage-api.aman-lpucse.workers.dev' }}
+      VANTAGE_API_BASE: ${{ secrets.VANTAGE_API_BASE || 'https://api.vantageaiops.com' }}
       # Budget limits (USD) — adjust per project
       PR_BUDGET_USD: ${{ vars.PR_BUDGET_USD || '5.00' }}
       DAILY_BUDGET_USD: ${{ vars.DAILY_BUDGET_USD || '50.00' }}
