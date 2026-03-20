@@ -403,8 +403,8 @@ auth.get('/session', authMiddleware, async (c) => {
   const memberId = c.get('memberId');
 
   const org = await c.env.DB.prepare(
-    'SELECT name, email, plan, budget_usd FROM orgs WHERE id = ?'
-  ).bind(orgId).first<{ name: string; email: string; plan: string; budget_usd: number }>();
+    'SELECT name, email, plan, budget_usd, api_key_hint, created_at FROM orgs WHERE id = ?'
+  ).bind(orgId).first<{ name: string; email: string; plan: string; budget_usd: number; api_key_hint: string; created_at: number }>();
 
   let memberInfo: { name: string | null; email: string | null } | null = null;
   if (memberId) {
@@ -427,10 +427,12 @@ auth.get('/session', authMiddleware, async (c) => {
     role,
     member_id: memberId,
     org: {
-      name:       org?.name,
-      email:      org?.email,
-      plan:       org?.plan ?? 'free',
-      budget_usd: org?.budget_usd ?? 0,
+      name:         org?.name,
+      email:        org?.email,
+      plan:         org?.plan ?? 'free',
+      budget_usd:   org?.budget_usd ?? 0,
+      api_key_hint: org?.api_key_hint ?? null,
+      created_at:   org?.created_at ? new Date(org.created_at * 1000).toISOString() : null,
     },
     member: memberInfo,
     sse_token: sseToken,

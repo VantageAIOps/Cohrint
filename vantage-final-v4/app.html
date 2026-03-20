@@ -380,7 +380,6 @@ button{font-family:var(--sans);cursor:pointer}
     </select>
     <span id="api-status" class="tb-period" style="font-size:11px;padding:5px 10px;">Config: local</span>
     <button class="tb-btn" onclick="openCmd()" title="Command palette (⌘K)" style="font-family:var(--mono);font-size:11px;gap:8px;min-width:160px;justify-content:flex-start;color:var(--mu)"><span>⌕</span><span>Search...</span><span style="margin-left:auto;background:var(--bg);border:1px solid var(--b1);border-radius:3px;padding:1px 5px;font-size:9px">⌘K</span></button>
-    <button class="tb-btn" onclick="nav('settings', document.getElementById('sb-settings'))" title="Settings">&#9881; Settings</button>
     <button class="tb-btn" onclick="document.getElementById('sh-modal').classList.add('open')" title="Keyboard shortcuts (?)">?</button>
     <div id="notif-wrap">
       <button class="tb-btn tb-notif" onclick="toggleNotifications()" id="notif-btn">&#128276;<div class="tb-notif-dot" id="notif-dot"></div></button>
@@ -1460,7 +1459,7 @@ let charts = {};
  * - Auth is via HTTP-only session cookie (set by POST /v1/auth/session)
  * - All API calls use credentials:'include' to send the cookie automatically
  */
-const API_BASE = 'https://api.vantageaiops.com';
+const API_BASE = localStorage.getItem('api_base') || 'https://api.vantageaiops.com';
 
 // session cache populated by initKeyAuth()
 let _session = null;
@@ -2223,6 +2222,57 @@ init_cost(); window["inited_cost"]=true;
 </div>
 
 <script>
+/* ── Browser Error Logger ────────────────────────────────────────────────────
+   Captures ALL JS errors + unhandled promise rejections and stores them in
+   localStorage so the developer can inspect them later. Errors are also
+   visible via window.vantageLog.errors() in the browser console.
+   IMPORTANT: runs before any other code so it catches early-boot errors.
+─────────────────────────────────────────────────────────────────────────── */
+(function() {
+  const MAX_ERRORS = 50;
+  function loadErrs() {
+    try { return JSON.parse(localStorage.getItem('vantage_errors') || '[]'); } catch { return []; }
+  }
+  function saveErr(entry) {
+    try {
+      const list = loadErrs();
+      list.push(entry);
+      if (list.length > MAX_ERRORS) list.splice(0, list.length - MAX_ERRORS);
+      localStorage.setItem('vantage_errors', JSON.stringify(list));
+    } catch {}
+  }
+  window.onerror = function(msg, src, line, col, err) {
+    const entry = { t: new Date().toISOString(), type: 'error', msg: String(msg), src, line, col, stack: err?.stack };
+    saveErr(entry);
+    console.error('[vantage:logger]', msg, 'at', src, line + ':' + col);
+  };
+  window.onunhandledrejection = function(ev) {
+    const entry = { t: new Date().toISOString(), type: 'rejection', msg: String(ev.reason), stack: ev.reason?.stack };
+    saveErr(entry);
+    console.error('[vantage:logger] Unhandled rejection:', ev.reason);
+  };
+  window.vantageLog = {
+    errors:  ()  => loadErrs(),
+    clear:   ()  => { try { localStorage.removeItem('vantage_errors'); } catch {} },
+    last:    (n) => loadErrs().slice(-(n || 10)),
+    report:  ()  => { const e = loadErrs(); console.table(e); return e; },
+  };
+  // Patch fetch to log API errors
+  const _origFetch = window.fetch;
+  window.fetch = async function(...args) {
+    try {
+      const res = await _origFetch.apply(this, args);
+      if (!res.ok && res.status >= 500) {
+        saveErr({ t: new Date().toISOString(), type: 'api_error', status: res.status, url: args[0]?.toString?.() });
+      }
+      return res;
+    } catch(e) {
+      saveErr({ t: new Date().toISOString(), type: 'fetch_fail', msg: String(e), url: args[0]?.toString?.() });
+      throw e;
+    }
+  };
+})();
+
 // ── Session Auth ─────────────────────────────────────
 async function initKeyAuth() {
   // Only catch auth/network errors — DOM errors in populateUserFromSession
@@ -2294,7 +2344,11 @@ function populateUserFromSession(sess) {
 
   // API key hint
   const keyHintEl = document.getElementById('acct-key-hint');
-  if (keyHintEl) keyHintEl.textContent = hint ? `vnt_••••••••••${hint}` : 'vnt_••••••••••••';
+  if (keyHintEl) {
+    // hint from DB is first 12 chars of key (e.g. "vnt_myorg1_a..."), show masked version
+    const last4 = hint ? hint.replace('...','').slice(-4) : '';
+    keyHintEl.textContent = last4 ? `vnt_•••••••••••••${last4}` : 'vnt_•••••••••••••••••';
+  }
 
   // Org ID
   const orgIdEl = document.getElementById('acct-org-id-display');
@@ -2435,53 +2489,53 @@ async function sendRecovery() {
 // ── Load alert config when settings view opens ─────────
 async function loadSettingsView() {
   const org = _session?.org_id || window._orgId;
-  if (!org) return;
-  try {
-    const r = await apiFetch(`/v1/alerts/${org}`);
-    if (r?.ok !== false) {
-      const d = await r.json().catch(() => r);
-      if (d && typeof d === 'object') {
-        const urlEl = document.getElementById('set-slack-url');
-        if (urlEl && d.slack_url) urlEl.value = d.slack_url;
-        const budEl = document.getElementById('set-slack-budget');
-        if (budEl) budEl.checked = !!d.trigger_budget;
-        const anoEl = document.getElementById('set-slack-anomaly');
-        if (anoEl) anoEl.checked = !!d.trigger_anomaly;
-        const dayEl = document.getElementById('set-slack-daily');
-        if (dayEl) dayEl.checked = !!d.trigger_daily;
-      }
-    }
-  } catch(e) {}
-  // Load default period
+  // Always populate from localStorage even without session
   const dp = localStorage.getItem('default_period') || '30';
   const dpSel = document.getElementById('set-default-period');
   if (dpSel) dpSel.value = dp;
+  const baseInp = document.getElementById('set-base-input');
+  if (baseInp) baseInp.value = localStorage.getItem('api_base') || 'https://api.vantageaiops.com';
+  if (!org) return;
+  try {
+    // apiFetch returns parsed JSON directly
+    const d = await apiFetch(`/v1/alerts/${org}`);
+    if (d && typeof d === 'object') {
+      const urlEl = document.getElementById('set-slack-url');
+      if (urlEl && d.slack_url) urlEl.value = d.slack_url;
+      const budEl = document.getElementById('set-slack-budget');
+      if (budEl) budEl.checked = !!d.trigger_budget;
+      const anoEl = document.getElementById('set-slack-anomaly');
+      if (anoEl) anoEl.checked = !!d.trigger_anomaly;
+      const dayEl = document.getElementById('set-slack-daily');
+      if (dayEl) dayEl.checked = !!d.trigger_daily;
+    }
+  } catch(e) { /* endpoint may not exist for all plans — silent */ }
 }
 
 async function loadAccountView() {
+  // Populate from session data we already have
+  if (_session) populateUserFromSession(_session);
   const org = _session?.org_id || window._orgId;
   if (!org) return;
   try {
-    const r = await apiFetch('/v1/analytics/summary');
-    if (r?.ok !== false) {
-      const d = await r.json().catch(() => r);
-      const bar  = document.getElementById('acct-usage-bar');
-      const cnt  = document.getElementById('acct-usage-count');
-      const lim  = document.getElementById('acct-usage-limit');
-      const plan = _session?.org?.plan || 'free';
-      const limit = plan === 'free' ? 10000 : Infinity;
-      const used  = (d?.today_requests || 0) + (d?.mtd_requests || 0) || d?.total_requests || 0;
-      if (bar) bar.style.width = limit === Infinity ? '5%' : Math.min(100, used / limit * 100) + '%';
-      if (cnt) cnt.textContent = used.toLocaleString() + ' events';
-      if (lim) lim.textContent = limit === Infinity ? 'unlimited' : limit.toLocaleString() + ' limit';
-    }
-  } catch(e) {}
-  // Member since from session creation if available
+    // apiFetch returns parsed JSON directly
+    const d = await apiFetch('/v1/analytics/summary');
+    const bar   = document.getElementById('acct-usage-bar');
+    const cnt   = document.getElementById('acct-usage-count');
+    const lim   = document.getElementById('acct-usage-limit');
+    const plan  = _session?.org?.plan || 'free';
+    const limit = plan === 'free' ? 10000 : Infinity;
+    const used  = d?.total_requests || d?.mtd_requests || 0;
+    if (bar) bar.style.width = limit === Infinity ? '5%' : Math.min(100, used / limit * 100) + '%';
+    if (cnt) cnt.textContent = used.toLocaleString() + ' events';
+    if (lim) lim.textContent = limit === Infinity ? 'unlimited' : limit.toLocaleString() + ' limit';
+  } catch(e) { /* analytics may return no data for new accounts */ }
+  // Member since date
   const ca = _session?.org?.created_at;
   const caEl = document.getElementById('acct-created-at');
   if (caEl && ca) {
     try { caEl.textContent = new Date(ca).toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'}); }
-    catch(e) { caEl.textContent = ca; }
+    catch { caEl.textContent = ca; }
   }
 }
 
@@ -2581,9 +2635,17 @@ async function checkSeedStatus() {
   if (!status.seeded) setTimeout(showSeedPanel, 1200);
 }
 
-// ── PWA ───────────────────────────────────────────────
+// ── PWA + auto-reload on SW update ────────────────────
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
+  // When a new service worker activates it sends SW_UPDATED — reload silently
+  // so the user always gets the latest HTML without clearing cache manually.
+  navigator.serviceWorker.addEventListener('message', ev => {
+    if (ev.data?.type === 'SW_UPDATED') {
+      console.info('[vantage] New version deployed — reloading for latest build');
+      window.location.reload();
+    }
+  });
 }
 
 // ── Init ──────────────────────────────────────────────

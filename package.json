@@ -5,9 +5,9 @@
   "private": true,
   "scripts": {
     "dev": "wrangler pages dev --port=8788 --live-reload",
-    "deploy": "wrangler pages deploy",
-    "deploy:preview": "wrangler pages deploy --branch=preview",
-    "deploy:prod": "npm run deploy",
+    "deploy": "wrangler pages deploy ./vantage-final-v4 --project-name=vantageai",
+    "deploy:preview": "wrangler pages deploy ./vantage-final-v4 --project-name=vantageai --branch=preview",
+    "deploy:prod": "wrangler pages deploy ./vantage-final-v4 --project-name=vantageai --branch=main",
     "logs": "wrangler pages deployment tail --format=pretty",
     "deployments": "wrangler pages deployment list",
     "login": "wrangler login",

@@ -897,7 +897,12 @@ function closeMobileNav() {
 document.addEventListener('click', e => {
   if (!e.target.closest('nav') && !e.target.closest('#navMobile')) closeMobileNav();
 });
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  navigator.serviceWorker.addEventListener('message', ev => {
+    if (ev.data?.type === 'SW_UPDATED') window.location.reload();
+  });
+}
 </script>
 </body>
 </html>
