@@ -119,33 +119,34 @@ try:
         # ── 2. Test each sidebar view ──────────────────────────────────────
         section("2. Sidebar views — all 10 views load without crash")
 
+        # nav() ids match onclick="nav('cost',this)" pattern
         VIEWS = [
-            ("sb-cost",     "Cost Intelligence"),
-            ("sb-tokens",   "Token Analytics"),
-            ("sb-models",   "Model Comparison"),
-            ("sb-perf",     "Performance & Latency"),
-            ("sb-quality",  "Quality & Evaluation"),
-            ("sb-ai",       "AI Intelligence Layer"),
-            ("sb-traces",   "Agent Traces"),
-            ("sb-reports",  "Enterprise Reporting"),
-            ("sb-security", "Security & Governance"),
-            ("sb-devx",     "Developer Experience"),
+            ("cost",     "Cost Intelligence"),
+            ("tokens",   "Token Analytics"),
+            ("models",   "Model Comparison"),
+            ("perf",     "Performance & Latency"),
+            ("quality",  "Quality & Evaluation"),
+            ("ai",       "AI Intelligence Layer"),
+            ("traces",   "Agent Traces"),
+            ("reports",  "Enterprise Reporting"),
+            ("security", "Security & Governance"),
+            ("devx",     "Developer Experience"),
         ]
 
-        for view_id, view_name in VIEWS:
+        for nav_id, view_name in VIEWS:
             try:
-                btn = page.locator(f"#{view_id}, .sb-item[onclick*=\"'{view_id}'\"], .sb-item[onclick*='{view_id}']")
+                # Buttons use onclick="nav('cost',this)" — match on the nav id
+                btn = page.locator(f".sb-item[onclick*=\"('{nav_id}'\"]")
                 if btn.count() == 0:
-                    # Fallback: find by text
-                    btn = page.locator(f".sb-item:has-text('{view_name.split()[0]}')")
+                    btn = page.locator(f"#sb-{nav_id}")
                 if btn.count() > 0:
-                    btn.first.click()
+                    btn.first.click(timeout=5000)
                     page.wait_for_timeout(600)
                     still_on_app = "/app" in page.url
                     chk(f"2.x  '{view_name}' view — no crash/redirect",
                         still_on_app, f"redirected to {page.url}")
                 else:
-                    warn(f"2.x  '{view_name}' view button not found in sidebar")
+                    warn(f"2.x  '{view_name}' view button not found (nav_id='{nav_id}')")
             except Exception as e:
                 fail(f"2.x  '{view_name}' view error", str(e)[:100])
 
@@ -159,7 +160,7 @@ try:
         try:
             sb_settings = page.locator("#sb-settings")
             if sb_settings.count() > 0:
-                sb_settings.first.click()
+                sb_settings.first.click(timeout=8000)
                 page.wait_for_timeout(800)
                 settings_active = page.locator("#view-settings.active").count() > 0
                 chk("3.1  Settings sidebar view becomes active",
@@ -186,7 +187,7 @@ try:
         try:
             user_menu = page.locator("#user-menu, #user-avatar")
             if user_menu.count() > 0:
-                user_menu.first.click()
+                user_menu.first.click(timeout=8000)
                 page.wait_for_timeout(400)
                 dropdown_visible = page.locator("#user-dropdown").is_visible() if \
                     page.locator("#user-dropdown").count() > 0 else False
