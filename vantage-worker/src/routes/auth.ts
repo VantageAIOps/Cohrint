@@ -423,11 +423,13 @@ auth.get('/session', authMiddleware, async (c) => {
   const sseToken = Array.from(sseTokenBytes).map(b => b.toString(16).padStart(2, '0')).join('');
 
   // Store in KV with 120-second TTL — one-time use, consumed by stream.ts
-  // Wrapped in try/catch so a KV permission error doesn't break session auth
+  // If KV write fails (e.g. free tier limit), return null sse_token so the
+  // client knows SSE is unavailable instead of getting a phantom token.
+  let sseTokenFinal: string | null = sseToken;
   try {
     await c.env.KV.put(`sse:${orgId}:${sseToken}`, '1', { expirationTtl: 120 });
   } catch {
-    // KV unavailable (e.g. missing permission) — session still works, SSE disabled
+    sseTokenFinal = null; // KV unavailable — SSE disabled for this session
   }
 
   return c.json({
@@ -444,8 +446,10 @@ auth.get('/session', authMiddleware, async (c) => {
       created_at:   org?.created_at ? new Date(org.created_at * 1000).toISOString() : null,
     },
     member: memberInfo,
-    sse_token: sseToken,
-    sse_url:   `https://api.vantageaiops.com/v1/stream/${orgId}?sse_token=${sseToken}`,
+    sse_token: sseTokenFinal,
+    sse_url:   sseTokenFinal
+      ? `https://api.vantageaiops.com/v1/stream/${orgId}?sse_token=${sseTokenFinal}`
+      : null,
   });
 });
 

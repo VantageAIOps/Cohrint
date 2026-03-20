@@ -140,7 +140,12 @@ try:
         chk("21.4   Session contains org.name", bool(sess.get("org", {}).get("name")))
         chk("21.5   Session contains org.email", bool(sess.get("org", {}).get("email")))
         chk("21.6   Session contains org.plan",  bool(sess.get("org", {}).get("plan")))
-        chk("21.7   Session contains sse_token", bool(sess.get("sse_token")))
+        # sse_token may be null when KV daily write limit is hit (free tier)
+        sse_tok = sess.get("sse_token")
+        if sse_tok:
+            ok("21.7   Session contains sse_token")
+        else:
+            warn("21.7   Session sse_token is null (KV write limit hit — SSE disabled today)")
 
         # api_key_hint / created_at: may be null if worker not redeployed yet
         hint = sess.get("org", {}).get("api_key_hint")

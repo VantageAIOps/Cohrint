@@ -37,8 +37,9 @@ alerts.post('/slack/:orgId', async (c) => {
     body.trigger_daily   === true  ? 1 : 0,
   ).run();
 
-  // Cache in KV for fast lookup during event ingest
-  await c.env.KV.put(`slack:${orgId}`, body.webhook_url, { expirationTtl: 3600 });
+  // Cache in KV for fast lookup during event ingest (best-effort — D1 is the source of truth)
+  try { await c.env.KV.put(`slack:${orgId}`, body.webhook_url, { expirationTtl: 3600 }); }
+  catch { /* KV write limit reached — cached only in D1 */ }
 
   return c.json({ ok: true });
 });

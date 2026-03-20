@@ -236,7 +236,7 @@ try:
     rotate_results = []
 
     def do_rotate():
-        nonlocal rot_cks
+        global rot_cks
         try:
             r = requests.post(f"{API_URL}/v1/auth/rotate",
                               cookies=rot_cks, timeout=15)
