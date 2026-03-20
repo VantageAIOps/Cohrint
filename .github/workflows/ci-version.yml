@@ -110,13 +110,15 @@ jobs:
           cache: 'pip'
 
       - name: Install dependencies
-        run: pip install requests structlog
+        run: pip install -r tests/requirements.txt
 
-      - name: Run all API suites (no browser)
+      - name: Run API + core suites (no browser)
         env:
           HEADLESS: '1'
+          VANTAGE_SITE_URL: "https://vantageaiops.com"
+          VANTAGE_API_URL: "https://api.vantageaiops.com"
         run: |
-          python tests/run_suite.py --all --fast --no-report 2>&1 | tee /tmp/api-tests.txt
+          python tests/run_suite.py --no-browser --clean --no-report 2>&1 | tee /tmp/api-tests.txt
           EXIT=${PIPESTATUS[0]}
           echo "Exit code: $EXIT"
           exit $EXIT
@@ -150,19 +152,21 @@ jobs:
           cache: 'pip'
 
       - name: Install dependencies
-        run: pip install requests structlog playwright
+        run: pip install -r tests/requirements.txt playwright
 
       - name: Install Chromium
         run: python -m playwright install chromium --with-deps
 
-      - name: Run full suite with browser tests
+      - name: Run browser/UI suites
         env:
           HEADLESS: '1'
+          VANTAGE_SITE_URL: "https://vantageaiops.com"
+          VANTAGE_API_URL: "https://api.vantageaiops.com"
         run: |
           if [ "${{ inputs.extended }}" = "true" ] || [ "${{ github.event_name }}" = "push" ]; then
-            python tests/run_suite.py --all --no-report 2>&1 | tee /tmp/ui-tests.txt
+            python tests/run_suite.py --category 02_ui --category 13_dashboard --no-report 2>&1 | tee /tmp/ui-tests.txt
           else
-            python tests/run_suite.py --fast --no-report 2>&1 | tee /tmp/ui-tests.txt
+            python tests/run_suite.py --category 02_ui --no-report 2>&1 | tee /tmp/ui-tests.txt
           fi
           EXIT=${PIPESTATUS[0]}
           exit $EXIT
