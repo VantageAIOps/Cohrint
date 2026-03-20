@@ -1,6 +1,6 @@
 {
-  "name": "Vantage AI",
-  "short_name": "Vantage",
+  "name": "VantageAI",
+  "short_name": "VantageAI",
   "description": "AI cost intelligence — track LLM spend, tokens, and model performance",
   "start_url": "/app.html",
   "display": "standalone",

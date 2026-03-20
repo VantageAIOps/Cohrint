@@ -1,5 +1,5 @@
 /**
- * Vantage AI — Test Data Seed Engine
+ * VantageAI — Test Data Seed Engine
  * Generates 50,000+ realistic AI API call events across:
  *   - 23 models / 7 providers
  *   - 90 days of history
@@ -70,12 +70,12 @@ class VantageDataGen {
     } = opts;
 
     if (!force && await this.isSeedDone()) {
-      console.log("[VantageDataGen] Already seeded — use seed({ force: true }) to reseed");
+      console.log("[vantageai] Already seeded — use seed({ force: true }) to reseed");
       return;
     }
 
     await this.openDB();
-    console.log(`[VantageDataGen] Generating ${eventsTotal.toLocaleString()} events over ${days} days...`);
+    console.log(`[vantageai] Generating ${eventsTotal.toLocaleString()} events over ${days} days...`);
     const t0 = performance.now();
 
     const BATCH = 500;
@@ -116,7 +116,7 @@ class VantageDataGen {
 
     await this.markSeedDone(generated);
     const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
-    console.log(`[VantageDataGen] Done — ${generated.toLocaleString()} events in ${elapsed}s`);
+    console.log(`[vantageai] Done — ${generated.toLocaleString()} events in ${elapsed}s`);
     return generated;
   }
 

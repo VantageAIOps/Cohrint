@@ -1,4 +1,4 @@
-# Vantage AI — Backend SDK & Server
+# VantageAI — Backend SDK & Server
 
 Enterprise AI observability: token tracking, cost analysis, latency monitoring,
 efficiency scoring, and hallucination detection across all AI providers and agents.

@@ -1,5 +1,5 @@
 -- ============================================================
--- Vantage AI — Full Database Schema
+-- VantageAI — Full Database Schema
 -- Run this in: Supabase Dashboard > SQL Editor
 -- ============================================================
 
@@ -239,4 +239,4 @@ FROM ai_events
 GROUP BY org_id, model, provider;
 
 -- Done!
-SELECT 'Vantage AI schema installed successfully' AS status;
+SELECT 'VantageAI schema installed successfully' AS status;

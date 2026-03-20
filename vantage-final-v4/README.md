@@ -1,4 +1,4 @@
-# Vantage AI — Enterprise Documentation
+# VantageAI — Enterprise Documentation
 
 > AI cost intelligence platform — token tracking, model pricing comparison,
 > efficiency scoring and budget governance for developers and organisations.
@@ -124,10 +124,10 @@ Additional redirect URLs:
 
 ### Step 1 — Google Cloud Console
 1. Go to https://console.cloud.google.com
-2. Create project → **Vantage AI**
+2. Create project → **VantageAI**
 3. APIs & Services → **OAuth consent screen**
    - User type: **External**
-   - App name: Vantage AI
+   - App name: VantageAI
    - Save and continue (skip scopes and test users)
 4. APIs & Services → **Credentials → Create Credentials → OAuth 2.0 Client ID**
    - Application type: **Web application**
@@ -474,7 +474,7 @@ The bottom-up growth engine.
 # 1. Push files to GitHub
 git init
 git add .
-git commit -m "Initial Vantage AI deployment"
+git commit -m "Initial VantageAI deployment"
 git remote add origin https://github.com/YOUR_USERNAME/vantage-ai
 git push -u origin main
 

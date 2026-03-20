@@ -56,12 +56,12 @@ alerts.post('/slack/:orgId/test', async (c) => {
   }
 
   const sent = await sendSlackMessage(cfg.slack_url, {
-    text: '✅ *Vantage AI* — test alert from your workspace. Webhooks are working!',
+    text: '✅ *VantageAI* — test alert from your workspace. Webhooks are working!',
     blocks: [{
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: '*✅ Vantage AI — Test Alert*\nYour Slack integration is working correctly.\nYou\'ll receive alerts here when budget thresholds or anomalies are detected.',
+        text: '*✅ VantageAI — Test Alert*\nYour Slack integration is working correctly.\nYou\'ll receive alerts here when budget thresholds or anomalies are detected.',
       },
     }],
   });
@@ -123,7 +123,7 @@ export async function maybeSendBudgetAlert(
 
   const emoji = pct >= 100 ? '🚨' : '⚠️';
   await sendSlackMessage(slackUrl, {
-    text: `${emoji} Vantage AI budget alert for org ${orgId}`,
+    text: `${emoji} VantageAI budget alert for org ${orgId}`,
     blocks: [{
       type: 'section',
       text: {

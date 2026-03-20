@@ -1,5 +1,5 @@
 -- ============================================================
--- Vantage AI — ai_events table migration
+-- VantageAI — ai_events table migration
 -- Run AFTER supabase-schema.sql
 -- Supabase Dashboard → SQL Editor → Run
 -- ============================================================

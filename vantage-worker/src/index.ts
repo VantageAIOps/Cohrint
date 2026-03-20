@@ -75,7 +75,7 @@ app.notFound((c) => c.json({
 
 // ── Global error handler ──────────────────────────────────────────────────────
 app.onError((err, c) => {
-  console.error('[vantage-worker]', err);
+  console.error('[vantageai]', err);
   const origin  = c.req.header('Origin') ?? '';
   const allowed = (c.env.ALLOWED_ORIGINS ?? '').split(',').map(s => s.trim());
   const isAllowed = allowed.includes('*') || allowed.includes(origin) ||

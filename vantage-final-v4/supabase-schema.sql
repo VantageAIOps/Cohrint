@@ -1,5 +1,5 @@
 -- ============================================================
--- Vantage AI — Complete Supabase Schema
+-- VantageAI — Complete Supabase Schema
 -- Project: oyljzpvwdfktrkeotmon
 -- Run in: Supabase Dashboard → SQL Editor → New Query → Run All
 -- ============================================================
