@@ -870,10 +870,11 @@ function toggleFaq(qEl) {
       const cta       = document.getElementById('nav-cta');
       const signinMob = document.getElementById('nav-signin-mob');
       const ctaMob    = document.getElementById('nav-cta-mob');
-      if (signin)    { signin.textContent = 'Dashboard'; signin.href = '/app.html'; }
-      if (cta)       { cta.textContent    = 'Go to dashboard →'; cta.href = '/app.html'; }
-      if (signinMob) { signinMob.textContent = 'Dashboard'; signinMob.href = '/app.html'; }
-      if (ctaMob)    { ctaMob.textContent    = 'Go to dashboard →'; ctaMob.href = '/app.html'; }
+      // Logged-in: show ONE "Dashboard →" button; hide the sign-up CTA (redundant)
+      if (signin)    { signin.textContent = 'Dashboard →'; signin.href = '/app.html'; signin.style.fontWeight = '500'; signin.style.color = 'var(--accent)'; }
+      if (cta)       { cta.style.display = 'none'; }  // hide duplicate
+      if (signinMob) { signinMob.textContent = 'Dashboard →'; signinMob.href = '/app.html'; }
+      if (ctaMob)    { ctaMob.style.display = 'none'; } // hide duplicate
     }
   } catch { /* offline, timed out, or not logged in — keep Sign in / Sign up defaults */ }
 })();

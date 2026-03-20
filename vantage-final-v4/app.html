@@ -380,7 +380,7 @@ button{font-family:var(--sans);cursor:pointer}
     </select>
     <span id="api-status" class="tb-period" style="font-size:11px;padding:5px 10px;">Config: local</span>
     <button class="tb-btn" onclick="openCmd()" title="Command palette (⌘K)" style="font-family:var(--mono);font-size:11px;gap:8px;min-width:160px;justify-content:flex-start;color:var(--mu)"><span>⌕</span><span>Search...</span><span style="margin-left:auto;background:var(--bg);border:1px solid var(--b1);border-radius:3px;padding:1px 5px;font-size:9px">⌘K</span></button>
-    <button class="tb-btn" onclick="openSettings()">&#9881; Settings</button>
+    <button class="tb-btn" onclick="nav('settings', document.getElementById('sb-settings'))" title="Settings">&#9881; Settings</button>
     <button class="tb-btn" onclick="document.getElementById('sh-modal').classList.add('open')" title="Keyboard shortcuts (?)">?</button>
     <div id="notif-wrap">
       <button class="tb-btn tb-notif" onclick="toggleNotifications()" id="notif-btn">&#128276;<div class="tb-notif-dot" id="notif-dot"></div></button>
@@ -392,7 +392,6 @@ button{font-family:var(--sans);cursor:pointer}
         <div class="nd-list" id="nd-list"><div class="nd-empty">Loading…</div></div>
       </div>
     </div>
-    <a href="/app" class="tb-btn" style="font-weight:600;color:var(--ac);letter-spacing:-.3px">Vantage</a>
       <button class="tb-btn" onclick="showSeedPanel()" title="Load test data" style="color:var(--am)">&#127806; Seed data</button>
     <div id="user-menu" style="position:relative">
       <button class="tb-btn" id="user-btn" onclick="toggleUserMenu()" style="gap:8px">
@@ -404,8 +403,9 @@ button{font-family:var(--sans);cursor:pointer}
           <div style="font-size:12px;font-weight:500" id="user-name">Loading...</div>
           <div style="font-size:11px;color:var(--mu)" id="user-email-full"></div>
         </div>
-        <button onclick="goToApp()" style="width:100%;text-align:left;padding:8px 10px;font-size:12px;color:var(--tx);background:transparent;border:none;border-radius:7px;cursor:pointer;display:block;font-family:var(--sans)">&#128202; Dashboard</button>
-        <button onclick="window.location='/docs.html'" style="width:100%;text-align:left;padding:8px 10px;font-size:12px;color:var(--tx);background:transparent;border:none;border-radius:7px;cursor:pointer;display:block;font-family:var(--sans)">&#128196; Docs</button>
+        <button onclick="nav('account',document.getElementById('sb-account'));document.getElementById('user-dropdown').style.display='none';menuOpen=false;" style="width:100%;text-align:left;padding:8px 10px;font-size:12px;color:var(--tx);background:transparent;border:none;border-radius:7px;cursor:pointer;display:block;font-family:var(--sans)">&#128100; Account &amp; Profile</button>
+        <button onclick="nav('settings',document.getElementById('sb-settings'));document.getElementById('user-dropdown').style.display='none';menuOpen=false;" style="width:100%;text-align:left;padding:8px 10px;font-size:12px;color:var(--tx);background:transparent;border:none;border-radius:7px;cursor:pointer;display:block;font-family:var(--sans)">&#9881; Settings</button>
+        <button onclick="window.open('/docs.html','_blank')" style="width:100%;text-align:left;padding:8px 10px;font-size:12px;color:var(--tx);background:transparent;border:none;border-radius:7px;cursor:pointer;display:block;font-family:var(--sans)">&#128196; Docs</button>
         <hr style="border:none;border-top:1px solid var(--b1);margin:6px 0">
         <button onclick="signOut()" style="width:100%;text-align:left;padding:8px 10px;font-size:12px;color:var(--re);background:transparent;border:none;border-radius:7px;cursor:pointer;display:block;font-family:var(--sans)">&#8594; Sign out</button>
       </div>
@@ -533,6 +533,8 @@ button{font-family:var(--sans);cursor:pointer}
     <button class="sb-item" id="sb-members" onclick="nav('members',this)"><span class="ico">&#128101;</span><span>Team Members</span></button>
     <div class="sb-section">Platform</div>
     <button class="sb-item" onclick="nav('devx',this)"><span class="ico">&#128295;</span><span>Developer Experience</span><span class="sb-badge">3</span></button>
+    <button class="sb-item" id="sb-settings" onclick="nav('settings',this)"><span class="ico">&#9881;</span><span>Settings</span></button>
+    <button class="sb-item" id="sb-account" onclick="nav('account',this)"><span class="ico">&#128100;</span><span>Account</span></button>
     <div class="sb-bottom">
       <div class="sb-user">
         <div class="sb-avatar">AC</div>
@@ -1208,6 +1210,195 @@ curl -X POST https://api.vantageaiops.com/v1/events \
       </div>
     </div><!-- /view-members -->
 
+    <!-- ════════════════════════════════════════════════════════════════════
+         ACCOUNT VIEW
+    ═══════════════════════════════════════════════════════════════════════ -->
+    <div class="view" id="view-account">
+      <div class="view-title">&#128100; Account &amp; Profile</div>
+      <div class="view-sub muted">Your personal details, API key and profile information</div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:900px">
+
+        <!-- Identity card -->
+        <div class="card card-p" style="grid-column:1/-1">
+          <div class="card-hdr"><span class="card-title">Identity</span><span class="tag tag-green" id="acct-plan-badge">FREE</span></div>
+          <div style="display:flex;align-items:center;gap:20px;margin-bottom:20px">
+            <div id="acct-avatar-big" style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--ac),var(--bl));display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#000;flex-shrink:0">?</div>
+            <div>
+              <div id="acct-name-display" style="font-size:18px;font-weight:600;margin-bottom:2px">—</div>
+              <div id="acct-email-display" style="font-size:13px;color:var(--mu)">—</div>
+              <div id="acct-org-display" style="font-size:11px;color:var(--di);margin-top:2px;font-family:var(--mono)">org: —</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div>
+              <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:4px">DISPLAY NAME</label>
+              <input id="acct-name-input" class="input" placeholder="Your name" style="width:100%">
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:4px">EMAIL</label>
+              <input id="acct-email-input" class="input" placeholder="you@example.com" type="email" style="width:100%" readonly>
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:4px">PHONE NUMBER</label>
+              <input id="acct-phone-input" class="input" placeholder="+1 555 000 0000" type="tel" style="width:100%">
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:4px">DATE OF BIRTH</label>
+              <input id="acct-dob-input" class="input" placeholder="YYYY-MM-DD" type="date" style="width:100%">
+            </div>
+          </div>
+          <div style="margin-top:16px;display:flex;gap:10px;align-items:center">
+            <button class="btn btn-primary" onclick="saveProfile()" style="min-width:120px">Save profile</button>
+            <span id="acct-save-msg" style="font-size:12px;color:var(--ac);display:none">&#10003; Saved</span>
+          </div>
+        </div>
+
+        <!-- API Key card -->
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">API Key</span></div>
+          <div style="font-size:12px;color:var(--mu);margin-bottom:12px">Your key is stored securely. Only the last 4 characters are shown.</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <div style="background:var(--bg3);border:1px solid var(--b2);border-radius:8px;padding:10px 14px;font-family:var(--mono);font-size:13px;flex:1;letter-spacing:.5px" id="acct-key-hint">vnt_••••••••••••</div>
+            <button class="btn btn-ghost" onclick="copyAccountKey()" style="font-size:12px;padding:8px 14px;white-space:nowrap">&#128203; Copy hint</button>
+          </div>
+          <div style="font-size:11px;color:var(--di);margin-bottom:16px">To get a new key, use key recovery via <a href="/auth.html#recover" style="color:var(--ac)">the auth page</a>.</div>
+          <div class="card-hdr" style="margin-top:8px"><span class="card-title" style="font-size:12px">Org ID</span></div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+            <div style="background:var(--bg3);border:1px solid var(--b2);border-radius:8px;padding:8px 14px;font-family:var(--mono);font-size:12px;flex:1;color:var(--mu)" id="acct-org-id-display">—</div>
+            <button class="btn btn-ghost" onclick="copyText(document.getElementById('acct-org-id-display').textContent)" style="font-size:12px;padding:8px 14px">Copy</button>
+          </div>
+        </div>
+
+        <!-- Plan card -->
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Plan &amp; Usage</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <div>
+              <div id="acct-plan-name" style="font-size:16px;font-weight:600;color:var(--ac)">Free</div>
+              <div style="font-size:12px;color:var(--mu)">Current plan</div>
+            </div>
+            <a href="https://vantageaiops.com/#pricing" target="_blank" class="btn btn-primary" style="font-size:12px;text-decoration:none">Upgrade →</a>
+          </div>
+          <div style="font-size:12px;color:var(--mu);margin-bottom:8px">Events this month</div>
+          <div style="background:var(--bg3);border-radius:6px;height:8px;overflow:hidden;margin-bottom:6px">
+            <div id="acct-usage-bar" style="height:100%;background:var(--ac);border-radius:6px;transition:width .5s;width:0%"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--mu)">
+            <span id="acct-usage-count">0 events</span>
+            <span id="acct-usage-limit">10,000 limit</span>
+          </div>
+          <hr style="border:none;border-top:1px solid var(--b1);margin:16px 0">
+          <div style="font-size:12px;color:var(--mu)">Member since</div>
+          <div id="acct-created-at" style="font-size:13px;margin-top:2px">—</div>
+        </div>
+
+      </div><!-- /grid -->
+    </div><!-- /view-account -->
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         SETTINGS VIEW
+    ═══════════════════════════════════════════════════════════════════════ -->
+    <div class="view" id="view-settings">
+      <div class="view-title">&#9881; Settings</div>
+      <div class="view-sub muted">API configuration, budgets, alerts and account preferences</div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:900px">
+
+        <!-- API Config -->
+        <div class="card card-p" style="grid-column:1/-1">
+          <div class="card-hdr"><span class="card-title">API Configuration</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div style="grid-column:1/-1">
+              <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:4px">SWITCH API KEY <span style="color:var(--di)">(paste new key to switch accounts)</span></label>
+              <div style="display:flex;gap:8px">
+                <input id="set-key-input" class="input" type="password" placeholder="vnt_…" autocomplete="off" spellcheck="false" style="flex:1">
+                <button class="btn btn-primary" onclick="applyNewKey()" style="white-space:nowrap;min-width:110px">Apply key</button>
+              </div>
+              <div id="set-key-msg" style="font-size:11px;color:var(--mu);margin-top:4px">Leave blank to keep current key.</div>
+            </div>
+            <div style="grid-column:1/-1">
+              <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:4px">API BASE URL</label>
+              <div style="display:flex;gap:8px">
+                <input id="set-base-input" class="input" placeholder="https://api.vantageaiops.com" spellcheck="false" style="flex:1">
+                <button class="btn btn-ghost" onclick="applyBaseUrl()" style="white-space:nowrap">Apply</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Budget -->
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Monthly Budget</span></div>
+          <div style="font-size:12px;color:var(--mu);margin-bottom:12px">Get alerted when monthly AI spend approaches this limit.</div>
+          <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:4px">BUDGET (USD / month)</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span style="color:var(--mu)">$</span>
+            <input id="set-budget-input" class="input" type="number" placeholder="500" min="0" step="10" style="width:140px">
+            <button class="btn btn-primary" onclick="saveBudget()" style="white-space:nowrap">Save</button>
+          </div>
+          <div id="set-budget-msg" style="font-size:11px;color:var(--ac);margin-top:8px;display:none">&#10003; Budget saved</div>
+          <div style="font-size:11px;color:var(--di);margin-top:8px">Set to 0 to disable budget alerts.</div>
+        </div>
+
+        <!-- Slack Alerts -->
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Slack Alerts</span></div>
+          <div style="font-size:12px;color:var(--mu);margin-bottom:12px">Receive budget, anomaly and daily digest alerts in Slack.</div>
+          <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:4px">WEBHOOK URL</label>
+          <input id="set-slack-url" class="input" placeholder="https://hooks.slack.com/services/…" style="width:100%;margin-bottom:12px">
+          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer"><input type="checkbox" id="set-slack-budget" style="accent-color:var(--ac)"> Budget threshold alerts</label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer"><input type="checkbox" id="set-slack-anomaly" style="accent-color:var(--ac)"> Anomaly detection alerts</label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer"><input type="checkbox" id="set-slack-daily" style="accent-color:var(--ac)"> Daily cost digest</label>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary" onclick="saveAlerts()" style="flex:1">Save alerts</button>
+            <button class="btn btn-ghost" onclick="testAlert()" style="flex:1">Send test</button>
+          </div>
+          <div id="set-alerts-msg" style="font-size:11px;color:var(--ac);margin-top:8px;display:none">&#10003; Saved</div>
+        </div>
+
+        <!-- Display Preferences -->
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Display Preferences</span></div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div>
+              <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:6px">DEFAULT PERIOD</label>
+              <select id="set-default-period" class="select" style="width:100%" onchange="localStorage.setItem('default_period',this.value)">
+                <option value="7">Last 7 days</option>
+                <option value="30">Last 30 days</option>
+                <option value="90">Last 90 days</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:6px">CURRENCY DISPLAY</label>
+              <select class="select" style="width:100%">
+                <option value="usd">USD ($)</option>
+                <option value="eur" disabled>EUR (€) — coming soon</option>
+                <option value="gbp" disabled>GBP (£) — coming soon</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Session & Danger Zone -->
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Session</span></div>
+          <div style="font-size:12px;color:var(--mu);margin-bottom:16px">Your session is stored as an HTTP-only cookie (30-day TTL).</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <button class="btn btn-ghost" onclick="signOut()" style="width:100%;justify-content:center;color:var(--re);border-color:var(--re)">&#8594; Sign out</button>
+          </div>
+          <hr style="border:none;border-top:1px solid var(--b1);margin:16px 0">
+          <div class="card-title" style="font-size:12px;margin-bottom:8px">&#128273; Recovery</div>
+          <div style="font-size:12px;color:var(--mu);margin-bottom:10px">Lost your API key? Send a recovery link to your email.</div>
+          <button class="btn btn-ghost" onclick="sendRecovery()" style="width:100%;justify-content:center">Send recovery email</button>
+          <div id="set-recovery-msg" style="font-size:11px;color:var(--ac);margin-top:8px;display:none">&#10003; Recovery email sent — check your inbox</div>
+        </div>
+
+      </div><!-- /grid -->
+    </div><!-- /view-settings -->
+
   </div><!-- /main -->
 </div><!-- /shell -->
 
@@ -1322,7 +1513,9 @@ function nav(id, el) {
   document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
   el.classList.add("active");
   document.getElementById("view-"+id).classList.add("active");
-  if(id==="members") loadMembersView();
+  if(id==="members")  loadMembersView();
+  if(id==="account")  loadAccountView();
+  if(id==="settings") loadSettingsView();
   // Lazy init charts for that view
   if(!window["init_"+id]) return;
   if(!window["inited_"+id]){window["init_"+id]();window["inited_"+id]=true;}
@@ -2059,24 +2252,242 @@ async function initKeyAuth() {
 
 function populateUserFromSession(sess) {
   const orgId    = sess?.org_id || sess?.org?.name || 'org';
-  const initials = orgId.slice(0, 2).toUpperCase();
+  const name     = sess?.org?.name || orgId;
+  const initials = name.slice(0, 2).toUpperCase();
   const email    = sess?.org?.email || sess?.member?.email || '';
   const plan     = sess?.org?.plan || 'free';
-  document.getElementById('user-avatar').textContent        = initials;
-  document.getElementById('user-name').textContent          = sess?.org?.name || orgId;
-  document.getElementById('user-email-full').textContent    = email || orgId;
-  document.getElementById('user-email-short').textContent   = orgId;
-  const planEl = document.querySelector('.sb-uplan');
-  if (planEl) planEl.textContent = plan.toUpperCase() + ' PLAN';
+  const hint     = sess?.org?.api_key_hint || sess?.hint || '';
+
+  // Topbar
+  document.getElementById('user-avatar').textContent       = initials;
+  document.getElementById('user-name').textContent         = name;
+  document.getElementById('user-email-full').textContent   = email || orgId;
+  document.getElementById('user-email-short').textContent  = name || orgId;
+
+  // Sidebar bottom
+  const planEl  = document.querySelector('.sb-uplan');
+  const unameEl = document.querySelector('.sb-uname');
+  if (planEl)  planEl.textContent  = plan.toUpperCase() + ' PLAN';
+  if (unameEl) unameEl.textContent = name;
+
+  // Populate Account view
+  const avatar2 = document.getElementById('acct-avatar-big');
+  if (avatar2) avatar2.textContent = initials;
+  const nameDisp = document.getElementById('acct-name-display');
+  if (nameDisp) nameDisp.textContent = name;
+  const emailDisp = document.getElementById('acct-email-display');
+  if (emailDisp) emailDisp.textContent = email || '—';
+  const orgDisp = document.getElementById('acct-org-display');
+  if (orgDisp) orgDisp.textContent = 'org: ' + orgId;
+  const nameInp = document.getElementById('acct-name-input');
+  if (nameInp) nameInp.value = name;
+  const emailInp = document.getElementById('acct-email-input');
+  if (emailInp) emailInp.value = email;
+
+  // Restore saved profile extras from localStorage
+  const phone = localStorage.getItem('profile_phone') || '';
+  const dob   = localStorage.getItem('profile_dob')   || '';
+  const phoneInp = document.getElementById('acct-phone-input');
+  const dobInp   = document.getElementById('acct-dob-input');
+  if (phoneInp) phoneInp.value = phone;
+  if (dobInp)   dobInp.value   = dob;
+
+  // API key hint
+  const keyHintEl = document.getElementById('acct-key-hint');
+  if (keyHintEl) keyHintEl.textContent = hint ? `vnt_••••••••••${hint}` : 'vnt_••••••••••••';
+
+  // Org ID
+  const orgIdEl = document.getElementById('acct-org-id-display');
+  if (orgIdEl) orgIdEl.textContent = orgId;
+
+  // Plan badge
+  const planBadge = document.getElementById('acct-plan-badge');
+  if (planBadge) planBadge.textContent = plan.toUpperCase();
+  const planName = document.getElementById('acct-plan-name');
+  if (planName) planName.textContent = plan.charAt(0).toUpperCase() + plan.slice(1);
+
+  // Settings view pre-populate
+  const baseInp = document.getElementById('set-base-input');
+  if (baseInp) baseInp.value = API_BASE;
+
+  // Store hint for copy
+  window._keyHint = hint;
+  window._orgId   = orgId;
+}
+
+// ── Account: save profile ──────────────────────────────
+function saveProfile() {
+  const name  = document.getElementById('acct-name-input')?.value.trim();
+  const phone = document.getElementById('acct-phone-input')?.value.trim();
+  const dob   = document.getElementById('acct-dob-input')?.value.trim();
+  // Save extras to localStorage (no backend field for these yet)
+  if (phone !== undefined) localStorage.setItem('profile_phone', phone);
+  if (dob   !== undefined) localStorage.setItem('profile_dob', dob);
+  // Update display name
+  if (name) {
+    document.getElementById('acct-name-display').textContent = name;
+    document.getElementById('user-name').textContent         = name;
+    document.querySelector('.sb-uname').textContent          = name;
+    const avatar = document.getElementById('user-avatar');
+    if (avatar) avatar.textContent = name.slice(0,2).toUpperCase();
+    const avatar2 = document.getElementById('acct-avatar-big');
+    if (avatar2) avatar2.textContent = name.slice(0,2).toUpperCase();
+  }
+  const msg = document.getElementById('acct-save-msg');
+  if (msg) { msg.style.display = 'inline'; setTimeout(() => msg.style.display = 'none', 2500); }
+}
+
+function copyAccountKey() {
+  const hint = window._keyHint || '';
+  const text = hint ? `vnt_••••••••••${hint}` : 'vnt_••••••••••••';
+  navigator.clipboard.writeText(text).catch(()=>{});
+}
+function copyText(text) {
+  if (text && text !== '—') navigator.clipboard.writeText(text).catch(()=>{});
+}
+
+// ── Settings view logic ────────────────────────────────
+async function applyNewKey() {
+  const key = document.getElementById('set-key-input')?.value.trim();
+  const msg = document.getElementById('set-key-msg');
+  if (!key || !key.startsWith('vnt_')) {
+    if (msg) { msg.textContent = '⚠ Key must start with vnt_'; msg.style.color = 'var(--re)'; }
+    return;
+  }
+  if (msg) { msg.textContent = 'Signing in…'; msg.style.color = 'var(--mu)'; }
+  const res = await fetch(`${API_BASE}/v1/auth/session`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ api_key: key }),
+  });
+  if (res.ok) {
+    try {
+      const r2 = await fetch(`${API_BASE}/v1/auth/session`, { credentials: 'include' });
+      if (r2.ok) {
+        _session = await r2.json();
+        populateUserFromSession(_session);
+        checkPlanUsage();
+        updateStatus();
+        document.getElementById('set-key-input').value = '';
+        if (msg) { msg.textContent = '✓ Switched account'; msg.style.color = 'var(--ac)'; }
+      }
+    } catch (e) { console.warn('[vantage] Session refresh failed', e); }
+  } else {
+    if (msg) { msg.textContent = '✗ Invalid key — check and try again'; msg.style.color = 'var(--re)'; }
+  }
+}
+
+function applyBaseUrl() {
+  const val = document.getElementById('set-base-input')?.value.trim();
+  if (val) {
+    localStorage.setItem('api_base', val);
+    location.reload();
+  }
+}
+
+async function saveBudget() {
+  const val = parseFloat(document.getElementById('set-budget-input')?.value || '0');
+  const msg = document.getElementById('set-budget-msg');
+  try {
+    const org = _session?.org_id || window._orgId;
+    await apiFetch(`/v1/admin/team-budgets/all`, { method: 'PUT', body: JSON.stringify({ budget_usd: val }) });
+  } catch(e) {}
+  if (msg) { msg.style.display = 'block'; setTimeout(() => msg.style.display = 'none', 2500); }
+}
+
+async function saveAlerts() {
+  const url    = document.getElementById('set-slack-url')?.value.trim();
+  const budget = document.getElementById('set-slack-budget')?.checked;
+  const anomaly= document.getElementById('set-slack-anomaly')?.checked;
+  const daily  = document.getElementById('set-slack-daily')?.checked;
+  const msg    = document.getElementById('set-alerts-msg');
+  if (!url) return;
+  try {
+    const org = _session?.org_id || window._orgId;
+    await apiFetch(`/v1/alerts/slack/${org}`, {
+      method: 'POST',
+      body: JSON.stringify({ slack_url: url, trigger_budget: budget, trigger_anomaly: anomaly, trigger_daily: daily }),
+    });
+  } catch(e) {}
+  if (msg) { msg.style.display = 'block'; setTimeout(() => msg.style.display = 'none', 2500); }
+}
+
+async function testAlert() {
+  const org = _session?.org_id || window._orgId;
+  if (!org) return;
+  try { await apiFetch(`/v1/alerts/slack/${org}/test`, { method: 'POST', body: '{}' }); } catch(e) {}
+}
+
+async function sendRecovery() {
+  const email = _session?.org?.email || _session?.member?.email;
+  const msg   = document.getElementById('set-recovery-msg');
+  if (!email) { if (msg) { msg.textContent = '✗ No email found on account'; msg.style.color='var(--re)'; msg.style.display='block'; } return; }
+  try {
+    await fetch(`${API_BASE}/v1/auth/recover`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ email }),
+    });
+  } catch(e) {}
+  if (msg) { msg.style.display = 'block'; setTimeout(() => msg.style.display = 'none', 4000); }
+}
+
+// ── Load alert config when settings view opens ─────────
+async function loadSettingsView() {
+  const org = _session?.org_id || window._orgId;
+  if (!org) return;
+  try {
+    const r = await apiFetch(`/v1/alerts/${org}`);
+    if (r?.ok !== false) {
+      const d = await r.json().catch(() => r);
+      if (d && typeof d === 'object') {
+        const urlEl = document.getElementById('set-slack-url');
+        if (urlEl && d.slack_url) urlEl.value = d.slack_url;
+        const budEl = document.getElementById('set-slack-budget');
+        if (budEl) budEl.checked = !!d.trigger_budget;
+        const anoEl = document.getElementById('set-slack-anomaly');
+        if (anoEl) anoEl.checked = !!d.trigger_anomaly;
+        const dayEl = document.getElementById('set-slack-daily');
+        if (dayEl) dayEl.checked = !!d.trigger_daily;
+      }
+    }
+  } catch(e) {}
+  // Load default period
+  const dp = localStorage.getItem('default_period') || '30';
+  const dpSel = document.getElementById('set-default-period');
+  if (dpSel) dpSel.value = dp;
+}
+
+async function loadAccountView() {
+  const org = _session?.org_id || window._orgId;
+  if (!org) return;
+  try {
+    const r = await apiFetch('/v1/analytics/summary');
+    if (r?.ok !== false) {
+      const d = await r.json().catch(() => r);
+      const bar  = document.getElementById('acct-usage-bar');
+      const cnt  = document.getElementById('acct-usage-count');
+      const lim  = document.getElementById('acct-usage-limit');
+      const plan = _session?.org?.plan || 'free';
+      const limit = plan === 'free' ? 10000 : Infinity;
+      const used  = (d?.today_requests || 0) + (d?.mtd_requests || 0) || d?.total_requests || 0;
+      if (bar) bar.style.width = limit === Infinity ? '5%' : Math.min(100, used / limit * 100) + '%';
+      if (cnt) cnt.textContent = used.toLocaleString() + ' events';
+      if (lim) lim.textContent = limit === Infinity ? 'unlimited' : limit.toLocaleString() + ' limit';
+    }
+  } catch(e) {}
+  // Member since from session creation if available
+  const ca = _session?.org?.created_at;
+  const caEl = document.getElementById('acct-created-at');
+  if (caEl && ca) {
+    try { caEl.textContent = new Date(ca).toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'}); }
+    catch(e) { caEl.textContent = ca; }
+  }
 }
 
 async function signOut() {
   await fetch(`${API_BASE}/v1/auth/session`, { method: 'DELETE', credentials: 'include' });
   window.location.replace('/auth.html');
-}
-
-function goToApp() {
-  document.getElementById('user-dropdown').style.display = 'none';
 }
 
 // ── User menu toggle ─────────────────────────────────
@@ -2095,62 +2506,13 @@ document.addEventListener('click', e => {
     document.getElementById('notif-dropdown')?.classList.remove('open');
     notifOpen = false;
   }
-  if (!document.getElementById('settings-modal')?.contains(e.target) &&
-      !e.target.closest('[onclick*="openSettings"]')) {
-    // don't close if clicking inside modal
-  }
 });
 
-// ── Settings modal ────────────────────────────────────
-function openSettings() {
-  const org  = _session?.org_id || '—';
-  const plan = _session?.org?.plan || 'free';
-  document.getElementById('sm-key-input').value       = '';
-  document.getElementById('sm-base-input').value      = API_BASE;
-  document.getElementById('sm-org-val').textContent   = org;
-  document.getElementById('sm-plan-val').textContent  = plan.charAt(0).toUpperCase() + plan.slice(1);
-  document.getElementById('settings-modal').classList.add('open');
-}
-function closeSettings() {
-  document.getElementById('settings-modal').classList.remove('open');
-}
-document.getElementById('settings-modal').addEventListener('click', function(e) {
-  if (e.target === this) closeSettings();
-});
-async function saveSettings() {
-  const key = document.getElementById('sm-key-input').value.trim();
-  if (key && key.startsWith('vnt_')) {
-    // Switch to a different API key — create a new session
-    const res = await fetch(`${API_BASE}/v1/auth/session`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ api_key: key }),
-    });
-    if (res.ok) {
-      try {
-        const r2 = await fetch(`${API_BASE}/v1/auth/session`, { credentials: 'include' });
-        if (r2.ok) {
-          _session = await r2.json();
-          populateUserFromSession(_session);
-          checkPlanUsage();
-          updateStatus();
-        }
-      } catch (e) {
-        console.warn('[vantage] Session refresh after key switch failed', e);
-      }
-    }
-  }
-  closeSettings();
-}
-function copySettingsVal(inputId) {
-  const v = document.getElementById(inputId)?.value;
-  if (v) navigator.clipboard.writeText(v).catch(()=>{});
-}
-function copySettingsText(elId) {
-  const v = document.getElementById(elId)?.textContent;
-  if (v && v !== '—') navigator.clipboard.writeText(v).catch(()=>{});
-}
+// ── Legacy settings modal (kept for command-palette compat) ───
+function openSettings() { nav('settings', document.getElementById('sb-settings')); }
+function closeSettings() {}
+function copySettingsVal(inputId) { const v = document.getElementById(inputId)?.value; if(v) navigator.clipboard.writeText(v).catch(()=>{}); }
+function copySettingsText(elId)   { const v = document.getElementById(elId)?.textContent; if(v&&v!=='—') navigator.clipboard.writeText(v).catch(()=>{}); }
 
 // ── Notifications ─────────────────────────────────────
 let notifOpen = false;
