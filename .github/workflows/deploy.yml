@@ -44,14 +44,29 @@ jobs:
         id: branch
         run: echo "branch=${GITHUB_REF##*/}" >> $GITHUB_OUTPUT
 
-      - name: Deploy to Cloudflare Pages
-        run: |
-          npx wrangler pages deploy ./vantage-final-v4 \
-            --project-name=vantageai \
-            --branch=${{ steps.branch.outputs.branch }}
+      - name: Deploy to Cloudflare Pages (with retry)
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          MAX_ATTEMPTS=4
+          DELAY=30
+          for attempt in $(seq 1 $MAX_ATTEMPTS); do
+            echo "▶ Deploy attempt $attempt / $MAX_ATTEMPTS"
+            if npx wrangler pages deploy ./vantage-final-v4 \
+                --project-name=vantageai \
+                --branch=${{ steps.branch.outputs.branch }}; then
+              echo "✅ Deploy succeeded on attempt $attempt"
+              exit 0
+            fi
+            if [ $attempt -lt $MAX_ATTEMPTS ]; then
+              echo "⏳ Cloudflare API timeout — waiting ${DELAY}s before retry..."
+              sleep $DELAY
+              DELAY=$((DELAY * 2))   # exponential back-off: 30s → 60s → 120s
+            fi
+          done
+          echo "❌ All $MAX_ATTEMPTS deploy attempts failed"
+          exit 1
 
       - name: Confirm deployment
         if: github.ref == 'refs/heads/main'

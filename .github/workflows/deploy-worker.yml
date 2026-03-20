@@ -57,11 +57,27 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Deploy Worker
-        run: npm run deploy
+      - name: Deploy Worker (with retry)
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          MAX_ATTEMPTS=4
+          DELAY=30
+          for attempt in $(seq 1 $MAX_ATTEMPTS); do
+            echo "▶ Deploy attempt $attempt / $MAX_ATTEMPTS"
+            if npm run deploy; then
+              echo "✅ Worker deploy succeeded on attempt $attempt"
+              exit 0
+            fi
+            if [ $attempt -lt $MAX_ATTEMPTS ]; then
+              echo "⏳ Cloudflare API timeout — waiting ${DELAY}s before retry..."
+              sleep $DELAY
+              DELAY=$((DELAY * 2))
+            fi
+          done
+          echo "❌ All $MAX_ATTEMPTS deploy attempts failed"
+          exit 1
 
       - name: Confirm deployment
         run: echo "✅ vantageai-api deployed — https://api.vantageaiops.com"
