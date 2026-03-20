@@ -392,7 +392,7 @@ button{font-family:var(--sans);cursor:pointer}
         <div class="nd-list" id="nd-list"><div class="nd-empty">Loading…</div></div>
       </div>
     </div>
-    <a href="/" class="tb-btn" style="color:var(--mu)">&#8592; Home</a>
+    <a href="/app" class="tb-btn" style="font-weight:600;color:var(--ac);letter-spacing:-.3px">Vantage</a>
       <button class="tb-btn" onclick="showSeedPanel()" title="Load test data" style="color:var(--am)">&#127806; Seed data</button>
     <div id="user-menu" style="position:relative">
       <button class="tb-btn" id="user-btn" onclick="toggleUserMenu()" style="gap:8px">
@@ -1291,11 +1291,11 @@ async function apiFetch(path, opts={}){
   return res.json();
 }
 async function loadKpis(org, days){
-  try{ return await apiFetch(`/v1/kpis/${encodeURIComponent(org)}?days=${days}`); }
+  try{ return await apiFetch(`/v1/analytics/kpis?period=${days}`); }
   catch(e){ console.warn("Failed to fetch KPIs", e); return null; }
 }
 async function loadTimeseries(org, days){
-  try{ return await apiFetch(`/v1/timeseries/${encodeURIComponent(org)}?days=${days}`); }
+  try{ return await apiFetch(`/v1/analytics/timeseries?period=${days}`); }
   catch(e){ console.warn("Failed to fetch timeseries", e); return null; }
 }
 
@@ -2046,7 +2046,13 @@ async function initKeyAuth() {
     window.location.replace('/auth.html?next=' + encodeURIComponent(window.location.pathname));
     return false;
   }
-  _session = await res.json();
+  try {
+    _session = await res.json();
+  } catch (e) {
+    // Unexpected non-JSON response (e.g. Cloudflare error page) — don't crash
+    console.error('[vantage] Session response was not JSON — check API health', e);
+    return false;
+  }
   populateUserFromSession(_session);
   return true;
 }
@@ -2122,10 +2128,17 @@ async function saveSettings() {
       body: JSON.stringify({ api_key: key }),
     });
     if (res.ok) {
-      _session = await fetch(`${API_BASE}/v1/auth/session`, { credentials: 'include' }).then(r => r.json());
-      populateUserFromSession(_session);
-      checkPlanUsage();
-      updateStatus();
+      try {
+        const r2 = await fetch(`${API_BASE}/v1/auth/session`, { credentials: 'include' });
+        if (r2.ok) {
+          _session = await r2.json();
+          populateUserFromSession(_session);
+          checkPlanUsage();
+          updateStatus();
+        }
+      } catch (e) {
+        console.warn('[vantage] Session refresh after key switch failed', e);
+      }
     }
   }
   closeSettings();

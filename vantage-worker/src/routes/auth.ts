@@ -449,7 +449,11 @@ auth.delete('/session', async (c) => {
   }
 
   const res = c.json({ ok: true });
-  (await res).headers.set('Set-Cookie', 'vantage_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax');
+  const isProdLogout = (c.env.ENVIRONMENT ?? 'production') === 'production';
+  const clearCookie = isProdLogout
+    ? 'vantage_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax; Secure; Domain=vantageaiops.com'
+    : 'vantage_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax';
+  (await res).headers.set('Set-Cookie', clearCookie);
   return res;
 });
 

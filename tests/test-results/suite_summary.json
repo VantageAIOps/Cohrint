@@ -1,0 +1,18 @@
+{
+  "run": "2026-03-19T19:46:52Z",
+  "passed": 0,
+  "failed": 1,
+  "skipped": 0,
+  "total": 1,
+  "duration_ms": 30713,
+  "suites": [
+    {
+      "file": "test_02_signin.py",
+      "returncode": 1,
+      "duration_ms": 30713,
+      "passed": false,
+      "num": "02",
+      "label": "Sign-in (API + UI)"
+    }
+  ]
+}
