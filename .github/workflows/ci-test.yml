@@ -36,7 +36,7 @@ on:
   schedule:
     - cron: "0 2 * * *"
 
-  # Also run on PR to main for fast smoke tests
+  # Also run on PRs from version branches to main
   pull_request:
     branches:
       - main
@@ -44,6 +44,13 @@ on:
       - "vantage-worker/**"
       - "vantage-final-v4/**"
       - "tests/**"
+
+  # Also trigger when ci-version completes on a version branch
+  workflow_run:
+    workflows:
+      - "Version Branch Pipeline"
+    types:
+      - completed
 
 jobs:
   # ── 1. Deployment health check ──────────────────────────────────────────────

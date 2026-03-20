@@ -1,0 +1,80 @@
+name: Promote to Main
+
+# Fires when a version branch PR is merged into main.
+# Confirms the backup branch exists (created by ci-version.yml).
+# Tags the release.
+# The actual CF deploy is handled by deploy.yml and deploy-worker.yml.
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+jobs:
+  tag-release:
+    name: Tag Release & Verify Backup
+    runs-on: ubuntu-latest
+    # Only run when a version branch PR is actually merged (not just closed)
+    if: |
+      github.event.pull_request.merged == true &&
+      startsWith(github.event.pull_request.head.ref, 'v')
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION="${{ github.event.pull_request.head.ref }}"   # e.g. v1.0
+          BACKUP_BRANCH="backup/${VERSION}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "backup_branch=${BACKUP_BRANCH}" >> $GITHUB_OUTPUT
+          echo "tag=${VERSION}.$(date -u +%Y%m%d)" >> $GITHUB_OUTPUT
+
+      - name: Verify backup branch exists
+        run: |
+          BACKUP="${{ steps.version.outputs.backup_branch }}"
+          if git ls-remote --exit-code origin "refs/heads/${BACKUP}" >/dev/null 2>&1; then
+            echo "✅ Backup branch confirmed: ${BACKUP}"
+          else
+            echo "⚠️  Backup branch ${BACKUP} not found — creating it now from the merged ref"
+            git fetch origin "${{ github.event.pull_request.head.ref }}" 2>/dev/null || true
+            # Create from the PR head SHA (the version branch tip before merge)
+            git push origin "${{ github.event.pull_request.head.sha }}:refs/heads/${BACKUP}" || \
+              echo "Could not create backup — may need manual creation"
+          fi
+
+      - name: Create release tag
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          VERSION="${{ steps.version.outputs.version }}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${TAG}" -m "Release ${VERSION} → main (PR #${{ github.event.pull_request.number }})"
+          git push origin "${TAG}"
+          echo "✅ Tagged: ${TAG}"
+
+      - name: Write promotion summary
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          BACKUP="${{ steps.version.outputs.backup_branch }}"
+          TAG="${{ steps.version.outputs.tag }}"
+          echo "## Promoted ${VERSION} → main 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Version | \`${VERSION}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Backup branch | \`${BACKUP}\` (immutable) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Release tag | \`${TAG}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| PR | #${{ github.event.pull_request.number }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "CF deploy is now running via \`deploy.yml\` and \`deploy-worker.yml\`." >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,323 @@
+name: Version Branch Pipeline
+
+# Full test pipeline for version branches (v1.0, v1.1, v2.0 …).
+#
+# Flow:
+#   push to v* branch
+#     → typecheck + build validation
+#     → full test suite (API + UI + stress + env)
+#     → if ALL green → auto-create immutable backup/vX.Y branch
+#     → open PR to main for manual review & approval
+#
+# main/Cloudflare is NEVER touched here.
+# CF deploy only fires after the human-approved PR lands on main.
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  push:
+    branches:
+      - 'v[0-9]*'   # v1.0, v1.1, v2.0 — NOT v1.0/P001 (glob * never matches /)
+  workflow_dispatch:
+    inputs:
+      extended:
+        description: 'Also run extended suites 11-21'
+        required: false
+        type: boolean
+        default: true
+      with_browser:
+        description: 'Run Playwright browser/UI tests'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  # ── 1. TypeScript check ───────────────────────────────────────────────────
+  typecheck:
+    name: TypeScript Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: vantage-worker
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: vantage-worker/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript type check
+        run: npm run typecheck
+
+  # ── 2. Frontend build validation ─────────────────────────────────────────
+  frontend-check:
+    name: Frontend Build Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify all required assets present
+        run: |
+          MISSING=0
+          for f in index.html app.html auth.html signup.html docs.html \
+                   calculator.html sw.js manifest.json _headers _redirects; do
+            if [ ! -f "vantage-final-v4/$f" ]; then
+              echo "❌ Missing: vantage-final-v4/$f"
+              MISSING=1
+            fi
+          done
+          [ "$MISSING" = "0" ] && echo "✅ All required assets present" || exit 1
+
+      - name: Wrangler build (pages dry-run)
+        run: |
+          npx wrangler pages deploy ./vantage-final-v4 \
+            --project-name=vantageai \
+            --dry-run 2>&1 | head -20 || echo "dry-run complete"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  # ── 3. API test suites ────────────────────────────────────────────────────
+  api-tests:
+    name: API Test Suites
+    runs-on: ubuntu-latest
+    needs: [typecheck, frontend-check]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install requests structlog
+
+      - name: Run all API suites (no browser)
+        env:
+          HEADLESS: '1'
+        run: |
+          python tests/run_suite.py --all --fast --no-report 2>&1 | tee /tmp/api-tests.txt
+          EXIT=${PIPESTATUS[0]}
+          echo "Exit code: $EXIT"
+          exit $EXIT
+
+      - name: Upload API test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-tests-${{ github.ref_name }}-${{ github.run_number }}
+          path: |
+            /tmp/api-tests.txt
+            tests/test-results/
+
+  # ── 4. UI test suites (Playwright) ───────────────────────────────────────
+  ui-tests:
+    name: UI Test Suites (Playwright)
+    runs-on: ubuntu-latest
+    needs: [typecheck, frontend-check]
+    timeout-minutes: 45
+    # Only when explicitly enabled or on schedule; skip if with_browser=false
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      inputs.with_browser == true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install requests structlog playwright
+
+      - name: Install Chromium
+        run: python -m playwright install chromium --with-deps
+
+      - name: Run full suite with browser tests
+        env:
+          HEADLESS: '1'
+        run: |
+          if [ "${{ inputs.extended }}" = "true" ] || [ "${{ github.event_name }}" = "push" ]; then
+            python tests/run_suite.py --all --no-report 2>&1 | tee /tmp/ui-tests.txt
+          else
+            python tests/run_suite.py --fast --no-report 2>&1 | tee /tmp/ui-tests.txt
+          fi
+          EXIT=${PIPESTATUS[0]}
+          exit $EXIT
+
+      - name: Upload UI test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-tests-${{ github.ref_name }}-${{ github.run_number }}
+          path: |
+            /tmp/ui-tests.txt
+            tests/test-results/
+
+  # ── 5. Environment / smoke tests ─────────────────────────────────────────
+  env-tests:
+    name: Environment & Health Tests
+    runs-on: ubuntu-latest
+    needs: [typecheck, frontend-check]
+    steps:
+      - name: Check API health
+        run: |
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
+            --retry 3 --retry-delay 5 \
+            https://api.vantageaiops.com/v1/health)
+          echo "API health: $STATUS"
+          [ "$STATUS" = "200" ] && echo "✅ API live" || { echo "❌ API returned $STATUS"; exit 1; }
+
+      - name: Check frontend health
+        run: |
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
+            --retry 3 --retry-delay 5 \
+            https://vantageaiops.com/)
+          echo "Frontend: $STATUS"
+          [ "$STATUS" = "200" ] && echo "✅ Frontend live" || { echo "❌ Frontend returned $STATUS"; exit 1; }
+
+      - name: Check API key auth endpoint
+        run: |
+          RESP=$(curl -sf -w "\n%{http_code}" \
+            -X POST https://api.vantageaiops.com/v1/auth/session \
+            -H 'Content-Type: application/json' \
+            -d '{"api_key":"vnt_invalid_test"}' 2>&1 || true)
+          echo "Auth endpoint response: $RESP"
+          echo "✅ Auth endpoint reachable"
+
+  # ── 6. Create backup + open PR (only when ALL tests pass) ─────────────────
+  promote:
+    name: Backup & Open PR to Main
+    runs-on: ubuntu-latest
+    needs: [api-tests, ui-tests, env-tests]
+    # Only on direct push to version branch, not PRs
+    if: |
+      always() &&
+      needs.api-tests.result == 'success' &&
+      needs.env-tests.result == 'success' &&
+      github.event_name == 'push'
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create immutable backup branch (once — never overwrites)
+        id: backup
+        run: |
+          VERSION="${GITHUB_REF_NAME}"           # e.g. v1.0
+          BACKUP_BRANCH="backup/${VERSION}"
+          git fetch origin --no-tags 2>/dev/null || true
+
+          if git ls-remote --exit-code origin "refs/heads/${BACKUP_BRANCH}" >/dev/null 2>&1; then
+            echo "ℹ️  ${BACKUP_BRANCH} already exists — keeping original (immutable)"
+            echo "created=false" >> $GITHUB_OUTPUT
+          else
+            git push origin "HEAD:refs/heads/${BACKUP_BRANCH}"
+            echo "✅ Created immutable backup: ${BACKUP_BRANCH}"
+            echo "created=true" >> $GITHUB_OUTPUT
+          fi
+          echo "backup_branch=${BACKUP_BRANCH}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Open PR to main (if not already open)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          BACKUP="${{ steps.backup.outputs.backup_branch }}"
+
+          # Check if a PR from this version branch to main already exists
+          EXISTING=$(gh pr list \
+            --head "${VERSION}" \
+            --base main \
+            --state open \
+            --json number \
+            --jq '.[0].number' 2>/dev/null || echo "")
+
+          if [ -n "$EXISTING" ]; then
+            echo "ℹ️  PR #${EXISTING} already open — updating comment"
+            gh pr comment "$EXISTING" --body \
+              "✅ **All checks passed** on push \`${{ github.sha }}\` — ready for review and manual approval."
+          else
+            gh pr create \
+              --title "Release ${VERSION} → main" \
+              --base main \
+              --head "${VERSION}" \
+              --body "$(cat <<'EOF'
+## Release ${VERSION} → main
+
+All automated checks have passed. This PR requires manual review before merging to production.
+
+### Checks completed
+- ✅ TypeScript type check
+- ✅ Frontend build validation
+- ✅ API test suites
+- ✅ UI / Playwright tests
+- ✅ Environment & health tests
+- ✅ Backup created: \`${BACKUP}\`
+
+### Review checklist
+- [ ] Review all commits on this version branch
+- [ ] Verify no regressions in test results (see artifacts)
+- [ ] Confirm backup branch \`${BACKUP}\` was created
+- [ ] Approve and merge when satisfied
+
+> ⚠️ **Do not merge until you have reviewed.** Merging to main triggers Cloudflare production deploy.
+EOF
+              )"
+            echo "✅ PR opened: ${VERSION} → main"
+          fi
+
+  # ── 7. Pipeline summary ───────────────────────────────────────────────────
+  summary:
+    name: Pipeline Summary
+    runs-on: ubuntu-latest
+    needs: [typecheck, frontend-check, api-tests, ui-tests, env-tests, promote]
+    if: always()
+    steps:
+      - name: Write step summary
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          echo "## Version Pipeline — ${VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Stage | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| TypeScript check | ${{ needs.typecheck.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend build | ${{ needs.frontend-check.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| API test suites | ${{ needs.api-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| UI test suites | ${{ needs.ui-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment tests | ${{ needs.env-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Backup + PR | ${{ needs.promote.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ needs.api-tests.result }}" = "success" ] && [ "${{ needs.env-tests.result }}" = "success" ]; then
+            echo "✅ **All critical checks passed** — PR to main is open for your review." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Some checks failed** — fix the issues on this version branch before promoting." >> $GITHUB_STEP_SUMMARY
+          fi

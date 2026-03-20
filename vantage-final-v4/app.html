@@ -23,6 +23,10 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="VantageAI — LLM Cost Analytics Dashboard">
 <meta name="twitter:image" content="https://vantageaiops.com/og-image.png">
+<script>
+/* Apply theme immediately — prevents flash of wrong theme */
+(function(){var t=localStorage.getItem('vantage_theme')||'dark';document.documentElement.setAttribute('data-theme',t)})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -38,6 +42,15 @@
   --mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;
   --r:8px;--rl:12px;--rxl:16px;
 }
+/* ── Light theme overrides ─────────────────────────────────────────────── */
+[data-theme="light"]{
+  --bg:#f0f2f5;--bg2:#ffffff;--bg3:#f5f6f8;--bg4:#eceef1;--bg5:#e4e7eb;
+  --b1:rgba(0,0,0,.07);--b2:rgba(0,0,0,.12);--b3:rgba(0,0,0,.20);
+  --tx:#0d1318;--mu:#5a6878;--di:#adb5bd;
+  --ac2:rgba(0,180,130,.12);--bl2:rgba(0,120,220,.1);--am2:rgba(200,130,0,.1);--re2:rgba(220,80,80,.1);--pu2:rgba(140,100,220,.1);
+}
+[data-theme="light"] body{background:var(--bg);color:var(--tx)}
+[data-theme="light"] ::-webkit-scrollbar-thumb{background:var(--b3)}
 html,body{height:100%;overflow:hidden}
 body{background:var(--bg);color:var(--tx);font-family:var(--sans);font-size:14px;line-height:1.5;display:flex;flex-direction:column}
 a{color:inherit;text-decoration:none}
@@ -1363,6 +1376,17 @@ curl -X POST https://api.vantageaiops.com/v1/events \
           <div class="card-hdr"><span class="card-title">Display Preferences</span></div>
           <div style="display:flex;flex-direction:column;gap:14px">
             <div>
+              <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:6px">THEME</label>
+              <div style="display:flex;gap:8px">
+                <button id="theme-dark-btn" onclick="setTheme('dark')" class="btn btn-ghost" style="flex:1;justify-content:center;gap:6px">
+                  <span>&#9790;</span> Dark
+                </button>
+                <button id="theme-light-btn" onclick="setTheme('light')" class="btn btn-ghost" style="flex:1;justify-content:center;gap:6px">
+                  <span>&#9728;</span> Light
+                </button>
+              </div>
+            </div>
+            <div>
               <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:6px">DEFAULT PERIOD</label>
               <select id="set-default-period" class="select" style="width:100%" onchange="localStorage.setItem('default_period',this.value)">
                 <option value="7">Last 7 days</option>
@@ -2486,9 +2510,26 @@ async function sendRecovery() {
   if (msg) { msg.style.display = 'block'; setTimeout(() => msg.style.display = 'none', 4000); }
 }
 
+// ── Theme toggle ────────────────────────────────────────
+function setTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('vantage_theme', theme);
+  // Update button active states
+  const darkBtn  = document.getElementById('theme-dark-btn');
+  const lightBtn = document.getElementById('theme-light-btn');
+  if (darkBtn && lightBtn) {
+    darkBtn.style.borderColor  = theme === 'dark'  ? 'var(--ac)' : '';
+    darkBtn.style.color        = theme === 'dark'  ? 'var(--ac)' : '';
+    lightBtn.style.borderColor = theme === 'light' ? 'var(--ac)' : '';
+    lightBtn.style.color       = theme === 'light' ? 'var(--ac)' : '';
+  }
+}
+
 // ── Load alert config when settings view opens ─────────
 async function loadSettingsView() {
   const org = _session?.org_id || window._orgId;
+  // Reflect current theme in toggle buttons
+  setTheme(localStorage.getItem('vantage_theme') || 'dark');
   // Always populate from localStorage even without session
   const dp = localStorage.getItem('default_period') || '30';
   const dpSel = document.getElementById('set-default-period');
