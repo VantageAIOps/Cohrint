@@ -35,9 +35,9 @@ jobs:
   protect-main:
     name: Protect main branch
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      administration: write
+    # administration: write is NOT available to GITHUB_TOKEN on personal repos.
+    # This workflow uses ADMIN_PAT (a classic PAT with repo + admin:repo_hook scope).
+    # Add it: repo Settings → Secrets → Actions → ADMIN_PAT
 
     steps:
       - name: Show planned rules
@@ -63,7 +63,7 @@ jobs:
       - name: Apply protection to main
         if: inputs.dry_run != true
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.ADMIN_PAT }}
         run: |
           gh api repos/${{ github.repository }}/branches/main/protection \
             --method PUT \
@@ -102,7 +102,7 @@ jobs:
       - name: Apply protection to backup branches
         if: inputs.dry_run != true
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.ADMIN_PAT }}
         run: |
           # Protect backup/* branches — fully immutable (no push, no delete, no force-push)
           # Uses the newer branch protection rulesets API (available for all repos)
@@ -139,7 +139,7 @@ jobs:
       - name: Apply protection to version branches
         if: inputs.dry_run != true
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.ADMIN_PAT }}
         run: |
           # Version branches: no force-push, no deletion
           gh api repos/${{ github.repository }}/rulesets \

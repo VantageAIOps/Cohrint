@@ -13,19 +13,11 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
-  # Post-deploy validation on main
+  # Post-deploy validation (main) + after version branch pipeline
   workflow_run:
     workflows:
       - "Deploy VantageAI API Worker"
       - "Deploy to Cloudflare Pages"
-    types:
-      - completed
-    branches:
-      - main
-
-  # After version branch pipeline completes
-  workflow_run:
-    workflows:
       - "Version Branch Pipeline"
     types:
       - completed

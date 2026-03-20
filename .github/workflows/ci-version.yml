@@ -266,12 +266,7 @@ jobs:
             gh pr comment "$EXISTING" --body \
               "✅ **All checks passed** on push \`${{ github.sha }}\` — ready for review and manual approval."
           else
-            gh pr create \
-              --title "Release ${VERSION} → main" \
-              --base main \
-              --head "${VERSION}" \
-              --body "$(cat <<'EOF'
-## Release ${VERSION} → main
+            PR_BODY="## Release ${VERSION} → main
 
 All automated checks have passed. This PR requires manual review before merging to production.
 
@@ -289,9 +284,13 @@ All automated checks have passed. This PR requires manual review before merging 
 - [ ] Confirm backup branch \`${BACKUP}\` was created
 - [ ] Approve and merge when satisfied
 
-> ⚠️ **Do not merge until you have reviewed.** Merging to main triggers Cloudflare production deploy.
-EOF
-              )"
+> ⚠️ **Do not merge until you have reviewed.** Merging to main triggers Cloudflare production deploy."
+
+            gh pr create \
+              --title "Release ${VERSION} → main" \
+              --base main \
+              --head "${VERSION}" \
+              --body "${PR_BODY}"
             echo "✅ PR opened: ${VERSION} → main"
           fi
 
