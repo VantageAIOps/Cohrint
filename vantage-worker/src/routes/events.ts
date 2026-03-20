@@ -218,7 +218,11 @@ async function broadcastEvent(kv: KVNamespace, orgId: string, ev: EventIn) {
     team: ev.team,
     ts: Date.now(),
   });
-  await kv.put(`stream:${orgId}:latest`, payload, { expirationTtl: 60 });
+  try {
+    await kv.put(`stream:${orgId}:latest`, payload, { expirationTtl: 60 });
+  } catch {
+    // KV unavailable — event still recorded in D1, SSE broadcast skipped
+  }
 }
 
 export { events };

@@ -79,7 +79,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import time
 import requests
 from helpers import (
-    API_URL, SITE_URL, signup_api, get_session_cookie,
+    API_URL, SITE_URL, signup_api, get_session_cookie, rand_tag,
     make_browser_ctx, collect_critical_errors, HEADLESS,
     ok, fail, warn, info, section, chk, get_results,
 )
@@ -99,7 +99,10 @@ except Exception as e:
 
 
 def _set_session_cookie(ctx):
-    """Inject the session cookie into a Playwright browser context."""
+    """Inject the session cookie into a Playwright browser context.
+    Adds the cookie for both vantageaiops.com and api.vantageaiops.com so
+    that XHR requests from the app to the API sub-domain also send the cookie.
+    """
     if not TEST_KEY:
         return False
     r = requests.post(f"{API_URL}/v1/auth/session",
@@ -107,12 +110,13 @@ def _set_session_cookie(ctx):
     if not r.ok:
         return False
     for c in r.cookies:
-        ctx.add_cookies([{
-            "name":   c.name,
-            "value":  c.value,
-            "domain": "vantageaiops.com",
-            "path":   "/",
-        }])
+        for domain in ("vantageaiops.com", "api.vantageaiops.com"):
+            ctx.add_cookies([{
+                "name":   c.name,
+                "value":  c.value,
+                "domain": domain,
+                "path":   "/",
+            }])
     return True
 
 
@@ -154,13 +158,14 @@ try:
         # Ingest + analytics
         ev_r = requests.post(
             f"{API_URL}/v1/events",
-            json={"model": "gpt-4o", "provider": "openai",
+            json={"event_id": f"evt-test-{rand_tag(8)}",
+                  "model": "gpt-4o", "provider": "openai",
                   "prompt_tokens": 100, "completion_tokens": 50,
                   "cost_usd": 0.003, "latency_ms": 800},
             headers={"Authorization": f"Bearer {TEST_KEY}"},
             timeout=15,
         )
-        chk("21.9   POST /v1/events → 202", ev_r.status_code == 202,
+        chk("21.9   POST /v1/events → 201", ev_r.status_code == 201,
             f"got {ev_r.status_code}: {ev_r.text[:100]}")
 
         kpi_r = requests.get(
@@ -184,9 +189,15 @@ try:
         try:
             page.goto(f"{SITE_URL}/app.html", wait_until="domcontentloaded", timeout=30_000)
             page.wait_for_timeout(2_000)
-            chk("21.11  app.html loads without page-level JS error",
-                len([e for e in all_errs if e.startswith("JS:")]) == 0,
-                str(all_errs[:3]))
+            # Confirm we stayed on /app (not redirected to /auth due to cookie failure)
+            on_app = "/app" in page.url and "auth" not in page.url
+            if not on_app:
+                fail("21.11  Redirected to auth — session cookie injection failed",
+                     f"url={page.url}")
+            else:
+                chk("21.11  app.html loads without page-level JS error",
+                    len([e for e in all_errs if e.startswith("JS:")]) == 0,
+                    str(all_errs[:3]))
         except Exception as e:
             fail("21.11  app.html failed to load", str(e)[:200])
 

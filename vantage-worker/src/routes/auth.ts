@@ -418,7 +418,12 @@ auth.get('/session', authMiddleware, async (c) => {
   const sseToken = Array.from(sseTokenBytes).map(b => b.toString(16).padStart(2, '0')).join('');
 
   // Store in KV with 120-second TTL — one-time use, consumed by stream.ts
-  await c.env.KV.put(`sse:${orgId}:${sseToken}`, '1', { expirationTtl: 120 });
+  // Wrapped in try/catch so a KV permission error doesn't break session auth
+  try {
+    await c.env.KV.put(`sse:${orgId}:${sseToken}`, '1', { expirationTtl: 120 });
+  } catch {
+    // KV unavailable (e.g. missing permission) — session still works, SSE disabled
+  }
 
   return c.json({
     authenticated: true,

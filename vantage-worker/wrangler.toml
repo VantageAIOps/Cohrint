@@ -3,6 +3,9 @@ main            = "src/index.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
+# ── Custom domain — api.vantageaiops.com → this Worker ───────────────────────
+routes = [{ pattern = "api.vantageaiops.com/*", zone_name = "vantageaiops.com" }]
+
 # ── D1 Database (events, orgs, config) ───────────────────────────────────────
 # After running `npm run db:create`, replace the placeholder IDs below.
 [[d1_databases]]
@@ -26,11 +29,6 @@ RATE_LIMIT_RPM     = "1000"
 # ── Secrets (set via: wrangler secret put SECRET_NAME) ───────────────────────
 # RESEND_API_KEY   — Resend API key for email (member invites, key recovery)
 #                    Get a free key at resend.com — 3,000 emails/month
-
-# ── Custom domain — api.vantageaiops.com → this Worker ───────────────────────
-# Configured in Cloudflare dashboard: Workers & Pages → vantageai-api → Settings → Domains
-# Or uncomment:
-# routes = [{ pattern = "api.vantageaiops.com/*", zone_name = "vantageaiops.com" }]
 
 # ── Preview environment ───────────────────────────────────────────────────────
 [env.preview]
