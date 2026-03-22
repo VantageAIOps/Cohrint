@@ -1,9 +1,11 @@
 name: Promote to Main
 
-# Fires when a version branch PR is merged into main.
-# Confirms the backup branch exists (created by ci-version.yml).
-# Tags the release.
-# The actual CF deploy is handled by deploy.yml and deploy-worker.yml.
+# Fires when a version-branch PR is merged into main.
+# Responsibilities:
+#   1. Verify (or create) the immutable backup branch
+#   2. Create a dated release tag
+#   3. Explicitly trigger CF Pages + Worker deploys (in case path filters miss)
+#   4. Write a promotion summary
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -14,16 +16,39 @@ on:
     branches:
       - main
 
+  # Manual re-run (e.g. if the auto-trigger was missed)
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version branch name (e.g. v1.1)'
+        required: true
+        type: string
+      skip_deploy:
+        description: 'Skip triggering deploy workflows'
+        required: false
+        type: boolean
+        default: false
+
 jobs:
   tag-release:
     name: Tag Release & Verify Backup
     runs-on: ubuntu-latest
-    # Only run when a version branch PR is actually merged (not just closed)
+    # PR trigger: only when a version branch is actually merged (not just closed)
+    # Manual trigger: always run
     if: |
-      github.event.pull_request.merged == true &&
-      startsWith(github.event.pull_request.head.ref, 'v')
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.pull_request.merged == true &&
+        startsWith(github.event.pull_request.head.ref, 'v')
+      )
     permissions:
       contents: write
+      actions: write   # needed to trigger other workflows via gh CLI
+
+    outputs:
+      version:      ${{ steps.version.outputs.version }}
+      backup_branch: ${{ steps.version.outputs.backup_branch }}
+      tag:          ${{ steps.version.outputs.tag }}
 
     steps:
       - uses: actions/checkout@v4
@@ -34,40 +59,92 @@ jobs:
       - name: Extract version
         id: version
         run: |
-          VERSION="${{ github.event.pull_request.head.ref }}"   # e.g. v1.0
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${{ github.event.pull_request.head.ref }}"
+          fi
           BACKUP_BRANCH="backup/${VERSION}"
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          # Use date + short SHA for unique tags on re-runs
+          TAG="${VERSION}.$(date -u +%Y%m%d)"
+          echo "version=${VERSION}"        >> $GITHUB_OUTPUT
           echo "backup_branch=${BACKUP_BRANCH}" >> $GITHUB_OUTPUT
-          echo "tag=${VERSION}.$(date -u +%Y%m%d)" >> $GITHUB_OUTPUT
+          echo "tag=${TAG}"               >> $GITHUB_OUTPUT
+          echo "Promoting: ${VERSION} → main  |  backup: ${BACKUP_BRANCH}  |  tag: ${TAG}"
 
-      - name: Verify backup branch exists
+      - name: Verify or create backup branch
         run: |
           BACKUP="${{ steps.version.outputs.backup_branch }}"
+          git fetch origin --no-tags 2>/dev/null || true
+
           if git ls-remote --exit-code origin "refs/heads/${BACKUP}" >/dev/null 2>&1; then
-            echo "✅ Backup branch confirmed: ${BACKUP}"
+            echo "✅ Immutable backup confirmed: ${BACKUP}"
           else
-            echo "⚠️  Backup branch ${BACKUP} not found — creating it now from the merged ref"
-            git fetch origin "${{ github.event.pull_request.head.ref }}" 2>/dev/null || true
-            # Create from the PR head SHA (the version branch tip before merge)
-            git push origin "${{ github.event.pull_request.head.sha }}:refs/heads/${BACKUP}" || \
-              echo "Could not create backup — may need manual creation"
+            echo "⚠️  Backup branch ${BACKUP} not found — creating from merge ref"
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              # Use current HEAD of the version branch
+              git fetch origin "${{ steps.version.outputs.version }}" 2>/dev/null || true
+              BACKUP_SHA=$(git rev-parse "origin/${{ steps.version.outputs.version }}" 2>/dev/null \
+                           || git rev-parse HEAD)
+            else
+              BACKUP_SHA="${{ github.event.pull_request.head.sha }}"
+            fi
+            git push origin "${BACKUP_SHA}:refs/heads/${BACKUP}" \
+              && echo "✅ Created backup branch: ${BACKUP}" \
+              || echo "⚠️  Could not create backup branch — may need manual creation"
           fi
 
-      - name: Create release tag
+      - name: Create release tag (idempotent)
         run: |
           TAG="${{ steps.version.outputs.tag }}"
           VERSION="${{ steps.version.outputs.version }}"
+          PR_NUM="${{ github.event.pull_request.number }}"
+
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "${TAG}" -m "Release ${VERSION} → main (PR #${{ github.event.pull_request.number }})"
-          git push origin "${TAG}"
-          echo "✅ Tagged: ${TAG}"
+
+          if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q "${TAG}"; then
+            echo "ℹ️  Tag ${TAG} already exists — skipping"
+          else
+            MSG="Release ${VERSION} → main"
+            [ -n "${PR_NUM}" ] && MSG="${MSG} (PR #${PR_NUM})"
+            git tag -a "${TAG}" -m "${MSG}"
+            git push origin "${TAG}"
+            echo "✅ Tagged: ${TAG}"
+          fi
+
+      - name: Trigger CF Pages deploy
+        if: ${{ inputs.skip_deploy != true }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "▶ Triggering deploy.yml (Cloudflare Pages)…"
+          gh workflow run deploy.yml \
+            --ref main \
+            --repo "${{ github.repository }}" \
+            && echo "✅ deploy.yml triggered" \
+            || echo "⚠️  Could not trigger deploy.yml (may already be running from push event)"
+
+      - name: Trigger CF Worker deploy
+        if: ${{ inputs.skip_deploy != true }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "▶ Triggering deploy-worker.yml (Cloudflare Worker)…"
+          gh workflow run deploy-worker.yml \
+            --ref main \
+            --repo "${{ github.repository }}" \
+            && echo "✅ deploy-worker.yml triggered" \
+            || echo "⚠️  Could not trigger deploy-worker.yml (may already be running from push event)"
 
       - name: Write promotion summary
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           BACKUP="${{ steps.version.outputs.backup_branch }}"
           TAG="${{ steps.version.outputs.tag }}"
+          PR_NUM="${{ github.event.pull_request.number }}"
+          TRIGGER="${{ github.event_name }}"
+
           echo "## Promoted ${VERSION} → main 🚀" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
@@ -75,6 +152,8 @@ jobs:
           echo "| Version | \`${VERSION}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Backup branch | \`${BACKUP}\` (immutable) |" >> $GITHUB_STEP_SUMMARY
           echo "| Release tag | \`${TAG}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| PR | #${{ github.event.pull_request.number }} |" >> $GITHUB_STEP_SUMMARY
+          [ -n "${PR_NUM}" ] && echo "| PR | #${PR_NUM} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Trigger | ${TRIGGER} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "CF deploy is now running via \`deploy.yml\` and \`deploy-worker.yml\`." >> $GITHUB_STEP_SUMMARY
+          echo "CF Pages deploy → \`deploy.yml\`" >> $GITHUB_STEP_SUMMARY
+          echo "CF Worker deploy → \`deploy-worker.yml\`" >> $GITHUB_STEP_SUMMARY

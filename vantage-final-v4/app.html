@@ -1128,6 +1128,22 @@ curl -X POST https://api.vantageaiops.com/v1/events \
         </div>
         <div id="slack-status" style="display:none"></div>
       </div>
+
+      <!-- Theme toggle — quick access from DevX -->
+      <div class="card card-p" style="margin-top:16px">
+        <div class="card-hdr"><span class="card-title">&#127775; Display Theme</span></div>
+        <div>
+          <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:8px">Choose your preferred appearance</label>
+          <div style="display:flex;gap:8px">
+            <button id="devx-theme-dark-btn" onclick="setTheme('dark')" class="btn btn-ghost" style="flex:1;justify-content:center;gap:6px">
+              <span>&#9790;</span> Dark
+            </button>
+            <button id="devx-theme-light-btn" onclick="setTheme('light')" class="btn btn-ghost" style="flex:1;justify-content:center;gap:6px">
+              <span>&#9728;</span> Light
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ════════════════════════════════════════════════════════════════════
@@ -2514,15 +2530,15 @@ async function sendRecovery() {
 function setTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
   localStorage.setItem('vantage_theme', theme);
-  // Update button active states
-  const darkBtn  = document.getElementById('theme-dark-btn');
-  const lightBtn = document.getElementById('theme-light-btn');
-  if (darkBtn && lightBtn) {
-    darkBtn.style.borderColor  = theme === 'dark'  ? 'var(--ac)' : '';
-    darkBtn.style.color        = theme === 'dark'  ? 'var(--ac)' : '';
-    lightBtn.style.borderColor = theme === 'light' ? 'var(--ac)' : '';
-    lightBtn.style.color       = theme === 'light' ? 'var(--ac)' : '';
-  }
+  // Update button active states — both Settings and DevX buttons
+  ['theme-dark-btn','devx-theme-dark-btn'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) { btn.style.borderColor = theme === 'dark' ? 'var(--ac)' : ''; btn.style.color = theme === 'dark' ? 'var(--ac)' : ''; }
+  });
+  ['theme-light-btn','devx-theme-light-btn'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) { btn.style.borderColor = theme === 'light' ? 'var(--ac)' : ''; btn.style.color = theme === 'light' ? 'var(--ac)' : ''; }
+  });
 }
 
 // ── Load alert config when settings view opens ─────────
@@ -3078,6 +3094,38 @@ document.addEventListener('keydown', e => {
   // R → refresh
   if (e.key === 'r' || e.key === 'R') { refreshData(); return; }
 });
+</script>
+
+<!-- ── Platform tracking (pageview + session duration) ──────────────────── -->
+<script>
+(function(){
+  const TRACK_BASE = 'https://api.vantageaiops.com';
+  // Generate or reuse a session ID for this browser tab
+  let sid = sessionStorage.getItem('_vsid');
+  if (!sid) {
+    sid = 'vs_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    sessionStorage.setItem('_vsid', sid);
+  }
+  // Record pageview
+  const orgId = localStorage.getItem('vantage_org') || '';
+  fetch(TRACK_BASE + '/v1/platform/pageview', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ page: 'app', referrer: document.referrer.slice(0,200), session_id: sid }),
+    keepalive: true,
+  }).catch(()=>{});
+  // Track session duration — report on page hide
+  const t0 = Date.now();
+  document.addEventListener('visibilitychange', function(){
+    if (document.visibilityState === 'hidden') {
+      const dur = Math.round((Date.now() - t0) / 1000);
+      fetch(TRACK_BASE + '/v1/platform/session', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ session_id: sid, org_id: orgId, duration_sec: dur }),
+        keepalive: true,
+      }).catch(()=>{});
+    }
+  });
+})();
 </script>
 
 </body>

@@ -35,7 +35,9 @@ jobs:
 
       - name: Verify required files exist
         run: |
-          for f in index.html app.html auth.html signup.html docs.html calculator.html sw.js manifest.json _headers _redirects; do
+          for f in index.html app.html auth.html signup.html docs.html \
+                   calculator.html superadmin.html sw.js manifest.json \
+                   _headers _redirects; do
             [ -f "vantage-final-v4/$f" ] || { echo "❌ Missing: vantage-final-v4/$f"; exit 1; }
           done
           echo "✅ All required files present"

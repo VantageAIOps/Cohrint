@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VantageAI — Superadmin</title>
+<meta name="robots" content="noindex,nofollow">
+<script>(function(){document.documentElement.setAttribute('data-theme','dark')})();</script>
+<style>
+/* ── Reset & base ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:  #0d0d10; --bg2: #141418; --bg3: #1c1c22; --bg4: #24242c;
+  --bd:  rgba(255,255,255,.08); --bd2: rgba(255,255,255,.12);
+  --tx:  #e8e8f0; --mu:  #888; --mu2: #666;
+  --ac:  #7c6bff; --ac2: #9d8fff; --acs: rgba(124,107,255,.15);
+  --gr:  #34d399; --re:  #f87171; --ye:  #fbbf24; --bl: #60a5fa;
+  --r:   10px; --r2: 6px;
+  --sh:  0 4px 24px rgba(0,0,0,.45);
+}
+[data-theme="light"] {
+  --bg: #f5f5f7; --bg2: #fff; --bg3: #ebebf0; --bg4: #e2e2e8;
+  --bd: rgba(0,0,0,.08); --bd2: rgba(0,0,0,.12);
+  --tx: #1a1a2e; --mu: #666; --mu2: #999;
+}
+
+html, body { height: 100%; background: var(--bg); color: var(--tx);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px; line-height: 1.5; }
+
+/* ── Login screen ─────────────────────────────────────────────────────────── */
+#login-screen {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100vh; padding: 24px;
+}
+.login-card {
+  background: var(--bg2); border: 1px solid var(--bd); border-radius: var(--r);
+  padding: 40px; width: 100%; max-width: 380px; box-shadow: var(--sh);
+}
+.login-logo { font-size: 26px; font-weight: 700; color: var(--ac); margin-bottom: 6px; }
+.login-sub  { color: var(--mu); font-size: 12px; margin-bottom: 28px; }
+.login-card input {
+  width: 100%; padding: 10px 14px; border-radius: var(--r2);
+  border: 1px solid var(--bd2); background: var(--bg3); color: var(--tx);
+  font-size: 13px; outline: none; margin-bottom: 14px;
+}
+.login-card input:focus { border-color: var(--ac); }
+.btn-login {
+  width: 100%; padding: 11px; border-radius: var(--r2); border: none;
+  background: var(--ac); color: #fff; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: opacity .15s;
+}
+.btn-login:hover { opacity: .88; }
+#login-err { color: var(--re); font-size: 12px; margin-top: 10px; display: none; }
+
+/* ── App shell ────────────────────────────────────────────────────────────── */
+#app { display: none; height: 100vh; overflow: hidden; }
+
+/* Sidebar */
+.sidebar {
+  position: fixed; top: 0; left: 0; bottom: 0; width: 210px;
+  background: var(--bg2); border-right: 1px solid var(--bd);
+  display: flex; flex-direction: column; z-index: 10;
+}
+.sidebar-brand {
+  padding: 20px 18px 14px; border-bottom: 1px solid var(--bd);
+}
+.sidebar-brand .brand-name { font-size: 15px; font-weight: 700; color: var(--ac); }
+.sidebar-brand .brand-sub  { font-size: 10px; color: var(--mu); letter-spacing: .06em; text-transform: uppercase; }
+.nav-list { flex: 1; overflow-y: auto; padding: 10px 0; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 18px; cursor: pointer; color: var(--mu);
+  font-size: 12.5px; border-left: 2px solid transparent;
+  transition: color .15s, background .15s;
+}
+.nav-item:hover  { background: var(--bg3); color: var(--tx); }
+.nav-item.active { color: var(--ac); background: var(--acs); border-left-color: var(--ac); }
+.nav-icon { font-size: 14px; width: 18px; text-align: center; }
+.sidebar-footer {
+  padding: 14px 18px; border-top: 1px solid var(--bd);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.sidebar-footer .user-label { font-size: 11px; color: var(--mu); }
+.btn-logout {
+  font-size: 11px; color: var(--re); background: none; border: none;
+  cursor: pointer; padding: 4px 8px; border-radius: var(--r2);
+}
+.btn-logout:hover { background: rgba(248,113,113,.1); }
+
+/* Main content */
+.main {
+  margin-left: 210px; height: 100vh; overflow-y: auto;
+  padding: 28px 28px 60px;
+}
+.page { display: none; }
+.page.active { display: block; }
+.page-title  { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+.page-sub    { color: var(--mu); font-size: 12px; margin-bottom: 24px; }
+
+/* KPI grid */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr)); gap: 14px; margin-bottom: 24px; }
+.kpi-card {
+  background: var(--bg2); border: 1px solid var(--bd);
+  border-radius: var(--r); padding: 18px 18px 14px;
+}
+.kpi-label { font-size: 10px; color: var(--mu); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+.kpi-value { font-size: 26px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+.kpi-note  { font-size: 11px; color: var(--mu); }
+
+/* Cards */
+.card {
+  background: var(--bg2); border: 1px solid var(--bd);
+  border-radius: var(--r); padding: 18px; margin-bottom: 18px;
+}
+.card-title { font-size: 13px; font-weight: 600; margin-bottom: 14px; }
+
+/* Tables */
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th { text-align: left; padding: 7px 10px; font-size: 10px; text-transform: uppercase;
+     letter-spacing: .05em; color: var(--mu); border-bottom: 1px solid var(--bd); }
+td { padding: 8px 10px; border-bottom: 1px solid var(--bd); color: var(--tx); }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--bg3); }
+
+/* Charts */
+.chart-wrap { position: relative; height: 220px; }
+
+/* Badges */
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 20px;
+  font-size: 10px; font-weight: 600; letter-spacing: .04em;
+}
+.badge-gr  { background: rgba(52,211,153,.15); color: var(--gr); }
+.badge-re  { background: rgba(248,113,113,.15); color: var(--re); }
+.badge-ye  { background: rgba(251,191,36,.15);  color: var(--ye); }
+.badge-bl  { background: rgba(96,165,250,.15);  color: var(--bl); }
+.badge-ac  { background: var(--acs); color: var(--ac2); }
+
+/* Reset panel */
+.reset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.reset-card {
+  background: var(--bg3); border: 1px solid var(--bd); border-radius: var(--r);
+  padding: 18px;
+}
+.reset-card h4 { font-size: 13px; margin-bottom: 6px; }
+.reset-card p  { font-size: 11px; color: var(--mu); margin-bottom: 14px; }
+.reset-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn-soft { padding: 7px 14px; border-radius: var(--r2); border: 1px solid var(--ye);
+  background: rgba(251,191,36,.1); color: var(--ye); font-size: 12px; cursor: pointer; }
+.btn-hard { padding: 7px 14px; border-radius: var(--r2); border: 1px solid var(--re);
+  background: rgba(248,113,113,.1); color: var(--re); font-size: 12px; cursor: pointer; }
+.btn-soft:hover { background: rgba(251,191,36,.2); }
+.btn-hard:hover { background: rgba(248,113,113,.2); }
+#reset-log {
+  margin-top: 16px; padding: 12px; background: var(--bg); border-radius: var(--r2);
+  font-size: 11px; font-family: monospace; color: var(--gr); min-height: 60px;
+  display: none; white-space: pre-wrap;
+}
+
+/* Period picker */
+.period-bar {
+  display: flex; gap: 6px; margin-bottom: 22px;
+}
+.period-btn {
+  padding: 5px 12px; border-radius: var(--r2); border: 1px solid var(--bd2);
+  background: var(--bg3); color: var(--mu); font-size: 11px; cursor: pointer;
+}
+.period-btn.active { border-color: var(--ac); background: var(--acs); color: var(--ac2); }
+
+/* Loading skeleton */
+.skel {
+  background: linear-gradient(90deg, var(--bg3) 25%, var(--bg4) 50%, var(--bg3) 75%);
+  background-size: 200% 100%; animation: skel 1.4s infinite;
+  border-radius: 4px; height: 14px;
+}
+@keyframes skel { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+/* Toast */
+#toast {
+  position: fixed; bottom: 24px; right: 24px;
+  background: var(--bg2); border: 1px solid var(--bd2);
+  border-radius: var(--r); padding: 12px 18px;
+  font-size: 12px; box-shadow: var(--sh); z-index: 1000;
+  display: none; max-width: 320px;
+}
+
+/* Geography bar chart */
+.geo-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.geo-label { width: 50px; font-size: 11px; color: var(--mu); text-align: right; flex-shrink: 0; }
+.geo-track { flex: 1; height: 10px; background: var(--bg4); border-radius: 5px; overflow: hidden; }
+.geo-fill  { height: 100%; background: var(--ac); border-radius: 5px; transition: width .4s; }
+.geo-count { width: 55px; font-size: 11px; color: var(--mu2); text-align: right; flex-shrink: 0; }
+
+/* Misc */
+.muted { color: var(--mu); }
+.up    { color: var(--gr); }
+.dn    { color: var(--re); }
+.divider { border: none; border-top: 1px solid var(--bd); margin: 18px 0; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+@media (max-width: 720px) { .two-col { grid-template-columns: 1fr; } .reset-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<!-- ── Login ─────────────────────────────────────────────────────────────── -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">&#9671; VantageAI</div>
+    <div class="login-sub">Superadmin Portal — internal use only</div>
+    <input type="password" id="secret-input" placeholder="Superadmin secret" autocomplete="current-password">
+    <button class="btn-login" onclick="doLogin()">Unlock Dashboard</button>
+    <div id="login-err"></div>
+  </div>
+</div>
+
+<!-- ── App ───────────────────────────────────────────────────────────────── -->
+<div id="app">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-name">&#9671; VantageAI</div>
+      <div class="brand-sub">Superadmin</div>
+    </div>
+    <div class="nav-list">
+      <div class="nav-item active" onclick="navTo('overview',this)">
+        <span class="nav-icon">&#128200;</span> Overview
+      </div>
+      <div class="nav-item" onclick="navTo('users',this)">
+        <span class="nav-icon">&#128100;</span> Users
+      </div>
+      <div class="nav-item" onclick="navTo('geography',this)">
+        <span class="nav-icon">&#127757;</span> Geography
+      </div>
+      <div class="nav-item" onclick="navTo('features',this)">
+        <span class="nav-icon">&#128293;</span> Features
+      </div>
+      <div class="nav-item" onclick="navTo('traffic',this)">
+        <span class="nav-icon">&#128202;</span> Traffic
+      </div>
+      <div class="nav-item" onclick="navTo('storage',this)">
+        <span class="nav-icon">&#128451;</span> Storage
+      </div>
+      <div class="nav-item" onclick="navTo('reset',this)">
+        <span class="nav-icon">&#9888;</span> Reset
+      </div>
+    </div>
+    <div class="sidebar-footer">
+      <span class="user-label">superadmin</span>
+      <button class="btn-logout" onclick="logout()">Sign out</button>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- Period bar (shared) -->
+    <div class="period-bar" id="period-bar">
+      <button class="period-btn" onclick="setPeriod(7,this)">7d</button>
+      <button class="period-btn active" onclick="setPeriod(30,this)">30d</button>
+      <button class="period-btn" onclick="setPeriod(90,this)">90d</button>
+    </div>
+
+    <!-- ── Overview ────────────────────────────────────────────────────── -->
+    <div id="page-overview" class="page active">
+      <div class="page-title">&#128200; Platform Overview</div>
+      <div class="page-sub">Platform-wide stats across all organisations</div>
+
+      <div class="kpi-grid" id="overview-kpis">
+        <div class="kpi-card"><div class="kpi-label">Total orgs</div><div class="kpi-value skel">&nbsp;</div></div>
+        <div class="kpi-card"><div class="kpi-label">New orgs (period)</div><div class="kpi-value skel">&nbsp;</div></div>
+        <div class="kpi-card"><div class="kpi-label">Active orgs</div><div class="kpi-value skel">&nbsp;</div></div>
+        <div class="kpi-card"><div class="kpi-label">API events</div><div class="kpi-value skel">&nbsp;</div></div>
+        <div class="kpi-card"><div class="kpi-label">Total cost (USD)</div><div class="kpi-value skel">&nbsp;</div></div>
+        <div class="kpi-card"><div class="kpi-label">Avg latency</div><div class="kpi-value skel">&nbsp;</div></div>
+        <div class="kpi-card"><div class="kpi-label">Pageviews</div><div class="kpi-value skel">&nbsp;</div></div>
+        <div class="kpi-card"><div class="kpi-label">Unique sessions</div><div class="kpi-value skel">&nbsp;</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Recent sign-ups</div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Org ID</th><th>Name</th><th>Email</th><th>Plan</th><th>Signed up</th></tr></thead>
+            <tbody id="recent-signups-tbody"><tr><td colspan="5" class="muted">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Users ───────────────────────────────────────────────────────── -->
+    <div id="page-users" class="page">
+      <div class="page-title">&#128100; User Activity</div>
+      <div class="page-sub">Signups, logins and session data</div>
+
+      <div class="kpi-grid" id="users-kpis">
+        <div class="kpi-card"><div class="kpi-label">Signups (period)</div><div class="kpi-value skel">&nbsp;</div></div>
+        <div class="kpi-card"><div class="kpi-label">Total sessions</div><div class="kpi-value skel">&nbsp;</div></div>
+        <div class="kpi-card"><div class="kpi-label">Unique orgs w/ sessions</div><div class="kpi-value skel">&nbsp;</div></div>
+        <div class="kpi-card"><div class="kpi-label">Avg session (min)</div><div class="kpi-value skel">&nbsp;</div></div>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-title">Daily signups</div>
+          <div class="chart-wrap"><canvas id="chart-daily-signups"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Recent signups</div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Email</th><th>Plan</th><th>Signed up</th></tr></thead>
+              <tbody id="users-signups-tbody"><tr><td colspan="3" class="muted">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Geography ──────────────────────────────────────────────────── -->
+    <div id="page-geography" class="page">
+      <div class="page-title">&#127757; Geography</div>
+      <div class="page-sub">API requests by country and Cloudflare data centre</div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-title">Top countries</div>
+          <div id="geo-countries">
+            <div class="muted" style="font-size:12px">Loading…</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Top Cloudflare colos</div>
+          <div id="geo-colos">
+            <div class="muted" style="font-size:12px">Loading…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Features ───────────────────────────────────────────────────── -->
+    <div id="page-features" class="page">
+      <div class="page-title">&#128293; Feature Usage</div>
+      <div class="page-sub">Which features, models and providers are being used</div>
+
+      <div class="card">
+        <div class="card-title">Features</div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Feature</th><th>Events</th><th>Orgs</th><th>Cost (USD)</th></tr></thead>
+            <tbody id="features-tbody"><tr><td colspan="4" class="muted">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-title">Models</div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Model</th><th>Events</th><th>Cost</th><th>Avg latency</th></tr></thead>
+              <tbody id="models-tbody"><tr><td colspan="4" class="muted">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Providers</div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Provider</th><th>Events</th><th>Cost (USD)</th></tr></thead>
+              <tbody id="providers-tbody"><tr><td colspan="3" class="muted">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Traffic ────────────────────────────────────────────────────── -->
+    <div id="page-traffic" class="page">
+      <div class="page-title">&#128202; Network Traffic</div>
+      <div class="page-sub">Daily API events and frontend pageviews</div>
+
+      <div class="card">
+        <div class="card-title">API events per day</div>
+        <div class="chart-wrap"><canvas id="chart-api-traffic"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Frontend pageviews per day</div>
+        <div class="chart-wrap"><canvas id="chart-page-traffic"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ── Storage ────────────────────────────────────────────────────── -->
+    <div id="page-storage" class="page">
+      <div class="page-title">&#128451; Storage</div>
+      <div class="page-sub">D1 table row counts and KV key estimates</div>
+
+      <div class="kpi-grid" id="storage-kpis">
+        <div class="kpi-card"><div class="kpi-label">KV keys (approx)</div><div class="kpi-value skel">&nbsp;</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">D1 table row counts</div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Table</th><th>Row count</th><th>Status</th></tr></thead>
+            <tbody id="storage-tbody"><tr><td colspan="3" class="muted">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Reset ──────────────────────────────────────────────────────── -->
+    <div id="page-reset" class="page">
+      <div class="page-title">&#9888;&#65039; Reset Operations</div>
+      <div class="page-sub">Soft reset clears stale data; hard reset deletes all rows. Both require confirmation.</div>
+
+      <div class="reset-grid">
+        <div class="reset-card">
+          <h4>&#128202; Events table</h4>
+          <p>Soft: delete events older than 30 days.<br>Hard: delete ALL event rows.</p>
+          <div class="reset-actions">
+            <button class="btn-soft" onclick="doReset('events','soft')">Soft reset</button>
+            <button class="btn-hard" onclick="doReset('events','hard')">Hard reset</button>
+          </div>
+        </div>
+        <div class="reset-card">
+          <h4>&#128203; Platform tracking</h4>
+          <p>Soft: remove pageviews/sessions/requests older than 30 days.<br>Hard: delete all tracking rows.</p>
+          <div class="reset-actions">
+            <button class="btn-soft" onclick="doReset('all_platform','soft')">Soft reset</button>
+            <button class="btn-hard" onclick="doReset('all_platform','hard')">Hard reset</button>
+          </div>
+        </div>
+        <div class="reset-card">
+          <h4>&#128273; KV store</h4>
+          <p>Soft: clear rate-limit and throttle keys only.<br>Hard: delete ALL KV keys (includes sessions).</p>
+          <div class="reset-actions">
+            <button class="btn-soft" onclick="doReset('kv','soft')">Soft reset</button>
+            <button class="btn-hard" onclick="doReset('kv','hard')">Hard reset</button>
+          </div>
+        </div>
+        <div class="reset-card">
+          <h4>&#128221; Pageviews only</h4>
+          <p>Soft: remove pageviews older than 30 days.<br>Hard: truncate platform_pageviews table.</p>
+          <div class="reset-actions">
+            <button class="btn-soft" onclick="doReset('platform_pageviews','soft')">Soft reset</button>
+            <button class="btn-hard" onclick="doReset('platform_pageviews','hard')">Hard reset</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="reset-log"></div>
+    </div>
+
+  </main>
+</div><!-- /app -->
+
+<div id="toast"></div>
+
+<!-- ── Chart.js ────────────────────────────────────────────────────────── -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<script>
+'use strict';
+// ── Config ──────────────────────────────────────────────────────────────────
+const API = 'https://api.vantageaiops.com';
+let SECRET = '';
+let PERIOD = 30;
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const inp = document.getElementById('secret-input');
+  const err = document.getElementById('login-err');
+  const val = inp.value.trim();
+  if (!val) { showErr('Enter the superadmin secret'); return; }
+
+  try {
+    const r = await fetch(API + '/v1/superadmin/auth', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + val, 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    if (r.status === 403) { showErr('Invalid secret'); return; }
+    if (!r.ok) { showErr('Server error ' + r.status); return; }
+    SECRET = val;
+    sessionStorage.setItem('_sa_secret', SECRET);
+    enterApp();
+  } catch(e) {
+    showErr('Could not reach API: ' + e.message);
+  }
+
+  function showErr(msg) { err.textContent = msg; err.style.display = 'block'; }
+}
+
+function logout() {
+  SECRET = '';
+  sessionStorage.removeItem('_sa_secret');
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+function enterApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  loadPage('overview');
+}
+
+// Auto-restore session
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = sessionStorage.getItem('_sa_secret');
+  if (saved) { SECRET = saved; enterApp(); }
+
+  // Enter key on password field
+  document.getElementById('secret-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doLogin();
+  });
+});
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+const PAGES = ['overview','users','geography','features','traffic','storage','reset'];
+let _currentPage = 'overview';
+const _chartInstances = {};
+
+function navTo(page, el) {
+  if (el) {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    el.classList.add('active');
+  }
+  PAGES.forEach(p => {
+    document.getElementById('page-'+p).classList.toggle('active', p === page);
+  });
+  const pb = document.getElementById('period-bar');
+  pb.style.display = page === 'reset' ? 'none' : 'flex';
+  _currentPage = page;
+  loadPage(page);
+}
+
+// ── Period picker ─────────────────────────────────────────────────────────────
+function setPeriod(days, el) {
+  document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  PERIOD = days;
+  loadPage(_currentPage);
+}
+
+// ── Data loading ──────────────────────────────────────────────────────────────
+const _cache = {};
+
+async function apiFetch(path) {
+  const key = path + '?period=' + PERIOD;
+  // Brief cache to avoid re-fetching on tab switch within same period
+  if (_cache[key] && (Date.now() - _cache[key].ts) < 30_000) return _cache[key].data;
+  const r = await fetch(API + path + '?period=' + PERIOD, {
+    headers: { 'Authorization': 'Bearer ' + SECRET },
+  });
+  if (r.status === 403) { logout(); throw new Error('Session expired'); }
+  if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
+  const data = await r.json();
+  _cache[key] = { data, ts: Date.now() };
+  return data;
+}
+
+function loadPage(page) {
+  if (!SECRET) return;
+  ({
+    overview:  loadOverview,
+    users:     loadUsers,
+    geography: loadGeography,
+    features:  loadFeatures,
+    traffic:   loadTraffic,
+    storage:   loadStorage,
+    reset:     () => {},
+  }[page] || (() => {}))();
+}
+
+// ── Overview ─────────────────────────────────────────────────────────────────
+async function loadOverview() {
+  try {
+    const d = await apiFetch('/v1/superadmin/stats');
+    const kpis = document.getElementById('overview-kpis');
+    kpis.innerHTML = `
+      <div class="kpi-card"><div class="kpi-label">Total orgs</div><div class="kpi-value">${fmt(d.orgs?.total_orgs)}</div><div class="kpi-note">all time</div></div>
+      <div class="kpi-card"><div class="kpi-label">New orgs (period)</div><div class="kpi-value up">${fmt(d.orgs?.new_orgs_period)}</div><div class="kpi-note">last ${PERIOD}d</div></div>
+      <div class="kpi-card"><div class="kpi-label">Active orgs</div><div class="kpi-value">${fmt(d.events?.active_orgs)}</div><div class="kpi-note">w/ events last ${PERIOD}d</div></div>
+      <div class="kpi-card"><div class="kpi-label">API events</div><div class="kpi-value">${fmt(d.events?.total_events)}</div><div class="kpi-note">last ${PERIOD}d</div></div>
+      <div class="kpi-card"><div class="kpi-label">Total cost (USD)</div><div class="kpi-value">$${fmtCost(d.events?.total_cost_usd)}</div><div class="kpi-note">last ${PERIOD}d</div></div>
+      <div class="kpi-card"><div class="kpi-label">Avg latency</div><div class="kpi-value">${Math.round(d.events?.avg_latency_ms ?? 0)}<small>ms</small></div><div class="kpi-note">last ${PERIOD}d</div></div>
+      <div class="kpi-card"><div class="kpi-label">Pageviews</div><div class="kpi-value">${fmt(d.pageviews?.views)}</div><div class="kpi-note">last ${PERIOD}d</div></div>
+      <div class="kpi-card"><div class="kpi-label">Unique sessions</div><div class="kpi-value">${fmt(d.pageviews?.sessions)}</div><div class="kpi-note">last ${PERIOD}d</div></div>
+    `;
+    const tbody = document.getElementById('recent-signups-tbody');
+    const rows = d.recent_signups ?? [];
+    tbody.innerHTML = rows.length
+      ? rows.map(r => `<tr>
+          <td><span class="badge badge-ac">${esc(r.id)}</span></td>
+          <td>${esc(r.name)}</td>
+          <td>${esc(r.email)}</td>
+          <td><span class="badge ${r.plan==='pro'?'badge-ac':'badge-bl'}">${esc(r.plan)}</span></td>
+          <td class="muted">${esc(r.signed_up?.slice(0,16).replace('T',' '))}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="5" class="muted">No signups yet</td></tr>';
+  } catch(e) { toast('Failed to load overview: ' + e.message, true); }
+}
+
+// ── Users ─────────────────────────────────────────────────────────────────────
+let _chartDailySignups = null;
+async function loadUsers() {
+  try {
+    const d = await apiFetch('/v1/superadmin/users');
+    const kpis = document.getElementById('users-kpis');
+    const avgMin = ((d.avg_session?.avg_duration_sec ?? 0) / 60).toFixed(1);
+    kpis.innerHTML = `
+      <div class="kpi-card"><div class="kpi-label">Signups (period)</div><div class="kpi-value up">${fmt((d.signups??[]).length)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Total sessions</div><div class="kpi-value">${fmt(d.sessions?.total_sessions)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Orgs w/ sessions</div><div class="kpi-value">${fmt(d.sessions?.unique_orgs)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Avg session</div><div class="kpi-value">${avgMin}<small>min</small></div></div>
+    `;
+    // Daily signups chart
+    const daily = d.daily_signups ?? [];
+    drawBarChart('chart-daily-signups', '_chartDailySignups',
+      daily.map(r => r.day), daily.map(r => r.count), 'Signups', '#7c6bff');
+
+    // Recent signups table
+    const tbody = document.getElementById('users-signups-tbody');
+    const rows = (d.signups ?? []).slice(0, 20);
+    tbody.innerHTML = rows.length
+      ? rows.map(r => `<tr>
+          <td>${esc(r.email)}</td>
+          <td><span class="badge ${r.plan==='pro'?'badge-ac':'badge-bl'}">${esc(r.plan)}</span></td>
+          <td class="muted">${esc(r.created_at?.slice(0,16).replace('T',' '))}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="3" class="muted">No signups</td></tr>';
+  } catch(e) { toast('Failed to load users: ' + e.message, true); }
+}
+
+// ── Geography ─────────────────────────────────────────────────────────────────
+async function loadGeography() {
+  try {
+    const d = await apiFetch('/v1/superadmin/geography');
+    renderGeoBars('geo-countries', d.countries ?? [], 'requests');
+    renderGeoBars('geo-colos', d.colos ?? [], 'requests');
+  } catch(e) { toast('Failed to load geography: ' + e.message, true); }
+}
+
+function renderGeoBars(containerId, rows, field) {
+  const el = document.getElementById(containerId);
+  if (!rows.length) { el.innerHTML = '<div class="muted" style="font-size:12px">No data yet — API requests are tracked as they arrive.</div>'; return; }
+  const max = rows[0][field] ?? 1;
+  el.innerHTML = rows.map(r => `
+    <div class="geo-bar">
+      <div class="geo-label">${esc(r.country ?? r.colo)}</div>
+      <div class="geo-track"><div class="geo-fill" style="width:${Math.round((r[field]/max)*100)}%"></div></div>
+      <div class="geo-count">${fmt(r[field])}</div>
+    </div>
+  `).join('');
+}
+
+// ── Features ──────────────────────────────────────────────────────────────────
+async function loadFeatures() {
+  try {
+    const d = await apiFetch('/v1/superadmin/features');
+    const ftbody = document.getElementById('features-tbody');
+    ftbody.innerHTML = (d.features ?? []).length
+      ? (d.features).map(r => `<tr>
+          <td>${esc(r.feature)}</td>
+          <td>${fmt(r.events)}</td>
+          <td>${fmt(r.orgs)}</td>
+          <td>$${fmtCost(r.cost_usd)}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="4" class="muted">No data yet</td></tr>';
+
+    document.getElementById('models-tbody').innerHTML = (d.models ?? []).length
+      ? (d.models).map(r => `<tr>
+          <td>${esc(r.model)}</td>
+          <td>${fmt(r.events)}</td>
+          <td>$${fmtCost(r.cost_usd)}</td>
+          <td>${Math.round(r.avg_latency_ms)}ms</td>
+        </tr>`).join('')
+      : '<tr><td colspan="4" class="muted">No data yet</td></tr>';
+
+    document.getElementById('providers-tbody').innerHTML = (d.providers ?? []).length
+      ? (d.providers).map(r => `<tr>
+          <td>${esc(r.provider)}</td>
+          <td>${fmt(r.events)}</td>
+          <td>$${fmtCost(r.cost_usd)}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="3" class="muted">No data yet</td></tr>';
+  } catch(e) { toast('Failed to load features: ' + e.message, true); }
+}
+
+// ── Traffic ───────────────────────────────────────────────────────────────────
+async function loadTraffic() {
+  try {
+    const d = await apiFetch('/v1/superadmin/traffic');
+    const api = d.api_traffic ?? [];
+    const pv  = d.page_traffic ?? [];
+    drawBarChart('chart-api-traffic', 'apiTraffic',
+      api.map(r => r.day), api.map(r => r.events), 'API events', '#7c6bff');
+    drawBarChart('chart-page-traffic', 'pageTraffic',
+      pv.map(r => r.day), pv.map(r => r.pageviews), 'Pageviews', '#34d399');
+  } catch(e) { toast('Failed to load traffic: ' + e.message, true); }
+}
+
+// ── Storage ───────────────────────────────────────────────────────────────────
+async function loadStorage() {
+  try {
+    const d = await apiFetch('/v1/superadmin/storage');
+    document.getElementById('storage-kpis').innerHTML = `
+      <div class="kpi-card"><div class="kpi-label">KV keys (approx)</div><div class="kpi-value">${fmt(d.kv_keys_approx)}</div><div class="kpi-note">rate-limit + sessions</div></div>
+    `;
+    const tbody = document.getElementById('storage-tbody');
+    const tables = d.db_tables ?? {};
+    const rows = Object.entries(tables);
+    const isBig = (n, count) => count > 100_000 ? 'badge-ye' : count > 1_000_000 ? 'badge-re' : 'badge-gr';
+    tbody.innerHTML = rows.length
+      ? rows.map(([tbl, count]) => `<tr>
+          <td>${esc(tbl)}</td>
+          <td>${count < 0 ? '<span class="muted">—</span>' : fmt(count)}</td>
+          <td>${count < 0
+            ? '<span class="badge badge-ye">not created</span>'
+            : '<span class="badge badge-gr">ok</span>'}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="3" class="muted">No data</td></tr>';
+  } catch(e) { toast('Failed to load storage: ' + e.message, true); }
+}
+
+// ── Reset ─────────────────────────────────────────────────────────────────────
+async function doReset(target, mode) {
+  const labels = {
+    soft: 'SOFT RESET (clears old/stale data)',
+    hard: 'HARD RESET (deletes ALL rows)',
+  };
+  const msg = `⚠️  ${labels[mode]} on: ${target}\n\nAre you sure?`;
+  if (!confirm(msg)) return;
+
+  const log = document.getElementById('reset-log');
+  log.style.display = 'block';
+  log.textContent = `> Sending ${mode} reset for "${target}"…\n`;
+
+  try {
+    const r = await fetch(API + '/v1/superadmin/reset', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + SECRET, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target, mode, confirm: `${target}-${mode}` }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      log.textContent += `✗ Error ${r.status}: ${data.error ?? JSON.stringify(data)}\n`;
+      return;
+    }
+    log.textContent += `✓ OK (${data.ts})\n`;
+    (data.results ?? []).forEach(l => log.textContent += `  • ${l}\n`);
+    // Bust cache
+    Object.keys(_cache).forEach(k => delete _cache[k]);
+    toast('Reset complete');
+  } catch(e) {
+    log.textContent += `✗ Network error: ${e.message}\n`;
+  }
+}
+
+// ── Chart helper ─────────────────────────────────────────────────────────────
+function drawBarChart(canvasId, cacheKey, labels, values, label, color) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  if (_chartInstances[cacheKey]) {
+    _chartInstances[cacheKey].destroy();
+  }
+  _chartInstances[cacheKey] = new Chart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ label, data: values, backgroundColor: color + 'bb', borderRadius: 4 }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#888', font: { size: 10 }, maxTicksLimit: 10 } },
+        y: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#888', font: { size: 10 } }, beginAtZero: true },
+      },
+    },
+  });
+}
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+function fmt(n) {
+  if (n == null || n === undefined) return '—';
+  if (n >= 1_000_000) return (n/1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000)     return (n/1_000).toFixed(1) + 'k';
+  return String(n);
+}
+function fmtCost(n) {
+  if (n == null) return '—';
+  if (n >= 1000) return n.toFixed(2);
+  if (n >= 1)    return n.toFixed(4);
+  return n.toFixed(6);
+}
+function esc(s) {
+  if (!s) return '<span class="muted">—</span>';
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+function toast(msg, isErr) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.borderColor = isErr ? 'var(--re)' : 'var(--gr)';
+  el.style.display = 'block';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.style.display = 'none', 4000);
+}
+</script>
+</body>
+</html>

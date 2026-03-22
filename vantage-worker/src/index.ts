@@ -33,17 +33,29 @@
  *   GET  /v1/admin/team-budgets      (admin — list team budgets)
  *   PUT  /v1/admin/team-budgets/:team (admin — set team budget)
  *   DELETE /v1/admin/team-budgets/:team (admin — remove team budget)
+ *   POST /v1/superadmin/auth            (superadmin — validate secret)
+ *   GET  /v1/superadmin/stats           (superadmin — platform overview)
+ *   GET  /v1/superadmin/users           (superadmin — signup + session activity)
+ *   GET  /v1/superadmin/geography       (superadmin — country + colo breakdown)
+ *   GET  /v1/superadmin/features        (superadmin — feature/model/provider usage)
+ *   GET  /v1/superadmin/traffic         (superadmin — daily traffic timeseries)
+ *   GET  /v1/superadmin/storage         (superadmin — DB table sizes + KV count)
+ *   POST /v1/superadmin/reset           (superadmin — soft/hard reset storage)
+ *   POST /v1/platform/pageview          (public — record frontend pageview)
+ *   POST /v1/platform/session           (public — record session duration)
  */
 
 import { Hono } from 'hono';
 import { Bindings, Variables } from './types';
 import { corsMiddleware } from './middleware/cors';
-import { auth }      from './routes/auth';
-import { events }    from './routes/events';
-import { analytics } from './routes/analytics';
-import { stream }    from './routes/stream';
-import { alerts }    from './routes/alerts';
-import { admin }     from './routes/admin';
+import { auth }       from './routes/auth';
+import { events }     from './routes/events';
+import { analytics }  from './routes/analytics';
+import { stream }     from './routes/stream';
+import { alerts }     from './routes/alerts';
+import { admin }      from './routes/admin';
+import { superadmin } from './routes/superadmin';
+import { platform }   from './routes/platform';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -60,12 +72,14 @@ app.get('/health', (c) => c.json({
 }));
 
 // ── API routes ────────────────────────────────────────────────────────────────
-app.route('/v1/auth',      auth);
-app.route('/v1/events',    events);
-app.route('/v1/analytics', analytics);
-app.route('/v1/stream',    stream);
-app.route('/v1/alerts',    alerts);
-app.route('/v1/admin',     admin);
+app.route('/v1/auth',       auth);
+app.route('/v1/events',     events);
+app.route('/v1/analytics',  analytics);
+app.route('/v1/stream',     stream);
+app.route('/v1/alerts',     alerts);
+app.route('/v1/admin',      admin);
+app.route('/v1/superadmin', superadmin);
+app.route('/v1/platform',   platform);
 
 // ── 404 fallback ──────────────────────────────────────────────────────────────
 app.notFound((c) => c.json({
