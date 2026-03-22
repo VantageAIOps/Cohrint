@@ -129,6 +129,29 @@ jobs:
           echo "Exit code: $EXIT"
           exit $EXIT
 
+      - name: Generate failure summary
+        if: always()
+        run: |
+          echo "## API Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          # Extract pass/fail totals
+          if grep -q "passed.*failed" /tmp/api-test-output.txt 2>/dev/null; then
+            grep -E "(passed|failed|skipped)" /tmp/api-test-output.txt | tail -5 | while read line; do
+              echo "$line" >> $GITHUB_STEP_SUMMARY
+            done
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          # List all failures with details
+          FAILURES=$(grep -E "^  ✗|^       └─" /tmp/api-test-output.txt 2>/dev/null || true)
+          if [ -n "$FAILURES" ]; then
+            echo "### Failures" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "$FAILURES" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ All tests passed" >> $GITHUB_STEP_SUMMARY
+          fi
+
       - name: Upload API test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -181,6 +204,27 @@ jobs:
           fi
           EXIT=${PIPESTATUS[0]}
           exit $EXIT
+
+      - name: Generate failure summary
+        if: always()
+        run: |
+          echo "## Browser Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if grep -q "passed.*failed" /tmp/browser-test-output.txt 2>/dev/null; then
+            grep -E "(passed|failed|skipped)" /tmp/browser-test-output.txt | tail -5 | while read line; do
+              echo "$line" >> $GITHUB_STEP_SUMMARY
+            done
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          FAILURES=$(grep -E "^  ✗|^       └─" /tmp/browser-test-output.txt 2>/dev/null || true)
+          if [ -n "$FAILURES" ]; then
+            echo "### Failures" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "$FAILURES" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ All tests passed" >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Upload browser test results
         if: always()

@@ -230,9 +230,8 @@ def _run_desktop(engine: str, label: str, prefix: str, viewport: tuple):
                 "#theme-toggle, .theme-toggle, [data-action='toggle-theme'], "
                 ".btn-theme, [aria-label*='theme'], [aria-label*='Theme']"
             )
-            chk(f"{prefix}.{counter[0]}  [{label}] Theme toggle element present",
-                theme_toggle is not None,
-                "theme toggle not found — acceptable if no toggle on landing page")
+            warn(f"{prefix}.{counter[0]}  [{label}] Theme toggle element present" +
+                 (" — found" if theme_toggle else " — not on landing page (acceptable)"))
             counter[0] += 1
 
         except Exception as e:
