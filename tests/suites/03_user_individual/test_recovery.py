@@ -47,13 +47,14 @@ def test_redeem_endpoint():
     section("RC. Recovery — GET/POST /recover/redeem")
 
     # RC.5 GET /redeem without token → 400/404
-    r = requests.get(f"{API_URL}/v1/auth/recover/redeem", timeout=15)
+    r = requests.get(f"{API_URL}/v1/auth/recover/redeem",
+                     headers={"Accept": "application/json"}, timeout=15, allow_redirects=False)
     chk("RC.5  GET /recover/redeem no token → 400/404",
         r.status_code in (400, 404, 422), f"got {r.status_code}")
 
     # RC.6 GET /redeem with fake token → 400/404/410
     r2 = requests.get(f"{API_URL}/v1/auth/recover/redeem?token=fake_invalid_token_abc",
-                      timeout=15)
+                      headers={"Accept": "application/json"}, timeout=15, allow_redirects=False)
     chk("RC.6  GET /recover/redeem fake token → 400/404/410",
         r2.status_code in (400, 404, 410), f"got {r2.status_code}")
 
@@ -65,7 +66,7 @@ def test_redeem_endpoint():
 
     # RC.8 Expired/used token scenario (second redemption of same fake token)
     r4 = requests.get(f"{API_URL}/v1/auth/recover/redeem?token=fake_invalid_token_abc",
-                      timeout=15)
+                      headers={"Accept": "application/json"}, timeout=15, allow_redirects=False)
     chk("RC.8  Second use of same fake token → 400/404/410",
         r4.status_code in (400, 404, 410), f"got {r4.status_code}")
 

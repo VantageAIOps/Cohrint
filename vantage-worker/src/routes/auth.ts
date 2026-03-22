@@ -137,17 +137,21 @@ auth.post('/recover', async (c) => {
 auth.get('/recover/redeem', async (c) => {
   const token = c.req.query('token') ?? '';
   const SITE  = 'https://vantageaiops.com';
+  const wantsJson = (c.req.header('Accept') ?? '').includes('application/json');
 
   if (!token) {
+    if (wantsJson) return c.json({ error: 'missing_token' }, 400);
     return c.redirect(`${SITE}/auth?recovery_error=missing_token`);
   }
 
   // Peek at the token (don't delete it yet)
   const raw = await c.env.KV.get(`recover:${token}`);
   if (!raw) {
+    if (wantsJson) return c.json({ error: 'expired' }, 404);
     return c.redirect(`${SITE}/auth?recovery_error=expired`);
   }
 
+  if (wantsJson) return c.json({ ok: true, token_valid: true });
   // Send to confirmation page — token still intact, ready for POST
   return c.redirect(`${SITE}/auth?confirm_token=${encodeURIComponent(token)}`);
 });
@@ -444,6 +448,9 @@ auth.get('/session', authMiddleware, async (c) => {
     org_id:   orgId,
     role,
     member_id: memberId,
+    // Top-level convenience fields (tests expect these)
+    email:        memberId ? (memberInfo?.email ?? org?.email) : org?.email,
+    api_key_hint: org?.api_key_hint ?? null,
     org: {
       name:         org?.name,
       email:        org?.email,
@@ -473,6 +480,25 @@ auth.delete('/session', async (c) => {
   const res = c.json({ ok: true });
   const isProdLogout = (c.env.ENVIRONMENT ?? 'production') === 'production';
   const clearCookie = isProdLogout
+    ? 'vantage_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax; Secure; Domain=vantageaiops.com'
+    : 'vantage_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax';
+  (await res).headers.set('Set-Cookie', clearCookie);
+  return res;
+});
+
+// ── POST /v1/auth/logout — alias for DELETE /session (tests + convenience) ───
+auth.post('/logout', async (c) => {
+  const cookieHeader = c.req.header('Cookie') ?? '';
+  const token = cookieHeader.split(';').map(s => s.trim())
+    .find(s => s.startsWith('vantage_session='))?.split('=')[1];
+
+  if (token) {
+    await c.env.DB.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
+  }
+
+  const res = c.json({ ok: true });
+  const isProd = (c.env.ENVIRONMENT ?? 'production') === 'production';
+  const clearCookie = isProd
     ? 'vantage_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax; Secure; Domain=vantageaiops.com'
     : 'vantage_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax';
   (await res).headers.set('Set-Cookie', clearCookie);

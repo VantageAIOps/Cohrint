@@ -46,7 +46,8 @@ def test_health(headers):
             f"got: {list(d.keys())}")
 
 
-def test_auth_endpoints(api_key, cookies):
+def test_auth_endpoints(api_key, cookies) -> str:
+    """Returns the (possibly rotated) API key."""
     section("E. Endpoints — Auth")
 
     # POST /signup
@@ -72,20 +73,31 @@ def test_auth_endpoints(api_key, cookies):
     else:
         warn("E.7  Could not get fresh cookies for logout test")
 
-    # POST /rotate
+    # POST /rotate — updates the API key; capture new key for subsequent tests
     r5 = requests.post(f"{API_URL}/v1/auth/rotate",
                        headers=get_headers(api_key), timeout=15)
     chk("E.8  POST /v1/auth/rotate → 200", r5.status_code == 200, f"got {r5.status_code}")
+    if r5.status_code == 200:
+        try:
+            new_key = r5.json().get("api_key", api_key)
+            if new_key:
+                api_key = new_key
+        except Exception:
+            pass
 
     # POST /recover
     r6 = requests.post(f"{API_URL}/v1/auth/recover",
                        json={"email": rand_email("ep")}, timeout=15)
     chk("E.9  POST /v1/auth/recover → 200", r6.status_code == 200, f"got {r6.status_code}")
 
-    # GET /recover/redeem (invalid)
-    r7 = requests.get(f"{API_URL}/v1/auth/recover/redeem?token=invalid123", timeout=15)
+    # GET /recover/redeem (invalid) — send Accept: application/json to get JSON not redirect
+    r7 = requests.get(f"{API_URL}/v1/auth/recover/redeem?token=invalid123",
+                      headers={"Accept": "application/json"}, timeout=15,
+                      allow_redirects=False)
     chk("E.10 GET /v1/auth/recover/redeem invalid → 400/404",
         r7.status_code in (400, 404, 410), f"got {r7.status_code}")
+
+    return api_key
 
 
 def test_events_endpoints(api_key):
@@ -221,7 +233,7 @@ def main():
     headers = get_headers(api_key)
 
     test_health(headers)
-    test_auth_endpoints(api_key, cookies)
+    api_key = test_auth_endpoints(api_key, cookies)
     test_events_endpoints(api_key)
     test_analytics_endpoints(api_key)
     test_admin_endpoints(api_key, cookies)

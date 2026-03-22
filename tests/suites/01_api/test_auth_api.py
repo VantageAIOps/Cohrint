@@ -167,13 +167,14 @@ def test_recovery(api_key):
         f"got {r2.status_code}")
 
     # 1.24 GET /recover/redeem with missing token → 400
-    r3 = requests.get(f"{API_URL}/v1/auth/recover/redeem", timeout=15)
+    r3 = requests.get(f"{API_URL}/v1/auth/recover/redeem",
+                      headers={"Accept": "application/json"}, timeout=15, allow_redirects=False)
     chk("1.24 GET /recover/redeem no token → 400/404", r3.status_code in (400, 404, 422),
         f"got {r3.status_code}")
 
     # 1.25 GET /recover/redeem with fake token → 400/404
     r4 = requests.get(f"{API_URL}/v1/auth/recover/redeem?token=fakeinvalidtoken123",
-                      timeout=15)
+                      headers={"Accept": "application/json"}, timeout=15, allow_redirects=False)
     chk("1.25 GET /recover/redeem fake token → 400/404", r4.status_code in (400, 404, 410),
         f"got {r4.status_code}")
 
