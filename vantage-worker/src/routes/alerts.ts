@@ -81,6 +81,24 @@ alerts.get('/:orgId', async (c) => {
   return c.json(cfg ?? { slack_url: null });
 });
 
+// ── GET /v1/alerts/:orgId/anomaly — latest anomaly detection result ───────────
+alerts.get('/:orgId/anomaly', async (c) => {
+  const orgId = c.get('orgId');
+
+  // Check KV for latest anomaly result (stored by cron)
+  const latest = await c.env.KV.get(`anomaly:${orgId}:latest`);
+  if (!latest) {
+    return c.json({ anomaly: false, message: 'No anomalies detected in the last 24 hours' });
+  }
+
+  try {
+    const result = JSON.parse(latest);
+    return c.json({ anomaly: true, ...result });
+  } catch {
+    return c.json({ anomaly: false });
+  }
+});
+
 // ── Shared Slack sender ───────────────────────────────────────────────────────
 export async function sendSlackMessage(
   webhookUrl: string,

@@ -47,6 +47,9 @@
  *   POST /v1/optimizer/analyze           (token count + cost estimate)
  *   POST /v1/optimizer/estimate          (cross-model cost comparison)
  *   GET  /v1/optimizer/stats             (optimizer usage stats)
+ *
+ * Cron Triggers:
+ *   Every 10 min  — anomaly detection (Z-score cost spike alerts)
  */
 
 import { Hono } from 'hono';
@@ -61,6 +64,7 @@ import { admin }      from './routes/admin';
 import { superadmin } from './routes/superadmin';
 import { platform }   from './routes/platform';
 import { optimizer }  from './routes/optimizer';
+import { runAnomalyDetection } from './lib/anomaly';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -108,4 +112,17 @@ app.onError((err, c) => {
   });
 });
 
-export default app;
+// ── Export with scheduled handler for cron-based anomaly detection ────────────
+export default {
+  fetch: app.fetch,
+  async scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionContext) {
+    ctx.waitUntil((async () => {
+      try {
+        const result = await runAnomalyDetection(env.DB, env.KV);
+        console.log(`[anomaly-cron] checked=${result.checked} anomalies=${result.anomalies} alerts=${result.alerts_sent}`);
+      } catch (err) {
+        console.error('[anomaly-cron] Fatal error:', err);
+      }
+    })());
+  },
+};

@@ -26,6 +26,10 @@ ENVIRONMENT        = "production"
 ALLOWED_ORIGINS    = "https://vantageaiops.com,https://www.vantageaiops.com,https://vantageai.pages.dev"
 RATE_LIMIT_RPM     = "1000"
 
+# ── Cron Triggers — anomaly detection every 10 minutes ──────────────────
+[triggers]
+crons = ["*/10 * * * *"]
+
 # ── Secrets (set via: wrangler secret put SECRET_NAME) ───────────────────────
 # RESEND_API_KEY   — Resend API key for email (member invites, key recovery)
 #                    Get a free key at resend.com — 3,000 emails/month
