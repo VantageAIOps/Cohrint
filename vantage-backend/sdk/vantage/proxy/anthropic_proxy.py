@@ -17,7 +17,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from vantage.proxy.universal import _build_event, _extract_messages
+from vantage.proxy.universal import _build_event, _compress_if_enabled, _extract_messages
 
 try:
     import anthropic as _ant
@@ -38,6 +38,10 @@ class _WrappedMessages:
     def create(self, *, model: str, messages: list, **kwargs) -> Any:
         if not HAS_ANTHROPIC: raise ImportError("pip install anthropic")
         cfg = _get_config()
+
+        # Optimizer: compress last user message if enabled
+        messages, optimizer_meta = _compress_if_enabled(messages, cfg)
+
         t0  = time.perf_counter()
         ttft_ref = [0.0]
 
@@ -71,6 +75,7 @@ class _WrappedMessages:
                 system_prompt=system_txt,
                 endpoint="/messages", extra_tags={},
                 org_id=cfg["org_id"], environment=cfg["environment"],
+                optimizer_meta=optimizer_meta,
             )
             _get_queue().enqueue(ev)
             return resp

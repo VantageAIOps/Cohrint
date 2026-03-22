@@ -20,6 +20,12 @@
  *   check_budget          — budget status + % used
  *   get_traces            — recent agent traces
  *   get_cost_gate         — CI/CD budget gate check
+ *
+ * Optimizer Tools:
+ *   optimize_prompt       — compress a prompt to reduce token usage
+ *   analyze_tokens        — count tokens and estimate cost for text
+ *   estimate_costs        — compare costs across models
+ *   compress_context      — compress conversation context within a token budget
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -61,6 +67,79 @@ async function api(path: string, opts: RequestInit = {}): Promise<unknown> {
   if (!res.ok) throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
   return body;
 }
+
+// ── LLM Cost Optimizer ───────────────────────────────────────────────────────
+
+class LLMCostOptimizer {
+  private readonly MODEL_RATES: Record<string, { input: number; output: number }> = {
+    'gpt-4o':           { input: 0.005,   output: 0.015 },
+    'gpt-4':            { input: 0.03,    output: 0.06 },
+    'gpt-3.5-turbo':    { input: 0.0005,  output: 0.0015 },
+    'claude-3-sonnet':  { input: 0.003,   output: 0.015 },
+    'claude-3-haiku':   { input: 0.00025, output: 0.00125 },
+    'gemini-pro':       { input: 0.00025, output: 0.0005 },
+  };
+
+  private readonly FILLER_WORDS = /\b(the|and|or|but|in|on|at|to|for|of|with|by|an|a|is|are|was|were|be|been|being|have|has|had|do|does|did|will|would|could|should|may|might|must|can|shall)\b/gi;
+
+  countTokens(text: string): number {
+    const words = text.split(/\s+/).filter(w => w.length > 0);
+    return Math.ceil(words.length * 1.3);
+  }
+
+  compressPrompt(prompt: string, compressionRate: number = 0.5): {
+    originalText: string;
+    compressedText: string;
+    originalTokens: number;
+    compressedTokens: number;
+    compressionRatio: number;
+    savingsPercentage: string;
+  } {
+    const originalTokens = this.countTokens(prompt);
+
+    let compressed = prompt.replace(this.FILLER_WORDS, '').replace(/\s+/g, ' ').trim();
+
+    const targetLength = Math.floor(prompt.length * compressionRate);
+    if (compressed.length > targetLength) {
+      compressed = compressed.substring(0, targetLength) + '...';
+    }
+
+    const compressedTokens = this.countTokens(compressed);
+    const compressionRatio = originalTokens > 0 ? compressedTokens / originalTokens : 1;
+    const savingsPct = originalTokens > 0
+      ? ((originalTokens - compressedTokens) / originalTokens * 100).toFixed(1)
+      : '0.0';
+
+    return {
+      originalText: prompt,
+      compressedText: compressed,
+      originalTokens,
+      compressedTokens,
+      compressionRatio,
+      savingsPercentage: savingsPct + '%',
+    };
+  }
+
+  estimateCost(model: string, tokens: number): number {
+    const rates = this.MODEL_RATES[model] ?? this.MODEL_RATES['gpt-3.5-turbo'];
+    return (tokens / 1000) * rates.input;
+  }
+
+  estimateCostDetailed(model: string, inputTokens: number, outputTokens: number): {
+    inputCost: number; outputCost: number; totalCost: number;
+  } {
+    const rates = this.MODEL_RATES[model] ?? this.MODEL_RATES['gpt-3.5-turbo'];
+    const inputCost = (inputTokens / 1000) * rates.input;
+    const outputCost = (outputTokens / 1000) * rates.output;
+    return { inputCost, outputCost, totalCost: inputCost + outputCost };
+  }
+
+  get modelNames(): string[] {
+    return Object.keys(this.MODEL_RATES);
+  }
+}
+
+const optimizer = new LLMCostOptimizer();
 
 // ── MCP Server ────────────────────────────────────────────────────────────────
 
@@ -147,6 +226,82 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         properties: {
           period: { type: 'string', description: 'Period to check: today | week | month (default: today)' },
         },
+      },
+    },
+
+    // ── Optimizer tools ────────────────────────────────────────────────────────
+    {
+      name: 'optimize_prompt',
+      description: 'Compress a prompt to reduce token usage while preserving meaning. Removes filler words and trims to a target compression rate.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          prompt: { type: 'string', description: 'The prompt text to optimize' },
+          compression_rate: {
+            type: 'number',
+            description: 'Target compression rate between 0.1 and 1.0 (default: 0.5)',
+            minimum: 0.1,
+            maximum: 1.0,
+          },
+        },
+        required: ['prompt'],
+      },
+    },
+    {
+      name: 'analyze_tokens',
+      description: 'Analyze token count and estimated cost for a given text and model.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          text: { type: 'string', description: 'The text to analyze' },
+          model: {
+            type: 'string',
+            description: 'Model to price against (default: gpt-3.5-turbo)',
+            enum: ['gpt-4o', 'gpt-4', 'gpt-3.5-turbo', 'claude-3-sonnet', 'claude-3-haiku', 'gemini-pro'],
+          },
+        },
+        required: ['text'],
+      },
+    },
+    {
+      name: 'estimate_costs',
+      description: 'Estimate costs for a prompt across all supported models — useful for choosing the cheapest option.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          prompt: { type: 'string', description: 'The prompt to estimate costs for' },
+          completion_tokens: {
+            type: 'number',
+            description: 'Expected number of completion/output tokens (default: 100)',
+          },
+        },
+        required: ['prompt'],
+      },
+    },
+    {
+      name: 'compress_context',
+      description: 'Compress a conversation message list to fit within a token budget, keeping the most recent messages and summarizing older ones.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          messages: {
+            type: 'array',
+            description: 'Array of conversation messages',
+            items: {
+              type: 'object',
+              properties: {
+                role: { type: 'string', enum: ['user', 'assistant', 'system'] },
+                content: { type: 'string' },
+              },
+              required: ['role', 'content'],
+            },
+          },
+          max_tokens: {
+            type: 'number',
+            description: 'Maximum token budget for the compressed context (default: 4000)',
+          },
+        },
+        required: ['messages'],
       },
     },
   ],
@@ -314,6 +469,138 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           `| Status | ${passed ? 'Within budget' : '**Over budget — block merge**'} |`,
         ].join('\n');
         return { content: [{ type: 'text', text }] };
+      }
+
+      // ── Optimizer tool handlers ───────────────────────────────────────────
+
+      case 'optimize_prompt': {
+        const prompt = args.prompt as string;
+        if (!prompt) throw new Error('prompt is required');
+        const rate = Number(args.compression_rate ?? 0.5);
+        const result = optimizer.compressPrompt(prompt, rate);
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              success: true,
+              original_prompt: result.originalText,
+              optimized_prompt: result.compressedText,
+              original_tokens: result.originalTokens,
+              compressed_tokens: result.compressedTokens,
+              compression_ratio: result.compressionRatio,
+              savings_percentage: result.savingsPercentage,
+            }, null, 2),
+          }],
+        };
+      }
+
+      case 'analyze_tokens': {
+        const text = args.text as string;
+        if (!text) throw new Error('text is required');
+        const model = (args.model as string) || 'gpt-3.5-turbo';
+        const tokenCount = optimizer.countTokens(text);
+        const cost = optimizer.estimateCost(model, tokenCount);
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              success: true,
+              text_length: text.length,
+              token_count: tokenCount,
+              model,
+              estimated_cost: `$${cost.toFixed(6)}`,
+              cost_breakdown: {
+                tokens: tokenCount,
+                rate_per_1k: `$${(cost * 1000 / Math.max(tokenCount, 1)).toFixed(6)}`,
+                total: `$${cost.toFixed(6)}`,
+              },
+            }, null, 2),
+          }],
+        };
+      }
+
+      case 'estimate_costs': {
+        const estPrompt = args.prompt as string;
+        if (!estPrompt) throw new Error('prompt is required');
+        const completionTokens = Number(args.completion_tokens ?? 100);
+        const promptTokens = optimizer.countTokens(estPrompt);
+        const totalTokens = promptTokens + completionTokens;
+
+        const comparisons = optimizer.modelNames.map((m) => {
+          const detail = optimizer.estimateCostDetailed(m, promptTokens, completionTokens);
+          return {
+            model: m,
+            input_cost: `$${detail.inputCost.toFixed(6)}`,
+            output_cost: `$${detail.outputCost.toFixed(6)}`,
+            total_cost: `$${detail.totalCost.toFixed(6)}`,
+          };
+        });
+
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              success: true,
+              prompt_tokens: promptTokens,
+              completion_tokens: completionTokens,
+              total_tokens: totalTokens,
+              comparisons,
+            }, null, 2),
+          }],
+        };
+      }
+
+      case 'compress_context': {
+        const messages = args.messages as Array<{ role: string; content: string }>;
+        if (!messages || !Array.isArray(messages)) throw new Error('messages array is required');
+        const maxTokens = Number(args.max_tokens ?? 4000);
+
+        const compressed: Array<{ role: string; content: string }> = [];
+        let usedTokens = 0;
+        const skippedMessages: Array<{ role: string; content: string }> = [];
+
+        // Walk from newest to oldest, keep messages that fit
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const msg = messages[i];
+          const msgTokens = optimizer.countTokens(msg.content);
+          if (usedTokens + msgTokens <= maxTokens) {
+            compressed.unshift(msg);
+            usedTokens += msgTokens;
+          } else {
+            // Collect all remaining older messages for summary
+            for (let j = 0; j <= i; j++) {
+              skippedMessages.push(messages[j]);
+            }
+            break;
+          }
+        }
+
+        // If we skipped messages, prepend a summary message
+        if (skippedMessages.length > 0) {
+          const summaryText = `[Summarized ${skippedMessages.length} earlier message(s): ` +
+            skippedMessages.map(m => `${m.role}: ${m.content.slice(0, 60)}${m.content.length > 60 ? '...' : ''}`).join(' | ') +
+            ']';
+          const summaryTokens = optimizer.countTokens(summaryText);
+          if (usedTokens + summaryTokens <= maxTokens) {
+            compressed.unshift({ role: 'system', content: summaryText });
+            usedTokens += summaryTokens;
+          }
+        }
+
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              success: true,
+              original_messages: messages.length,
+              compressed_messages: compressed.length,
+              total_tokens: usedTokens,
+              max_tokens: maxTokens,
+              compression_ratio: messages.length > 0 ? compressed.length / messages.length : 1,
+              messages: compressed,
+            }, null, 2),
+          }],
+        };
       }
 
       default:

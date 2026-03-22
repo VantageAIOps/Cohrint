@@ -74,6 +74,17 @@ class QualityMetrics:
 
 
 @dataclass
+class OptimizerMeta:
+    """Token optimization metrics — populated when optimizer is enabled."""
+    enabled:            bool  = False
+    original_tokens:    int   = 0
+    compressed_tokens:  int   = 0
+    tokens_saved:       int   = 0
+    compression_ratio:  float = 1.0
+    compression_ms:     float = 0.0
+
+
+@dataclass
 class VantageEvent:
     # Identity
     event_id:    str
@@ -102,6 +113,9 @@ class VantageEvent:
     cost:   CostInfo   = field(default_factory=CostInfo)
     quality: QualityMetrics = field(default_factory=QualityMetrics)
 
+    # Optimizer
+    optimizer: OptimizerMeta = field(default_factory=OptimizerMeta)
+
     # Previews
     request_preview:  str = ""
     response_preview: str = ""
@@ -111,10 +125,11 @@ class VantageEvent:
     def to_dict(self) -> dict:
         d = asdict(self)
         # Flatten nested objects for DB insertion
-        u, c, q = d.pop("usage"), d.pop("cost"), d.pop("quality")
+        u, c, q, o = d.pop("usage"), d.pop("cost"), d.pop("quality"), d.pop("optimizer")
         return {**d, **{f"usage_{k}": v for k,v in u.items()},
                      **{f"cost_{k}": v for k,v in c.items()},
-                     **{f"quality_{k}": v for k,v in q.items()}}
+                     **{f"quality_{k}": v for k,v in q.items()},
+                     **{f"optimizer_{k}": v for k,v in o.items()}}
 
     @property
     def is_error(self) -> bool:

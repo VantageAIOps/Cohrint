@@ -20,7 +20,7 @@ from __future__ import annotations
 import time
 from typing import Any, Iterator, AsyncIterator, Optional
 
-from vantage.proxy.universal import _build_event, _CTX_TAGS, _CTX_FEATURE, _CTX_PROJECT
+from vantage.proxy.universal import _build_event, _compress_if_enabled, _CTX_TAGS, _CTX_FEATURE, _CTX_PROJECT
 from vantage.models.event import VantageEvent
 
 try:
@@ -56,25 +56,29 @@ class _WrappedChatCompletions:
         if not HAS_OPENAI:
             raise ImportError("pip install openai")
 
-        system_prompt, user_text = _extract_messages(messages)
         cfg = _get_config()
+
+        # Optimizer: compress last user message if enabled
+        messages, optimizer_meta = _compress_if_enabled(messages, cfg)
+
+        system_prompt, user_text = _extract_messages(messages)
         t0  = time.perf_counter()
         ttft = 0.0
 
         if kwargs.get("stream", False):
-            return self._stream(model, messages, system_prompt, user_text, t0, cfg, kwargs)
+            return self._stream(model, messages, system_prompt, user_text, t0, cfg, kwargs, optimizer_meta)
 
         try:
             resp = self._inner.create(model=model, messages=messages, **kwargs)
             lat  = (time.perf_counter() - t0) * 1000
-            self._capture(resp, model, lat, 0.0, system_prompt, user_text, cfg)
+            self._capture(resp, model, lat, 0.0, system_prompt, user_text, cfg, optimizer_meta)
             return resp
         except Exception as exc:
             lat = (time.perf_counter() - t0) * 1000
             self._capture_error(str(exc), model, lat, cfg)
             raise
 
-    def _stream(self, model, messages, system_prompt, user_text, t0, cfg, kwargs):
+    def _stream(self, model, messages, system_prompt, user_text, t0, cfg, kwargs, optimizer_meta=None):
         kwargs_clean = {k: v for k,v in kwargs.items() if k != "stream"}
         ttft_ref = [0.0]
         chunks   = []
@@ -104,22 +108,22 @@ class _WrappedChatCompletions:
                 c.choices[0].delta.content or "" for c in chunks if c.choices
             )
             self._capture_raw(model, pt, ct, cached, lat, ttft_ref[0], 200, None,
-                               user_text, resp_text, system_prompt, cfg)
+                               user_text, resp_text, system_prompt, cfg, optimizer_meta)
 
-    def _capture(self, resp, model, lat, ttft, system_prompt, user_text, cfg):
+    def _capture(self, resp, model, lat, ttft, system_prompt, user_text, cfg, optimizer_meta=None):
         u = resp.usage
         pt     = u.prompt_tokens     if u else 0
         ct     = u.completion_tokens if u else 0
         cached = getattr(getattr(u,"prompt_tokens_details",None),"cached_tokens",0) or 0
         rt     = resp.choices[0].message.content[:600] if resp.choices else ""
         self._capture_raw(model, pt, ct, cached, lat, ttft, 200, None,
-                          user_text, rt, system_prompt, cfg)
+                          user_text, rt, system_prompt, cfg, optimizer_meta)
 
     def _capture_error(self, error, model, lat, cfg):
         self._capture_raw(model, 0, 0, 0, lat, 0, 500, error[:400], "", "", "", cfg)
 
     def _capture_raw(self, model, pt, ct, cached, lat, ttft, status, error,
-                     user_text, resp_text, system_prompt, cfg):
+                     user_text, resp_text, system_prompt, cfg, optimizer_meta=None):
         try:
             ev = _build_event(
                 provider="openai", model=model,
@@ -131,6 +135,7 @@ class _WrappedChatCompletions:
                 endpoint="/chat/completions",
                 extra_tags={},
                 org_id=cfg["org_id"], environment=cfg["environment"],
+                optimizer_meta=optimizer_meta,
             )
             _get_queue().enqueue(ev)
         except Exception:

@@ -13,7 +13,8 @@ _config: dict = {}
 
 def init(api_key: str, *, org: str = "", team: str = "", environment: str = "production",
          ingest_url: str = "https://vantage-api.aman-lpucse.workers.dev", flush_interval: float = 2.0,
-         batch_size: int = 50, debug: bool = False) -> None:
+         batch_size: int = 50, debug: bool = False,
+         enable_optimizer: bool = False, compression_rate: float = 0.5) -> None:
     global _queue, _config
     if debug:
         logging.basicConfig(level=logging.DEBUG)
@@ -21,11 +22,12 @@ def init(api_key: str, *, org: str = "", team: str = "", environment: str = "pro
         parts = api_key.split("_")
         org = parts[1] if len(parts) >= 3 else "default"
     _config = {"api_key": api_key, "org_id": org, "team": team,
-               "environment": environment, "ingest_url": ingest_url, "debug": debug}
+               "environment": environment, "ingest_url": ingest_url, "debug": debug,
+               "optimizer_enabled": enable_optimizer, "compression_rate": compression_rate}
     _queue = EventQueue(api_key=api_key, ingest_url=ingest_url,
                         flush_interval=flush_interval, batch_size=batch_size, debug=debug)
     _queue.start()
-    logger.info("Vantage initialised — org=%s env=%s", org, environment)
+    logger.info("Vantage initialised — org=%s env=%s optimizer=%s", org, environment, enable_optimizer)
 
 
 def _get_queue() -> EventQueue:

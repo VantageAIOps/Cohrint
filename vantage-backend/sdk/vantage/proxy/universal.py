@@ -33,7 +33,7 @@ from dataclasses import dataclass, field, asdict
 from typing import Any, Callable, Optional
 from functools import wraps
 
-from vantage.models.event import VantageEvent, TokenUsage, CostInfo, QualityMetrics
+from vantage.models.event import VantageEvent, TokenUsage, CostInfo, QualityMetrics, OptimizerMeta
 from vantage.models.pricing import calculate_cost, find_cheapest
 from vantage.utils.queue import EventQueue
 
@@ -80,6 +80,76 @@ def trace(
         _CTX_PROJECT.reset(token_project)
 
 
+# ── Optimizer integration ────────────────────────────────────────────────────
+_compressor = None
+
+def _get_compressor():
+    """Lazy-init the prompt compressor from vantage-optimizer module."""
+    global _compressor
+    if _compressor is None:
+        try:
+            import sys, os
+            # Add vantage-optimizer to path if available
+            optimizer_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', 'vantage-optimizer')
+            if os.path.isdir(optimizer_path) and optimizer_path not in sys.path:
+                sys.path.insert(0, os.path.dirname(optimizer_path))
+            from vantage_optimizer.compressor import PromptCompressor
+            _compressor = PromptCompressor()
+        except ImportError:
+            from vantage_optimizer.compressor import SimpleCompressor
+            _compressor = SimpleCompressor()
+    return _compressor
+
+
+def _compress_if_enabled(messages: list, cfg: dict) -> tuple:
+    """
+    Compress the last user message if optimizer is enabled.
+    Returns (messages, optimizer_meta_dict).
+    Messages are NOT mutated in-place — a shallow copy is returned.
+    """
+    if not cfg.get("optimizer_enabled", False):
+        return messages, {}
+
+    # Find the last user message
+    user_indices = [i for i, m in enumerate(messages) if m.get("role") == "user"]
+    if not user_indices:
+        return messages, {}
+
+    last_idx = user_indices[-1]
+    user_content = messages[last_idx].get("content", "")
+    if not isinstance(user_content, str) or len(user_content.split()) < 20:
+        return messages, {}  # skip short prompts
+
+    try:
+        import time as _t
+        t0 = _t.perf_counter()
+        compressor = _get_compressor()
+        rate = cfg.get("compression_rate", 0.5)
+        result = compressor.compress(user_content, rate=rate)
+        compression_ms = (_t.perf_counter() - t0) * 1000
+
+        compressed_text = result.get("compressed_prompt", user_content)
+        original_tokens = result.get("original_tokens", 0)
+        compressed_tokens = result.get("compressed_tokens", 0)
+
+        # Build new messages list (don't mutate original)
+        new_messages = [*messages[:last_idx],
+                        {**messages[last_idx], "content": compressed_text},
+                        *messages[last_idx + 1:]]
+
+        meta = {
+            "enabled": True,
+            "original_tokens": original_tokens,
+            "compressed_tokens": compressed_tokens,
+            "tokens_saved": original_tokens - compressed_tokens,
+            "compression_ratio": result.get("ratio", 1.0),
+            "compression_ms": round(compression_ms, 2),
+        }
+        return new_messages, meta
+    except Exception:
+        return messages, {}
+
+
 # ── Core capture function ────────────────────────────────────────────────────
 def _build_event(
     provider: str,
@@ -98,6 +168,7 @@ def _build_event(
     extra_tags: dict,
     org_id: str,
     environment: str,
+    optimizer_meta: Optional[dict] = None,
 ) -> VantageEvent:
     costs = calculate_cost(model, prompt_tokens, completion_tokens, cached_tokens)
     cheaper = find_cheapest(model, prompt_tokens, completion_tokens)
@@ -149,4 +220,6 @@ def _build_event(
         prompt_hash      = prompt_hash,
         # Quality — filled async by analysis worker
         quality = QualityMetrics(),
+        # Optimizer — populated when optimizer is enabled
+        optimizer = OptimizerMeta(**optimizer_meta) if optimizer_meta else OptimizerMeta(),
     )

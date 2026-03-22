@@ -43,6 +43,10 @@
  *   POST /v1/superadmin/reset           (superadmin — soft/hard reset storage)
  *   POST /v1/platform/pageview          (public — record frontend pageview)
  *   POST /v1/platform/session           (public — record session duration)
+ *   POST /v1/optimizer/compress          (prompt compression)
+ *   POST /v1/optimizer/analyze           (token count + cost estimate)
+ *   POST /v1/optimizer/estimate          (cross-model cost comparison)
+ *   GET  /v1/optimizer/stats             (optimizer usage stats)
  */
 
 import { Hono } from 'hono';
@@ -56,6 +60,7 @@ import { alerts }     from './routes/alerts';
 import { admin }      from './routes/admin';
 import { superadmin } from './routes/superadmin';
 import { platform }   from './routes/platform';
+import { optimizer }  from './routes/optimizer';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -80,6 +85,7 @@ app.route('/v1/alerts',     alerts);
 app.route('/v1/admin',      admin);
 app.route('/v1/superadmin', superadmin);
 app.route('/v1/platform',   platform);
+app.route('/v1/optimizer',  optimizer);
 
 // ── 404 fallback ──────────────────────────────────────────────────────────────
 app.notFound((c) => c.json({

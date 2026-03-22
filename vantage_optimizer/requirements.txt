@@ -1,0 +1,6 @@
+# Required (none - the module works standalone with SimpleCompressor fallback)
+
+# Optional - install for advanced LLMLingua-based compression
+llmlingua>=0.2.0        # optional
+transformers>=4.21.0    # optional
+torch>=1.12.0           # optional

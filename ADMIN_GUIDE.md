@@ -1201,6 +1201,56 @@ Set-Cookie: vantage_session=TOKEN; Path=/; HttpOnly; SameSite=Lax; Max-Age=25920
 
 ---
 
+## 16.5 Token Optimizer
+
+VantageAI includes an integrated **AI Token Optimizer** that reduces LLM costs by compressing prompts before they are sent to providers.
+
+### Architecture
+
+```
+vantage_optimizer/          # Core Python module
+├── compressor.py           # PromptCompressor (LLMLingua) + SimpleCompressor (regex fallback)
+├── context_manager.py      # Conversation context management + summarization
+├── utils.py                # TokenCounter, cost estimation, clean_text()
+└── config.py               # OptimizerConfig dataclass
+```
+
+### How It Works
+
+1. **Prompt Compression**: Removes filler words, redundant phrases, and extra whitespace while preserving semantic meaning. Advanced mode uses LLMLingua for ML-based compression.
+2. **Context Summarization**: Long conversation histories are automatically summarized — older messages are compressed while recent messages remain verbatim.
+3. **Token-Aware Optimization**: Tracks tokens per message and enforces configurable limits.
+
+### SDK Integration
+
+```python
+import vantage
+vantage.init(api_key="vnt_...", enable_optimizer=True, compression_rate=0.5)
+
+from vantage.proxy.openai_proxy import OpenAI
+client = OpenAI(api_key="sk-...")
+# All subsequent calls are automatically optimized
+```
+
+### API Endpoints (Worker)
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/v1/optimizer/compress` | POST | Compress a prompt |
+| `/v1/optimizer/analyze` | POST | Count tokens + estimate cost |
+| `/v1/optimizer/estimate` | POST | Compare costs across models |
+| `/v1/optimizer/stats` | GET | Optimizer usage statistics |
+
+### MCP Tools
+
+The MCP server exposes 4 optimizer tools: `optimize_prompt`, `analyze_tokens`, `estimate_costs`, `compress_context`.
+
+### Dashboard
+
+The "Token Optimizer" view in the dashboard provides an interactive prompt compressor, cost estimator, and optimization KPIs.
+
+---
+
 ## 17. Business Algorithms — Current & Research-Backed Future
 
 ### 17.1 Currently Implemented
