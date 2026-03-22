@@ -15,6 +15,7 @@ Flags:
   --integrations    Include integration suites (11_integrations, 12_mcp)
   --security        Include security + rate-limiting suites
   --superadmin      Include superadmin suite (14_superadmin)
+  --cross-browser   Include cross-browser suite (15_cross_browser)
   --all             Run everything
   --no-report       Skip writing summary artifact
   --clean           Run cleanup before starting
@@ -66,8 +67,9 @@ CAT_HEAVY        = {"06_stress", "07_load", "08_latency"}
 CAT_SECURITY_RL  = {"09_rate_limiting", "10_security"}
 CAT_INTEGRATIONS = {"11_integrations", "12_mcp"}
 CAT_DASHBOARD    = {"13_dashboard"}
-CAT_SUPERADMIN   = {"14_superadmin"}
-CAT_BROWSER      = {"02_ui", "13_dashboard"}
+CAT_SUPERADMIN    = {"14_superadmin"}
+CAT_CROSS_BROWSER = {"15_cross_browser"}
+CAT_BROWSER       = {"02_ui", "13_dashboard"}
 
 
 def discover_suites(filter_categories=None):
@@ -132,6 +134,8 @@ def parse_args():
                    help="Include security + rate-limiting suites (09, 10)")
     p.add_argument("--superadmin", action="store_true",
                    help="Include superadmin suite (14_superadmin)")
+    p.add_argument("--cross-browser", action="store_true",
+                   help="Include cross-browser suite (15_cross_browser — needs all engines)")
     p.add_argument("--all", action="store_true",
                    help="Run everything")
     p.add_argument("--no-report", action="store_true",
@@ -167,6 +171,9 @@ def build_category_filter(args):
 
     if args.superadmin:
         cats.update(CAT_SUPERADMIN)
+
+    if getattr(args, 'cross_browser', False):
+        cats.update(CAT_CROSS_BROWSER)
 
     if not args.no_browser:
         cats.update(CAT_DASHBOARD)  # 13_dashboard included unless --no-browser

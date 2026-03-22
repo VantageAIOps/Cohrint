@@ -1,0 +1,161 @@
+name: Cross-Browser Compatibility Tests
+
+# Tests the site across Chrome, Firefox, Safari/WebKit, Android mobile,
+# iOS mobile, and tablet viewports to catch browser-specific regressions.
+#
+# Triggers:
+#   - Push to main (after deploy — catches live regressions)
+#   - Push to version branches (before promotion)
+#   - Nightly schedule (catches third-party CDN / Cloudflare changes)
+#   - Manual trigger
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  push:
+    branches:
+      - main
+      - 'v[0-9]*'
+    paths:
+      - 'vantage-final-v4/**'
+      - 'vantage-worker/**'
+      - 'tests/suites/15_cross_browser/**'
+      - 'tests/helpers/browser.py'
+      - '.github/workflows/ci-cross-browser.yml'
+
+  schedule:
+    # Nightly at 02:00 UTC (catches CDN / third-party drift)
+    - cron: '0 2 * * *'
+
+  workflow_dispatch:
+    inputs:
+      all_devices:
+        description: 'Run full device matrix (mobile + tablet)'
+        required: false
+        type: boolean
+        default: true
+      site_url:
+        description: 'Override site URL (default: https://vantageaiops.com)'
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  # ── 1. Desktop browsers (Chrome + Firefox + WebKit) ──────────────────────────
+  desktop-browsers:
+    name: Desktop Browsers (Chrome · Firefox · Safari)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: pip install -r tests/requirements.txt
+
+      - name: Install Playwright browsers (all engines)
+        run: python -m playwright install chromium firefox webkit --with-deps
+
+      - name: Run cross-browser compat tests (desktop)
+        env:
+          HEADLESS: '1'
+          CB_ALL_DEVICES: '0'   # desktop only in this job
+          VANTAGE_SITE_URL: ${{ inputs.site_url || 'https://vantageaiops.com' }}
+          VANTAGE_API_URL: "https://api.vantageaiops.com"
+        run: |
+          python tests/run_suite.py \
+            --category 15_cross_browser \
+            --no-report 2>&1 | tee /tmp/cross-browser-desktop.txt
+          EXIT=${PIPESTATUS[0]}
+          echo "Exit code: $EXIT"
+          exit $EXIT
+
+      - name: Upload desktop results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-browser-desktop-${{ github.ref_name }}-${{ github.run_number }}
+          path: /tmp/cross-browser-desktop.txt
+
+  # ── 2. Mobile + tablet devices ────────────────────────────────────────────────
+  mobile-devices:
+    name: Mobile & Tablet Devices (Android · iOS · iPad)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Run on: manual trigger with all_devices=true, nightly, or push to main
+    if: |
+      github.event_name == 'schedule' ||
+      github.ref == 'refs/heads/main' ||
+      (github.event_name == 'workflow_dispatch' && inputs.all_devices == true)
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: pip install -r tests/requirements.txt
+
+      - name: Install Playwright browsers (Chromium + WebKit for devices)
+        run: python -m playwright install chromium webkit --with-deps
+
+      - name: Run cross-browser tests (full device matrix)
+        env:
+          HEADLESS: '1'
+          CB_ALL_DEVICES: '1'   # enable mobile + tablet devices
+          VANTAGE_SITE_URL: ${{ inputs.site_url || 'https://vantageaiops.com' }}
+          VANTAGE_API_URL: "https://api.vantageaiops.com"
+        run: |
+          python tests/run_suite.py \
+            --category 15_cross_browser \
+            --no-report 2>&1 | tee /tmp/cross-browser-mobile.txt
+          EXIT=${PIPESTATUS[0]}
+          echo "Exit code: $EXIT"
+          exit $EXIT
+
+      - name: Upload mobile results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-browser-mobile-${{ github.ref_name }}-${{ github.run_number }}
+          path: /tmp/cross-browser-mobile.txt
+
+  # ── 3. Summary ────────────────────────────────────────────────────────────────
+  summary:
+    name: Cross-Browser Summary
+    runs-on: ubuntu-latest
+    needs: [desktop-browsers, mobile-devices]
+    if: always()
+    steps:
+      - name: Write step summary
+        run: |
+          echo "## Cross-Browser Compatibility — ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Browser / Device | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|------------------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Desktop (Chrome · Firefox · Safari) | ${{ needs.desktop-browsers.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Mobile + Tablet (Android · iOS · iPad) | ${{ needs.mobile-devices.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ needs.desktop-browsers.result }}" = "success" ]; then
+            echo "✅ All desktop browsers passed." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Desktop browser tests failed — check artifacts." >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ "${{ needs.mobile-devices.result }}" = "success" ]; then
+            echo "✅ All mobile/tablet devices passed." >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.mobile-devices.result }}" = "skipped" ]; then
+            echo "ℹ️  Mobile/tablet tests skipped (not a main push or nightly run)." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Mobile/tablet tests failed — check artifacts." >> $GITHUB_STEP_SUMMARY
+          fi

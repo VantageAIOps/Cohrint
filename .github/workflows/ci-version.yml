@@ -158,19 +158,24 @@ jobs:
       - name: Install dependencies
         run: pip install -r tests/requirements.txt playwright
 
-      - name: Install Chromium
-        run: python -m playwright install chromium --with-deps
+      - name: Install browsers (all engines for cross-browser suite)
+        run: python -m playwright install chromium firefox webkit --with-deps
 
       - name: Run browser/UI suites
         env:
           HEADLESS: '1'
+          CB_ALL_DEVICES: '1'
           VANTAGE_SITE_URL: "https://vantageaiops.com"
           VANTAGE_API_URL: "https://api.vantageaiops.com"
         run: |
           if [ "${{ inputs.extended }}" = "true" ] || [ "${{ github.event_name }}" = "push" ]; then
-            python tests/run_suite.py --category 02_ui --category 13_dashboard --no-report 2>&1 | tee /tmp/ui-tests.txt
+            python tests/run_suite.py \
+              --category 02_ui --category 13_dashboard --category 15_cross_browser \
+              --no-report 2>&1 | tee /tmp/ui-tests.txt
           else
-            python tests/run_suite.py --category 02_ui --no-report 2>&1 | tee /tmp/ui-tests.txt
+            python tests/run_suite.py \
+              --category 02_ui --category 15_cross_browser \
+              --no-report 2>&1 | tee /tmp/ui-tests.txt
           fi
           EXIT=${PIPESTATUS[0]}
           exit $EXIT
