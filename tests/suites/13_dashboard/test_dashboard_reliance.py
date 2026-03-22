@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from config.settings import API_URL, SITE_URL
 from helpers.api import signup_api, get_headers
-from helpers.data import rand_email, rand_org, rand_name
+from helpers.data import rand_email, rand_org, rand_name, make_event
 from helpers.output import ok, fail, warn, info, section, chk, get_results
 
 
@@ -40,13 +40,12 @@ def ingest_50_events(api_key):
     accepted = 0
     for i in range(50):
         model = MODELS[i % len(MODELS)]
-        event = {
-            "model":     model,
-            "cost":      round(0.001 + (i % 10) * 0.002, 6),
-            "tokens":    {"prompt": 100 + i * 5, "completion": 50 + i * 2},
-            "timestamp": int(time.time() * 1000) + i * 100,
-            "tags":      {"test": "dashboard_reliance", "model_family": model.split("-")[0]},
-        }
+        event = make_event(i=i, model=model,
+                           cost=round(0.001 + (i % 10) * 0.002, 6),
+                           prompt_tokens=100 + i * 5,
+                           completion_tokens=50 + i * 2,
+                           tags={"test": "dashboard_reliance",
+                                 "model_family": model.split("-")[0]})
         r = requests.post(f"{API_URL}/v1/events", json=event, headers=headers, timeout=15)
         if r.status_code in (201, 202):
             accepted += 1

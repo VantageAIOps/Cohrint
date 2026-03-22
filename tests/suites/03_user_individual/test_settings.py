@@ -86,7 +86,13 @@ def test_settings_ui(api_key, org_id):
 
     with sync_playwright() as pw:
         from helpers.browser import make_browser_ctx, collect_console_errors, signin_ui
-        browser, ctx, page = make_browser_ctx(pw)
+        try:
+            browser, ctx, page = make_browser_ctx(pw)
+        except Exception as e:
+            if "Executable doesn't exist" in str(e):
+                warn("ST.9  Chromium not installed — skipping browser tests")
+                return
+            raise
         errors = collect_console_errors(page)
 
         try:

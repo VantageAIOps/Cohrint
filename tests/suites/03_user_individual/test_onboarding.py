@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from config.settings import API_URL, SITE_URL
 from helpers.api import signup_api, get_headers, get_session_cookie
-from helpers.data import rand_email, rand_org, rand_name
+from helpers.data import rand_email, rand_org, rand_name, make_event
 from helpers.output import ok, fail, warn, info, section, chk, get_results
 
 
@@ -47,13 +47,8 @@ def test_api_onboarding():
     # ON.3 Ingest 6 events (cost/tokens/model fields)
     events_ingested = 0
     for i, model in enumerate(MODELS[:3] + ["gpt-4o"] * 3):
-        event = {
-            "model":     model,
-            "cost":      round(0.002 * (i + 1), 6),
-            "tokens":    {"prompt": 100 + i * 10, "completion": 50 + i * 5},
-            "timestamp": int(time.time() * 1000) + i * 100,
-            "tags":      {"test": "onboarding", "run": f"event_{i}"},
-        }
+        event = make_event(i=i, model=model, cost=0.002 * (i + 1),
+                           tags={"test": "onboarding", "run": f"event_{i}"})
         r = requests.post(f"{API_URL}/v1/events", json=event, headers=headers, timeout=15)
         if r.status_code in (201, 202):
             events_ingested += 1
@@ -141,9 +136,7 @@ def test_playwright_onboarding():
                 headers = get_headers(api_key)
                 for i in range(3):
                     requests.post(f"{API_URL}/v1/events",
-                                  json={"model": "gpt-4o", "cost": 0.01 * (i+1),
-                                        "tokens": {"prompt": 100, "completion": 50},
-                                        "timestamp": int(time.time() * 1000) + i},
+                                  json=make_event(i=i, cost=0.01 * (i + 1)),
                                   headers=headers, timeout=10)
 
                 time.sleep(2)

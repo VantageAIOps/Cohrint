@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from config.settings import API_URL
 from helpers.api import signup_api, get_headers, get_session_cookie, fresh_account
-from helpers.data import rand_email, rand_org, rand_name
+from helpers.data import rand_email, rand_org, rand_name, make_event
 from helpers.output import ok, fail, warn, info, section, chk, get_results
 
 
@@ -39,10 +39,9 @@ def test_cross_org_isolation():
 
     # Ingest event for org A
     r_ingest = requests.post(f"{API_URL}/v1/events",
-                             json={"model": "gpt-4o", "cost": 9.99,
-                                   "tokens": {"prompt": 999, "completion": 999},
-                                   "timestamp": int(time.time() * 1000),
-                                   "tags": {"secret": "org_a_only"}},
+                             json=make_event(cost=9.99, prompt_tokens=999,
+                                             completion_tokens=999,
+                                             tags={"secret": "org_a_only"}),
                              headers=get_headers(key_a), timeout=15)
     chk("TA.1  Org A can ingest events", r_ingest.status_code in (201, 202),
         f"got {r_ingest.status_code}")
@@ -124,9 +123,7 @@ def test_concurrent_reads_isolated():
     # Ingest unique data for each org
     for i, d in enumerate(orgs):
         requests.post(f"{API_URL}/v1/events",
-                      json={"model": "gpt-4o", "cost": float(i + 1) * 1.0,
-                            "tokens": {"prompt": 100, "completion": 50},
-                            "timestamp": int(time.time() * 1000)},
+                      json=make_event(i=i, cost=float(i + 1) * 1.0),
                       headers=get_headers(d["api_key"]), timeout=10)
 
     time.sleep(1)

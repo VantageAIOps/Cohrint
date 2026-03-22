@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from config.settings import API_URL, SITE_URL
 from helpers.api import signup_api, get_headers, get_session_cookie, fresh_account
-from helpers.data import rand_email, rand_org, rand_name, rand_tag
+from helpers.data import rand_email, rand_org, rand_name, rand_tag, make_event
 from helpers.output import ok, fail, warn, info, section, chk, get_results
 
 
@@ -105,24 +105,14 @@ def test_events_endpoints(api_key):
     headers = get_headers(api_key)
 
     # Single event
-    event = {
-        "model": "gpt-4o",
-        "cost": 0.005,
-        "tokens": {"prompt": 100, "completion": 50},
-        "timestamp": int(time.time() * 1000),
-        "tags": {"test": "ep_test"},
-    }
+    event = make_event(tags={"test": "ep_test"})
     r = requests.post(f"{API_URL}/v1/events", json=event, headers=headers, timeout=15)
     chk("E.11 POST /v1/events single → 201/202", r.status_code in (201, 202),
         f"got {r.status_code}: {r.text[:100]}")
     chk("E.12 POST /v1/events CORS header", cors_ok(r))
 
     # Batch events
-    batch = [
-        {"model": "gpt-4o", "cost": 0.001 * i, "tokens": {"prompt": 50, "completion": 25},
-         "timestamp": int(time.time() * 1000) + i, "tags": {"test": "batch"}}
-        for i in range(1, 4)
-    ]
+    batch = [make_event(i=i, tags={"test": "batch"}) for i in range(1, 4)]
     r2 = requests.post(f"{API_URL}/v1/events/batch", json={"events": batch},
                        headers=headers, timeout=15)
     chk("E.13 POST /v1/events/batch → 201/202", r2.status_code in (201, 202),

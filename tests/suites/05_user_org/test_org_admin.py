@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from config.settings import API_URL
 from helpers.api import signup_api, get_headers, get_session_cookie
-from helpers.data import rand_email, rand_org, rand_name
+from helpers.data import rand_email, rand_org, rand_name, make_event
 from helpers.output import ok, fail, warn, info, section, chk, get_results
 
 
@@ -74,9 +74,7 @@ def test_shared_analytics(owner_key, org_id):
     # Ingest some events
     for i in range(3):
         requests.post(f"{API_URL}/v1/events",
-                      json={"model": "gpt-4o", "cost": 0.01 * (i + 1),
-                            "tokens": {"prompt": 100, "completion": 50},
-                            "timestamp": int(time.time() * 1000) + i},
+                      json=make_event(i=i, cost=0.01 * (i + 1)),
                       headers=headers, timeout=10)
 
     time.sleep(1)

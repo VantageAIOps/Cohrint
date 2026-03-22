@@ -31,7 +31,7 @@ superadmin.use('*', async (c, next) => {
   if (token !== secret) {
     return c.json({ error: 'Forbidden' }, 403);
   }
-  await next();
+  return next();
 });
 
 // ── POST /v1/superadmin/auth — validate secret ───────────────────────────────

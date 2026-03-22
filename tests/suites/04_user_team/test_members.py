@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from config.settings import API_URL
 from helpers.api import signup_api, get_headers, get_session_cookie
-from helpers.data import rand_email, rand_org, rand_name
+from helpers.data import rand_email, rand_org, rand_name, make_event
 from helpers.output import ok, fail, warn, info, section, chk, get_results
 
 
@@ -24,11 +24,11 @@ def test_owner_invite(owner_key, owner_id):
     headers = get_headers(owner_key)
     member_email = rand_email("tm-member")
 
-    # TM.1 POST /admin/invite → member key
-    r = requests.post(f"{API_URL}/v1/admin/invite",
+    # TM.1 POST /auth/members → member key
+    r = requests.post(f"{API_URL}/v1/auth/members",
                       json={"email": member_email, "name": rand_name(), "role": "member"},
                       headers=headers, timeout=15)
-    chk("TM.1  POST /admin/invite → 200/201",
+    chk("TM.1  POST /auth/members → 200/201",
         r.status_code in (200, 201),
         f"got {r.status_code}: {r.text[:100]}")
 
@@ -40,7 +40,7 @@ def test_owner_invite(owner_key, owner_id):
         chk("TM.2  Invite response includes member key", bool(member_key),
             f"response keys: {list(d.keys())}")
     else:
-        warn("TM.2  /admin/invite may not be implemented yet")
+        warn("TM.2  /auth/members may not be implemented yet")
         # Try alternative: create member via signup with org context
         try:
             d2 = signup_api(email=member_email, org=rand_org("tm-sub"))
@@ -90,13 +90,8 @@ def test_member_ingest(member_key, owner_key):
         return
 
     headers = get_headers(member_key)
-    event = {
-        "model": "gpt-4o",
-        "cost": 0.003,
-        "tokens": {"prompt": 80, "completion": 40},
-        "timestamp": int(time.time() * 1000),
-        "tags": {"source": "member_test"},
-    }
+    event = make_event(cost=0.003, prompt_tokens=80, completion_tokens=40,
+                       tags={"source": "member_test"})
     r = requests.post(f"{API_URL}/v1/events", json=event, headers=headers, timeout=15)
     chk("TM.6  Member can ingest events", r.status_code in (201, 202),
         f"got {r.status_code}: {r.text[:100]}")
