@@ -37,5 +37,6 @@
     "sideBar.background": "#0d1318",
     "statusBar.background": "#00d4a1",
     "statusBar.foreground": "#000000"
-  }
+  },
+  "cSpell.words": ["modelcontextprotocol", "vantageaiops"]
 }

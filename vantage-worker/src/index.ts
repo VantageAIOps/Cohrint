@@ -72,13 +72,15 @@ const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 app.use('*', corsMiddleware);
 
 // ── Health check (no auth) ────────────────────────────────────────────────────
-app.get('/health', (c) => c.json({
+const healthResponse = (c: any) => c.json({
   status:  'ok',
   service: 'vantage-api',
   version: '1.0.0',
   region:  (c.req.raw as Request & { cf?: { colo?: string } }).cf?.colo ?? 'unknown',
   ts:      new Date().toISOString(),
-}));
+});
+app.get('/health', healthResponse);
+app.get('/v1/health', healthResponse);
 
 // ── API routes ────────────────────────────────────────────────────────────────
 app.route('/v1/auth',       auth);
