@@ -53,6 +53,8 @@ An application integrates the VantageAI SDK (Python or JS). Every LLM API call t
 
 ## 2. System Architecture
 
+> **Interactive Diagram:** [System Architecture (UI + Backend + Infrastructure)](https://excalidraw.com/#json=92A4NZAtAZvzmUbVg_nd6,M0575eSAO8Eh8Eo3AVOPxg) — open in Excalidraw to explore the full UI layer, API worker middleware pipeline, and data storage topology.
+
 ### 2.1 High-Level Flow
 
 ```
@@ -857,6 +859,8 @@ Content-Security-Policy:
 
 ## 13. Client Types & Integration Patterns
 
+> **Interactive Diagram:** [SDK Architecture (Python + JavaScript)](https://excalidraw.com/#json=Tv6Kcu6jof1GZlHAFQMP2,DT4JGkvQJqxQ1EL2IoudbA) — open in Excalidraw to see how the SDK proxy wrappers intercept LLM calls, extract metadata, and POST events to the VantageAI API.
+
 VantageAI serves four distinct client archetypes. Each has different integration patterns, auth needs, and data characteristics.
 
 ---
@@ -1071,6 +1075,8 @@ exit 1
 ---
 
 ## 15. Test Infrastructure
+
+> **Interactive Diagram:** [Testing Framework (15 Suites + CI/CD)](https://excalidraw.com/#json=Otd993P-wGAX_4ANOAbUC,KQGCEnuRZvRTr5XPgey_jA) — open in Excalidraw to see all 15 test suites organized by category (Functional, Performance, Security, Integration) with CI/CD pipeline and test infrastructure.
 
 ### 15.1 New Directory Structure (Post-Restructure)
 
