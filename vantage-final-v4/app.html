@@ -2771,9 +2771,8 @@ async function runSeed() {
   setTimeout(() => { hideSeedPanel(); rebuildAll(); }, 1500);
 }
 async function checkSeedStatus() {
-  if (!window.vantageData) return;
-  const status = await window.vantageData.status();
-  if (!status.seeded) setTimeout(showSeedPanel, 1200);
+  // No longer auto-pops the seed panel. Users can trigger it manually
+  // via the toolbar "Seed data" button or the command palette.
 }
 
 // ── PWA + auto-reload on SW update ────────────────────
