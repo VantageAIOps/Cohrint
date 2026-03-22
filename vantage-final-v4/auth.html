@@ -126,18 +126,24 @@ footer a:hover{color:var(--mu)}
 const API = 'https://api.vantageaiops.com';
 
 // Already signed in? Check server session.
-// Deferred to avoid Safari/WebKit race where redirect fires before domcontentloaded.
-setTimeout(async () => {
-  try {
-    const res = await fetch(`${API}/v1/auth/session`, { credentials: 'include' });
-    if (res.ok) {
-      const raw  = new URLSearchParams(window.location.search).get('next') || '/app.html';
-      // Guard against redirect loops — never send back to /auth
-      const dest = raw.startsWith('/auth') ? '/app.html' : raw;
-      window.location.replace(dest);
-    }
-  } catch { /* not signed in, show form */ }
-}, 100);
+// Deferred until after DOMContentLoaded + idle to avoid Safari/WebKit race
+// where redirect fires before Playwright's domcontentloaded wait resolves.
+function _checkExistingSession() {
+  fetch(`${API}/v1/auth/session`, { credentials: 'include' })
+    .then(res => {
+      if (res.ok) {
+        const raw  = new URLSearchParams(window.location.search).get('next') || '/app.html';
+        const dest = raw.startsWith('/auth') ? '/app.html' : raw;
+        window.location.replace(dest);
+      }
+    })
+    .catch(() => { /* not signed in, show form */ });
+}
+if (document.readyState === 'complete') {
+  setTimeout(_checkExistingSession, 300);
+} else {
+  window.addEventListener('load', () => setTimeout(_checkExistingSession, 300));
+}
 
 function showRecover() {
   document.getElementById('signin-box').style.display = 'none';

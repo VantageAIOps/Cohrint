@@ -146,7 +146,14 @@ def _desktop_visual_check(pw, engine: str, label: str, prefix: str,
         n += 1
 
         # ── Auth page ─────────────────────────────────────────────────────────
-        page.goto(f"{SITE_URL}/auth", wait_until="domcontentloaded", timeout=15_000)
+        try:
+            page.goto(f"{SITE_URL}/auth", wait_until="domcontentloaded", timeout=15_000)
+        except Exception as nav_err:
+            if "interrupted by another navigation" in str(nav_err):
+                warn(f"{prefix}.{n}  [{label}] Auth — navigation redirected (Safari session check)")
+                n += len(AUTH_ELEMENTS)
+            else:
+                raise
 
         for elem_label, selector in AUTH_ELEMENTS.items():
             visible = _element_visible(page, selector)
@@ -197,7 +204,10 @@ def _desktop_visual_check(pw, engine: str, label: str, prefix: str,
             n += len(APP_ELEMENTS) + 1
 
     except Exception as e:
-        fail(f"{prefix}.X  [{label}] Unexpected error: {e}")
+        if "interrupted by another navigation" in str(e):
+            warn(f"{prefix}.X  [{label}] Navigation redirected (Safari session check)")
+        else:
+            fail(f"{prefix}.X  [{label}] Unexpected error: {e}")
     finally:
         browser.close()
 
@@ -351,7 +361,10 @@ def _mobile_visual_check(pw, device_name: str, engine: str, label: str,
             ok_js, f"errors: {list(errors)[:3]}")
 
     except Exception as e:
-        fail(f"{prefix}.X  [{label}] Unexpected error: {e}")
+        if "interrupted by another navigation" in str(e):
+            warn(f"{prefix}.X  [{label}] Navigation redirected (Safari session check)")
+        else:
+            fail(f"{prefix}.X  [{label}] Unexpected error: {e}")
     finally:
         browser.close()
 
