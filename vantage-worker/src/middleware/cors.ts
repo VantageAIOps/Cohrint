@@ -10,7 +10,11 @@ export async function corsMiddleware(c: Context<{ Bindings: Bindings }>, next: N
     allowed.includes(origin) ||
     allowed.some(p => p.endsWith('*') && origin.startsWith(p.slice(0, -1)));
 
-  const corsOrigin = isAllowed ? origin : allowed[0] ?? '*';
+  // Safari/WebKit requires explicit origin (not *) when credentials are used.
+  // If origin is allowed, echo it back; otherwise use first allowed origin.
+  // Never combine credentials: true with wildcard *.
+  const corsOrigin = isAllowed && origin ? origin : (allowed.find(a => a !== '*') || origin || '*');
+  const canCredential = corsOrigin !== '*';
 
   // Preflight
   if (c.req.method === 'OPTIONS') {
@@ -20,8 +24,9 @@ export async function corsMiddleware(c: Context<{ Bindings: Bindings }>, next: N
         'Access-Control-Allow-Origin':      corsOrigin,
         'Access-Control-Allow-Methods':     'GET, POST, PUT, PATCH, DELETE, OPTIONS',
         'Access-Control-Allow-Headers':     'Authorization, Content-Type, X-Vantage-Org',
-        'Access-Control-Allow-Credentials': 'true',
+        ...(canCredential ? { 'Access-Control-Allow-Credentials': 'true' } : {}),
         'Access-Control-Max-Age':           '86400',
+        'Vary':                             'Origin',
       },
     });
   }
@@ -29,6 +34,6 @@ export async function corsMiddleware(c: Context<{ Bindings: Bindings }>, next: N
   await next();
   c.res.headers.set('Access-Control-Allow-Origin',      corsOrigin);
   c.res.headers.set('Access-Control-Allow-Headers',     'Authorization, Content-Type, X-Vantage-Org');
-  c.res.headers.set('Access-Control-Allow-Credentials', 'true');
+  if (canCredential) c.res.headers.set('Access-Control-Allow-Credentials', 'true');
   c.res.headers.set('Vary', 'Origin');
 }

@@ -375,7 +375,7 @@ def test_security_headers():
     n = 1
     required_headers = [
         ("x-content-type-options", "nosniff"),
-        ("x-frame-options",        "DENY"),
+        ("x-frame-options",        "deny"),   # lowercased — headers_lower lowercases values
         ("referrer-policy",        None),     # just presence
     ]
 
