@@ -458,7 +458,63 @@ mcp: `
 <tr><td><code>check_budget</code></td><td>"Are we within our AI budget?"</td></tr>
 <tr><td><code>get_traces</code></td><td>"Show me recent agent traces and their cost"</td></tr>
 <tr><td><code>get_cost_gate</code></td><td>CI/CD gate — pass/fail vs monthly budget</td></tr>
-</tbody></table>`,
+<tr><td><code>optimize_prompt</code></td><td>Compress prompts to reduce token usage</td></tr>
+<tr><td><code>analyze_tokens</code></td><td>Count tokens and estimate cost for given text</td></tr>
+<tr><td><code>estimate_costs</code></td><td>Compare costs across all supported models</td></tr>
+<tr><td><code>compress_context</code></td><td>Compress conversation context within a token budget</td></tr>
+</tbody></table>
+
+<h2>Claude Desktop setup (step by step)</h2>
+<div class="step-row"><div class="step-num">1</div><div class="step-body">Get your API key from <a href="/signup.html">vantageaiops.com/signup</a>. It starts with <code>vnt_</code>.</div></div>
+<div class="step-row"><div class="step-num">2</div><div class="step-body">Open the config file: <code>~/Library/Application Support/Claude/claude_desktop_config.json</code><br>(On Windows: <code>%APPDATA%\\Claude\\claude_desktop_config.json</code>)</div></div>
+<div class="step-row"><div class="step-num">3</div><div class="step-body">Add the VantageAI server (create the file if it doesn't exist):</div></div>
+<pre>{
+  <span class="c-string">"mcpServers"</span>: {
+    <span class="c-string">"vantage"</span>: {
+      <span class="c-string">"command"</span>: <span class="c-string">"npx"</span>,
+      <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"vantageaiops-mcp"</span>],
+      <span class="c-string">"env"</span>: {
+        <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"vnt_your_key_here"</span>
+      }
+    }
+  }
+}</pre>
+<div class="step-row"><div class="step-num">4</div><div class="step-body"><strong>Completely quit and reopen Claude Desktop</strong> (not just close the window — quit from the menu bar). Tools appear in the hammer icon.</div></div>
+
+<h2>Environment variables</h2>
+<table class="api-table"><thead><tr><th>Variable</th><th>Required</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>VANTAGE_API_KEY</code></td><td>Yes</td><td>Your <code>vnt_...</code> API key from signup</td></tr>
+<tr><td><code>VANTAGE_ORG</code></td><td>No</td><td>Org ID override (auto-parsed from key)</td></tr>
+<tr><td><code>VANTAGE_API_BASE</code></td><td>No</td><td>Custom API base (default: <code>https://api.vantageaiops.com</code>)</td></tr>
+</tbody></table>
+
+<h2>Example prompts</h2>
+<p>Once connected, try these in your AI assistant chat:</p>
+<pre><span class="c-comment"># Cost tracking</span>
+"How much have we spent on LLMs this month?"
+"Which model is costing us the most?"
+"Are we within our AI budget?"
+
+<span class="c-comment"># Logging calls</span>
+"Track this call: gpt-4o, 500 prompt tokens, 120 completion tokens, $0.003"
+
+<span class="c-comment"># Optimization</span>
+"Compare costs for this prompt across all models"
+"Compress this prompt to reduce tokens"</pre>
+
+<h2>Troubleshooting</h2>
+<div class="warn-box">
+<strong>Server not showing up?</strong><br>
+1. Make sure <code>node</code> (v18+) is installed: run <code>node --version</code> in terminal<br>
+2. Verify your config JSON is valid (no trailing commas, correct path)<br>
+3. Fully quit and restart the app (not just close the window)<br>
+4. Check if <code>npx -y vantageaiops-mcp</code> works in terminal (you should see no errors)<br>
+5. On macOS: Claude Desktop may need <code>/usr/local/bin/npx</code> as the full path instead of just <code>npx</code>
+</div>
+<div class="warn-box" style="margin-top:8px">
+<strong>Tools fail with auth error?</strong><br>
+Make sure your <code>VANTAGE_API_KEY</code> is correct and starts with <code>vnt_</code>. Get a new key at <a href="/signup.html">signup</a> if needed.
+</div>`,
 
 cursor: `
 <h1>Cursor</h1>
@@ -498,7 +554,10 @@ windsurf: `
 
 claudecode: `
 <h1>Claude Code</h1>
-<p>Claude Code supports MCP natively. Add to your project's <code>.mcp.json</code> (or <code>~/.claude/mcp.json</code> for global):</p>
+<p>Claude Code supports MCP natively. You can add VantageAI at the project level or globally.</p>
+
+<h2>Project-level setup</h2>
+<p>Create <code>.mcp.json</code> in your project root:</p>
 <pre>{
   <span class="c-string">"mcpServers"</span>: {
     <span class="c-string">"vantage"</span>: {
@@ -508,7 +567,31 @@ claudecode: `
       <span class="c-string">"env"</span>: { <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"vnt_your_key"</span> }
     }
   }
-}</pre>`,
+}</pre>
+
+<h2>Global setup (all projects)</h2>
+<p>Add to <code>~/.claude/mcp.json</code>:</p>
+<pre>{
+  <span class="c-string">"mcpServers"</span>: {
+    <span class="c-string">"vantage"</span>: {
+      <span class="c-string">"type"</span>: <span class="c-string">"stdio"</span>,
+      <span class="c-string">"command"</span>: <span class="c-string">"npx"</span>,
+      <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"vantageaiops-mcp"</span>],
+      <span class="c-string">"env"</span>: { <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"vnt_your_key"</span> }
+    }
+  }
+}</pre>
+
+<h2>Verify it works</h2>
+<p>Open Claude Code and type: <code>/mcp</code> — you should see "vantage" listed with 12 tools. Then try:</p>
+<pre><span class="c-comment"># Ask Claude Code about your AI costs</span>
+"How much have we spent on LLMs this month?"
+"Which model is the most expensive?"
+"Track this call: gpt-4o, 1000 prompt tokens, 500 completion, $0.01"</pre>
+
+<div class="warn-box">
+<strong>Tip:</strong> If you get "server not found", make sure <code>npx</code> is on your PATH. You can use the full path: <code>/usr/local/bin/npx</code> or <code>/opt/homebrew/bin/npx</code> (run <code>which npx</code> to find it).
+</div>`,
 
 vscode: `
 <h1>VS Code Extension</h1>

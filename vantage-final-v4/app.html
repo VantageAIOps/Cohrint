@@ -1611,6 +1611,14 @@ async function loadTimeseries(org, days){
   try{ return await apiFetch(`/v1/analytics/timeseries?period=${days}`); }
   catch(e){ console.warn("Failed to fetch timeseries", e); return null; }
 }
+async function loadModels(org, days){
+  try{ return await apiFetch(`/v1/analytics/models?period=${days}`); }
+  catch(e){ console.warn("Failed to fetch models", e); return null; }
+}
+async function loadTeams(org, days){
+  try{ return await apiFetch(`/v1/analytics/teams?period=${days}`); }
+  catch(e){ console.warn("Failed to fetch teams", e); return null; }
+}
 
 function updateStatus(){
   const el = document.getElementById("api-status");
@@ -1848,19 +1856,46 @@ async function init_cost(){
   const spendData = ts.length ? ts.map(r => r.cost_usd) : Array.from({length:period},(_,i)=>Math.round((80+i*(period===7?45:12)+rnd(-30,50))*mult()));
   mkChart("costChart","bar",{labels, datasets:[barDs(spendData,"rgb(0,212,161)")]});
 
-  // Model cost rows
-  document.getElementById("model-cost-rows").innerHTML=DEMO_MODELS.map(m=>`
-    <div class="model-row">
-      <div class="model-dot" style="background:${m.color}"></div>
-      <div style="flex:1;font-size:12px">${m.name}</div>
-      <div class="bar-wrap"><div class="bar-fill" style="width:${m.pct}%;background:${m.color}40;border-right:2px solid ${m.color}"></div></div>
-      <div class="mono" style="font-size:11px;min-width:54px;text-align:right">$${(m.cost*mult()).toFixed(0)}</div>
-      <div class="mono muted" style="font-size:10px;min-width:30px;text-align:right">${m.pct}%</div>
-    </div>`).join("");
+  // Model cost rows — use real API data when available
+  const modelData = await loadModels(cfg.org, period);
+  const PROV_COLORS = {openai:"#74aa9c",anthropic:"#d97757",google:"#4285f4",meta:"#a78bfa",mistral:"#ff7000",cohere:"#39a4ff",deepseek:"#5b6ee1",amazon:"#ff9900"};
+  const realModels = modelData?.models;
+  if (realModels && realModels.length > 0) {
+    const totalCost = realModels.reduce((s,m) => s + (m.cost_usd||0), 0);
+    document.getElementById("model-cost-rows").innerHTML = realModels.map(m => {
+      const pct = totalCost > 0 ? Math.round((m.cost_usd||0)/totalCost*100) : 0;
+      const color = PROV_COLORS[m.provider] || "#6b7b8a";
+      return `<div class="model-row">
+        <div class="model-dot" style="background:${color}"></div>
+        <div style="flex:1;font-size:12px">${m.model}</div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${color}40;border-right:2px solid ${color}"></div></div>
+        <div class="mono" style="font-size:11px;min-width:54px;text-align:right">${fmt(m.cost_usd||0)}</div>
+        <div class="mono muted" style="font-size:10px;min-width:30px;text-align:right">${pct}%</div>
+      </div>`;
+    }).join("");
+  } else {
+    document.getElementById("model-cost-rows").innerHTML = DEMO_MODELS.map(m=>`
+      <div class="model-row">
+        <div class="model-dot" style="background:${m.color}"></div>
+        <div style="flex:1;font-size:12px">${m.name}</div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:${m.pct}%;background:${m.color}40;border-right:2px solid ${m.color}"></div></div>
+        <div class="mono" style="font-size:11px;min-width:54px;text-align:right">$${(m.cost*mult()).toFixed(0)}</div>
+        <div class="mono muted" style="font-size:10px;min-width:30px;text-align:right">${m.pct}%</div>
+      </div>`).join("");
+  }
 
-  // Team chart
-  const teamData=[32,28,18,12,10].map(v=>Math.round(v*48.21*mult()/100));
-  mkChart("teamChart","doughnut",{labels:TEAMS,datasets:[{data:teamData,backgroundColor:["#0098ff","#00d4a1","#f59e0b","#a78bfa","#f87171"],borderWidth:0}]},{plugins:{legend:{display:true,position:"right",labels:{color:"#6b7b8a",font:{size:11},boxWidth:10}}}});
+  // Team chart — use real API data when available
+  const teamResp = await loadTeams(cfg.org, period);
+  const realTeams = teamResp?.teams;
+  const TEAM_COLORS = ["#0098ff","#00d4a1","#f59e0b","#a78bfa","#f87171","#ff7000","#39a4ff","#e8b4a0"];
+  if (realTeams && realTeams.length > 0) {
+    const teamLabels = realTeams.map(t => t.team || 'unassigned');
+    const teamCosts  = realTeams.map(t => t.cost_usd || 0);
+    mkChart("teamChart","doughnut",{labels:teamLabels,datasets:[{data:teamCosts,backgroundColor:TEAM_COLORS.slice(0,teamLabels.length),borderWidth:0}]},{plugins:{legend:{display:true,position:"right",labels:{color:"#6b7b8a",font:{size:11},boxWidth:10}}}});
+  } else {
+    const teamData=[32,28,18,12,10].map(v=>Math.round(v*48.21*mult()/100));
+    mkChart("teamChart","doughnut",{labels:TEAMS,datasets:[{data:teamData,backgroundColor:TEAM_COLORS,borderWidth:0}]},{plugins:{legend:{display:true,position:"right",labels:{color:"#6b7b8a",font:{size:11},boxWidth:10}}}});
+  }
 
   // Budget donut
   const pct=Math.min(100,+spend/6000*100);
@@ -1877,21 +1912,23 @@ async function init_cost(){
     <div class="alert-item"><div class="alert-ico" style="background:var(--am2)">&#9889;</div><div><div class="alert-title">Token spike — GPT-4o</div><div class="alert-desc">3× above baseline, 14:22 UTC</div></div><div class="alert-time">18m</div></div>
     <div class="alert-item"><div class="alert-ico" style="background:var(--ac2)">&#128161;</div><div><div class="alert-title">Savings opportunity</div><div class="alert-desc">Switch /embed &#8594; save $680/mo</div></div><div class="alert-time">1h</div></div>`;
 
-  // Expensive requests table
+  // Expensive requests table — use real models when available
+  const expModels = (realModels && realModels.length > 0) ? realModels : DEMO_MODELS.map(m=>({model:m.name,provider:m.provider}));
+  const expTeams  = (realTeams && realTeams.length > 0) ? realTeams.map(t=>t.team) : TEAMS;
   document.getElementById("expensive-body").innerHTML=Array.from({length:10},(_,i)=>{
-    const m=DEMO_MODELS[i%DEMO_MODELS.length];
+    const m=expModels[i%expModels.length];
     const ti=ri(500,8000),to=ri(200,2000);
     const cost=((ti*.0000025)+(to*.00001)).toFixed(5);
     const lat=ri(400,3000);
     return`<tr>
       <td class="mono muted">${ri(1,60)}m ago</td>
       <td class="mono">${ENDPOINTS[i%ENDPOINTS.length]}</td>
-      <td><span class="prov prov-${m.provider}">${m.name}</span></td>
+      <td><span class="prov prov-${m.provider}">${m.model||m.name}</span></td>
       <td class="mono">${ti.toLocaleString()}</td>
       <td class="mono">${to.toLocaleString()}</td>
       <td class="mono" style="color:var(--am)">$${cost}</td>
       <td class="mono">${lat}ms</td>
-      <td><span class="tag tag-gray">${TEAMS[i%TEAMS.length]}</span></td>
+      <td><span class="tag tag-gray">${expTeams[i%expTeams.length]}</span></td>
     </tr>`;}).join("");
 }
 window.init_cost=init_cost;
@@ -1995,30 +2032,51 @@ window.filterModels=function(tier){
 /* ════════════════════════════════════════════════════════════════════════════
    MODULE 4 — PERFORMANCE & LATENCY
 ═══════════════════════════════════════════════════════════════════════════ */
-window.init_perf=function(){
+window.init_perf=async function(){
+  const cfg = getConfig();
   const lbl=daysSlice();
   const p50=Array.from({length:period},()=>ri(600,1100));
   const p95=Array.from({length:period},()=>ri(1400,2500));
   const p99=Array.from({length:period},()=>ri(2800,5000));
   mkChart("latencyChart","line",{labels:lbl,datasets:[lineDs(p50,"rgb(0,212,161)"),lineDs(p95,"rgb(245,158,11)"),lineDs(p99,"rgb(248,113,113)")]},{plugins:{legend:{display:true,labels:{color:"#6b7b8a",font:{size:11}}}},scales:{x:{display:false},y:{display:false}}});
 
-  mkChart("modelLatencyChart","bar",{labels:DEMO_MODELS.map(m=>m.name.split("-").slice(-1)[0]),datasets:[
-    {label:"p50",data:DEMO_MODELS.map(m=>m.p50),backgroundColor:"rgba(0,212,161,.5)",borderRadius:3},
-    {label:"p95",data:DEMO_MODELS.map(m=>m.p95),backgroundColor:"rgba(245,158,11,.5)",borderRadius:3},
-    {label:"p99",data:DEMO_MODELS.map(m=>m.p99),backgroundColor:"rgba(248,113,113,.5)",borderRadius:3},
-  ]},{plugins:{legend:{display:true,labels:{color:"#6b7b8a",font:{size:11}}}},scales:{x:{ticks:{color:"#6b7b8a",font:{size:9}}},y:{display:false}}});
+  // Use real model data for latency chart when available
+  const modelData = await loadModels(cfg.org, period);
+  const realModels = modelData?.models;
+  if (realModels && realModels.length > 0) {
+    mkChart("modelLatencyChart","bar",{labels:realModels.map(m=>m.model),datasets:[
+      {label:"avg",data:realModels.map(m=>Math.round(m.avg_latency_ms||0)),backgroundColor:"rgba(0,212,161,.5)",borderRadius:3},
+    ]},{plugins:{legend:{display:true,labels:{color:"#6b7b8a",font:{size:11}}}},scales:{x:{ticks:{color:"#6b7b8a",font:{size:9}}},y:{display:false}}});
+
+    document.getElementById("sla-body").innerHTML=realModels.map(m=>{
+      const lat = Math.round(m.avg_latency_ms||0);
+      return `<tr>
+        <td><span class="prov prov-${m.provider}">${m.model}</span></td>
+        <td class="mono">${lat}ms</td><td class="mono">—</td><td class="mono">—</td>
+        <td class="mono">—</td>
+        <td class="mono">${fmtNum(m.requests||0)}</td>
+        <td><span class="tag tag-green">&#10003; Within SLA</span></td>
+      </tr>`;
+    }).join("");
+  } else {
+    mkChart("modelLatencyChart","bar",{labels:DEMO_MODELS.map(m=>m.name.split("-").slice(-1)[0]),datasets:[
+      {label:"p50",data:DEMO_MODELS.map(m=>m.p50),backgroundColor:"rgba(0,212,161,.5)",borderRadius:3},
+      {label:"p95",data:DEMO_MODELS.map(m=>m.p95),backgroundColor:"rgba(245,158,11,.5)",borderRadius:3},
+      {label:"p99",data:DEMO_MODELS.map(m=>m.p99),backgroundColor:"rgba(248,113,113,.5)",borderRadius:3},
+    ]},{plugins:{legend:{display:true,labels:{color:"#6b7b8a",font:{size:11}}}},scales:{x:{ticks:{color:"#6b7b8a",font:{size:9}}},y:{display:false}}});
+
+    document.getElementById("sla-body").innerHTML=DEMO_MODELS.map(m=>`<tr>
+      <td><span class="prov prov-${m.provider}">${m.name}</span></td>
+      <td class="mono">${m.p50}ms</td><td class="mono">${m.p95}ms</td><td class="mono">${m.p99}ms</td>
+      <td class="mono ${m.err>0.8?'':''}">${m.err}%</td>
+      <td class="mono">${fmtNum(ri(5000,50000))}</td>
+      <td><span class="tag tag-green">&#10003; Within SLA</span></td>
+    </tr>`).join("");
+  }
 
   const errData=Array.from({length:period},()=>rnd(.1,1.2));
   mkChart("errorChart","line",{labels:lbl,datasets:[lineDs(errData,"rgb(248,113,113)")]});
   mkChart("ttftChart","bar",{labels:["<100ms","100-300ms","300-600ms","600ms-1s",">1s"],datasets:[barDs([5,32,45,14,4],"rgb(0,152,255)")]});
-
-  document.getElementById("sla-body").innerHTML=DEMO_MODELS.map(m=>`<tr>
-    <td><span class="prov prov-${m.provider}">${m.name}</span></td>
-    <td class="mono">${m.p50}ms</td><td class="mono">${m.p95}ms</td><td class="mono">${m.p99}ms</td>
-    <td class="mono ${m.err>0.8?'':''}">${m.err}%</td>
-    <td class="mono">${fmtNum(ri(5000,50000))}</td>
-    <td><span class="tag tag-green">&#10003; Within SLA</span></td>
-  </tr>`).join("");
 };
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -2997,15 +3055,27 @@ function _simulateLiveStream() {
   if (!streamEl) return;
   const dotEl    = document.getElementById('sse-dot');
   const statusEl = document.getElementById('stream-status');
+
+  // If user is authenticated, show waiting state instead of fake data
+  if (_session?.org_id) {
+    dotEl.style.background = 'var(--mu)';
+    dotEl.style.boxShadow  = '0 0 4px var(--mu)';
+    statusEl.textContent   = 'WAITING';
+    statusEl.className     = 'tag tag-gray';
+    streamEl.innerHTML = '<div style="color:var(--mu);font-size:12px;padding:8px">Waiting for live events... Send API calls to see them here in real time.</div>';
+    return;
+  }
+
+  // Only show demo stream for unauthenticated/demo users
   dotEl.style.background = 'var(--am)';
   dotEl.style.boxShadow  = '0 0 6px var(--am)';
   statusEl.textContent   = 'DEMO';
   statusEl.className     = 'tag tag-amber';
   streamEl.innerHTML = '';
-  const models = ['gpt-4o','claude-sonnet-4-6','gemini-2.0-flash','gpt-4o-mini','llama-3.3-70b'];
+  const models = ['gpt-4o','claude-sonnet-4-6','gemini-2.0-flash','gpt-4o-mini'];
   const provs  = {
     'gpt-4o':'openai','claude-sonnet-4-6':'anthropic','gemini-2.0-flash':'google',
-    'gpt-4o-mini':'openai','llama-3.3-70b':'meta'
+    'gpt-4o-mini':'openai'
   };
   function emit() {
     const m = models[Math.floor(Math.random()*models.length)];
