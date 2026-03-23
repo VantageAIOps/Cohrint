@@ -72,12 +72,33 @@ async function api(path: string, opts: RequestInit = {}): Promise<unknown> {
 
 class LLMCostOptimizer {
   private readonly MODEL_RATES: Record<string, { input: number; output: number }> = {
-    'gpt-4o':           { input: 0.005,   output: 0.015 },
+    // OpenAI
+    'gpt-4o':           { input: 0.0025,  output: 0.01 },
+    'gpt-4o-mini':      { input: 0.00015, output: 0.0006 },
+    'gpt-4-turbo':      { input: 0.01,    output: 0.03 },
     'gpt-4':            { input: 0.03,    output: 0.06 },
     'gpt-3.5-turbo':    { input: 0.0005,  output: 0.0015 },
+    'o1':               { input: 0.015,   output: 0.06 },
+    'o1-mini':          { input: 0.003,   output: 0.012 },
+    'o3-mini':          { input: 0.0011,  output: 0.0044 },
+    // Anthropic
+    'claude-sonnet-4':  { input: 0.003,   output: 0.015 },
+    'claude-3.5-sonnet':{ input: 0.003,   output: 0.015 },
     'claude-3-sonnet':  { input: 0.003,   output: 0.015 },
+    'claude-3-opus':    { input: 0.015,   output: 0.075 },
     'claude-3-haiku':   { input: 0.00025, output: 0.00125 },
+    'claude-haiku-3.5': { input: 0.0008,  output: 0.004 },
+    // Google
+    'gemini-2.0-flash': { input: 0.0001,  output: 0.0004 },
+    'gemini-1.5-pro':   { input: 0.00125, output: 0.005 },
+    'gemini-1.5-flash': { input: 0.000075,output: 0.0003 },
     'gemini-pro':       { input: 0.00025, output: 0.0005 },
+    // Meta / DeepSeek / Mistral
+    'llama-3.3-70b':    { input: 0.00059, output: 0.00079 },
+    'deepseek-v3':      { input: 0.00027, output: 0.0011 },
+    'deepseek-r1':      { input: 0.00055, output: 0.00219 },
+    'mistral-large':    { input: 0.002,   output: 0.006 },
+    'mistral-small':    { input: 0.0002,  output: 0.0006 },
   };
 
   private readonly FILLER_WORDS = /\b(the|and|or|but|in|on|at|to|for|of|with|by|an|a|is|are|was|were|be|been|being|have|has|had|do|does|did|will|would|could|should|may|might|must|can|shall)\b/gi;
@@ -144,7 +165,7 @@ const optimizer = new LLMCostOptimizer();
 // ── MCP Server ────────────────────────────────────────────────────────────────
 
 const server = new Server(
-  { name: 'vantage-mcp', version: '1.0.0' },
+  { name: 'vantage-mcp', version: '1.1.0' },
   { capabilities: { tools: {}, resources: {} } },
 );
 
@@ -257,7 +278,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           model: {
             type: 'string',
             description: 'Model to price against (default: gpt-3.5-turbo)',
-            enum: ['gpt-4o', 'gpt-4', 'gpt-3.5-turbo', 'claude-3-sonnet', 'claude-3-haiku', 'gemini-pro'],
+            enum: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo', 'o1', 'o1-mini', 'o3-mini', 'claude-sonnet-4', 'claude-3.5-sonnet', 'claude-3-opus', 'claude-3-haiku', 'claude-haiku-3.5', 'gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-1.5-flash', 'llama-3.3-70b', 'deepseek-v3', 'deepseek-r1', 'mistral-large', 'mistral-small'],
           },
         },
         required: ['text'],
@@ -319,7 +340,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const event = {
           event_id: `mcp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           ...args,
-          org_id: ORG,
         };
         await api('/v1/events', { method: 'POST', body: JSON.stringify(event) });
         return {
@@ -338,10 +358,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           `| Metric | Value |`,
           `|--------|-------|`,
           `| MTD Spend | $${Number(data.mtd_cost_usd ?? 0).toFixed(4)} |`,
-          `| Today | $${Number(data.today_cost_usd ?? 0).toFixed(4)} |`,
-          `| Requests | ${Number(data.today_requests ?? 0).toLocaleString()} |`,
-          `| Avg Latency | ${Number(data.avg_latency_ms ?? 0).toFixed(0)}ms |`,
+          `| Today Spend | $${Number(data.today_cost_usd ?? 0).toFixed(4)} |`,
+          `| Today Requests | ${Number(data.today_requests ?? 0).toLocaleString()} |`,
+          `| Today Tokens | ${Number(data.today_tokens ?? 0).toLocaleString()} |`,
+          `| Session Spend (30 min) | $${Number(data.session_cost_usd ?? 0).toFixed(4)} |`,
           `| Budget Used | ${Number(data.budget_pct ?? 0) > 0 ? `${Number(data.budget_pct).toFixed(1)}%` : 'No budget set'} |`,
+          `| Plan | ${data.plan ?? 'free'} |`,
           ``,
           `🔗 [View dashboard](https://vantageaiops.com/app.html)`,
         ];
@@ -428,7 +450,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_traces': {
         const limit = Math.min(Number(args?.limit ?? 10), 50);
-        const resp = await api(`/v1/analytics/traces`) as { traces: Record<string, unknown>[] };
+        const resp = await api(`/v1/analytics/traces?period=7`) as { traces: Record<string, unknown>[] };
         const traces = (resp.traces ?? []).slice(0, limit);
         if (!traces.length) {
           return { content: [{ type: 'text', text: 'No traces found. Make sure to pass `trace_id` when calling `track_llm_call`.' }] };
@@ -670,9 +692,14 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
 // ── Start ─────────────────────────────────────────────────────────────────────
 
 async function main() {
+  if (!API_KEY) {
+    process.stderr.write('[vantage-mcp] WARNING: VANTAGE_API_KEY is not set. Tools will fail until a key is provided.\n');
+    process.stderr.write('[vantage-mcp] Get your key at: https://vantageaiops.com/signup.html\n');
+  } else {
+    process.stderr.write(`[vantage-mcp] org=${ORG} api=${API_BASE}\n`);
+  }
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  // MCP servers must not write to stdout — use stderr for logs
   process.stderr.write('[vantage-mcp] Server started\n');
 }
 
