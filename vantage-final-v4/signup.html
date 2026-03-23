@@ -10,6 +10,7 @@
 <meta name="theme-color" content="#00d4a1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="/theme.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -73,6 +74,22 @@ footer{border-top:1px solid var(--border);padding:20px 48px;display:flex;align-i
 footer a{color:var(--dim);text-decoration:none;transition:color .2s}
 footer a:hover{color:var(--text)}
 @media(max-width:560px){nav{padding:14px 20px}.card{padding:28px 20px}.trust{gap:14px;flex-wrap:wrap}footer{padding:20px;flex-direction:column;gap:12px;text-align:center}}
+
+[data-theme="light"]{
+  --bg:#f0f2f5;--bg2:#ffffff;--bg3:#f5f6f8;--bg4:#eceef1;
+  --border:rgba(0,0,0,.07);--border2:rgba(0,0,0,.12);
+  --text:#0d1318;--muted:#5a6878;--dim:#adb5bd;
+  --accent:#00b882;--blue:#0070d6;--amber:#c88200;--red:#dc5050;--purple:#8c64dc;
+  --b1:rgba(0,0,0,.07);--b2:rgba(0,0,0,.12);
+  --tx:#0d1318;--mu:#5a6878;--di:#adb5bd;
+  --ac:#00b882;--re:#dc5050;--am:#c88200;
+}
+[data-theme="light"] body{background:var(--bg);color:var(--text)}
+[data-theme="light"] nav{background:rgba(255,255,255,.9);border-bottom-color:rgba(0,0,0,.08)}
+[data-theme="light"] .nav-links a{color:var(--muted)}
+[data-theme="light"] .nav-links a:hover,[data-theme="light"] .nav-links a.active{color:var(--text)}
+[data-theme="light"] footer{border-top-color:rgba(0,0,0,.08);color:var(--muted)}
+[data-theme="light"] body::before{opacity:0}
 </style>
 </head>
 <body>
@@ -82,6 +99,7 @@ footer a:hover{color:var(--text)}
   <div class="nav-links">
     <a href="/calculator.html">Calculator</a>
     <a href="/docs.html">Docs</a>
+    <button data-theme-toggle onclick="vantageTheme.toggle()" style="background:none;border:1px solid var(--border2,rgba(255,255,255,.13));color:var(--muted,#6b7b8a);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .2s" title="Toggle theme">☾</button>
     <a href="/auth.html" style="color:var(--accent)">Sign in →</a>
   </div>
 </nav>

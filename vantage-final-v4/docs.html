@@ -38,6 +38,7 @@
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="/theme.js"></script>
 <style>
 /* vantage-shared.css — loaded by all pages */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -102,6 +103,30 @@ footer a:hover{color:var(--text)}
   footer{flex-direction:column;gap:16px;text-align:center;padding:24px}
 }
 
+
+[data-theme="light"]{
+  --bg:#f0f2f5;--bg2:#ffffff;--bg3:#f5f6f8;--bg4:#eceef1;
+  --border:rgba(0,0,0,.07);--border2:rgba(0,0,0,.12);
+  --text:#0d1318;--muted:#5a6878;--dim:#adb5bd;
+  --accent:#00b882;--blue:#0070d6;--amber:#c88200;--red:#dc5050;--purple:#8c64dc;
+}
+[data-theme="light"] body{background:var(--bg);color:var(--text)}
+[data-theme="light"] nav{background:rgba(255,255,255,.9);border-bottom-color:rgba(0,0,0,.08)}
+[data-theme="light"] .nav-links a{color:var(--muted)}
+[data-theme="light"] .nav-links a:hover,[data-theme="light"] .nav-links a.active{color:var(--text)}
+[data-theme="light"] footer{border-top-color:rgba(0,0,0,.08);color:var(--muted)}
+[data-theme="light"] .docs-sidebar{background:var(--bg2);border-right-color:rgba(0,0,0,.08)}
+[data-theme="light"] .docs-nav-item:hover{background:rgba(0,0,0,.03)}
+[data-theme="light"] .docs-nav-item.active{color:var(--accent);background:rgba(0,184,130,.05)}
+[data-theme="light"] pre{background:var(--bg3);border-color:rgba(0,0,0,.1)}
+[data-theme="light"] code{background:var(--bg3)}
+[data-theme="light"] .info-box{background:rgba(0,112,214,.06);border-color:rgba(0,112,214,.15)}
+[data-theme="light"] .warn-box{background:rgba(200,130,0,.06);border-color:rgba(200,130,0,.15)}
+[data-theme="light"] .tab{background:var(--bg2);border-color:rgba(0,0,0,.08)}
+[data-theme="light"] .tab.active{background:var(--bg3);border-color:rgba(0,0,0,.12)}
+[data-theme="light"] .tab-content{background:var(--bg3);border-color:rgba(0,0,0,.12)}
+[data-theme="light"] .api-table th{border-bottom-color:rgba(0,0,0,.08)}
+[data-theme="light"] .api-table td{border-bottom-color:rgba(0,0,0,.05)}
 </style>
 <style>
 .docs-layout{display:grid;grid-template-columns:240px 1fr;gap:0;min-height:calc(100vh - 53px)}
@@ -149,6 +174,7 @@ pre{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;pad
     <a href="/calculator.html">Calculator</a>
     <a href="/app.html">Dashboard</a>
     <a href="/docs.html" class="active">Docs</a>
+    <button data-theme-toggle onclick="vantageTheme.toggle()" style="background:none;border:1px solid var(--border2,rgba(255,255,255,.13));color:var(--muted,#6b7b8a);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .2s" title="Toggle theme">☾</button>
     <a href="/signup.html" class="nav-cta">Start free →</a>
   </div>
 </nav>

@@ -124,6 +124,7 @@
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="/theme.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -357,6 +358,36 @@ footer a:hover{color:var(--text)}
   .trust-row{gap:12px}
   .compare-wrap{overflow-x:auto}
 }
+
+[data-theme="light"]{
+  --bg:#f0f2f5;--bg2:#ffffff;--bg3:#f5f6f8;--bg4:#eceef1;
+  --border:rgba(0,0,0,.07);--border2:rgba(0,0,0,.12);
+  --text:#0d1318;--muted:#5a6878;--dim:#adb5bd;
+  --accent:#00b882;--blue:#0070d6;--amber:#c88200;--red:#dc5050;--purple:#8c64dc;
+}
+[data-theme="light"] body{background:var(--bg);color:var(--text)}
+[data-theme="light"] nav{background:rgba(255,255,255,.9);border-bottom-color:rgba(0,0,0,.08)}
+[data-theme="light"] .nav-links a{color:var(--muted)}
+[data-theme="light"] .nav-links a:hover,[data-theme="light"] .nav-links a.active{color:var(--text)}
+[data-theme="light"] footer{border-top-color:rgba(0,0,0,.08);color:var(--muted)}
+[data-theme="light"] .hero-grid{opacity:0}
+[data-theme="light"] .hero-glow{opacity:.3}
+[data-theme="light"] body::before{opacity:0}
+[data-theme="light"] .install-box{background:var(--bg2);border-color:rgba(0,0,0,.1)}
+[data-theme="light"] .copy-btn{background:var(--bg3);border-color:rgba(0,0,0,.1);color:var(--text)}
+[data-theme="light"] .stat-item{border-color:rgba(0,0,0,.06)}
+[data-theme="light"] .step{border-color:rgba(0,0,0,.08);background:var(--bg2)}
+[data-theme="light"] .feat-card{background:var(--bg2);border-color:rgba(0,0,0,.08)}
+[data-theme="light"] .int-card{background:var(--bg2);border-color:rgba(0,0,0,.08)}
+[data-theme="light"] .code-block{background:var(--bg3);border-color:rgba(0,0,0,.1)}
+[data-theme="light"] .code-tab{background:var(--bg2);border-color:rgba(0,0,0,.08);color:var(--muted)}
+[data-theme="light"] .code-tab.active{background:var(--bg3);color:var(--text)}
+[data-theme="light"] .plan{background:var(--bg2);border-color:rgba(0,0,0,.08)}
+[data-theme="light"] .plan.featured{border-color:var(--accent)}
+[data-theme="light"] .faq-item{border-color:rgba(0,0,0,.06)}
+[data-theme="light"] .ticker-wrap{background:var(--bg2);border-color:rgba(0,0,0,.06)}
+[data-theme="light"] .demo-wrap{background:var(--bg2);border-color:rgba(0,0,0,.1)}
+[data-theme="light"] .demo-bar{background:var(--bg3);border-bottom-color:rgba(0,0,0,.06)}
 </style>
 </head>
 <body>
@@ -369,6 +400,7 @@ footer a:hover{color:var(--text)}
     <a href="#pricing">Pricing</a>
     <a href="#faq">FAQ</a>
     <a href="/auth" id="nav-signin" style="font-size:13px;color:var(--muted);text-decoration:none;transition:color .2s">Sign in</a>
+    <button data-theme-toggle onclick="vantageTheme.toggle()" style="background:none;border:1px solid var(--border2,rgba(255,255,255,.13));color:var(--muted,#6b7b8a);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .2s" title="Toggle theme">☾</button>
     <a href="/signup" class="nav-cta" id="nav-cta">Sign up free →</a>
   </div>
   <div class="nav-hamburger" onclick="toggleMobileNav(this)" aria-label="Menu">
