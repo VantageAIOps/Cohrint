@@ -1465,6 +1465,34 @@ For enterprise customers running self-hosted models (Llama on GPU): predict when
 
 `orgs.budget_usd = 0` means "no budget set" (not zero budget — users can't set $0 budget deliberately in current UI). Budget percent shown in KPI card: `(mtd_cost / budget) * 100`. If `budget = 0`, budget_pct returns 0 (no gauge shown).
 
+### 18.4 OTel Pricing Engine (Auto Cost Estimation)
+
+When AI tools send only token counts via OTel (no explicit cost metric), VantageAI auto-calculates `cost_usd` using its internal pricing table. This is critical for tools like GitHub Copilot and Gemini CLI that emit token counts but not costs.
+
+**Pricing Table** (maintained in `vantage-worker/src/routes/otel.ts` → `MODEL_PRICES`):
+
+| Model | Input ($/1M) | Output ($/1M) | Cache ($/1M) |
+|---|---|---|---|
+| claude-opus-4-6 | $15.00 | $75.00 | $1.50 |
+| claude-sonnet-4-6 | $3.00 | $15.00 | $0.30 |
+| claude-haiku-4-5 | $0.80 | $4.00 | $0.08 |
+| gpt-4o | $2.50 | $10.00 | $1.25 |
+| gpt-4o-mini | $0.15 | $0.60 | $0.075 |
+| o1 | $15.00 | $60.00 | $7.50 |
+| o3-mini | $1.10 | $4.40 | $0.55 |
+| gemini-2.0-flash | $0.10 | $0.40 | $0.025 |
+| gemini-1.5-pro | $1.25 | $5.00 | $0.31 |
+| gemini-1.5-flash | $0.075 | $0.30 | $0.018 |
+
+**Cost Formula:**
+```
+cost_usd = (uncached_input / 1M) × input_price + (cached_input / 1M) × cache_price + (output / 1M) × output_price
+```
+
+**Fuzzy Matching:** If exact model name not in table, the engine tries substring matching (e.g., `claude-sonnet-4-6-20260301` matches `claude-sonnet-4-6`). Unknown models return `cost_usd = 0`.
+
+**Precedence:** If a tool sends both token counts AND an explicit cost metric, the explicit cost takes precedence (auto-estimation only fills in when `cost_usd == 0`).
+
 ---
 
 ## 19. Operational Runbook
@@ -1563,6 +1591,19 @@ npx wrangler d1 execute vantage-events --file ./migrations/0002_add_anomaly_scor
 ```
 
 Always use `IF NOT EXISTS` and `IF NOT EXISTS` for safety. D1 has no rollback — test on preview first.
+
+### 19.6 SQLite Date Format (Critical)
+
+All date comparisons in cross-platform queries use SQLite-native format: `YYYY-MM-DD HH:MM:SS` (space separator, no T, no Z). This is because `datetime('now')` in SQLite produces this format.
+
+**Common mistake:** Using ISO 8601 (`2026-03-24T00:00:00Z`) in WHERE clauses — this breaks string-based comparisons because `T` sorts differently than space.
+
+**Helper functions** in `crossplatform.ts`:
+- `sqliteDateSince(days)` — returns `YYYY-MM-DD HH:MM:SS` for N days ago
+- `sqliteTodayStart()` — returns `YYYY-MM-DD 00:00:00` for today
+- `sqliteMonthStart()` — returns `YYYY-MM-01 00:00:00` for current month
+
+**When writing new queries:** Always use these helpers or `datetime('now')` — never construct ISO dates manually.
 
 ---
 
@@ -2321,13 +2362,16 @@ The "All AI Spend" module (`view-allspend`) is the new default landing page in `
 - Model cost breakdown
 - Live OTel event feed (auto-refreshes every 30 seconds)
 - Data source connection status
+- **Dual-write to otel_events:** OTel metrics with token/cost data are also inserted into the `otel_events` table, powering the `/live` feed. This ensures real-time visibility for metrics-only sources (not just log events).
 
 ### Test Coverage
 
 - `tests/suites/17_otel/test_otel_collector.py` — 41 checks (auth, ingestion, API queries)
 - `tests/suites/17_otel/test_otel_e2e.py` — 78 checks (multi-platform simulation, ROI metrics, edge cases)
-- Total: **119 checks** covering OTel + cross-platform features
+- `tests/suites/18_sdk_privacy/test_sdk_privacy.py` — 50+ checks (privacy modes, pricing engine, date format, dual-write)
+- `tests/suites/19_local_proxy/test_local_proxy.py` — 42+ checks (privacy engine, pricing accuracy, proxy integration, scanner coverage)
+- Total: **210+ checks** covering OTel + cross-platform + privacy + pricing features
 
 ---
 
-*Last updated: 23 March 2026 — v2 cross-platform OTel collector, 4-layer architecture, new dashboard module, 119 test checks.*
+*Last updated: 24 March 2026 — v2.1 SDK privacy mode, OTel pricing engine, local proxy, SQLite date fixes, dual-write otel_events, 210+ test checks.*

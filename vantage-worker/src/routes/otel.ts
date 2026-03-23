@@ -135,6 +135,40 @@ interface ParsedOTelRecord {
   timestamp: string;
 }
 
+// ── Pricing table ($ per 1M tokens) ─────────────────────────────────────────
+// Used to calculate cost_usd when tools only send token counts (no cost metric)
+
+const MODEL_PRICES: Record<string, { input: number; output: number; cache: number }> = {
+  'claude-opus-4-6':      { input: 15.00, output: 75.00, cache: 1.50  },
+  'claude-sonnet-4-6':    { input: 3.00,  output: 15.00, cache: 0.30  },
+  'claude-haiku-4-5':     { input: 0.80,  output: 4.00,  cache: 0.08  },
+  'claude-3-5-sonnet':    { input: 3.00,  output: 15.00, cache: 0.30  },
+  'claude-3-haiku':       { input: 0.25,  output: 1.25,  cache: 0.03  },
+  'gpt-4o':               { input: 2.50,  output: 10.00, cache: 1.25  },
+  'gpt-4o-mini':          { input: 0.15,  output: 0.60,  cache: 0.075 },
+  'o1':                   { input: 15.00, output: 60.00, cache: 7.50  },
+  'o3-mini':              { input: 1.10,  output: 4.40,  cache: 0.55  },
+  'gemini-2.0-flash':     { input: 0.10,  output: 0.40,  cache: 0.025 },
+  'gemini-1.5-pro':       { input: 1.25,  output: 5.00,  cache: 0.31  },
+  'gemini-1.5-flash':     { input: 0.075, output: 0.30,  cache: 0.018 },
+};
+
+function estimateCostUsd(model: string | null, inputTokens: number, outputTokens: number, cachedTokens: number): number {
+  if (!model) return 0;
+  // Exact match first, then fuzzy
+  let price = MODEL_PRICES[model];
+  if (!price) {
+    const lower = model.toLowerCase();
+    const key = Object.keys(MODEL_PRICES).find(k => lower.includes(k) || k.includes(lower));
+    if (key) price = MODEL_PRICES[key];
+  }
+  if (!price) return 0;
+  const uncached = Math.max(0, inputTokens - cachedTokens);
+  const inputCost = (uncached / 1e6) * price.input + (cachedTokens / 1e6) * price.cache;
+  const outputCost = (outputTokens / 1e6) * price.output;
+  return inputCost + outputCost;
+}
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function getAttr(attrs: OTLPResourceAttribute[], key: string): string | null {
@@ -425,9 +459,16 @@ otel.post('/v1/metrics', async (c) => {
     }
   }
 
+  // Auto-calculate cost when only tokens are provided (no separate cost metric)
+  for (const r of records) {
+    if (r.cost_usd === 0 && (r.input_tokens > 0 || r.output_tokens > 0)) {
+      r.cost_usd = estimateCostUsd(r.model, r.input_tokens, r.output_tokens, r.cached_tokens);
+    }
+  }
+
   // Batch insert into D1
   if (records.length > 0) {
-    const stmt = c.env.DB.prepare(`
+    const usageStmt = c.env.DB.prepare(`
       INSERT INTO cross_platform_usage (
         org_id, provider, tool_type, source, developer_id, developer_email,
         team, cost_center, model, input_tokens, output_tokens, cached_tokens,
@@ -437,7 +478,7 @@ otel.post('/v1/metrics', async (c) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    const batch = records.map(r => stmt.bind(
+    const batch = records.map(r => usageStmt.bind(
       r.org_id, r.provider, r.tool_type, r.source,
       r.developer_id, r.developer_email, r.team, r.cost_center,
       r.model, r.input_tokens, r.output_tokens, r.cached_tokens,
@@ -446,6 +487,23 @@ otel.post('/v1/metrics', async (c) => {
       r.active_time_s, r.ttft_ms, r.latency_ms,
       r.timestamp, r.timestamp, JSON.stringify({ metric: r.raw_metric_name }),
     ));
+
+    // Also insert token/cost records into otel_events for /live feed
+    const tokenRecords = records.filter(r => r.input_tokens > 0 || r.output_tokens > 0 || r.cost_usd > 0);
+    const eventStmt = c.env.DB.prepare(`
+      INSERT INTO otel_events (
+        org_id, provider, session_id, developer_email, event_name,
+        model, cost_usd, tokens_in, tokens_out, duration_ms, timestamp, raw_attrs
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    for (const r of tokenRecords) {
+      batch.push(eventStmt.bind(
+        r.org_id, r.provider, r.session_id, r.developer_email,
+        r.raw_metric_name, r.model, r.cost_usd,
+        r.input_tokens, r.output_tokens, r.latency_ms ?? 0,
+        r.timestamp, JSON.stringify({ metric: r.raw_metric_name, source: 'otel_metrics' }),
+      ));
+    }
 
     try {
       await c.env.DB.batch(batch);

@@ -208,6 +208,7 @@ pre{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;pad
     <a class="docs-nav-item" onclick="show('otel-gemini',this)">Gemini CLI</a>
     <a class="docs-nav-item" onclick="show('otel-codex',this)">Codex CLI</a>
     <a class="docs-nav-item" onclick="show('otel-cline',this)">Cline</a>
+    <a class="docs-nav-item" onclick="show('otel-pricing',this)">Pricing Engine</a>
     <a class="docs-nav-item" onclick="show('xp-api',this)">Cross-Platform API</a>
 
     <div class="docs-nav-sec">Privacy &amp; Security</div>
@@ -1574,6 +1575,43 @@ export CLINE_OTEL_EXPORTER_OTLP_ENDPOINT=https://api.vantageaiops.com/v1/otel
 export CLINE_OTEL_EXPORTER_OTLP_PROTOCOL=http/json</pre>
 <p>Set auth:</p>
 <pre>export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer vnt_your_key"</pre>
+`,
+
+"otel-pricing": `
+<h1>OTel Pricing Engine — Auto Cost Estimation</h1>
+<p>When AI tools send only token counts via OTel (no explicit cost metric), VantageAI <strong>automatically calculates cost in USD</strong> using its internal pricing table. This is critical for tools like GitHub Copilot and Gemini CLI that emit token counts but not dollar costs.</p>
+
+<h2>How It Works</h2>
+<div class="step-row"><div class="step-num">1</div><div class="step-body">Tool sends OTel metrics with token counts (e.g., <code>copilot_chat.token.usage</code>)</div></div>
+<div class="step-row"><div class="step-num">2</div><div class="step-body">VantageAI checks if <code>cost_usd == 0</code> for the record</div></div>
+<div class="step-row"><div class="step-num">3</div><div class="step-body">Looks up model in the pricing table (exact match, then fuzzy substring match)</div></div>
+<div class="step-row"><div class="step-num">4</div><div class="step-body">Calculates: <code>cost = (uncached_input / 1M) × input_price + (cached / 1M) × cache_price + (output / 1M) × output_price</code></div></div>
+
+<h2>Supported Models &amp; Pricing</h2>
+<table class="api-table">
+<thead><tr><th>Model</th><th>Provider</th><th>Input ($/1M)</th><th>Output ($/1M)</th><th>Cache ($/1M)</th></tr></thead>
+<tbody>
+<tr><td><code>claude-opus-4-6</code></td><td>Anthropic</td><td>$15.00</td><td>$75.00</td><td>$1.50</td></tr>
+<tr><td><code>claude-sonnet-4-6</code></td><td>Anthropic</td><td>$3.00</td><td>$15.00</td><td>$0.30</td></tr>
+<tr><td><code>claude-haiku-4-5</code></td><td>Anthropic</td><td>$0.80</td><td>$4.00</td><td>$0.08</td></tr>
+<tr><td><code>gpt-4o</code></td><td>OpenAI</td><td>$2.50</td><td>$10.00</td><td>$1.25</td></tr>
+<tr><td><code>gpt-4o-mini</code></td><td>OpenAI</td><td>$0.15</td><td>$0.60</td><td>$0.075</td></tr>
+<tr><td><code>o1</code></td><td>OpenAI</td><td>$15.00</td><td>$60.00</td><td>$7.50</td></tr>
+<tr><td><code>o3-mini</code></td><td>OpenAI</td><td>$1.10</td><td>$4.40</td><td>$0.55</td></tr>
+<tr><td><code>gemini-2.0-flash</code></td><td>Google</td><td>$0.10</td><td>$0.40</td><td>$0.025</td></tr>
+<tr><td><code>gemini-1.5-pro</code></td><td>Google</td><td>$1.25</td><td>$5.00</td><td>$0.31</td></tr>
+<tr><td><code>gemini-1.5-flash</code></td><td>Google</td><td>$0.075</td><td>$0.30</td><td>$0.018</td></tr>
+</tbody>
+</table>
+
+<h2>Fuzzy Model Matching</h2>
+<p>If the exact model name isn't in the table, the engine tries substring matching. For example, <code>claude-sonnet-4-6-20260301</code> matches <code>claude-sonnet-4-6</code>. Unknown models return <code>cost_usd = 0</code>.</p>
+
+<h2>Precedence Rules</h2>
+<div class="info-box">💡 If a tool sends both token counts AND an explicit cost metric (e.g., <code>claude_code.cost.usage</code>), the <strong>explicit cost takes precedence</strong>. Auto-estimation only fills in when <code>cost_usd == 0</code>.</div>
+
+<h2>Dual-Write to Live Feed</h2>
+<p>OTel metrics with token/cost data are also inserted into the <code>otel_events</code> table, powering the <strong>/live</strong> feed in the dashboard. This ensures real-time visibility for metrics-only sources (Copilot, Gemini CLI) — not just tools that send log events.</p>
 `,
 
 "xp-api": `

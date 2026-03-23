@@ -1,0 +1,482 @@
+/**
+ * Local Proxy Server — runs on the client's machine.
+ * Uses ONLY Node.js built-in modules — zero npm dependencies.
+ *
+ * ARCHITECTURE:
+ *   Client App → localhost:4891 → Real LLM API (OpenAI/Anthropic/Google)
+ *                     ↓
+ *           Extract stats locally
+ *                     ↓
+ *           Strip ALL sensitive data
+ *                     ↓
+ *           Send ONLY stats → api.vantageaiops.com
+ *
+ * The client's API key and prompts NEVER leave their machine.
+ * Only anonymized numbers (tokens, cost, latency) are forwarded.
+ */
+
+import { createServer, IncomingMessage, ServerResponse } from "node:http";
+import { sanitizeEvent, PrivacyConfig, DEFAULT_PRIVACY } from "./privacy.js";
+import { calculateCost, findCheapest } from "./pricing.js";
+import { scanAll } from "./scanners/index.js";
+import type { ToolName } from "./scanners/types.js";
+
+// ── Types ────────────────────────────────────────────────────────────────────
+
+export interface LocalProxyConfig {
+  /** Port to listen on (default: 4891) */
+  port?: number;
+
+  /** VantageAI API key for sending stats (vnt_...) */
+  vantageApiKey: string;
+
+  /** VantageAI ingest endpoint (default: https://api.vantageaiops.com) */
+  vantageApiBase?: string;
+
+  /** Privacy configuration */
+  privacy?: PrivacyConfig;
+
+  /** Team tag for all events from this proxy */
+  team?: string;
+
+  /** Environment tag */
+  environment?: string;
+
+  /** Enable debug logging to stderr */
+  debug?: boolean;
+
+  /** Batch size before flushing stats (default: 20) */
+  batchSize?: number;
+
+  /** Flush interval in ms (default: 5000) */
+  flushInterval?: number;
+}
+
+interface PendingStat {
+  event: Record<string, unknown>;
+  timestamp: number;
+}
+
+// ── LLM Provider Endpoints ───────────────────────────────────────────────────
+
+const PROVIDER_ENDPOINTS: Record<string, string> = {
+  openai: "https://api.openai.com",
+  anthropic: "https://api.anthropic.com",
+  google: "https://generativelanguage.googleapis.com",
+  mistral: "https://api.mistral.ai",
+  cohere: "https://api.cohere.ai",
+  deepseek: "https://api.deepseek.com",
+  groq: "https://api.groq.com/openai",
+};
+
+// ── Stats Queue ──────────────────────────────────────────────────────────────
+
+class StatsQueue {
+  private queue: PendingStat[] = [];
+  private timer: ReturnType<typeof setInterval> | null = null;
+
+  constructor(
+    private readonly vantageApiKey: string,
+    private readonly vantageApiBase: string,
+    private readonly batchSize: number,
+    private readonly flushInterval: number,
+    private readonly privacy: PrivacyConfig,
+    private readonly debug: boolean,
+  ) {}
+
+  start(): void {
+    if (this.timer) return;
+    this.timer = setInterval(() => this.flush(), this.flushInterval);
+    process.on("beforeExit", () => this.flush());
+  }
+
+  stop(): void {
+    if (this.timer) { clearInterval(this.timer); this.timer = null; }
+    this.flush();
+  }
+
+  enqueue(raw: Record<string, unknown>): void {
+    const sanitized = sanitizeEvent(raw, this.privacy);
+    this.queue.push({ event: sanitized as unknown as Record<string, unknown>, timestamp: Date.now() });
+    if (this.debug) {
+      process.stderr.write(`[vantage-proxy] Queued: ${sanitized.model} ${sanitized.prompt_tokens}→${sanitized.completion_tokens} tokens $${sanitized.cost_total_usd.toFixed(4)}\n`);
+    }
+    if (this.queue.length >= this.batchSize) this.flush();
+  }
+
+  flush(): void {
+    if (this.queue.length === 0) return;
+    const batch = this.queue.splice(0, this.batchSize);
+    this._send(batch.map((s) => s.event)).catch((err) => {
+      if (this.debug) process.stderr.write(`[vantage-proxy] Flush error: ${err}\n`);
+    });
+  }
+
+  private async _send(events: Record<string, unknown>[]): Promise<void> {
+    const body = JSON.stringify({
+      events,
+      sdk_version: "1.0.0",
+      sdk_language: "local-proxy",
+    });
+    try {
+      const res = await fetch(`${this.vantageApiBase}/v1/events`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.vantageApiKey}`,
+        },
+        body,
+      });
+      if (this.debug) {
+        process.stderr.write(`[vantage-proxy] Sent ${events.length} stats → ${res.status}\n`);
+      }
+    } catch (err) {
+      if (this.debug) process.stderr.write(`[vantage-proxy] Send failed: ${err}\n`);
+    }
+  }
+}
+
+// ── Extract Stats from LLM Responses ─────────────────────────────────────────
+
+function extractOpenAIStats(
+  reqBody: Record<string, unknown>,
+  resBody: Record<string, unknown>,
+  latencyMs: number,
+  statusCode: number,
+): Record<string, unknown> {
+  const model = String(resBody.model ?? reqBody.model ?? "unknown");
+  const usage = resBody.usage as Record<string, number> | undefined;
+  const promptTokens = usage?.prompt_tokens ?? 0;
+  const completionTokens = usage?.completion_tokens ?? 0;
+  const cachedTokens = usage?.cached_tokens ?? 0;
+  const { inputCostUsd, outputCostUsd, totalCostUsd } = calculateCost(model, promptTokens, completionTokens, cachedTokens);
+  const cheapest = findCheapest(model, promptTokens, completionTokens);
+
+  return {
+    provider: "openai", model, endpoint: "/chat/completions",
+    prompt_tokens: promptTokens, completion_tokens: completionTokens,
+    total_tokens: promptTokens + completionTokens, cached_tokens: cachedTokens,
+    latency_ms: Math.round(latencyMs), status_code: statusCode,
+    cost_input_usd: inputCostUsd, cost_output_usd: outputCostUsd, cost_total_usd: totalCostUsd,
+    cheapest_model: cheapest?.model ?? "", cheapest_cost_usd: cheapest?.costUsd ?? 0,
+    potential_saving_usd: cheapest ? Math.max(0, totalCostUsd - cheapest.costUsd) : 0,
+  };
+}
+
+function extractAnthropicStats(
+  reqBody: Record<string, unknown>,
+  resBody: Record<string, unknown>,
+  latencyMs: number,
+  statusCode: number,
+): Record<string, unknown> {
+  const model = String(resBody.model ?? reqBody.model ?? "unknown");
+  const usage = resBody.usage as Record<string, number> | undefined;
+  const promptTokens = usage?.input_tokens ?? 0;
+  const completionTokens = usage?.output_tokens ?? 0;
+  const cachedTokens = usage?.cache_read_input_tokens ?? 0;
+  const { inputCostUsd, outputCostUsd, totalCostUsd } = calculateCost(model, promptTokens, completionTokens, cachedTokens);
+  const cheapest = findCheapest(model, promptTokens, completionTokens);
+
+  return {
+    provider: "anthropic", model, endpoint: "/messages",
+    prompt_tokens: promptTokens, completion_tokens: completionTokens,
+    total_tokens: promptTokens + completionTokens, cached_tokens: cachedTokens,
+    latency_ms: Math.round(latencyMs), status_code: statusCode,
+    cost_input_usd: inputCostUsd, cost_output_usd: outputCostUsd, cost_total_usd: totalCostUsd,
+    cheapest_model: cheapest?.model ?? "", cheapest_cost_usd: cheapest?.costUsd ?? 0,
+    potential_saving_usd: cheapest ? Math.max(0, totalCostUsd - cheapest.costUsd) : 0,
+  };
+}
+
+// ── HTTP Helpers ─────────────────────────────────────────────────────────────
+
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (c) => chunks.push(c));
+    req.on("end", () => resolve(Buffer.concat(chunks).toString()));
+    req.on("error", reject);
+  });
+}
+
+function sendJson(res: ServerResponse, status: number, data: unknown): void {
+  const body = JSON.stringify(data);
+  res.writeHead(status, {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  });
+  res.end(body);
+}
+
+// ── Proxy Server ─────────────────────────────────────────────────────────────
+
+export function startProxyServer(config: LocalProxyConfig): void {
+  const {
+    port = 4891,
+    vantageApiKey,
+    vantageApiBase = "https://api.vantageaiops.com",
+    privacy = DEFAULT_PRIVACY,
+    team = "",
+    environment = "production",
+    debug = false,
+    batchSize = 20,
+    flushInterval = 5000,
+  } = config;
+
+  const orgId = vantageApiKey.split("_")[1] ?? "default";
+
+  const statsQueue = new StatsQueue(
+    vantageApiKey, vantageApiBase, batchSize, flushInterval, privacy, debug,
+  );
+  statsQueue.start();
+
+  const server = createServer(async (req, res) => {
+    const url = req.url ?? "/";
+    const method = req.method ?? "GET";
+
+    // CORS preflight
+    if (method === "OPTIONS") {
+      res.writeHead(204, {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      });
+      return res.end();
+    }
+
+    // ── Health check ────────────────────────────────────────────────────
+    if (url === "/health" && method === "GET") {
+      return sendJson(res, 200, {
+        status: "ok",
+        proxy: "vantage-local-proxy",
+        privacy: privacy.level,
+        org: orgId,
+        uptime: process.uptime(),
+      });
+    }
+
+    // ── Local file scan ─────────────────────────────────────────────────
+    if (url.startsWith("/scan") && method === "GET") {
+      try {
+        const urlObj = new URL(url, `http://localhost:${port}`);
+        const tool = urlObj.searchParams.get("tool") as ToolName | null;
+        const since = urlObj.searchParams.get("since") ?? undefined;
+        const until = urlObj.searchParams.get("until") ?? undefined;
+        const limit = urlObj.searchParams.get("limit");
+        const includeMessages = urlObj.searchParams.get("messages") !== "false";
+
+        const result = await scanAll({
+          tools: tool ? [tool] : undefined,
+          since,
+          until,
+          limit: limit ? parseInt(limit, 10) : undefined,
+          includeMessages,
+        });
+        return sendJson(res, 200, result);
+      } catch (err) {
+        return sendJson(res, 500, {
+          error: `Scan failed: ${err instanceof Error ? err.message : String(err)}`,
+        });
+      }
+    }
+
+    // ── Privacy info ────────────────────────────────────────────────────
+    if (url === "/privacy" && method === "GET") {
+      return sendJson(res, 200, {
+        level: privacy.level,
+        what_stays_local: [
+          "Your LLM API keys (OpenAI, Anthropic, etc.)",
+          "Your prompt text and content",
+          "LLM response text and content",
+          "System prompts",
+          "User data in prompts",
+        ],
+        what_is_sent_to_vantage: [
+          "Model name (e.g., gpt-4o)",
+          "Provider (e.g., openai)",
+          "Token counts (prompt_tokens, completion_tokens)",
+          "Calculated cost in USD",
+          "Latency in milliseconds",
+          "HTTP status code",
+          "Team and environment tags",
+          privacy.level === "standard" ? "SHA-256 prompt hash (non-reversible)" : null,
+          privacy.level === "relaxed" ? "First 100 chars of prompt (NOT recommended)" : null,
+        ].filter(Boolean),
+        what_is_never_sent: [
+          "API keys — your keys are used locally to call LLM APIs, never forwarded",
+          "Full prompt or response text (in strict/standard mode)",
+          "PII, user data, or business logic from your prompts",
+        ],
+      });
+    }
+
+    // ── Determine provider from path ────────────────────────────────────
+    let provider = "openai";
+    let targetPath = url;
+
+    if (url.startsWith("/v1/chat/completions")) {
+      provider = "openai";
+      targetPath = "/v1/chat/completions";
+    } else if (url.startsWith("/v1/messages")) {
+      provider = "anthropic";
+      targetPath = "/v1/messages";
+    } else if (url.startsWith("/proxy/")) {
+      // /proxy/openai/v1/chat/completions → provider=openai, path=/v1/chat/completions
+      const parts = url.split("/");
+      provider = parts[2] ?? "openai";
+      targetPath = "/" + parts.slice(3).join("/");
+    } else {
+      return sendJson(res, 404, {
+        error: "Unknown endpoint. Use /v1/chat/completions (OpenAI), /v1/messages (Anthropic), or /proxy/:provider/*",
+        endpoints: {
+          openai: "/v1/chat/completions",
+          anthropic: "/v1/messages",
+          generic: "/proxy/:provider/path",
+          health: "/health",
+          privacy: "/privacy",
+        },
+      });
+    }
+
+    if (method !== "POST") {
+      return sendJson(res, 405, { error: "POST required for LLM proxy endpoints" });
+    }
+
+    const targetBase = PROVIDER_ENDPOINTS[provider];
+    if (!targetBase) {
+      return sendJson(res, 400, {
+        error: `Unknown provider: ${provider}`,
+        supported: Object.keys(PROVIDER_ENDPOINTS),
+      });
+    }
+
+    // ── Proxy the request ───────────────────────────────────────────────
+    const t0 = performance.now();
+    let reqBody: Record<string, unknown> = {};
+
+    try {
+      const rawBody = await readBody(req);
+      if (rawBody) reqBody = JSON.parse(rawBody);
+    } catch {
+      // Non-JSON body, continue with empty
+    }
+
+    // Forward ALL headers from client (including their API key) to the real LLM API
+    const forwardHeaders: Record<string, string> = {};
+    for (const [key, val] of Object.entries(req.headers)) {
+      if (!val) continue;
+      const lower = key.toLowerCase();
+      if (lower === "host" || lower === "content-length" || lower === "connection") continue;
+      forwardHeaders[key] = Array.isArray(val) ? val.join(", ") : val;
+    }
+    forwardHeaders["Content-Type"] = "application/json";
+
+    const isStreaming = reqBody.stream === true;
+
+    try {
+      const targetUrl = `${targetBase}${targetPath}`;
+      if (debug) process.stderr.write(`[vantage-proxy] → ${provider} ${targetPath}\n`);
+
+      const upstreamRes = await fetch(targetUrl, {
+        method: "POST",
+        headers: forwardHeaders,
+        body: JSON.stringify(reqBody),
+      });
+
+      const latencyMs = performance.now() - t0;
+
+      if (isStreaming && upstreamRes.body) {
+        // Stream pass-through — log basic stats, pipe body directly
+        statsQueue.enqueue({
+          provider, model: String(reqBody.model ?? "unknown"), endpoint: targetPath,
+          latency_ms: Math.round(latencyMs), status_code: upstreamRes.status,
+          prompt_tokens: 0, completion_tokens: 0, total_tokens: 0,
+          cached_tokens: 0, cost_total_usd: 0, cost_input_usd: 0, cost_output_usd: 0,
+          org_id: orgId, team, environment,
+        });
+
+        // Forward headers
+        const headers: Record<string, string> = {
+          "Access-Control-Allow-Origin": "*",
+        };
+        upstreamRes.headers.forEach((v, k) => { headers[k] = v; });
+        res.writeHead(upstreamRes.status, headers);
+
+        // Pipe the stream
+        const reader = upstreamRes.body.getReader();
+        const pump = async () => {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) { res.end(); break; }
+            res.write(value);
+          }
+        };
+        await pump();
+        return;
+      }
+
+      // Non-streaming: read full response, extract stats, return to client
+      const resBody = await upstreamRes.json() as Record<string, unknown>;
+
+      let stats: Record<string, unknown>;
+      if (provider === "anthropic") {
+        stats = extractAnthropicStats(reqBody, resBody, latencyMs, upstreamRes.status);
+      } else {
+        stats = extractOpenAIStats(reqBody, resBody, latencyMs, upstreamRes.status);
+      }
+
+      stats.org_id = orgId;
+      stats.team = team;
+      stats.environment = environment;
+
+      // Queue sanitized stats (privacy engine strips all text)
+      statsQueue.enqueue(stats);
+
+      // Return FULL response to client — they get everything
+      return sendJson(res, upstreamRes.status, resBody);
+
+    } catch (err: unknown) {
+      const latencyMs = performance.now() - t0;
+      const errorMsg = err instanceof Error ? err.message : String(err);
+
+      statsQueue.enqueue({
+        provider, model: String(reqBody.model ?? "unknown"), endpoint: targetPath,
+        latency_ms: Math.round(latencyMs), status_code: 502,
+        error: errorMsg.split("\n")[0],
+        prompt_tokens: 0, completion_tokens: 0, cost_total_usd: 0,
+        org_id: orgId, team, environment,
+      });
+
+      return sendJson(res, 502, { error: `Proxy error: ${errorMsg}` });
+    }
+  });
+
+  server.listen(port, () => {
+    console.log(`
+╔══════════════════════════════════════════════════════════════╗
+║              VantageAI Local Proxy — RUNNING                ║
+╠══════════════════════════════════════════════════════════════╣
+║                                                              ║
+║  Address:  http://localhost:${String(port).padEnd(37)}║
+║  Org:      ${orgId.padEnd(45)}║
+║  Privacy:  ${String(privacy.level).padEnd(45)}║
+║                                                              ║
+║  YOUR DATA STAYS LOCAL:                                      ║
+║    API keys    → never sent to VantageAI                     ║
+║    Prompts     → never sent to VantageAI                     ║
+║    Responses   → never sent to VantageAI                     ║
+║    Stats only  → token counts, cost, latency                 ║
+║                                                              ║
+║  ENDPOINTS:                                                  ║
+║  OpenAI:    http://localhost:${String(port).padEnd(6)}/v1/chat/completions   ║
+║  Anthropic: http://localhost:${String(port).padEnd(6)}/v1/messages           ║
+║  Scan:      http://localhost:${String(port).padEnd(6)}/scan                  ║
+║  Health:    http://localhost:${String(port).padEnd(6)}/health                ║
+║  Privacy:   http://localhost:${String(port).padEnd(6)}/privacy               ║
+║                                                              ║
+╚══════════════════════════════════════════════════════════════╝
+`);
+  });
+}
