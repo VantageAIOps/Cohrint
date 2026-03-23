@@ -620,14 +620,45 @@ claudecode: `
 </div>`,
 
 vscode: `
-<h1>VS Code Extension</h1>
-<h2>Install</h2>
-<pre>code --install-extension vantage-ai.vantage-ai</pre>
-<p>Or search <strong>VantageAI</strong> in the Extensions marketplace.</p>
-<h2>Configure</h2>
-<p>Open Settings (<code>Cmd+,</code>) and search <strong>Vantage</strong>. Add your API key to <code>vantage.apiKey</code>.</p>
-<h2>Features</h2>
-<p>Status bar shows live token count and session cost. The sidebar dashboard (click the Vantage icon in the activity bar) shows your 30-day spend chart, model breakdown, efficiency tips, and active alerts. Use the command palette for quick access: <code>Vantage: Compare Model Prices</code>, <code>Vantage: Open Dashboard</code>.</p>`,
+<h1>VS Code (MCP via Copilot Chat)</h1>
+<p>VantageAI integrates with VS Code through the <strong>Model Context Protocol (MCP)</strong>, available in VS Code 1.99+ with GitHub Copilot Chat.</p>
+
+<h2>Setup</h2>
+<div class="step-row"><div class="step-num">1</div><div class="step-body">Create <code>.vscode/mcp.json</code> in your project root:</div></div>
+<pre>{
+  <span class="c-string">"servers"</span>: {
+    <span class="c-string">"vantage"</span>: {
+      <span class="c-string">"type"</span>: <span class="c-string">"stdio"</span>,
+      <span class="c-string">"command"</span>: <span class="c-string">"npx"</span>,
+      <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"vantageaiops-mcp"</span>],
+      <span class="c-string">"env"</span>: { <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"vnt_your_key"</span> }
+    }
+  }
+}</pre>
+
+<div class="step-row"><div class="step-num">2</div><div class="step-body">Open Copilot Chat (<code>Ctrl+Shift+I</code>) and ask about your AI costs:</div></div>
+<pre><span class="c-comment"># Example prompts in Copilot Chat:</span>
+"How much have we spent on LLMs this month?"
+"Which model costs the most?"
+"Compare costs for this prompt across all models"
+"Compress this prompt to save tokens"</pre>
+
+<h2>Requirements</h2>
+<ul style="color:var(--muted);font-size:14px;line-height:2;padding-left:20px">
+<li>VS Code <strong>1.99+</strong></li>
+<li>GitHub Copilot extension (for Copilot Chat)</li>
+<li>Node.js 18+ (for <code>npx</code>)</li>
+</ul>
+
+<h2>Also works with Cline</h2>
+<p>If you use the <strong>Cline</strong> VS Code extension, open Cline → MCP Servers → Add Server and paste:</p>
+<pre>{
+  <span class="c-string">"vantage"</span>: {
+    <span class="c-string">"command"</span>: <span class="c-string">"npx"</span>,
+    <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"vantageaiops-mcp"</span>],
+    <span class="c-string">"env"</span>: { <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"vnt_your_key"</span> }
+  }
+}</pre>`,
 
 zed: `
 <h1>Zed & JetBrains</h1>
