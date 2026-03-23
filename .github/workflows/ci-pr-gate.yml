@@ -7,8 +7,9 @@ name: PR Gate
 #   2. API Test Suites           — core API tests against live environment
 #   3. Environment & Health Tests — verify API + frontend are reachable
 #   4. Cross-Browser Tests       — Chrome, Firefox, Safari via Playwright
-#   5. Preview Deploy            — deploy frontend preview, post URL as PR comment
-#   6. PR Gate Summary           — fail if any critical job failed
+#   5. MCP Server Tests          — MCP transport, stress, resilience (84 checks)
+#   6. Preview Deploy            — deploy frontend preview, post URL as PR comment
+#   7. PR Gate Summary           — fail if any critical job failed
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -198,7 +199,60 @@ jobs:
           name: pr-cross-browser-${{ github.run_number }}
           path: /tmp/cross-browser-output.txt
 
-  # ── 5. Preview Deploy ────────────────────────────────────────────────────────
+  # ── 5. MCP Server Tests (transport, stress, resilience) ──────────────────────
+  mcp-tests:
+    name: MCP Server Tests
+    runs-on: ubuntu-latest
+    needs: typecheck
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r tests/requirements.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Run MCP server transport tests
+        run: python tests/suites/12_mcp/test_mcp_server.py 2>&1 | tee /tmp/mcp-server.txt
+
+      - name: Run MCP stress & resilience tests
+        run: python tests/suites/12_mcp/test_mcp_stress.py 2>&1 | tee /tmp/mcp-stress.txt
+
+      - name: Generate failure summary
+        if: always()
+        run: |
+          echo "## MCP Server Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          for f in /tmp/mcp-server.txt /tmp/mcp-stress.txt; do
+            if [ -f "$f" ]; then
+              FAILURES=$(grep -E "^  ✗|^       └─" "$f" 2>/dev/null || true)
+              SUMMARY=$(grep -E "Results:" "$f" | tail -1 || true)
+              echo "**$(basename $f .txt):** $SUMMARY" >> $GITHUB_STEP_SUMMARY
+              if [ -n "$FAILURES" ]; then
+                echo '```' >> $GITHUB_STEP_SUMMARY
+                echo "$FAILURES" >> $GITHUB_STEP_SUMMARY
+                echo '```' >> $GITHUB_STEP_SUMMARY
+              fi
+            fi
+          done
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-mcp-tests-${{ github.run_number }}
+          path: /tmp/mcp-*.txt
+
+  # ── 6. Preview Deploy ────────────────────────────────────────────────────────
   preview-deploy:
     name: Preview Deploy
     runs-on: ubuntu-latest
@@ -269,11 +323,11 @@ jobs:
               });
             }
 
-  # ── 6. PR Gate Summary (required check — blocks merge on failure) ───────────
+  # ── 7. PR Gate Summary (required check — blocks merge on failure) ───────────
   pr-summary:
     name: PR Gate Summary
     runs-on: ubuntu-latest
-    needs: [typecheck, api-tests, env-tests, cross-browser, preview-deploy]
+    needs: [typecheck, api-tests, env-tests, cross-browser, mcp-tests, preview-deploy]
     if: always()
     steps:
       - name: Write summary
@@ -286,6 +340,7 @@ jobs:
           echo "| API Test Suites | ${{ needs.api-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Environment & Health | ${{ needs.env-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Cross-Browser Tests | ${{ needs.cross-browser.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| MCP Server Tests | ${{ needs.mcp-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Preview Deploy | ${{ needs.preview-deploy.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**PR:** #${{ github.event.number }}" >> $GITHUB_STEP_SUMMARY
@@ -295,7 +350,8 @@ jobs:
       - name: Fail if critical checks failed
         if: |
           needs.typecheck.result == 'failure' ||
-          needs.api-tests.result == 'failure'
+          needs.api-tests.result == 'failure' ||
+          needs.mcp-tests.result == 'failure'
         run: |
           echo "❌ PR gate failed — fix the issues above before merging"
           exit 1

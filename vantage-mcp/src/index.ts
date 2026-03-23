@@ -48,22 +48,54 @@ function parseOrgFromKey(key: string): string {
   return parts.length >= 3 ? parts[1] : 'default';
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/** Sanitise a number: NaN, Infinity, undefined → fallback. */
+function safeNum(v: unknown, fallback = 0): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+/** Structured error log to stderr (machine-parseable, never leaks full key). */
+function errorLog(context: string, err: unknown): void {
+  const msg = err instanceof Error ? err.message : String(err);
+  const ts = new Date().toISOString();
+  const safe = msg.replace(new RegExp(API_KEY.slice(8), 'g'), '****');
+  process.stderr.write(`[vantage-mcp] ${ts} ERROR ${context}: ${safe}\n`);
+}
+
 // ── API client ────────────────────────────────────────────────────────────────
 
 async function api(path: string, opts: RequestInit = {}): Promise<unknown> {
-  if (!API_KEY) throw new Error('VANTAGE_API_KEY is not set. Add it to your MCP config.');
+  if (!API_KEY) throw new Error('VANTAGE_API_KEY is not set. Add it to your MCP config. Get a key at https://vantageaiops.com/signup.html');
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...opts,
-    headers: {
-      'Authorization': `Bearer ${API_KEY}`,
-      'X-Vantage-Org': ORG,
-      'Content-Type': 'application/json',
-      ...(opts.headers ?? {}),
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      ...opts,
+      signal: AbortSignal.timeout(15_000),
+      headers: {
+        'Authorization': `Bearer ${API_KEY}`,
+        'X-Vantage-Org': ORG,
+        'Content-Type': 'application/json',
+        ...(opts.headers ?? {}),
+      },
+    });
+  } catch (fetchErr) {
+    const msg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
+    errorLog(`api ${path}`, fetchErr);
+    if (msg.includes('abort') || msg.includes('timeout')) {
+      throw new Error(`Request to VantageAI API timed out (${path}). Check your network connection.`);
+    }
+    throw new Error(`Cannot reach VantageAI API (${path}): ${msg.split('\n')[0]}`);
+  }
 
-  const body = await res.json();
+  let body: unknown;
+  try {
+    body = await res.json();
+  } catch {
+    throw new Error(`VantageAI API returned invalid JSON (HTTP ${res.status} on ${path}).`);
+  }
   if (!res.ok) throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
   return body;
 }
@@ -361,15 +393,36 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     switch (name) {
 
       case 'track_llm_call': {
-        const event = {
+        const model = String(args.model ?? '').trim();
+        const provider = String(args.provider ?? '').trim();
+        if (!model) throw new Error('model is required (e.g. "gpt-4o", "claude-sonnet-4")');
+        if (!provider) throw new Error('provider is required (e.g. "openai", "anthropic")');
+
+        const promptTokens = safeNum(args.prompt_tokens, 0);
+        const completionTokens = safeNum(args.completion_tokens, 0);
+        const totalCost = safeNum(args.total_cost_usd, 0);
+        const latency = safeNum(args.latency_ms);
+        const spanDepth = safeNum(args.span_depth, 0);
+
+        const event: Record<string, unknown> = {
           event_id: `mcp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          ...args,
+          model,
+          provider,
+          prompt_tokens: promptTokens,
+          completion_tokens: completionTokens,
+          total_cost_usd: totalCost,
+          ...(latency > 0 ? { latency_ms: latency } : {}),
+          ...(args.team ? { team: String(args.team).slice(0, 100) } : {}),
+          ...(args.environment ? { environment: String(args.environment).slice(0, 50) } : {}),
+          ...(args.trace_id ? { trace_id: String(args.trace_id).slice(0, 256) } : {}),
+          ...(spanDepth > 0 ? { span_depth: spanDepth } : {}),
+          ...(args.tags && typeof args.tags === 'object' ? { tags: args.tags } : {}),
         };
         await api('/v1/events', { method: 'POST', body: JSON.stringify(event) });
         return {
           content: [{
             type: 'text',
-            text: `✅ Tracked: ${args.model} | ${args.prompt_tokens}→${args.completion_tokens} tokens | $${Number(args.total_cost_usd).toFixed(4)} | ${args.latency_ms ? `${args.latency_ms}ms` : 'no latency recorded'}`,
+            text: `✅ Tracked: ${model} | ${promptTokens}→${completionTokens} tokens | $${totalCost.toFixed(4)} | ${latency > 0 ? `${latency}ms` : 'no latency recorded'}`,
           }],
         };
       }
@@ -415,7 +468,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'get_model_breakdown': {
-        const days = args?.days ?? 30;
+        const days = Math.min(Math.max(1, safeNum(args?.days, 30)), 365);
         const resp = await api(`/v1/analytics/models?period=${days}`) as { models: Record<string, unknown>[] };
         const models = resp.models ?? [];
         const rows = models.map((r) =>
@@ -432,7 +485,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'get_team_breakdown': {
-        const days = args?.days ?? 30;
+        const days = Math.min(Math.max(1, safeNum(args?.days, 30)), 365);
         const resp = await api(`/v1/analytics/teams?period=${days}`) as { teams: Record<string, unknown>[] };
         const teams = resp.teams ?? [];
         const rows = teams.map((r) =>
@@ -473,7 +526,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'get_traces': {
-        const limit = Math.min(Number(args?.limit ?? 10), 50);
+        const limit = Math.min(Math.max(1, safeNum(args?.limit, 10)), 50);
         const resp = await api(`/v1/analytics/traces?period=7`) as { traces: Record<string, unknown>[] };
         const traces = (resp.traces ?? []).slice(0, limit);
         if (!traces.length) {
@@ -520,8 +573,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       // ── Optimizer tool handlers (work offline — no API key needed) ────────
 
       case 'optimize_prompt': {
-        const prompt = args.prompt as string;
-        if (!prompt) throw new Error('prompt is required');
+        const prompt = typeof args.prompt === 'string' ? args.prompt : '';
+        if (!prompt.trim()) throw new Error('prompt is required — pass a non-empty string to optimize');
         const model = (args.model as string) || 'gpt-4o';
         const originalTokens = countTokens(prompt);
         const compressed = compressPrompt(prompt);
@@ -548,11 +601,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'analyze_tokens': {
-        const text = args.text as string;
-        if (!text) throw new Error('text is required');
-        const model = (args.model as string) || 'gpt-4o';
+        const text = typeof args.text === 'string' ? args.text : '';
+        if (!text.trim()) throw new Error('text is required — pass a non-empty string to analyze');
+        const model = (typeof args.model === 'string' && args.model) || 'gpt-4o';
         const inputTokens = countTokens(text);
-        const outputTokens = Number(args.output_tokens ?? inputTokens);
+        const outputTokens = safeNum(args.output_tokens, inputTokens);
         const cost = calcCost(model, inputTokens, outputTokens);
         const cheapest = findCheapest(inputTokens, outputTokens);
         const tips = getOptimizationTips(text);
@@ -577,10 +630,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'estimate_costs': {
-        const estPrompt = args.prompt as string;
-        if (!estPrompt) throw new Error('prompt is required');
+        const estPrompt = typeof args.prompt === 'string' ? args.prompt : '';
+        if (!estPrompt.trim()) throw new Error('prompt is required — pass a non-empty string to estimate costs');
         const inputTokens = countTokens(estPrompt);
-        const outputTokens = Number(args.completion_tokens ?? inputTokens);
+        const outputTokens = safeNum(args.completion_tokens, inputTokens);
 
         const comparisons = Object.entries(MODEL_RATES)
           .map(([model, rates]) => {
@@ -612,23 +665,32 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'compress_context': {
-        const messages = args.messages as Array<{ role: string; content: string }>;
-        if (!messages || !Array.isArray(messages)) throw new Error('messages array is required');
-        const maxTokens = Number(args.max_tokens ?? 4000);
+        const messages = args.messages;
+        if (!messages || !Array.isArray(messages)) throw new Error('messages is required — pass an array of {role, content} objects');
+        const maxTokens = safeNum(args.max_tokens, 4000);
 
-        const totalBefore = messages.reduce((s, m) => s + countTokens(m.content), 0);
+        // Sanitise: filter out non-object entries and coerce content to string
+        const safeMsgs = messages
+          .filter((m: unknown): m is { role: string; content: string } =>
+            m != null && typeof m === 'object' && 'content' in (m as Record<string, unknown>))
+          .map((m: { role?: unknown; content?: unknown }) => ({
+            role: String(m.role ?? 'user'),
+            content: String(m.content ?? ''),
+          }));
+
+        const totalBefore = safeMsgs.reduce((s, m) => s + countTokens(m.content), 0);
         const compressed: Array<{ role: string; content: string }> = [];
         let usedTokens = 0;
         const skipped: Array<{ role: string; content: string }> = [];
 
-        for (let i = messages.length - 1; i >= 0; i--) {
-          const msg = messages[i];
+        for (let i = safeMsgs.length - 1; i >= 0; i--) {
+          const msg = safeMsgs[i];
           const msgTokens = countTokens(msg.content);
           if (usedTokens + msgTokens <= maxTokens) {
             compressed.unshift(msg);
             usedTokens += msgTokens;
           } else {
-            for (let j = 0; j <= i; j++) skipped.push(messages[j]);
+            for (let j = 0; j <= i; j++) skipped.push(safeMsgs[j]);
             break;
           }
         }
@@ -648,7 +710,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           ``,
           `| Metric | Value |`,
           `|--------|-------|`,
-          `| Original messages | ${messages.length} |`,
+          `| Original messages | ${safeMsgs.length} |`,
           `| Compressed messages | ${compressed.length} |`,
           `| Tokens before | ${totalBefore} |`,
           `| Tokens after | ${usedTokens} |`,
@@ -665,8 +727,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'find_cheapest_model': {
-        const inputTokens = Number(args.input_tokens ?? 1000);
-        const outputTokens = Number(args.output_tokens ?? 500);
+        const inputTokens = safeNum(args.input_tokens, 1000);
+        const outputTokens = safeNum(args.output_tokens, 500);
         const tierFilter = args.tier as string | undefined;
         const providerFilter = args.provider as string | undefined;
 
@@ -701,8 +763,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         throw new Error(`Unknown tool: ${name}`);
     }
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    errorLog(`tool/${name}`, err);
     return {
-      content: [{ type: 'text', text: `❌ Error: ${(err as Error).message}` }],
+      content: [{ type: 'text', text: `❌ Error: ${message}` }],
       isError: true,
     };
   }
@@ -774,6 +838,15 @@ async function main() {
   await server.connect(transport);
   process.stderr.write('[vantage-mcp] Server started\n');
 }
+
+// Catch unhandled errors so the server never silently dies
+process.on('uncaughtException', (err) => {
+  errorLog('uncaughtException', err);
+  // Don't exit — keep the server alive for remaining tool calls
+});
+process.on('unhandledRejection', (reason) => {
+  errorLog('unhandledRejection', reason);
+});
 
 main().catch((err) => {
   process.stderr.write(`[vantage-mcp] Fatal: ${err.message}\n`);

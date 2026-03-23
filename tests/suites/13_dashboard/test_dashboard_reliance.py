@@ -23,14 +23,14 @@ MODELS = ["gpt-4o", "gpt-3.5-turbo", "claude-3-sonnet", "gemini-pro",
           "gpt-4-turbo", "claude-instant"]
 
 SIDEBAR_SELECTORS = [
-    ("#nav-cost",     "Cost"),
-    ("#nav-tokens",   "Tokens"),
-    ("#nav-models",   "Models"),
-    ("#nav-perf",     "Performance"),
-    ("#nav-settings", "Settings"),
-    ("#nav-account",  "Account"),
-    ("#nav-devx",     "DevX"),
-    ("#nav-traces",   "Traces"),
+    ("button.sb-item:has-text('Cost')",        "Cost"),
+    ("button.sb-item:has-text('Token')",       "Tokens"),
+    ("button.sb-item:has-text('Model')",       "Models"),
+    ("button.sb-item:has-text('Performance')", "Performance"),
+    ("button.sb-item:has-text('Quality')",     "Quality"),
+    ("button.sb-item:has-text('Traces')",      "Traces"),
+    ("button.sb-item:has-text('Security')",    "Security"),
+    ("button.sb-item:has-text('Developer')",   "DevX"),
 ]
 
 
@@ -146,7 +146,7 @@ def test_full_dashboard_flow(api_key, email):
 
             # DR.9 KPI cards show real data (not dashes)
             try:
-                page.click("#nav-cost", timeout=3000)
+                page.click('button.sb-item:has-text("Cost")', timeout=3000)
             except Exception:
                 pass  # Already on cost view from sidebar iteration
             time.sleep(1)
@@ -168,7 +168,7 @@ def test_full_dashboard_flow(api_key, email):
 
             # DR.11 Models view shows model breakdown
             try:
-                page.click("#nav-models", timeout=3000)
+                page.click('button.sb-item:has-text("Model")', timeout=3000)
                 time.sleep(1)
                 models_body = page.inner_text("body")
                 has_model_names = any(m.split("-")[0] in models_body.lower()
@@ -177,29 +177,29 @@ def test_full_dashboard_flow(api_key, email):
                     has_model_names,
                     f"model names not found in: {models_body[:200]}")
             except PWTimeout:
-                warn("DR.11 #nav-models not found")
+                warn('DR.11 button.sb-item:has-text("Model") not found')
 
             # DR.12 Performance view loads
             try:
-                page.click("#nav-perf", timeout=3000)
+                page.click('button.sb-item:has-text("Performance")', timeout=3000)
                 time.sleep(0.8)
                 chk("DR.12 Performance view loads", True)
             except PWTimeout:
-                warn("DR.12 #nav-perf not found")
+                warn('DR.12 button.sb-item:has-text("Performance") not found')
 
             # DR.13 Settings shows org info
             try:
-                page.click("#nav-settings", timeout=3000)
+                page.click('button.sb-item:has-text("Settings"), button.sb-item:has-text("Account")', timeout=3000)
                 time.sleep(0.5)
                 settings_body = page.inner_text("body")
                 chk("DR.13 Settings/Account view loads with content",
                     len(settings_body) > 50)
             except PWTimeout:
-                warn("DR.13 #nav-settings not found")
+                warn('DR.13 button.sb-item:has-text("Settings") not found')
 
             # DR.14 Account shows correct email
             try:
-                page.click("#nav-account", timeout=3000)
+                page.click('button.sb-item:has-text("Account"), button.sb-item:has-text("Team")', timeout=3000)
                 time.sleep(0.5)
                 account_body = page.inner_text("body")
                 if email:
@@ -209,7 +209,7 @@ def test_full_dashboard_flow(api_key, email):
                 else:
                     chk("DR.14 Account view loads", True)
             except PWTimeout:
-                warn("DR.14 #nav-account not found")
+                warn('DR.14 button.sb-item:has-text("Account") not found')
 
             # DR.15 No JS errors across all views
             noise = ("cloudflareinsights.com", "beacon.min.js", "status of 401",

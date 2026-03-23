@@ -821,16 +821,49 @@ api: `
 
 "mcp-tools": `
 <h1>MCP tools reference</h1>
-<table class="api-table"><thead><tr><th>Tool name</th><th>Parameters</th><th>Returns</th></tr></thead><tbody>
+<p>13 tools total — 8 analytics (require API key) + 5 optimizer (work offline, no key needed).</p>
+
+<h2>Analytics tools</h2>
+<table class="api-table"><thead><tr><th>Tool</th><th>Parameters</th><th>Returns</th></tr></thead><tbody>
 <tr><td><code>track_llm_call</code></td><td><code>model</code>, <code>provider</code>, <code>prompt_tokens</code>, <code>completion_tokens</code>, <code>total_cost_usd</code>, <code>latency_ms</code>, <code>team</code>, <code>trace_id</code>, <code>tags</code></td><td>Confirmation with cost summary</td></tr>
-<tr><td><code>get_summary</code></td><td>none</td><td>MTD spend, today spend, requests, budget %</td></tr>
-<tr><td><code>get_kpis</code></td><td>none</td><td>Full KPI table — cost, tokens, latency, efficiency</td></tr>
-<tr><td><code>get_model_breakdown</code></td><td><code>days</code> (default 30)</td><td>Cost + usage per model, ranked</td></tr>
-<tr><td><code>get_team_breakdown</code></td><td><code>days</code> (default 30)</td><td>Cost + usage per team, with budget status</td></tr>
-<tr><td><code>check_budget</code></td><td>none</td><td>Budget %, remaining, over/under status</td></tr>
-<tr><td><code>get_traces</code></td><td><code>limit</code> (default 10, max 50)</td><td>Recent agent traces — spans, cost, agent name</td></tr>
-<tr><td><code>get_cost_gate</code></td><td><code>period</code>: today | week | month</td><td>PASSED / FAILED vs org budget</td></tr>
-</tbody></table>`,
+<tr><td><code>get_summary</code></td><td>none</td><td>MTD spend, today cost, requests, tokens, session spend, budget %, plan</td></tr>
+<tr><td><code>get_kpis</code></td><td>none</td><td>Full KPI table — cost, tokens, requests, latency, efficiency, streaming count</td></tr>
+<tr><td><code>get_model_breakdown</code></td><td><code>days</code> (default 30)</td><td>Cost + usage per model, sorted by cost descending</td></tr>
+<tr><td><code>get_team_breakdown</code></td><td><code>days</code> (default 30)</td><td>Cost + usage per team, with budget % if set</td></tr>
+<tr><td><code>check_budget</code></td><td>none</td><td>Budget %, remaining $, over/under status indicator</td></tr>
+<tr><td><code>get_traces</code></td><td><code>limit</code> (default 10, max 50)</td><td>Recent agent traces — spans, cost, agent name, trace ID</td></tr>
+<tr><td><code>get_cost_gate</code></td><td><code>period</code>: today | week | month</td><td>PASSED / FAILED vs org budget for CI/CD gates</td></tr>
+</tbody></table>
+
+<h2>Token &amp; prompt optimizer tools</h2>
+<p>These work <strong>offline</strong> — no API key required. Useful for cost estimation and prompt optimization before sending to an LLM.</p>
+<table class="api-table"><thead><tr><th>Tool</th><th>Parameters</th><th>Returns</th></tr></thead><tbody>
+<tr><td><code>optimize_prompt</code></td><td><code>prompt</code> (required), <code>model</code> (default gpt-4o)</td><td>Optimized prompt with before/after token count, cost savings, cheapest model recommendation, and optimization tips</td></tr>
+<tr><td><code>analyze_tokens</code></td><td><code>text</code> (required), <code>model</code>, <code>output_tokens</code></td><td>Token count, input/output cost breakdown, cheapest alternative model, optimization tips</td></tr>
+<tr><td><code>estimate_costs</code></td><td><code>prompt</code> (required), <code>completion_tokens</code></td><td>Cost comparison across all 22 models (6 providers), sorted cheapest first with savings vs most expensive</td></tr>
+<tr><td><code>compress_context</code></td><td><code>messages</code> array (required), <code>max_tokens</code> (default 4000)</td><td>Compressed conversation with token savings %, summarized older messages</td></tr>
+<tr><td><code>find_cheapest_model</code></td><td><code>input_tokens</code>, <code>output_tokens</code> (required), <code>tier</code>, <code>provider</code></td><td>Top 3 cheapest models, filterable by tier (frontier/mid/budget/reasoning) or provider</td></tr>
+</tbody></table>
+
+<h2>Anomaly detection (automatic)</h2>
+<p>Anomaly detection is <strong>not an MCP tool</strong> — it runs automatically as a Cloudflare Cron Trigger every 10 minutes. No manual invocation needed.</p>
+<div class="info-box">
+<strong>How it works:</strong> Z-score analysis on rolling 7-day hourly cost. If the last 10 minutes of spend is more than 3 standard deviations above the mean, an alert fires to your configured Slack webhook. Alerts are throttled to 1 per org per hour.
+</div>
+<p>To enable: configure a Slack webhook in <strong>Settings → Slack Integration</strong> and enable anomaly alerts. The system will automatically detect cost spikes, traffic surges, and runaway agents.</p>
+
+<h2>Example prompts</h2>
+<pre><span class="c-comment"># Token optimization (works offline)</span>
+"Optimize this prompt to save tokens"         → optimize_prompt
+"How many tokens is this text?"               → analyze_tokens
+"Compare costs for this across all models"    → estimate_costs
+"Find the cheapest frontier model for 5K in + 2K out tokens"  → find_cheapest_model
+
+<span class="c-comment"># Analytics (requires API key)</span>
+"How much have we spent on LLMs this month?"  → get_summary
+"Which model costs the most?"                 → get_model_breakdown
+"Are we within budget?"                       → check_budget
+"Show recent agent traces"                    → get_traces</pre>`,
 
 members: `
 <h1>Team members</h1>
