@@ -48,7 +48,7 @@ jobs:
           echo "- ✅ Require PR (no direct push)" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Require 1 approving review" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Dismiss stale reviews on new push" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Required checks: TypeScript, API Tests, Env Tests" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Required checks: TypeScript, API Tests, Env Tests, PR Gate Summary" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Allow admin bypass" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### v* (version branches)" >> $GITHUB_STEP_SUMMARY
@@ -74,7 +74,8 @@ jobs:
               "contexts": [
                 "TypeScript Check",
                 "API Test Suites",
-                "Environment & Health Tests"
+                "Environment & Health Tests",
+                "PR Gate Summary"
               ]
             },
             "enforce_admins": false,
@@ -193,7 +194,7 @@ jobs:
                ☑ Dismiss stale pull request approvals when new commits are pushed
              ☑ Require status checks to pass before merging
                ☑ Require branches to be up to date before merging
-               Add checks: "TypeScript Check", "API Test Suites", "Environment & Health Tests"
+               Add checks: "TypeScript Check", "API Test Suites", "Environment & Health Tests", "PR Gate Summary"
              ☑ Require conversation resolution before merging
              ☐ Do NOT check "Include administrators" (so Actions can still push)
              ☑ Allow force pushes → ☐ (disable)

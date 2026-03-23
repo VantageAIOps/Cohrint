@@ -4,6 +4,7 @@ name: Cross-Browser Compatibility Tests
 # iOS mobile, and tablet viewports to catch browser-specific regressions.
 #
 # Triggers:
+#   - PRs to main (pre-merge gate via ci-pr-gate.yml or standalone)
 #   - Push to main (after deploy — catches live regressions)
 #   - Push to version branches (before promotion)
 #   - Nightly schedule (catches third-party CDN / Cloudflare changes)
@@ -13,6 +14,14 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'vantage-final-v4/**'
+      - 'tests/suites/15_cross_browser/**'
+      - 'tests/helpers/browser.py'
+      - '.github/workflows/ci-cross-browser.yml'
+
   push:
     branches:
       - main
