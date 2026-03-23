@@ -2217,70 +2217,70 @@ window.init_reports=function(){
 /* ════════════════════════════════════════════════════════════════════════════
    MODULE 8 — SECURITY & GOVERNANCE
 ═══════════════════════════════════════════════════════════════════════════ */
-window.init_security=function(){
-  document.getElementById("keys-body").innerHTML=[
-    {key:"vnt_acme_prod_****8f3a",name:"Production",org:"Acme Corp",created:"2026-01-15",last:"2m ago",status:"active"},
-    {key:"vnt_acme_stag_****2b9c",name:"Staging",org:"Acme Corp",created:"2026-02-01",last:"1h ago",status:"active"},
-    {key:"vnt_acme_dev_****4d1e",name:"Development",org:"Acme Corp",created:"2026-02-20",last:"3d ago",status:"active"},
-    {key:"vnt_acme_old_****9a2f",name:"Legacy (deprecated)",org:"Acme Corp",created:"2025-10-01",last:"30d ago",status:"revoked"},
-  ].map(r=>`<tr>
-    <td class="mono" style="font-size:11px">${r.key}</td>
-    <td>${r.name}</td><td class="muted small">${r.org}</td>
-    <td class="mono muted small">${r.created}</td>
-    <td class="mono muted small">${r.last}</td>
-    <td><span class="tag ${r.status==='active'?'tag-green':'tag-red'}">${r.status}</span></td>
-    <td><button class="btn btn-ghost" style="font-size:10px;padding:4px 8px">${r.status==='active'?'Revoke':'Deleted'}</button></td>
-  </tr>`).join("");
+window.init_security=async function(){
+  // Security view — show real data from API, no fake audit logs or keys
+  try {
+    const overview = await apiFetch('/v1/admin/overview');
+    const members = overview?.members || [];
+    
+    // API Keys — show actual member key hints (no fake keys)
+    document.getElementById("keys-body").innerHTML = members.length > 0
+      ? members.map(m => `<tr>
+          <td class="mono" style="font-size:11px">${m.api_key_hint || '\u2014'}</td>
+          <td>${m.name || '\u2014'}</td><td class="muted small">${m.email || '\u2014'}</td>
+          <td class="mono muted small">${m.created_at || '\u2014'}</td>
+          <td class="mono muted small">\u2014</td>
+          <td><span class="tag tag-green">active</span></td>
+          <td>\u2014</td>
+        </tr>`).join("")
+      : `<tr><td colspan="7" style="color:var(--mu);text-align:center;padding:20px">No member keys. Owner key is managed in Account settings.</td></tr>`;
 
-  document.getElementById("rbac-body").innerHTML=[
-    {user:"admin@acme.com",role:"Owner",view:true,export:true,config:true},
-    {user:"dev@acme.com",role:"Developer",view:true,export:true,config:false},
-    {user:"analyst@acme.com",role:"Analyst",view:true,export:true,config:false},
-    {user:"viewer@acme.com",role:"Viewer",view:true,export:false,config:false},
-  ].map(r=>`<tr>
-    <td class="mono" style="font-size:11px">${r.user}</td>
-    <td><span class="tag ${r.role==='Owner'?'tag-purple':r.role==='Developer'?'tag-blue':'tag-gray'}">${r.role}</span></td>
-    <td>${r.view?'<span class="tag tag-green">&#10003;</span>':'<span class="tag tag-red">&#10005;</span>'}</td>
-    <td>${r.export?'<span class="tag tag-green">&#10003;</span>':'<span class="tag tag-red">&#10005;</span>'}</td>
-    <td>${r.config?'<span class="tag tag-green">&#10003;</span>':'<span class="tag tag-red">&#10005;</span>'}</td>
-  </tr>`).join("");
+    // RBAC — show real members with roles
+    document.getElementById("rbac-body").innerHTML = members.length > 0
+      ? members.map(m => `<tr>
+          <td class="mono" style="font-size:11px">${m.email || '\u2014'}</td>
+          <td><span class="tag ${m.role==='owner'?'tag-purple':m.role==='admin'?'tag-blue':'tag-gray'}">${m.role}</span></td>
+          <td><span class="tag tag-green">\u2713</span></td>
+          <td><span class="tag ${m.role==='viewer'?'tag-red':'tag-green'}">${m.role==='viewer'?'\u2717':'\u2713'}</span></td>
+          <td><span class="tag ${m.role==='owner'||m.role==='admin'?'tag-green':'tag-red'}">${m.role==='owner'||m.role==='admin'?'\u2713':'\u2717'}</span></td>
+        </tr>`).join("")
+      : `<tr><td colspan="5" style="color:var(--mu);text-align:center;padding:20px">Add team members in the Members tab to see roles here.</td></tr>`;
+  } catch(e) {
+    document.getElementById("keys-body").innerHTML = `<tr><td colspan="7" style="color:var(--mu);text-align:center;padding:20px">Admin access required to view security settings.</td></tr>`;
+    document.getElementById("rbac-body").innerHTML = `<tr><td colspan="5" style="color:var(--mu);text-align:center;padding:20px">Admin access required to view roles.</td></tr>`;
+  }
 
-  const actions=["API key created","User login","Report exported","Config changed","API call","API call","Report exported","User login"];
-  document.getElementById("audit-body").innerHTML=actions.map((a,i)=>`<tr>
-    <td class="mono muted small">${ri(1,59)}m ago</td>
-    <td class="mono small">admin@acme.com</td>
-    <td>${a}</td>
-    <td class="mono muted small">${i%2===0?'/settings':'/api/v1/events'}</td>
-    <td class="mono muted small">104.${ri(1,254)}.${ri(1,254)}.${ri(1,254)}</td>
-    <td><span class="tag tag-green">200 OK</span></td>
-  </tr>`).join("");
+  // Audit log — empty state (real audit log requires server-side implementation)
+  document.getElementById("audit-body").innerHTML = `<tr><td colspan="6" style="color:var(--mu);text-align:center;padding:20px">Audit logging coming soon. Activity will be tracked automatically.</td></tr>`;
 
-  document.getElementById("retention-settings").innerHTML=[
-    {tier:"Free",retention:"7 days",detail:"Request logs and events"},
-    {tier:"Team",retention:"90 days",detail:"All data including traces"},
-    {tier:"Enterprise",retention:"Unlimited",detail:"Custom per data type"},
-  ].map(r=>`
-    <div style="padding:10px 0;border-bottom:1px solid var(--b1)">
+  // Retention settings — based on actual plan
+  const plan = _session?.plan || _session?.org?.plan || 'free';
+  document.getElementById("retention-settings").innerHTML = [
+    {tier:"Free",retention:"7 days",detail:"Request logs and events", active: plan==='free'},
+    {tier:"Team",retention:"90 days",detail:"All data including traces", active: plan==='team'},
+    {tier:"Enterprise",retention:"Unlimited",detail:"Custom per data type", active: plan==='enterprise'},
+  ].map(r => `
+    <div style="padding:10px 0;border-bottom:1px solid var(--b1);${r.active?'background:rgba(0,212,161,.03);border-radius:6px;padding:10px;':''}">
       <div style="display:flex;justify-content:space-between;margin-bottom:3px">
-        <span style="font-weight:500">${r.tier}</span>
+        <span style="font-weight:500">${r.tier} ${r.active?'<span class=\'tag tag-green\'>Current</span>':''}</span>
         <span class="mono" style="color:var(--ac)">${r.retention}</span>
       </div>
       <div class="small muted">${r.detail}</div>
     </div>`).join("");
 
-  document.getElementById("compliance-status").innerHTML=[
-    {name:"SOC 2 Type II",status:"Certified",icon:"&#128274;",color:"var(--ac)"},
-    {name:"GDPR",status:"Compliant",icon:"&#127759;",color:"var(--ac)"},
-    {name:"HIPAA",status:"Enterprise only",icon:"&#9877;",color:"var(--am)"},
-    {name:"CCPA",status:"Compliant",icon:"&#127758;",color:"var(--ac)"},
-    {name:"ISO 27001",status:"In progress",icon:"&#128203;",color:"var(--mu)"},
-  ].map(r=>`
+  // Compliance — static info (not fake, this is actual product status)
+  document.getElementById("compliance-status").innerHTML = [
+    {name:"Data Encryption",status:"AES-256 at rest, TLS in transit",icon:"\u{1F512}",color:"var(--ac)"},
+    {name:"Data Residency",status:"Cloudflare global edge",icon:"\u{1F30D}",color:"var(--ac)"},
+    {name:"Access Control",status:"Role-based (RBAC)",icon:"\u{1F511}",color:"var(--ac)"},
+    {name:"API Security",status:"SHA-256 hashed keys",icon:"\u{1F6E1}",color:"var(--ac)"},
+  ].map(r => `
     <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--b1)">
       <span>${r.icon}</span>
       <span style="flex:1">${r.name}</span>
       <span class="mono" style="font-size:11px;color:${r.color}">${r.status}</span>
     </div>`).join("");
-};
+}
 
 /* ════════════════════════════════════════════════════════════════════════════
    MODULE 9 — DEVELOPER EXPERIENCE
@@ -3111,94 +3111,77 @@ function showSlackStatus(type, msg) {
   setTimeout(() => { el.style.display = 'none'; }, 5000);
 }
 
-// ── Agent Trace View ───────────────────────────────
-const DEMO_TRACES = [
-  {id:'trc-001',name:'Support Bot',spans:4,cost:0.0412,latency:3820,status:'ok',ts:'14:32:01'},
-  {id:'trc-002',name:'RAG Pipeline',spans:7,cost:0.1240,latency:8410,status:'ok',ts:'14:31:47'},
-  {id:'trc-003',name:'Summariser',spans:2,cost:0.0082,latency:921,status:'ok',ts:'14:31:33'},
-  {id:'trc-004',name:'Code Review Agent',spans:5,cost:0.0891,latency:6230,status:'error',ts:'14:31:12'},
-  {id:'trc-005',name:'Doc Extractor',spans:3,cost:0.0245,latency:2140,status:'ok',ts:'14:30:58'},
-  {id:'trc-006',name:'Support Bot',spans:4,cost:0.0398,latency:3650,status:'ok',ts:'14:30:44'},
-  {id:'trc-007',name:'Email Classifier',spans:2,cost:0.0041,latency:480,status:'ok',ts:'14:30:29'},
-];
-const DEMO_SPANS = {
-  'trc-001': [
-    {name:'router',model:'gpt-4o-mini',dur:210,cost:0.0008,depth:0},
-    {name:'context_retrieval',model:'text-embedding-3-small',dur:380,cost:0.0001,depth:1},
-    {name:'answer_generation',model:'gpt-4o',dur:2940,cost:0.0389,depth:1},
-    {name:'safety_check',model:'claude-haiku-4-5',dur:290,cost:0.0014,depth:2},
-  ],
-  'trc-002': [
-    {name:'query_expand',model:'gpt-4o-mini',dur:180,cost:0.0006,depth:0},
-    {name:'embed_query',model:'text-embedding-3-small',dur:120,cost:0.0001,depth:1},
-    {name:'vector_search',model:null,dur:45,cost:0,depth:1},
-    {name:'rerank_chunks',model:'gpt-4o-mini',dur:340,cost:0.0019,depth:1},
-    {name:'synthesise',model:'claude-sonnet-4-6',dur:5800,cost:0.1120,depth:1},
-    {name:'citation_check',model:'gpt-4o-mini',dur:480,cost:0.0062,depth:2},
-    {name:'format_output',model:null,dur:32,cost:0,depth:2},
-  ],
-};
-function renderTraceList() {
+// ── Agent Trace View (real API data) ─────────────────
+let _traceData = [];
+
+async function loadTraces(days = 7) {
+  try { return await apiFetch(`/v1/analytics/traces?period=${days}`); }
+  catch(e) { console.warn("Failed to load traces", e); return null; }
+}
+
+function renderTraceList(traces) {
   const el = document.getElementById('trace-list');
   if (!el) return;
-  // Use real traces from API, not demo data
-  if (!DEMO_TRACES.length || !_demoDataActive) {
-    el.innerHTML = '<div style="padding:20px;color:var(--mu);font-size:13px;text-align:center">No traces yet. Pass <code>trace_id</code> when sending events to see agent call trees here.</div>';
+  if (!traces || !traces.length) {
+    el.innerHTML = '<div style="padding:20px;color:var(--mu);font-size:13px;text-align:center">No traces yet. Pass <code>trace_id</code> and <code>agent_name</code> when sending events to see agent call trees here.</div>';
     return;
   }
-  el.innerHTML = DEMO_TRACES.map(t => `
-    <div onclick="showTrace('${t.id}')" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--b1);cursor:pointer;transition:background .1s" onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background='transparent'">
-      <span style="width:7px;height:7px;border-radius:50%;background:${t.status==='ok'?'var(--ac)':'var(--re)'};flex-shrink:0"></span>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</div>
-        <div style="font-size:10px;color:var(--mu);font-family:var(--mono)">${t.spans} spans · ${t.latency}ms · $${t.cost.toFixed(4)}</div>
-      </div>
-      <span style="font-family:var(--mono);font-size:10px;color:var(--di)">${t.ts}</span>
-    </div>
-  `).join('');
-}
-function showTrace(id) {
-  const spans = DEMO_SPANS[id] || [];
-  const el = document.getElementById('trace-timeline');
-  const idEl = document.getElementById('trace-selected-id');
-  idEl.textContent = id;
-  idEl.style.display = 'inline-flex';
-  if (!spans.length) {
-    el.innerHTML = '<div style="color:var(--mu);font-size:12px">No span data for this trace</div>';
-    return;
-  }
-  const totalDur = spans.reduce((s,sp) => s + sp.dur, 0);
-  el.innerHTML = spans.map(sp => {
-    const pct = Math.max(2, (sp.dur / Math.max(totalDur, 1)) * 100);
-    const indent = sp.depth * 16;
-    const modelTag = sp.model ? `<span style="color:var(--ac);margin-left:6px">${sp.model}</span>` : '';
+  _traceData = traces;
+  el.innerHTML = traces.map((t, i) => {
+    const ts = t.started_at ? new Date(t.started_at * 1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '\u2014';
+    const traceId = String(t.trace_id || '').slice(0, 20);
     return `
-      <div style="margin-bottom:10px;padding-left:${indent}px">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-          ${sp.depth > 0 ? `<span style="color:var(--di);font-size:10px">${'└'.repeat(sp.depth)}</span>` : ''}
-          <span style="font-size:11px;font-weight:500">${sp.name}</span>${modelTag}
-          <span style="margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--mu)">${sp.dur}ms${sp.cost > 0 ? ` · $${sp.cost.toFixed(4)}` : ''}</span>
-        </div>
-        <div style="height:6px;background:var(--bg3);border-radius:3px;overflow:hidden">
-          <div style="height:100%;width:${pct}%;background:${sp.model ? 'var(--ac)' : 'var(--bl)'};border-radius:3px;transition:width .4s ease"></div>
-        </div>
-      </div>`;
+    <div onclick="showTraceDetail(${i})" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--b1);cursor:pointer;transition:background .1s" onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background='transparent'">
+      <span style="width:7px;height:7px;border-radius:50%;background:var(--ac);flex-shrink:0"></span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name || traceId || 'Unnamed trace'}</div>
+        <div style="font-size:10px;color:var(--mu);font-family:var(--mono)">${t.spans || 0} spans \u00b7 ${Math.round(t.latency || 0)}ms \u00b7 $${Number(t.cost || 0).toFixed(4)}</div>
+      </div>
+      <span style="font-family:var(--mono);font-size:10px;color:var(--di)">${ts}</span>
+    </div>`;
   }).join('');
 }
-function initTraceSpanChart() {
+
+function showTraceDetail(idx) {
+  const t = _traceData[idx];
+  if (!t) return;
+  const el = document.getElementById('trace-timeline');
+  const idEl = document.getElementById('trace-selected-id');
+  const traceId = String(t.trace_id || '');
+  idEl.textContent = traceId.slice(0, 24);
+  idEl.style.display = 'inline-flex';
+  el.innerHTML = `
+    <div style="margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span style="font-size:11px;font-weight:500">${t.name || 'Root'}</span>
+        <span style="margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--mu)">${Math.round(t.latency || 0)}ms \u00b7 $${Number(t.cost || 0).toFixed(4)}</span>
+      </div>
+      <div style="height:6px;background:var(--bg3);border-radius:3px;overflow:hidden">
+        <div style="height:100%;width:100%;background:var(--ac);border-radius:3px"></div>
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:var(--mu)">
+        ${t.spans || 0} spans \u00b7 Trace ID: <code style="font-size:10px">${traceId}</code>
+      </div>
+    </div>`;
+}
+
+function initTraceSpanChart(traces) {
   const ctx = document.getElementById('traceSpanChart');
-  if (!ctx || charts.traceSpan) return;
+  if (!ctx) return;
+  if (charts.traceSpan) charts.traceSpan.destroy();
+  if (!traces || !traces.length) {
+    charts.traceSpan = new Chart(ctx, {
+      type: 'bar',
+      data: { labels: ['No data'], datasets: [{ data: [0], backgroundColor: ['rgba(255,255,255,.04)'], borderRadius: 4 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } }
+    });
+    return;
+  }
+  const traceLabels = traces.slice(0, 10).map(t => (t.name || String(t.trace_id || '').slice(0, 12)));
+  const traceCosts = traces.slice(0, 10).map(t => Number(t.cost || 0));
   charts.traceSpan = new Chart(ctx, {
     type: 'bar',
-    data: {
-      labels: ['LLM call','Embedding','Vector search','Tool call','Formatting'],
-      datasets: [{
-        label: 'Avg cost ($)',
-        data: [0.038, 0.001, 0, 0.012, 0],
-        backgroundColor: ['#00d4a1','#0098ff','#a78bfa','#f59e0b','#6b7b8a'],
-        borderRadius: 4,
-      }]
-    },
+    data: { labels: traceLabels, datasets: [{ label: 'Cost ($)', data: traceCosts, backgroundColor: '#00d4a1', borderRadius: 4 }] },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
@@ -3210,10 +3193,11 @@ function initTraceSpanChart() {
   });
 }
 
-// Register traces lazy-init (same pattern as all other views)
-window.init_traces = function() {
-  renderTraceList();
-  setTimeout(initTraceSpanChart, 100);
+window.init_traces = async function() {
+  const resp = await loadTraces(7);
+  const traces = resp?.traces || [];
+  renderTraceList(traces);
+  setTimeout(() => initTraceSpanChart(traces), 100);
 };
 
 // ── Start SSE after session loads ──────────────────
