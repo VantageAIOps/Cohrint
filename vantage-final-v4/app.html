@@ -363,7 +363,7 @@ button{font-family:var(--sans);cursor:pointer}
       <div class="sh-row"><span>Command palette</span><div class="sh-keys"><span class="sh-key">⌘</span><span class="sh-key">K</span></div></div>
       <div class="sh-row"><span>This help</span><div class="sh-keys"><span class="sh-key">?</span></div></div>
       <div class="sh-row"><span>Cost Intelligence</span><div class="sh-keys"><span class="sh-key">1</span></div></div>
-      <div class="sh-row"><span>Token Analytics</span><div class="sh-keys"><span class="sh-key">2</span></div></div>
+      <div class="sh-row"><span>Model Comparison</span><div class="sh-keys"><span class="sh-key">2</span></div></div>
       <div class="sh-row"><span>Model Comparison</span><div class="sh-keys"><span class="sh-key">3</span></div></div>
       <div class="sh-row"><span>Performance</span><div class="sh-keys"><span class="sh-key">4</span></div></div>
       <div class="sh-row"><span>Quality & Eval</span><div class="sh-keys"><span class="sh-key">5</span></div></div>
@@ -534,7 +534,6 @@ button{font-family:var(--sans);cursor:pointer}
     <div class="sb-section">Core</div>
     <button class="sb-item active" onclick="nav('allspend',this)"><span class="ico">&#127760;</span><span>All AI Spend</span><span class="sb-badge" style="background:var(--ac)">LIVE</span></button>
     <button class="sb-item" onclick="nav('cost',this)"><span class="ico">&#128176;</span><span>Cost Intelligence</span></button>
-    <button class="sb-item" onclick="nav('tokens',this)"><span class="ico">&#128290;</span><span>Token Analytics</span></button>
     <button class="sb-item" onclick="nav('models',this)"><span class="ico">&#9878;</span><span>Model Comparison</span></button>
     <button class="sb-item" onclick="nav('perf',this)"><span class="ico">&#9889;</span><span>Performance & Latency</span></button>
     <div class="sb-section">Intelligence</div>
@@ -617,7 +616,23 @@ button{font-family:var(--sans);cursor:pointer}
         </div>
       </div>
 
-      <!-- Row 4: Connection Status -->
+      <!-- Row 4: Token Efficiency & Optimization (merged from Token Analytics) -->
+      <div class="g2">
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Token Efficiency</span><span class="tag tag-blue">ANALYTICS</span></div>
+          <div class="kpi-grid" style="grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+            <div class="kpi" style="padding:10px"><div class="kpi-lbl">Efficiency Score</div><div class="kpi-val" style="font-size:20px;color:var(--ac)" id="xp-eff-score">--</div></div>
+            <div class="kpi" style="padding:10px"><div class="kpi-lbl">Cache Hit Rate</div><div class="kpi-val" style="font-size:20px" id="xp-cache-rate">--</div></div>
+          </div>
+          <canvas id="xpTokenBreakdownChart" height="140"></canvas>
+        </div>
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Optimization Opportunities</span><span class="tag tag-amber" id="xp-savings-tag">SAVE $--/mo</span></div>
+          <div id="xp-opt-tips" style="font-size:12px;color:var(--mu)">Analyzing spend patterns...</div>
+        </div>
+      </div>
+
+      <!-- Row 5: Connection Status -->
       <div class="card card-p mb">
         <div class="card-hdr"><span class="card-title">Data Sources</span><span class="tag tag-gray">CONNECTION STATUS</span></div>
         <div id="xp-connections"></div>
@@ -2212,6 +2227,59 @@ async function init_allspend(){
       } catch(e) { /* silent refresh failure */ }
     }, 30000);
   }
+
+  // ── Token Efficiency & Optimization (merged from Token Analytics) ────────
+  try {
+    const kpis = await apiFetch(`/v1/analytics/kpis?period=${days}`).catch(()=>null);
+    const effScore = kpis?.efficiency_score ?? '--';
+    document.getElementById('xp-eff-score').textContent = typeof effScore === 'number' ? effScore + '/100' : effScore;
+
+    // Cache hit rate from summary data
+    if (summary) {
+      const totalIn = summary.total_input_tokens || 0;
+      const cached = summary.total_cached_tokens || 0;
+      const cacheRate = totalIn > 0 ? Math.round((cached / totalIn) * 100) : 0;
+      const cacheEl = document.getElementById('xp-cache-rate');
+      cacheEl.textContent = cacheRate + '%';
+      cacheEl.style.color = cacheRate >= 40 ? 'var(--ac)' : cacheRate >= 20 ? 'var(--am)' : 'var(--re)';
+    }
+
+    // Token breakdown chart (input vs output vs cached)
+    if (summary && (summary.total_input_tokens || summary.total_output_tokens)) {
+      const inputTok = (summary.total_input_tokens || 0) - (summary.total_cached_tokens || 0);
+      const outputTok = summary.total_output_tokens || 0;
+      const cachedTok = summary.total_cached_tokens || 0;
+      mkChart('xpTokenBreakdownChart', 'doughnut', {
+        labels: ['Input tokens', 'Output tokens', 'Cached tokens'],
+        datasets: [{ data: [inputTok, outputTok, cachedTok], backgroundColor: ['#0098ff', '#00d4a1', '#a78bfa'], borderWidth: 0 }]
+      }, { cutout: '50%', plugins: { legend: { display: true, position: 'bottom', labels: { color: '#6b7b8a', font: { size: 10 }, boxWidth: 8, padding: 6 } } } });
+    }
+
+    // Optimization tips
+    const tips = [];
+    if (summary) {
+      const totalIn = summary.total_input_tokens || 0;
+      const cached = summary.total_cached_tokens || 0;
+      const cacheRate = totalIn > 0 ? (cached / totalIn) : 0;
+      if (cacheRate < 0.3) tips.push({ icon: '💾', text: 'Cache hit rate is low (' + Math.round(cacheRate*100) + '%). Standardize system prompts across requests to increase cache reuse.', save: 'up to 30%' });
+      const totalCost = summary.total_cost_usd || 0;
+      if (modelList.length > 0) {
+        const topModel = modelList[0];
+        if (topModel.cost > totalCost * 0.6) tips.push({ icon: '🔄', text: topModel.model + ' accounts for ' + Math.round((topModel.cost/totalCost)*100) + '% of spend. Consider a cheaper model for non-critical tasks.', save: 'up to 50%' });
+      }
+      if (typeof effScore === 'number' && effScore < 60) tips.push({ icon: '✂️', text: 'Efficiency score is ' + effScore + '/100. Use prompt compression to reduce input tokens by 10-30%.', save: '10-30%' });
+    }
+    if (tips.length === 0) tips.push({ icon: '✅', text: 'Spend patterns look healthy. Keep monitoring for anomalies.', save: '' });
+
+    const tipsEl = document.getElementById('xp-opt-tips');
+    tipsEl.innerHTML = tips.map(t => `<div style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--b1)">
+      <span style="font-size:16px">${t.icon}</span>
+      <div style="flex:1"><div style="margin-bottom:2px">${t.text}</div>${t.save ? '<span class="tag tag-amber" style="font-size:9px">SAVE '+t.save+'</span>' : ''}</div>
+    </div>`).join('');
+
+    const totalSavings = tips.filter(t=>t.save).length > 0 ? 'OPPORTUNITIES' : 'ALL CLEAR';
+    document.getElementById('xp-savings-tag').textContent = totalSavings;
+  } catch(e) { console.warn('Token efficiency init failed:', e); }
 }
 window.init_allspend=init_allspend;
 
@@ -3238,7 +3306,7 @@ async function checkPlanUsage() {
 const CMD_ITEMS = [
   { group:'Views', ico:'🌐', label:'All AI Spend (Live)', action:()=>navTo('allspend'), kbd:'0' },
   { group:'Views', ico:'💰', label:'Cost Intelligence', action:()=>navTo('cost'), kbd:'1' },
-  { group:'Views', ico:'📊', label:'Token Analytics', action:()=>navTo('tokens'), kbd:'2' },
+  { group:'Views', ico:'⚖', label:'Model Comparison', action:()=>navTo('models'), kbd:'2' },
   { group:'Views', ico:'⚖', label:'Model Comparison', action:()=>navTo('models'), kbd:'3' },
   { group:'Views', ico:'⚡', label:'Performance & Latency', action:()=>navTo('perf'), kbd:'4' },
   { group:'Views', ico:'🎯', label:'Quality & Evaluation', action:()=>navTo('quality'), kbd:'5' },
@@ -3471,38 +3539,44 @@ function showTraceDetail(idx) {
 }
 
 function initTraceSpanChart(traces) {
-  const ctx = document.getElementById('traceSpanChart');
-  if (!ctx) return;
-  if (charts.traceSpan) charts.traceSpan.destroy();
-  if (!traces || !traces.length) {
+  try {
+    const ctx = document.getElementById('traceSpanChart');
+    if (!ctx) return;
+    if (charts.traceSpan) { try { charts.traceSpan.destroy(); } catch(_){} charts.traceSpan = null; }
+    if (!Array.isArray(traces) || !traces.length) {
+      charts.traceSpan = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: ['No data'], datasets: [{ data: [0], backgroundColor: ['rgba(255,255,255,.04)'], borderRadius: 4 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } }
+      });
+      return;
+    }
+    const top = traces.slice(0, 10);
+    const traceLabels = top.map(t => String(t.name || t.trace_id || 'trace').slice(0, 20));
+    const traceCosts = top.map(t => { const n = Number(t.cost); return Number.isFinite(n) ? n : 0; });
     charts.traceSpan = new Chart(ctx, {
       type: 'bar',
-      data: { labels: ['No data'], datasets: [{ data: [0], backgroundColor: ['rgba(255,255,255,.04)'], borderRadius: 4 }] },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } }
-    });
-    return;
-  }
-  const traceLabels = traces.slice(0, 10).map(t => (t.name || String(t.trace_id || '').slice(0, 12)));
-  const traceCosts = traces.slice(0, 10).map(t => Number(t.cost || 0));
-  charts.traceSpan = new Chart(ctx, {
-    type: 'bar',
-    data: { labels: traceLabels, datasets: [{ label: 'Cost ($)', data: traceCosts, backgroundColor: '#00d4a1', borderRadius: 4 }] },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color:'#6b7b8a', font:{size:10} } },
-        y: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color:'#6b7b8a', font:{size:10} } },
+      data: { labels: traceLabels, datasets: [{ label: 'Cost ($)', data: traceCosts, backgroundColor: '#00d4a1', borderRadius: 4 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color:'#6b7b8a', font:{size:10} } },
+          y: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color:'#6b7b8a', font:{size:10}, callback: v => '$'+v.toFixed(4) } },
+        }
       }
-    }
-  });
+    });
+  } catch(e) { console.warn('Trace span chart init failed:', e); }
 }
 
 window.init_traces = async function() {
-  const resp = await loadTraces(7);
-  const traces = resp?.traces || [];
-  renderTraceList(traces);
-  setTimeout(() => initTraceSpanChart(traces), 100);
+  try {
+    const resp = await loadTraces(7);
+    const traces = Array.isArray(resp?.traces) ? resp.traces : [];
+    renderTraceList(traces);
+    // Wait for view layout to settle before Chart.js measures the canvas
+    requestAnimationFrame(() => initTraceSpanChart(traces));
+  } catch(e) { console.warn('Trace init failed:', e); }
 };
 
 // ── Start SSE after session loads ──────────────────
@@ -3519,7 +3593,7 @@ document.addEventListener('keydown', e => {
   if (e.key === '?') { document.getElementById('sh-modal').classList.toggle('open'); return; }
   if (e.key === 'Escape') { document.getElementById('sh-modal').classList.remove('open'); return; }
   // Number keys → views
-  const viewMap = { '1':'cost','2':'tokens','3':'models','4':'perf','5':'quality','6':'ai','7':'reports','8':'security','9':'devx','0':'traces' };
+  const viewMap = { '1':'cost','2':'models','3':'perf','4':'quality','5':'ai','6':'reports','7':'security','8':'devx','9':'optimizer','0':'traces' };
   if (viewMap[e.key]) { navTo(viewMap[e.key]); return; }
   // R → refresh
   if (e.key === 'r' || e.key === 'R') { refreshData(); return; }
