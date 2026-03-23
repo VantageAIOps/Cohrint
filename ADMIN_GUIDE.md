@@ -2355,14 +2355,36 @@ For enterprise admins deploying OTel across all developers:
 
 ### Dashboard Module
 
-The "All AI Spend" module (`view-allspend`) is the new default landing page in `app.html`. Features:
+The dashboard (`app.html`) has been restructured to use **only real API data**. No fake/demo/synthetic data is generated.
+
+**Sidebar layout:**
+- **Core:** All AI Spend (LIVE), Cost Intelligence, Model Comparison, Agent Traces
+- **Analytics:** Performance & Latency, Quality & Evaluation
+- **Team:** Enterprise Reporting (gated for team/org plans), Team Members, Security & Governance
+- **Tools:** Token Optimizer, Developer Experience, Settings, Account
+
+**All AI Spend** is the default landing page and includes:
 - 4 KPI cards (total spend, tokens, developers, budget %)
 - Provider doughnut chart with breakdown rows
 - Per-developer table with commits, PRs, lines, cost/PR
 - Model cost breakdown
 - Live OTel event feed (auto-refreshes every 30 seconds)
+- Token efficiency: efficiency score, cache hit rate, token breakdown chart, optimization tips
 - Data source connection status
-- **Dual-write to otel_events:** OTel metrics with token/cost data are also inserted into the `otel_events` table, powering the `/live` feed. This ensures real-time visibility for metrics-only sources (not just log events).
+- Dual-write to otel_events: OTel metrics with token/cost data are also inserted into the `otel_events` table, powering the `/live` feed
+
+**Enterprise Reporting** (team/org plans only):
+- Real data from `/v1/admin/overview`, `/v1/analytics/teams`, `/v1/cross-platform/developers`
+- Team chargeback table with budget %, cost/request
+- Developer spend table with ROI metrics (cost/PR, lines/$)
+- Daily spend trend chart from `/v1/analytics/timeseries`
+- Working CSV export for chargeback data
+- Free/individual users see an upgrade prompt
+
+**Modules with honest empty states** (no backend yet):
+- Quality & Evaluation — requires quality scoring events (hallucination, faithfulness, etc.)
+- AI Intelligence Layer — removed from sidebar (smart router not yet implemented)
+- Performance percentiles (p50/p95/p99) — requires per-request latency tracking
 
 ### Test Coverage
 
@@ -2370,8 +2392,9 @@ The "All AI Spend" module (`view-allspend`) is the new default landing page in `
 - `tests/suites/17_otel/test_otel_e2e.py` — 78 checks (multi-platform simulation, ROI metrics, edge cases)
 - `tests/suites/18_sdk_privacy/test_sdk_privacy.py` — 50+ checks (privacy modes, pricing engine, date format, dual-write)
 - `tests/suites/19_local_proxy/test_local_proxy.py` — 42+ checks (privacy engine, pricing accuracy, proxy integration, scanner coverage)
-- Total: **210+ checks** covering OTel + cross-platform + privacy + pricing features
+- `tests/suites/20_dashboard_real_data/test_dashboard_real_data.py` — 42+ checks (enterprise reporting, cost intelligence, no fake data, cross-platform integration)
+- Total: **250+ checks** covering OTel + cross-platform + privacy + pricing + dashboard features
 
 ---
 
-*Last updated: 24 March 2026 — v2.1 SDK privacy mode, OTel pricing engine, local proxy, SQLite date fixes, dual-write otel_events, 210+ test checks.*
+*Last updated: 24 March 2026 — v2.1 all fake data removed, enterprise reporting wired to real APIs, sidebar simplified, 250+ test checks.*
