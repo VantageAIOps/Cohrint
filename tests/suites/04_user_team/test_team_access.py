@@ -53,8 +53,9 @@ def test_cross_org_isolation():
                        headers=get_headers(key_b), timeout=15)
     if r_b.ok:
         d_b_data = r_b.json()
-        cost_b = (d_b_data.get("total_cost") or d_b_data.get("cost") or
-                  d_b_data.get("totalCost") or 0)
+        cost_b = (d_b_data.get("today_cost_usd") or d_b_data.get("mtd_cost_usd") or
+                  d_b_data.get("session_cost_usd") or d_b_data.get("total_cost") or
+                  d_b_data.get("cost") or d_b_data.get("totalCost") or 0)
         # Org B should not see org A's $9.99 event
         chk("TA.2  Org B analytics don't include Org A's data",
             cost_b < 9.0,  # Org B just signed up, should have ~0 cost
@@ -64,7 +65,7 @@ def test_cross_org_isolation():
             r_b.status_code in (200, 404), f"got {r_b.status_code}")
 
     # TA.3 Org B key cannot access Org A's admin
-    r_admin = requests.get(f"{API_URL}/v1/admin/members",
+    r_admin = requests.get(f"{API_URL}/v1/auth/members",
                            headers=get_headers(key_b), timeout=15)
     # Should only see Org B's members (or 404 if not implemented)
     chk("TA.3  Org B admin only sees Org B data (no cross-org leak)",
@@ -81,7 +82,7 @@ def test_member_cannot_invite():
         owner_key = d_owner["api_key"]
 
         # Invite or create a member
-        r_invite = requests.post(f"{API_URL}/v1/admin/invite",
+        r_invite = requests.post(f"{API_URL}/v1/auth/members",
                                  json={"email": rand_email("ta-m"), "name": rand_name()},
                                  headers=get_headers(owner_key), timeout=15)
         if r_invite.status_code in (200, 201):
@@ -102,7 +103,7 @@ def test_member_cannot_invite():
         return
 
     # TA.4 Member key cannot invite others (403)
-    r = requests.post(f"{API_URL}/v1/admin/invite",
+    r = requests.post(f"{API_URL}/v1/auth/members",
                       json={"email": rand_email("ta-new"), "name": rand_name()},
                       headers=get_headers(member_key), timeout=15)
     chk("TA.4  Member cannot invite others → 403/401",

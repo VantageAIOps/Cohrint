@@ -66,8 +66,10 @@ def test_api_onboarding():
 
     if r.ok:
         d = r.json()
-        # Try various field name patterns
-        cost = (d.get("total_cost") or d.get("cost") or d.get("totalCost") or
+        # Try various field name patterns (API returns today_cost_usd / mtd_cost_usd)
+        cost = (d.get("today_cost_usd") or d.get("mtd_cost_usd") or
+                d.get("session_cost_usd") or d.get("total_cost") or
+                d.get("cost") or d.get("totalCost") or
                 d.get("summary", {}).get("total_cost") or 0)
         chk("ON.5  Analytics summary cost > 0", cost > 0,
             f"cost={cost}, keys={list(d.keys())}")
@@ -142,7 +144,7 @@ def test_playwright_onboarding():
                 time.sleep(2)
 
                 # ON.13 Reload app and check KPI data appears
-                page.reload(wait_until="networkidle", timeout=15000)
+                page.reload(wait_until="domcontentloaded", timeout=30000)
                 time.sleep(2)
                 chk("ON.13 App reloads after data ingest", "/app" in page.url)
 

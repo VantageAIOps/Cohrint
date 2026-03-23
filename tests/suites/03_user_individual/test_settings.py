@@ -132,7 +132,7 @@ def test_settings_ui(api_key, org_id):
 
             # ST.13 Logout works
             try:
-                page.press("Escape")  # Close modal
+                page.keyboard.press("Escape")  # Close modal
                 time.sleep(0.3)
                 page.click("#btn-logout, [data-action='logout'], .logout-btn", timeout=5000)
                 time.sleep(1)

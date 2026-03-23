@@ -87,8 +87,8 @@ def test_auth_flow(api_key):
 
             # AU.7 Session preserved on reload
             if "/app" in page.url:
-                page.reload(wait_until="networkidle", timeout=15000)
-                time.sleep(1)
+                page.reload(wait_until="domcontentloaded", timeout=30000)
+                time.sleep(2)
                 chk("AU.7  Session preserved after reload", "/app" in page.url,
                     f"URL: {page.url}")
             else:

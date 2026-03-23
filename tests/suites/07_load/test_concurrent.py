@@ -7,6 +7,7 @@ Labels: CL.1 - CL.N
 
 import sys
 import time
+import uuid
 import requests
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -48,9 +49,10 @@ def do_analytics_read(api_key):
 def do_event_write(api_key):
     try:
         r = requests.post(f"{API_URL}/v1/events",
-                          json={"model": "gpt-4o", "cost": 0.001,
-                                "tokens": {"prompt": 50, "completion": 25},
-                                "timestamp": int(time.time() * 1000)},
+                          json={"event_id": f"cl-{uuid.uuid4().hex[:12]}",
+                                "provider": "openai", "model": "gpt-4o",
+                                "total_cost_usd": 0.001,
+                                "prompt_tokens": 50, "completion_tokens": 25},
                           headers=get_headers(api_key), timeout=15)
         return r.status_code in (201, 202)
     except Exception:
@@ -139,9 +141,10 @@ def test_no_cross_org_leakage(api_keys):
 
     # Ingest org-A-specific event with very high cost
     requests.post(f"{API_URL}/v1/events",
-                  json={"model": "gpt-4o", "cost": 999.0,
-                        "tokens": {"prompt": 9999, "completion": 9999},
-                        "timestamp": int(time.time() * 1000)},
+                  json={"event_id": f"leak-{uuid.uuid4().hex[:12]}",
+                        "provider": "openai", "model": "gpt-4o",
+                        "total_cost_usd": 999.0,
+                        "prompt_tokens": 9999, "completion_tokens": 9999},
                   headers=get_headers(key_a), timeout=10)
 
     time.sleep(1)
@@ -150,8 +153,10 @@ def test_no_cross_org_leakage(api_keys):
     r_b = requests.get(f"{API_URL}/v1/analytics/summary",
                        headers=get_headers(key_b), timeout=15)
     if r_b.ok:
-        cost_b = (r_b.json().get("total_cost") or r_b.json().get("cost") or
-                  r_b.json().get("totalCost") or 0)
+        d_b = r_b.json()
+        cost_b = (d_b.get("today_cost_usd") or d_b.get("mtd_cost_usd") or
+                  d_b.get("session_cost_usd") or d_b.get("total_cost") or
+                  d_b.get("cost") or d_b.get("totalCost") or 0)
         chk("CL.5  Org B doesn't see Org A's $999 event under load",
             cost_b < 500,
             f"Org B total_cost={cost_b}")

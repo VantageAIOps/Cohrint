@@ -48,10 +48,11 @@ self.addEventListener('activate', ev => {
 self.addEventListener('fetch', ev => {
   const url = new URL(ev.request.url);
 
-  // 1. Never intercept API calls, SSE streams, or cross-origin requests
+  // 1. Never intercept API calls, SSE streams, Cloudflare internals, or cross-origin requests
   if (
     url.origin !== self.location.origin ||
     url.pathname.startsWith('/v1/') ||
+    url.pathname.startsWith('/cdn-cgi/') ||
     url.pathname.includes('/stream/')
   ) {
     return; // fall through to browser

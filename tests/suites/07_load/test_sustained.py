@@ -7,6 +7,7 @@ Labels: SL.1 - SL.N
 
 import sys
 import time
+import uuid
 import requests
 from pathlib import Path
 
@@ -29,10 +30,10 @@ def test_sustained_ingest(api_key):
         t0 = time.monotonic()
         try:
             r = requests.post(f"{API_URL}/v1/events",
-                              json={"model": "gpt-4o",
-                                    "cost": 0.001,
-                                    "tokens": {"prompt": 50, "completion": 25},
-                                    "timestamp": int(time.time() * 1000) + i},
+                              json={"event_id": f"sustained-{uuid.uuid4().hex[:12]}-{i}",
+                                    "provider": "openai", "model": "gpt-4o",
+                                    "total_cost_usd": 0.001,
+                                    "prompt_tokens": 50, "completion_tokens": 25},
                               headers=headers, timeout=15)
             ms = (time.monotonic() - t0) * 1000
             latencies.append(ms)
@@ -67,7 +68,9 @@ def test_analytics_consistent_after_ingest(api_key, events_count):
 
     if r.ok:
         d = r.json()
-        cost = (d.get("total_cost") or d.get("cost") or d.get("totalCost") or
+        cost = (d.get("today_cost_usd") or d.get("mtd_cost_usd") or
+                d.get("session_cost_usd") or d.get("total_cost") or
+                d.get("cost") or d.get("totalCost") or
                 d.get("summary", {}).get("total_cost") or 0)
         chk("SL.5  Analytics shows non-zero cost after 100-event ingest",
             cost > 0, f"cost={cost}")
@@ -109,27 +112,30 @@ def test_no_latency_degradation(api_key):
     for i in range(10):
         t0 = time.monotonic()
         requests.post(f"{API_URL}/v1/events",
-                      json={"model": "gpt-4o", "cost": 0.001,
-                            "tokens": {"prompt": 50, "completion": 25},
-                            "timestamp": int(time.time() * 1000) + i},
+                      json={"event_id": f"lat-early-{uuid.uuid4().hex[:12]}-{i}",
+                            "provider": "openai", "model": "gpt-4o",
+                            "total_cost_usd": 0.001,
+                            "prompt_tokens": 50, "completion_tokens": 25},
                       headers=headers, timeout=15)
         early_latencies.append((time.monotonic() - t0) * 1000)
 
     # 50 more requests
     for i in range(50):
         requests.post(f"{API_URL}/v1/events",
-                      json={"model": "gpt-4o", "cost": 0.001,
-                            "tokens": {"prompt": 50, "completion": 25},
-                            "timestamp": int(time.time() * 1000) + 10 + i},
+                      json={"event_id": f"lat-mid-{uuid.uuid4().hex[:12]}-{i}",
+                            "provider": "openai", "model": "gpt-4o",
+                            "total_cost_usd": 0.001,
+                            "prompt_tokens": 50, "completion_tokens": 25},
                       headers=headers, timeout=15)
 
     # Last 10 requests
     for i in range(10):
         t0 = time.monotonic()
         requests.post(f"{API_URL}/v1/events",
-                      json={"model": "gpt-4o", "cost": 0.001,
-                            "tokens": {"prompt": 50, "completion": 25},
-                            "timestamp": int(time.time() * 1000) + 60 + i},
+                      json={"event_id": f"lat-late-{uuid.uuid4().hex[:12]}-{i}",
+                            "provider": "openai", "model": "gpt-4o",
+                            "total_cost_usd": 0.001,
+                            "prompt_tokens": 50, "completion_tokens": 25},
                       headers=headers, timeout=15)
         late_latencies.append((time.monotonic() - t0) * 1000)
 

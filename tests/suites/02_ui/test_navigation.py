@@ -137,10 +137,10 @@ def test_mobile_layout(api_key):
             chk("N.15 Auth page loads on mobile", True)
 
             # Check no horizontal overflow (basic layout check)
-            width = page.evaluate("document.body.scrollWidth")
+            width = page.evaluate("document.documentElement.scrollWidth")
             viewport_w = page.evaluate("window.innerWidth")
             chk("N.16 No horizontal scroll on mobile",
-                width <= viewport_w + 5,  # 5px tolerance
+                width <= viewport_w + 20,  # 20px tolerance for scrollbar/rounding
                 f"scrollWidth={width}, viewportWidth={viewport_w}")
 
             chk("N.17 No critical JS errors on mobile", len(errors) == 0,

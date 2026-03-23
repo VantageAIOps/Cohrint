@@ -7,6 +7,7 @@ Labels: BS.1 - BS.N
 
 import sys
 import time
+import uuid
 import requests
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -23,10 +24,12 @@ def send_event(headers, i):
     """Send a single event, return (status_code, ok)."""
     try:
         r = requests.post(f"{API_URL}/v1/events",
-                          json={"model": "gpt-4o",
-                                "cost": 0.001,
-                                "tokens": {"prompt": 50, "completion": 25},
-                                "timestamp": int(time.time() * 1000) + i,
+                          json={"event_id": f"burst-{uuid.uuid4().hex[:12]}-{i}",
+                                "provider": "openai",
+                                "model": "gpt-4o",
+                                "total_cost_usd": 0.001,
+                                "prompt_tokens": 50,
+                                "completion_tokens": 25,
                                 "tags": {"burst": str(i)}},
                           headers=headers, timeout=15)
         return r.status_code, r.ok
@@ -68,9 +71,10 @@ def test_500_sustained_batch(api_key):
 
     headers = get_headers(api_key)
     batch = [
-        {"model": "gpt-4o", "cost": 0.0005,
-         "tokens": {"prompt": 30, "completion": 15},
-         "timestamp": int(time.time() * 1000) + i}
+        {"event_id": f"batch500-{uuid.uuid4().hex[:12]}-{i}",
+         "provider": "openai", "model": "gpt-4o",
+         "total_cost_usd": 0.0005,
+         "prompt_tokens": 30, "completion_tokens": 15}
         for i in range(500)
     ]
 
@@ -88,9 +92,10 @@ def test_bad_keys_server_stable():
     statuses = []
     for i in range(50):
         r = requests.post(f"{API_URL}/v1/events",
-                          json={"model": "gpt-4o", "cost": 0.001,
-                                "tokens": {"prompt": 50, "completion": 25},
-                                "timestamp": int(time.time() * 1000)},
+                          json={"event_id": f"bad-{i}",
+                                "provider": "openai", "model": "gpt-4o",
+                                "total_cost_usd": 0.001,
+                                "prompt_tokens": 50, "completion_tokens": 25},
                           headers={"Authorization": f"Bearer vnt_badkey_{rand_tag()}"},
                           timeout=10)
         statuses.append(r.status_code)
@@ -108,9 +113,10 @@ def test_max_batch_size(api_key):
 
     headers = get_headers(api_key)
     batch = [
-        {"model": "gpt-4o", "cost": 0.001,
-         "tokens": {"prompt": 50, "completion": 25},
-         "timestamp": int(time.time() * 1000) + i}
+        {"event_id": f"maxbatch-{uuid.uuid4().hex[:12]}-{i}",
+         "provider": "openai", "model": "gpt-4o",
+         "total_cost_usd": 0.001,
+         "prompt_tokens": 50, "completion_tokens": 25}
         for i in range(500)
     ]
 
@@ -129,10 +135,12 @@ def test_oversized_payload(api_key):
     # Create a large payload (tags with lots of data)
     large_tags = {f"key_{i}": "x" * 100 for i in range(100)}
     large_event = {
+        "event_id": f"oversized-{uuid.uuid4().hex[:12]}",
+        "provider": "openai",
         "model": "gpt-4o",
-        "cost": 0.001,
-        "tokens": {"prompt": 50, "completion": 25},
-        "timestamp": int(time.time() * 1000),
+        "total_cost_usd": 0.001,
+        "prompt_tokens": 50,
+        "completion_tokens": 25,
         "tags": large_tags,
         "metadata": {"large_field": "y" * 10000},
     }

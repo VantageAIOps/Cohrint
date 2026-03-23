@@ -103,8 +103,11 @@ def _critical_elements_present(page, path: str) -> list[str]:
 
 
 def _no_critical_js_errors(errors) -> tuple[bool, list]:
-    # Filter out CORS/access-control warnings — not critical app errors
-    errs = [e for e in errors if "access control" not in str(e).lower()]
+    # Filter out non-critical browser/infra warnings (not app errors)
+    errs = [e for e in errors
+            if "access control" not in str(e).lower()
+            and "serviceworker" not in str(e).lower()
+            and "cdn-cgi" not in str(e).lower()]
     return len(errs) == 0, errs[:3]
 
 

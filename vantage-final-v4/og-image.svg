@@ -1,0 +1,129 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#080c0f"/>
+      <stop offset="100%" stop-color="#0d1318"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="600" cy="280" r="350" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#00d4a1" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#00d4a1" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow2" cx="900" cy="400" r="250" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0098ff" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#0098ff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Glow effects -->
+  <rect width="1200" height="630" fill="url(#glow)"/>
+  <rect width="1200" height="630" fill="url(#glow2)"/>
+
+  <!-- Grid pattern -->
+  <g opacity="0.04" stroke="#fff" stroke-width="0.5">
+    <line x1="0" y1="60" x2="1200" y2="60"/>
+    <line x1="0" y1="120" x2="1200" y2="120"/>
+    <line x1="0" y1="180" x2="1200" y2="180"/>
+    <line x1="0" y1="240" x2="1200" y2="240"/>
+    <line x1="0" y1="300" x2="1200" y2="300"/>
+    <line x1="0" y1="360" x2="1200" y2="360"/>
+    <line x1="0" y1="420" x2="1200" y2="420"/>
+    <line x1="0" y1="480" x2="1200" y2="480"/>
+    <line x1="0" y1="540" x2="1200" y2="540"/>
+    <line x1="60" y1="0" x2="60" y2="630"/>
+    <line x1="120" y1="0" x2="120" y2="630"/>
+    <line x1="180" y1="0" x2="180" y2="630"/>
+    <line x1="240" y1="0" x2="240" y2="630"/>
+    <line x1="300" y1="0" x2="300" y2="630"/>
+    <line x1="360" y1="0" x2="360" y2="630"/>
+    <line x1="420" y1="0" x2="420" y2="630"/>
+    <line x1="480" y1="0" x2="480" y2="630"/>
+    <line x1="540" y1="0" x2="540" y2="630"/>
+    <line x1="600" y1="0" x2="600" y2="630"/>
+    <line x1="660" y1="0" x2="660" y2="630"/>
+    <line x1="720" y1="0" x2="720" y2="630"/>
+    <line x1="780" y1="0" x2="780" y2="630"/>
+    <line x1="840" y1="0" x2="840" y2="630"/>
+    <line x1="900" y1="0" x2="900" y2="630"/>
+    <line x1="960" y1="0" x2="960" y2="630"/>
+    <line x1="1020" y1="0" x2="1020" y2="630"/>
+    <line x1="1080" y1="0" x2="1080" y2="630"/>
+    <line x1="1140" y1="0" x2="1140" y2="630"/>
+  </g>
+
+  <!-- Logo mark -->
+  <g transform="translate(80, 180)">
+    <!-- Logo box -->
+    <rect width="56" height="56" rx="12" fill="#121920" stroke="rgba(255,255,255,0.13)" stroke-width="1"/>
+    <text x="14" y="40" font-family="monospace" font-size="32" font-weight="700" fill="#e8edf2">V</text>
+    <circle cx="46" cy="12" r="5" fill="#00d4a1"/>
+    <circle cx="46" cy="12" r="5" fill="#00d4a1" opacity="0.4">
+      <animate attributeName="r" values="5;9;5" dur="2.4s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.4;0;0.4" dur="2.4s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- Brand name -->
+  <text x="152" y="224" font-family="monospace, 'Courier New'" font-size="28" font-weight="400" fill="#e8edf2" letter-spacing="3">VANTAGE</text>
+  <text x="152" y="224" font-family="monospace, 'Courier New'" font-size="28" font-weight="400" fill="#00d4a1" letter-spacing="3" opacity="0">
+    <tspan>AI</tspan>
+  </text>
+  <text x="330" y="224" font-family="monospace, 'Courier New'" font-size="28" font-weight="400" fill="#00d4a1" letter-spacing="3">AI</text>
+
+  <!-- Tagline -->
+  <text x="80" y="310" font-family="system-ui, -apple-system, sans-serif" font-size="52" font-weight="700" fill="#e8edf2">LLM Cost Tracking</text>
+  <text x="80" y="375" font-family="system-ui, -apple-system, sans-serif" font-size="52" font-weight="700" fill="#e8edf2">&amp; AI API Monitoring</text>
+
+  <!-- Subtitle -->
+  <text x="80" y="430" font-family="system-ui, -apple-system, sans-serif" font-size="20" fill="#6b7b8a">One line of code. Full visibility into your AI spending.</text>
+
+  <!-- Decorative dashboard preview (right side) -->
+  <g transform="translate(750, 100)" opacity="0.6">
+    <!-- Card 1 - Cost -->
+    <rect x="0" y="0" width="380" height="120" rx="12" fill="#121920" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+    <text x="24" y="36" font-family="monospace" font-size="11" fill="#6b7b8a" letter-spacing="1">TOTAL COST TODAY</text>
+    <text x="24" y="80" font-family="monospace" font-size="36" font-weight="700" fill="#e8edf2">$1,247</text>
+    <text x="190" y="80" font-family="monospace" font-size="14" fill="#00d4a1">-12.4%</text>
+    <!-- Mini chart -->
+    <polyline points="240,90 260,75 280,82 300,60 320,65 340,45 360,50" fill="none" stroke="#00d4a1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- Card 2 - Requests -->
+    <rect x="0" y="140" width="380" height="120" rx="12" fill="#121920" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+    <text x="24" y="176" font-family="monospace" font-size="11" fill="#6b7b8a" letter-spacing="1">API REQUESTS</text>
+    <text x="24" y="220" font-family="monospace" font-size="36" font-weight="700" fill="#e8edf2">48.2K</text>
+    <text x="175" y="220" font-family="monospace" font-size="14" fill="#0098ff">+8.1%</text>
+    <!-- Bar chart -->
+    <rect x="240" y="200" width="16" height="30" rx="3" fill="#0098ff" opacity="0.3"/>
+    <rect x="262" y="190" width="16" height="40" rx="3" fill="#0098ff" opacity="0.4"/>
+    <rect x="284" y="185" width="16" height="45" rx="3" fill="#0098ff" opacity="0.5"/>
+    <rect x="306" y="178" width="16" height="52" rx="3" fill="#0098ff" opacity="0.6"/>
+    <rect x="328" y="172" width="16" height="58" rx="3" fill="#0098ff" opacity="0.8"/>
+    <rect x="350" y="168" width="16" height="62" rx="3" fill="#0098ff"/>
+
+    <!-- Card 3 - Models -->
+    <rect x="0" y="280" width="380" height="120" rx="12" fill="#121920" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+    <text x="24" y="316" font-family="monospace" font-size="11" fill="#6b7b8a" letter-spacing="1">TOP MODELS BY COST</text>
+    <!-- Model bars -->
+    <rect x="24" y="332" width="200" height="8" rx="4" fill="#00d4a1" opacity="0.8"/>
+    <text x="232" y="340" font-family="monospace" font-size="10" fill="#6b7b8a">GPT-4o</text>
+    <rect x="24" y="352" width="140" height="8" rx="4" fill="#0098ff" opacity="0.8"/>
+    <text x="172" y="360" font-family="monospace" font-size="10" fill="#6b7b8a">Claude 3.5</text>
+    <rect x="24" y="372" width="80" height="8" rx="4" fill="#f59e0b" opacity="0.8"/>
+    <text x="112" y="380" font-family="monospace" font-size="10" fill="#6b7b8a">Gemini Pro</text>
+  </g>
+
+  <!-- Install command at bottom -->
+  <g transform="translate(80, 490)">
+    <rect width="400" height="44" rx="8" fill="#121920" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+    <text x="16" y="28" font-family="monospace, 'Courier New'" font-size="13" fill="#6b7b8a">$ </text>
+    <text x="32" y="28" font-family="monospace, 'Courier New'" font-size="13" fill="#e8edf2">pip install vantageai</text>
+  </g>
+
+  <!-- URL -->
+  <text x="80" y="575" font-family="monospace, 'Courier New'" font-size="14" fill="#6b7b8a">vantageaiops.com</text>
+
+  <!-- Border -->
+  <rect x="0.5" y="0.5" width="1199" height="629" rx="0" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+</svg>

@@ -48,9 +48,9 @@ def test_members_list(owner_key):
 
     headers = get_headers(owner_key)
 
-    # OA.4 GET /admin/members lists all members with roles
-    r = requests.get(f"{API_URL}/v1/admin/members", headers=headers, timeout=15)
-    chk("OA.4  GET /admin/members → 200/404",
+    # OA.4 GET /auth/members lists all members with roles
+    r = requests.get(f"{API_URL}/v1/auth/members", headers=headers, timeout=15)
+    chk("OA.4  GET /auth/members → 200/404",
         r.status_code in (200, 404), f"got {r.status_code}")
 
     if r.ok:
@@ -86,7 +86,9 @@ def test_shared_analytics(owner_key, org_id):
 
     if r.ok:
         d = r.json()
-        cost = (d.get("total_cost") or d.get("cost") or d.get("totalCost") or
+        cost = (d.get("today_cost_usd") or d.get("mtd_cost_usd") or
+                d.get("session_cost_usd") or d.get("total_cost") or
+                d.get("cost") or d.get("totalCost") or
                 d.get("summary", {}).get("total_cost") or 0)
         chk("OA.8  Analytics shows cost > 0 after ingest", cost > 0,
             f"cost={cost}, keys={list(d.keys())}")
@@ -106,18 +108,18 @@ def test_admin_requires_owner(owner_key):
     non_owner_headers = get_headers(non_owner_key)
 
     # OA.9 Non-org member cannot access first org's admin
-    r = requests.post(f"{API_URL}/v1/admin/invite",
+    r = requests.post(f"{API_URL}/v1/auth/members",
                       json={"email": rand_email("oa"), "name": rand_name()},
                       headers=non_owner_headers, timeout=15)
     # This should either 403 (not authorized for this org) or succeed for their own org
-    chk("OA.9  POST /admin/invite requires auth",
+    chk("OA.9  POST /auth/members requires auth",
         r.status_code in (200, 201, 400, 401, 403, 404),
         f"got {r.status_code}")
 
     # OA.10 Delete/deactivate endpoint exists (404 means not yet implemented)
-    r2 = requests.delete(f"{API_URL}/v1/admin/members/some-member-id",
+    r2 = requests.delete(f"{API_URL}/v1/auth/members/some-member-id",
                          headers=get_headers(owner_key), timeout=15)
-    chk("OA.10 DELETE /admin/members/:id → 200/404/405",
+    chk("OA.10 DELETE /auth/members/:id → 200/404/405",
         r2.status_code in (200, 204, 404, 405, 400),
         f"got {r2.status_code}")
 
