@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "vantage": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "vantageaiops-mcp"],
+      "env": {
+        "VANTAGE_API_KEY": "vnt_aaravbagraab_465dd2e76ca2abe8914305acf3964eba"
+      }
+    }
+  }
+}
