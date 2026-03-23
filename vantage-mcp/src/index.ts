@@ -131,7 +131,7 @@ const MODEL_RATES: Record<string, { input: number; output: number; provider: str
   'mistral-small':    { input: 0.0002,  output: 0.0006,  provider: 'mistral',   tier: 'budget' },
 };
 
-// Filler phrases that add tokens but no meaning
+// ── Filler phrases: politeness & padding that waste tokens ──────────────────
 const FILLER_PHRASES = [
   "i'd like you to", "i want you to", "i need you to",
   "would you mind", "could you please", "can you please",
@@ -139,18 +139,71 @@ const FILLER_PHRASES = [
   "as an ai language model", "as a helpful assistant",
   "in order to", "for the purpose of", "with regard to",
   "in the context of", "it should be noted that",
-  "please", "kindly", "basically", "essentially",
-  "actually", "literally", "obviously", "clearly",
+  "it is worth mentioning that", "i was wondering if you could",
+  "it goes without saying", "needless to say",
+  "as previously mentioned", "as stated above",
+  "for your information", "i would appreciate it if you could",
+  "please be advised that", "at the end of the day",
+  "in today's world", "in this day and age",
+  "each and every", "first and foremost",
+  "due to the fact that", "on account of the fact that",
+  "in light of the fact that", "despite the fact that",
+  "the reason is because", "whether or not",
 ];
 
-const FILLER_WORDS = /\b(the|and|or|but|in|on|at|to|for|of|with|by|an|a|is|are|was|were|be|been|being|have|has|had|do|does|did|will|would|could|should|may|might|must|can|shall|just|very|really|quite|rather|somewhat|pretty|fairly|bit)\b/gi;
+const FILLER_WORDS_RE = /\b(please|kindly|basically|essentially|actually|literally|obviously|clearly|simply|just|very|really|quite|rather|somewhat|pretty|fairly)\b/gi;
+
+// ── Verbose → concise rewrites: structural compression ─────────────────────
+const VERBOSE_REWRITES: Array<[RegExp, string]> = [
+  [/\bin order to\b/gi, 'to'],
+  [/\bfor the purpose of\b/gi, 'for'],
+  [/\bwith regard to\b/gi, 'regarding'],
+  [/\bwith respect to\b/gi, 'regarding'],
+  [/\bin the event that\b/gi, 'if'],
+  [/\bin the case of\b/gi, 'for'],
+  [/\bat this point in time\b/gi, 'now'],
+  [/\bat the present time\b/gi, 'now'],
+  [/\bprior to\b/gi, 'before'],
+  [/\bsubsequent to\b/gi, 'after'],
+  [/\bin close proximity to\b/gi, 'near'],
+  [/\ba large number of\b/gi, 'many'],
+  [/\ba small number of\b/gi, 'few'],
+  [/\bthe majority of\b/gi, 'most'],
+  [/\bon a daily basis\b/gi, 'daily'],
+  [/\bon a regular basis\b/gi, 'regularly'],
+  [/\bis able to\b/gi, 'can'],
+  [/\bare able to\b/gi, 'can'],
+  [/\bhas the ability to\b/gi, 'can'],
+  [/\bhave the ability to\b/gi, 'can'],
+  [/\bmake a decision\b/gi, 'decide'],
+  [/\bcome to a conclusion\b/gi, 'conclude'],
+  [/\btake into consideration\b/gi, 'consider'],
+  [/\bgive consideration to\b/gi, 'consider'],
+  [/\bthe fact that\b/gi, 'that'],
+  [/\bin spite of\b/gi, 'despite'],
+  [/\bdue to the fact that\b/gi, 'because'],
+  [/\bon account of\b/gi, 'because'],
+  [/\bit is necessary that\b/gi, 'must'],
+  [/\bit is important that\b/gi, 'must'],
+  [/\bfor the reason that\b/gi, 'because'],
+  [/\bwith the exception of\b/gi, 'except'],
+  [/\bin the near future\b/gi, 'soon'],
+  [/\bat a later date\b/gi, 'later'],
+  [/\bin the amount of\b/gi, 'for'],
+  [/\bin regard to\b/gi, 'about'],
+  [/\bpertaining to\b/gi, 'about'],
+  [/\bconcerning the matter of\b/gi, 'about'],
+  [/\bas a consequence of\b/gi, 'because of'],
+  [/\bin the process of\b/gi, 'while'],
+  [/\bin an effort to\b/gi, 'to'],
+  [/\bby means of\b/gi, 'by'],
+  [/\bin conjunction with\b/gi, 'with'],
+];
 
 /** Count tokens using word-level heuristic (matches GPT tokenizer ±10%). */
 function countTokens(text: string): number {
   if (!text) return 0;
-  // Count words + punctuation + special chars as separate tokens
   const words = text.split(/\s+/).filter(w => w.length > 0);
-  // Longer words tend to be split into multiple tokens
   let count = 0;
   for (const w of words) {
     if (w.length <= 4) count += 1;
@@ -161,25 +214,47 @@ function countTokens(text: string): number {
   return Math.ceil(count);
 }
 
-/** Smart prompt compression: remove filler, deduplicate, trim redundancy. */
+/**
+ * Smart prompt compression — 5 layers of optimization:
+ * 1. Remove filler phrases ("could you please", "it is important to note that")
+ * 2. Rewrite verbose patterns to concise equivalents ("in order to" → "to")
+ * 3. Remove filler words ("basically", "essentially", "just", "very")
+ * 4. Deduplicate repeated sentences
+ * 5. Collapse formatting (multi-spaces, redundant newlines, trailing punctuation)
+ */
 function compressPrompt(prompt: string): string {
   let text = prompt;
-  // Remove filler phrases (case-insensitive)
+
+  // Layer 1: Remove filler phrases
   for (const phrase of FILLER_PHRASES) {
     const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     text = text.replace(new RegExp(`\\b${escaped}\\b`, 'gi'), '');
   }
-  // Remove duplicate consecutive sentences
+
+  // Layer 2: Verbose → concise rewrites (structural compression)
+  for (const [pattern, replacement] of VERBOSE_REWRITES) {
+    text = text.replace(pattern, replacement);
+  }
+
+  // Layer 3: Remove filler words
+  text = text.replace(FILLER_WORDS_RE, '');
+
+  // Layer 4: Deduplicate sentences
   const sentences = text.split(/(?<=[.!?])\s+/);
   const unique: string[] = [];
   const seen = new Set<string>();
   for (const s of sentences) {
-    const norm = s.toLowerCase().trim();
-    if (norm && !seen.has(norm)) { seen.add(norm); unique.push(s); }
+    const norm = s.toLowerCase().trim().replace(/\s+/g, ' ');
+    if (norm.length > 2 && !seen.has(norm)) { seen.add(norm); unique.push(s); }
   }
   text = unique.join(' ');
-  // Collapse whitespace
-  return text.replace(/\s+/g, ' ').trim();
+
+  // Layer 5: Collapse whitespace and formatting
+  text = text.replace(/\n{3,}/g, '\n\n');        // max 2 newlines
+  text = text.replace(/[ \t]{2,}/g, ' ');         // collapse spaces
+  text = text.replace(/\s+([.!?,;:])/g, '$1');    // space before punct
+  text = text.replace(/([.!?])\1+/g, '$1');       // repeated punct
+  return text.trim();
 }
 
 /** Calculate cost for a model. */
@@ -200,21 +275,58 @@ function findCheapest(inputTokens: number, outputTokens: number) {
   return best;
 }
 
-/** Generate optimization tips for a prompt. */
+/** Generate actionable optimization tips for a prompt. */
 function getOptimizationTips(prompt: string): string[] {
   const tips: string[] = [];
   const tokens = countTokens(prompt);
   const compressed = compressPrompt(prompt);
   const compressedTokens = countTokens(compressed);
   const saved = tokens - compressedTokens;
+  const pct = tokens > 0 ? Math.round(saved / tokens * 100) : 0;
 
-  if (saved > 10) tips.push(`Remove filler words/phrases to save ~${saved} tokens (${Math.round(saved/tokens*100)}%)`);
-  if (prompt.length > 2000) tips.push('Consider breaking into smaller, focused prompts instead of one large one');
-  if (/```[\s\S]{500,}```/.test(prompt)) tips.push('Large code blocks detected — consider referencing files instead of inlining');
-  if ((prompt.match(/\n/g) || []).length > 30) tips.push('Many newlines — compact formatting can save tokens');
-  if (/(.{50,})\1/.test(prompt)) tips.push('Repeated content detected — deduplicate to save tokens');
-  if (tokens > 4000) tips.push('Prompt > 4000 tokens — consider using a cheaper model for this task (gemini-2.0-flash, deepseek-v3)');
-  if (tokens < 100) tips.push('Short prompt — already efficient');
+  // Compression savings
+  if (saved > 5) tips.push(`Compression saves ~${saved} tokens (${pct}%) by removing filler phrases and rewriting verbose patterns`);
+
+  // Structural analysis
+  if (/```[\s\S]{500,}```/.test(prompt)) tips.push('Large code block (500+ chars) inlined — reference the file path instead of pasting code');
+  if (/```[\s\S]*```[\s\S]*```[\s\S]*```/.test(prompt)) tips.push('Multiple code blocks — consolidate into one block or reference files');
+
+  const lines = (prompt.match(/\n/g) || []).length;
+  if (lines > 50) tips.push(`${lines} lines — use structured bullet points instead of prose to reduce tokens by ~30%`);
+
+  // Repetition detection
+  const words = prompt.toLowerCase().split(/\s+/);
+  const wordCounts: Record<string, number> = {};
+  for (const w of words) { if (w.length > 5) wordCounts[w] = (wordCounts[w] || 0) + 1; }
+  const repeated = Object.entries(wordCounts).filter(([, c]) => c > 5).map(([w]) => w);
+  if (repeated.length > 3) tips.push(`Repeated words (${repeated.slice(0, 3).join(', ')}...) — deduplicate or restructure`);
+
+  // Duplicate sentences
+  const sentences = prompt.split(/(?<=[.!?])\s+/);
+  const sentSet = new Set<string>();
+  let dupes = 0;
+  for (const s of sentences) {
+    const norm = s.toLowerCase().trim();
+    if (norm.length > 20 && sentSet.has(norm)) dupes++;
+    sentSet.add(norm);
+  }
+  if (dupes > 0) tips.push(`${dupes} duplicate sentence(s) detected — remove repeats`);
+
+  // Model-specific advice
+  if (tokens > 8000) tips.push('Prompt > 8K tokens — enable prompt caching (system prompt prefix) to save 90% on repeated context');
+  if (tokens > 4000) tips.push('Prompt > 4K tokens — consider gemini-2.0-flash ($0.10/1M) or deepseek-v3 ($0.27/1M) for this task');
+  if (tokens > 2000 && tokens <= 4000) tips.push('Consider claude-haiku-4-5 ($0.80/1M) or gpt-4o-mini ($0.15/1M) if quality allows');
+
+  // JSON/XML detection
+  if (/\{[\s\S]{200,}\}/.test(prompt)) tips.push('Large JSON payload — send as a tool parameter or file reference instead of inline text');
+  if (/<[a-z][\s\S]{200,}<\/[a-z]/i.test(prompt)) tips.push('Large XML/HTML block — consider extracting to a file reference');
+
+  // System prompt heuristics
+  if (/you are|your role|act as|behave as/i.test(prompt) && tokens > 500) {
+    tips.push('System prompt detected (500+ tokens) — move to a static system message and enable caching');
+  }
+
+  if (tips.length === 0) tips.push('Prompt is already concise — no major optimizations found');
   return tips;
 }
 
