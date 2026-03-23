@@ -2215,15 +2215,6 @@ async function init_allspend(){
 }
 window.init_allspend=init_allspend;
 
-// Auto-init the default view on load
-document.addEventListener('DOMContentLoaded', function(){
-  setTimeout(()=>{
-    if(!window.inited_allspend && typeof init_allspend==='function'){
-      init_allspend(); window.inited_allspend=true;
-    }
-  }, 500);
-});
-
 /* ════════════════════════════════════════════════════════════════════════════
    MODULE 2 — TOKEN ANALYTICS
 ═══════════════════════════════════════════════════════════════════════════ */
@@ -3175,6 +3166,10 @@ if ('serviceWorker' in navigator) {
   checkPlanUsage();
   // Start SSE live stream now that session is available
   if (_session?.org_id) connectSSE(); else _simulateLiveStream();
+  // Init default view (All AI Spend) now that auth is ready
+  if (!window.inited_allspend && typeof init_allspend === 'function') {
+    init_allspend(); window.inited_allspend = true;
+  }
 })();
 
 // ── Free-tier upgrade banner & modal ───────────────

@@ -16,42 +16,12 @@
 
 import { Hono } from 'hono';
 import type { Bindings, Variables } from '../types';
+import { authMiddleware } from '../middleware/auth';
 
 const crossplatform = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
-// ── Auth middleware (reuse existing pattern) ─────────────────────────────────
-
-async function authMiddleware(c: any, next: () => Promise<void>) {
-  const authHeader = c.req.header('Authorization') ?? '';
-  if (!authHeader.startsWith('Bearer ')) {
-    return c.json({ error: 'Missing Authorization header' }, 401);
-  }
-  const apiKey = authHeader.slice(7);
-  const encoder = new TextEncoder();
-  const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(apiKey));
-  const hash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-
-  // Check owner key (orgs table)
-  const org = await c.env.DB.prepare(
-    'SELECT id, plan FROM orgs WHERE api_key_hash = ?'
-  ).bind(hash).first() as { id: string; plan: string } | null;
-
-  if (org) {
-    c.set('orgId', org.id);
-    c.set('role', 'owner');
-  } else {
-    // Check member key (org_members table)
-    const member = await c.env.DB.prepare(
-      'SELECT org_id, role FROM org_members WHERE api_key_hash = ?'
-    ).bind(hash).first() as { org_id: string; role: string } | null;
-
-    if (!member) return c.json({ error: 'Invalid API key' }, 401);
-    c.set('orgId', member.org_id);
-    c.set('role', member.role);
-  }
-  await next();
-}
-
+// Use the shared auth middleware — supports both session cookies (dashboard)
+// and Bearer tokens (API/SDK/tests)
 crossplatform.use('*', authMiddleware);
 
 // ── GET /summary — total spend across all platforms ─────────────────────────
