@@ -532,7 +532,8 @@ button{font-family:var(--sans);cursor:pointer}
   <!-- SIDEBAR -->
   <div id="sidebar">
     <div class="sb-section">Core</div>
-    <button class="sb-item active" onclick="nav('cost',this)"><span class="ico">&#128176;</span><span>Cost Intelligence</span></button>
+    <button class="sb-item active" onclick="nav('allspend',this)"><span class="ico">&#127760;</span><span>All AI Spend</span><span class="sb-badge" style="background:var(--ac)">LIVE</span></button>
+    <button class="sb-item" onclick="nav('cost',this)"><span class="ico">&#128176;</span><span>Cost Intelligence</span></button>
     <button class="sb-item" onclick="nav('tokens',this)"><span class="ico">&#128290;</span><span>Token Analytics</span></button>
     <button class="sb-item" onclick="nav('models',this)"><span class="ico">&#9878;</span><span>Model Comparison</span></button>
     <button class="sb-item" onclick="nav('perf',this)"><span class="ico">&#9889;</span><span>Performance & Latency</span></button>
@@ -561,9 +562,72 @@ button{font-family:var(--sans);cursor:pointer}
   <div id="main">
 
     <!-- ════════════════════════════════════════════════════════════════════
+         MODULE 0 — ALL AI SPEND (Cross-Platform Live Dashboard)
+    ═══════════════════════════════════════════════════════════════════════ -->
+    <div class="view active" id="view-allspend">
+      <div class="view-title">&#127760; All AI Spend</div>
+      <div class="view-sub muted">Live token & cost tracking across Claude Code, Copilot, Gemini, Codex, Cursor and all AI coding tools</div>
+
+      <!-- KPI Grid -->
+      <div class="kpi-grid" id="xp-kpis">
+        <div class="kpi"><div class="kpi-lbl">Total AI Spend</div><div class="kpi-val" id="xp-total-cost">--</div><div class="kpi-ch" id="xp-today-cost">Loading...</div></div>
+        <div class="kpi"><div class="kpi-lbl">Total Tokens</div><div class="kpi-val" id="xp-total-tokens">--</div><div class="kpi-ch" id="xp-token-sub">across all tools</div></div>
+        <div class="kpi"><div class="kpi-lbl">Active Developers</div><div class="kpi-val" id="xp-dev-count">--</div><div class="kpi-ch" id="xp-provider-count">-- providers</div></div>
+        <div class="kpi"><div class="kpi-lbl">Budget Status</div><div class="kpi-val" id="xp-budget-pct">--</div><div class="kpi-ch" id="xp-budget-sub">of monthly limit</div></div>
+      </div>
+
+      <!-- Row 1: Provider Breakdown + Daily Trend -->
+      <div class="g21">
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Cost by Provider</span><span class="tag tag-blue" id="xp-period-tag">30 DAYS</span></div>
+          <canvas id="xpProviderChart" height="200"></canvas>
+        </div>
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Provider Breakdown</span></div>
+          <div id="xp-provider-rows"></div>
+        </div>
+      </div>
+
+      <!-- Row 2: Developer Spend Table -->
+      <div class="card card-p mb">
+        <div class="card-hdr">
+          <span class="card-title">Developer AI Spend</span>
+          <span class="tag tag-green">PER DEVELOPER</span>
+        </div>
+        <div class="tbl-wrap">
+          <table class="tbl" id="xp-dev-tbl">
+            <thead><tr>
+              <th>Developer</th><th>Providers</th><th>Tokens</th><th>Cost</th>
+              <th>Commits</th><th>PRs</th><th>Lines</th><th>Cost/PR</th>
+            </tr></thead>
+            <tbody id="xp-dev-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Row 3: Model Breakdown + Live Feed -->
+      <div class="g2">
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Cost by Model</span></div>
+          <div id="xp-model-rows"></div>
+        </div>
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Live OTel Feed</span><span class="tag tag-green" id="xp-live-tag">&#9679; LIVE</span></div>
+          <div id="xp-live-feed" style="max-height:340px;overflow-y:auto"></div>
+        </div>
+      </div>
+
+      <!-- Row 4: Connection Status -->
+      <div class="card card-p mb">
+        <div class="card-hdr"><span class="card-title">Data Sources</span><span class="tag tag-gray">CONNECTION STATUS</span></div>
+        <div id="xp-connections"></div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════
          MODULE 1 — COST INTELLIGENCE
     ═══════════════════════════════════════════════════════════════════════ -->
-    <div class="view active" id="view-cost">
+    <div class="view" id="view-cost">
       <div class="view-title">&#128176; Cost Intelligence</div>
       <div class="view-sub muted">Real-time AI spend tracking across all providers, models, teams and features</div>
 
@@ -1917,6 +1981,250 @@ async function init_cost(){
 window.init_cost=init_cost;
 
 /* ════════════════════════════════════════════════════════════════════════════
+   MODULE 0 — ALL AI SPEND (Cross-Platform Live Dashboard)
+═══════════════════════════════════════════════════════════════════════════ */
+
+const XP_PROVIDER_COLORS = {
+  claude_code:"#d97757", copilot_chat:"#74aa9c", gemini_cli:"#4285f4",
+  codex_cli:"#10a37f", cline:"#a78bfa", cursor:"#0098ff",
+  openai_api:"#74aa9c", anthropic_api:"#d97757", custom_api:"#6b7b8a",
+  opencode:"#ff7000", kiro:"#39a4ff", windsurf:"#00d4a1",
+  aider:"#f59e0b", roo_code:"#f87171"
+};
+
+const XP_PROVIDER_NAMES = {
+  claude_code:"Claude Code", copilot_chat:"GitHub Copilot", gemini_cli:"Gemini CLI",
+  codex_cli:"Codex CLI", cline:"Cline", cursor:"Cursor",
+  openai_api:"OpenAI API", anthropic_api:"Anthropic API", custom_api:"Custom API",
+  opencode:"OpenCode", kiro:"Kiro", windsurf:"Windsurf",
+  aider:"Aider", roo_code:"Roo Code"
+};
+
+async function init_allspend(){
+  const days = period || 30;
+  document.getElementById("xp-period-tag").textContent = days + " DAYS";
+
+  // Fetch all data in parallel
+  const [summary, devs, models, live, connections] = await Promise.all([
+    apiFetch(`/v1/cross-platform/summary?days=${days}`).catch(()=>null),
+    apiFetch(`/v1/cross-platform/developers?days=${days}`).catch(()=>null),
+    apiFetch(`/v1/cross-platform/models?days=${days}`).catch(()=>null),
+    apiFetch(`/v1/cross-platform/live?limit=30`).catch(()=>null),
+    apiFetch(`/v1/cross-platform/connections`).catch(()=>null),
+  ]);
+
+  // ── KPI Cards ────────────────────────────────────────────────────────────
+  if (summary) {
+    const totalCost = summary.total_cost_usd || 0;
+    const totalTokens = (summary.total_input_tokens || 0) + (summary.total_output_tokens || 0);
+    const todayCost = summary.today_cost_usd || 0;
+    const providers = summary.by_provider || [];
+    const devCount = devs?.developers?.length || 0;
+    const budgetPct = summary.budget?.budget_pct || 0;
+    const budgetLimit = summary.budget?.monthly_limit_usd || 0;
+
+    document.getElementById("xp-total-cost").textContent = "$" + totalCost.toFixed(2);
+    document.getElementById("xp-today-cost").innerHTML = `Today: <strong>$${todayCost.toFixed(2)}</strong>`;
+    document.getElementById("xp-total-tokens").textContent = fmtNum(totalTokens);
+    document.getElementById("xp-token-sub").textContent = `${fmtNum(summary.total_cached_tokens||0)} cached`;
+    document.getElementById("xp-dev-count").textContent = devCount;
+    document.getElementById("xp-provider-count").textContent = providers.length + " providers";
+
+    if (budgetLimit > 0) {
+      const budgetColor = budgetPct > 85 ? "var(--re)" : budgetPct > 60 ? "var(--am)" : "var(--ac)";
+      document.getElementById("xp-budget-pct").innerHTML = `<span style="color:${budgetColor}">${budgetPct}%</span>`;
+      document.getElementById("xp-budget-sub").textContent = `$${summary.budget.month_spend_usd.toFixed(2)} / $${budgetLimit}`;
+    } else {
+      document.getElementById("xp-budget-pct").textContent = "—";
+      document.getElementById("xp-budget-sub").textContent = "No budget set";
+    }
+
+    // ── Provider Doughnut Chart ──────────────────────────────────────────
+    if (providers.length > 0) {
+      const labels = providers.map(p => XP_PROVIDER_NAMES[p.provider] || p.provider);
+      const data = providers.map(p => p.cost || 0);
+      const colors = providers.map(p => XP_PROVIDER_COLORS[p.provider] || "#6b7b8a");
+      mkChart("xpProviderChart","doughnut",{labels,datasets:[{data,backgroundColor:colors,borderWidth:0}]},{
+        cutout:"55%",
+        plugins:{legend:{display:true,position:"bottom",labels:{color:"#6b7b8a",font:{size:11},boxWidth:10,padding:8}}}
+      });
+    }
+
+    // ── Provider Rows ────────────────────────────────────────────────────
+    const maxCost = Math.max(...providers.map(p => p.cost || 0), 1);
+    document.getElementById("xp-provider-rows").innerHTML = providers.length > 0 ?
+      providers.map(p => {
+        const pct = Math.round(((p.cost||0) / maxCost) * 100);
+        const color = XP_PROVIDER_COLORS[p.provider] || "#6b7b8a";
+        const name = XP_PROVIDER_NAMES[p.provider] || p.provider;
+        return `<div class="model-row">
+          <div class="model-dot" style="background:${color}"></div>
+          <div style="flex:1;font-size:12px">${name}</div>
+          <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${color}40;border-right:2px solid ${color}"></div></div>
+          <div class="mono" style="font-size:11px;min-width:60px;text-align:right">$${(p.cost||0).toFixed(4)}</div>
+          <div class="mono muted" style="font-size:10px;min-width:55px;text-align:right">${fmtNum(p.tokens||0)} tok</div>
+        </div>`;
+      }).join("") :
+      `<div style="color:var(--mu);text-align:center;padding:30px;font-size:13px">No data yet. Connect your AI tools via OTel or billing APIs.</div>`;
+  } else {
+    document.getElementById("xp-total-cost").textContent = "$0.00";
+    document.getElementById("xp-today-cost").textContent = "Connect tools to start tracking";
+  }
+
+  // ── Developer Table ──────────────────────────────────────────────────────
+  const devList = devs?.developers || [];
+  if (devList.length > 0) {
+    document.getElementById("xp-dev-body").innerHTML = devList.map(d => {
+      const providerTags = (d.providers||[]).map(p =>
+        `<span class="tag tag-gray" style="font-size:9px;margin:1px">${(XP_PROVIDER_NAMES[p]||p).split(" ")[0]}</span>`
+      ).join("");
+      const totalTokens = (d.input_tokens||0) + (d.output_tokens||0);
+      return `<tr>
+        <td><strong>${d.developer_email||"unknown"}</strong></td>
+        <td>${providerTags}</td>
+        <td class="mono">${fmtNum(totalTokens)}</td>
+        <td class="mono"><strong>$${(d.total_cost||0).toFixed(4)}</strong></td>
+        <td class="mono">${d.commits||0}</td>
+        <td class="mono">${d.pull_requests||0}</td>
+        <td class="mono">${(d.lines_added||0) + (d.lines_removed||0)}</td>
+        <td class="mono" style="color:${d.cost_per_pr?'var(--ac)':'var(--mu)'}">${d.cost_per_pr ? '$'+d.cost_per_pr.toFixed(2) : '—'}</td>
+      </tr>`;
+    }).join("");
+  } else {
+    document.getElementById("xp-dev-body").innerHTML = `<tr><td colspan="8" style="color:var(--mu);text-align:center;padding:20px;font-size:13px">No developer data yet. Set <code>CLAUDE_CODE_ENABLE_TELEMETRY=1</code> to start tracking.</td></tr>`;
+  }
+
+  // ── Model Breakdown ──────────────────────────────────────────────────────
+  const modelList = models?.models || [];
+  if (modelList.length > 0) {
+    const maxModelCost = Math.max(...modelList.map(m => m.cost || 0), 1);
+    document.getElementById("xp-model-rows").innerHTML = modelList.map(m => {
+      const pct = Math.round(((m.cost||0) / maxModelCost) * 100);
+      const color = XP_PROVIDER_COLORS[m.provider] || "#6b7b8a";
+      return `<div class="model-row">
+        <div class="model-dot" style="background:${color}"></div>
+        <div style="flex:1;font-size:12px">${m.model||"unknown"} <span class="muted" style="font-size:10px">${XP_PROVIDER_NAMES[m.provider]||m.provider}</span></div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${color}40;border-right:2px solid ${color}"></div></div>
+        <div class="mono" style="font-size:11px;min-width:60px;text-align:right">$${(m.cost||0).toFixed(4)}</div>
+      </div>`;
+    }).join("");
+  } else {
+    document.getElementById("xp-model-rows").innerHTML = `<div style="color:var(--mu);text-align:center;padding:30px;font-size:13px">Model data appears after OTel events are received.</div>`;
+  }
+
+  // ── Live OTel Feed ───────────────────────────────────────────────────────
+  const events = live?.events || [];
+  if (events.length > 0) {
+    document.getElementById("xp-live-feed").innerHTML = events.map(e => {
+      const color = XP_PROVIDER_COLORS[e.provider] || "#6b7b8a";
+      const name = XP_PROVIDER_NAMES[e.provider] || e.provider;
+      const time = e.timestamp ? new Date(e.timestamp).toLocaleTimeString() : "";
+      const cost = e.cost_usd ? `$${Number(e.cost_usd).toFixed(4)}` : "";
+      const tokens = (e.tokens_in||0) + (e.tokens_out||0);
+      return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--b1);font-size:12px">
+        <div class="model-dot" style="background:${color}"></div>
+        <span class="mono muted" style="font-size:10px;min-width:60px">${time}</span>
+        <span style="min-width:80px">${name}</span>
+        <span class="mono muted" style="font-size:10px">${e.model||""}</span>
+        <span style="flex:1"></span>
+        <span class="mono" style="min-width:50px;text-align:right">${tokens?fmtNum(tokens)+' tok':''}</span>
+        <span class="mono" style="min-width:55px;text-align:right;color:var(--ac)">${cost}</span>
+      </div>`;
+    }).join("");
+  } else {
+    document.getElementById("xp-live-feed").innerHTML = `<div style="color:var(--mu);text-align:center;padding:40px;font-size:13px">
+      Waiting for live OTel events...<br><br>
+      <code style="font-size:11px;color:var(--bl)">export CLAUDE_CODE_ENABLE_TELEMETRY=1<br>
+      export OTEL_EXPORTER_OTLP_ENDPOINT=https://api.vantageaiops.com/v1/otel</code>
+    </div>`;
+  }
+
+  // ── Connection Status ────────────────────────────────────────────────────
+  const otelSources = connections?.otel_sources || [];
+  const billingConns = connections?.billing_connections || [];
+
+  let connHTML = '<div style="display:flex;flex-wrap:wrap;gap:10px">';
+  // OTel sources
+  for (const src of otelSources) {
+    const name = XP_PROVIDER_NAMES[src.provider] || src.provider;
+    const color = XP_PROVIDER_COLORS[src.provider] || "#6b7b8a";
+    const lastAt = src.last_data_at ? new Date(src.last_data_at).toLocaleString() : "—";
+    connHTML += `<div style="flex:1;min-width:200px;background:var(--bg3);border-radius:8px;padding:12px;border:1px solid var(--b1)">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+        <div class="model-dot" style="background:${color}"></div>
+        <strong style="font-size:12px">${name}</strong>
+        <span class="tag tag-green" style="font-size:9px">OTel</span>
+      </div>
+      <div class="mono muted" style="font-size:10px">${src.record_count} records</div>
+      <div class="mono muted" style="font-size:10px">Last: ${lastAt}</div>
+    </div>`;
+  }
+  // Billing API connections
+  for (const conn of billingConns) {
+    const name = XP_PROVIDER_NAMES[conn.provider] || conn.provider;
+    const statusTag = conn.status === 'active' ? '<span class="tag tag-green" style="font-size:9px">Connected</span>' :
+                      conn.status === 'error' ? '<span class="tag tag-red" style="font-size:9px">Error</span>' :
+                      '<span class="tag tag-amber" style="font-size:9px">Pending</span>';
+    connHTML += `<div style="flex:1;min-width:200px;background:var(--bg3);border-radius:8px;padding:12px;border:1px solid var(--b1)">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+        <strong style="font-size:12px">${name}</strong>
+        ${statusTag}
+        <span class="tag tag-gray" style="font-size:9px">API</span>
+      </div>
+      <div class="mono muted" style="font-size:10px">Last sync: ${conn.last_sync_at || 'Never'}</div>
+    </div>`;
+  }
+  if (otelSources.length === 0 && billingConns.length === 0) {
+    connHTML += `<div style="flex:1;color:var(--mu);text-align:center;padding:20px;font-size:13px">
+      No data sources connected yet. Configure OTel export on your AI tools or connect billing APIs in Settings.
+    </div>`;
+  }
+  connHTML += '</div>';
+  document.getElementById("xp-connections").innerHTML = connHTML;
+
+  // ── Auto-refresh live feed every 30 seconds ────────────────────────────
+  if (!window._xpRefreshTimer) {
+    window._xpRefreshTimer = setInterval(async () => {
+      if (!document.getElementById("view-allspend").classList.contains("active")) return;
+      try {
+        const freshLive = await apiFetch(`/v1/cross-platform/live?limit=30`);
+        const freshEvents = freshLive?.events || [];
+        if (freshEvents.length > 0) {
+          const feedEl = document.getElementById("xp-live-feed");
+          feedEl.innerHTML = freshEvents.map(e => {
+            const color = XP_PROVIDER_COLORS[e.provider] || "#6b7b8a";
+            const name = XP_PROVIDER_NAMES[e.provider] || e.provider;
+            const time = e.timestamp ? new Date(e.timestamp).toLocaleTimeString() : "";
+            const cost = e.cost_usd ? `$${Number(e.cost_usd).toFixed(4)}` : "";
+            const tokens = (e.tokens_in||0) + (e.tokens_out||0);
+            return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--b1);font-size:12px">
+              <div class="model-dot" style="background:${color}"></div>
+              <span class="mono muted" style="font-size:10px;min-width:60px">${time}</span>
+              <span style="min-width:80px">${name}</span>
+              <span class="mono muted" style="font-size:10px">${e.model||""}</span>
+              <span style="flex:1"></span>
+              <span class="mono" style="min-width:50px;text-align:right">${tokens?fmtNum(tokens)+' tok':''}</span>
+              <span class="mono" style="min-width:55px;text-align:right;color:var(--ac)">${cost}</span>
+            </div>`;
+          }).join("");
+          document.getElementById("xp-live-tag").innerHTML = '&#9679; LIVE <span class="muted" style="font-size:9px">' + new Date().toLocaleTimeString() + '</span>';
+        }
+      } catch(e) { /* silent refresh failure */ }
+    }, 30000);
+  }
+}
+window.init_allspend=init_allspend;
+
+// Auto-init the default view on load
+document.addEventListener('DOMContentLoaded', function(){
+  setTimeout(()=>{
+    if(!window.inited_allspend && typeof init_allspend==='function'){
+      init_allspend(); window.inited_allspend=true;
+    }
+  }, 500);
+});
+
+/* ════════════════════════════════════════════════════════════════════════════
    MODULE 2 — TOKEN ANALYTICS
 ═══════════════════════════════════════════════════════════════════════════ */
 window.init_tokens=function(){
@@ -2933,6 +3241,7 @@ async function checkPlanUsage() {
 
 // ── Command Palette ────────────────────────────────
 const CMD_ITEMS = [
+  { group:'Views', ico:'🌐', label:'All AI Spend (Live)', action:()=>navTo('allspend'), kbd:'0' },
   { group:'Views', ico:'💰', label:'Cost Intelligence', action:()=>navTo('cost'), kbd:'1' },
   { group:'Views', ico:'📊', label:'Token Analytics', action:()=>navTo('tokens'), kbd:'2' },
   { group:'Views', ico:'⚖', label:'Model Comparison', action:()=>navTo('models'), kbd:'3' },

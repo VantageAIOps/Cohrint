@@ -201,6 +201,19 @@ pre{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;pad
     <a class="docs-nav-item" onclick="show('vscode',this)">VS Code</a>
     <a class="docs-nav-item" onclick="show('zed',this)">Zed / JetBrains</a>
 
+    <div class="docs-nav-sec" style="color:var(--ac)">Cross-Platform (NEW)</div>
+    <a class="docs-nav-item" onclick="show('otel-setup',this)">OTel Setup (all tools)</a>
+    <a class="docs-nav-item" onclick="show('otel-claude',this)">Claude Code</a>
+    <a class="docs-nav-item" onclick="show('otel-copilot',this)">GitHub Copilot</a>
+    <a class="docs-nav-item" onclick="show('otel-gemini',this)">Gemini CLI</a>
+    <a class="docs-nav-item" onclick="show('otel-codex',this)">Codex CLI</a>
+    <a class="docs-nav-item" onclick="show('otel-cline',this)">Cline</a>
+    <a class="docs-nav-item" onclick="show('xp-api',this)">Cross-Platform API</a>
+
+    <div class="docs-nav-sec">Privacy &amp; Security</div>
+    <a class="docs-nav-item" onclick="show('local-proxy',this)">Local Proxy (zero-trust)</a>
+    <a class="docs-nav-item" onclick="show('privacy-modes',this)">SDK privacy modes</a>
+
     <div class="docs-nav-sec">Features</div>
     <a class="docs-nav-item" onclick="show('tagging',this)">Cost attribution tags</a>
     <a class="docs-nav-item" onclick="show('alerts',this)">Budget alerts</a>
@@ -209,6 +222,7 @@ pre{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;pad
     <div class="docs-nav-sec">Reference</div>
     <a class="docs-nav-item" onclick="show('api',this)">REST API</a>
     <a class="docs-nav-item" onclick="show('mcp-tools',this)">MCP tools</a>
+    <a class="docs-nav-item" onclick="show('mcp-workflows',this)">MCP workflow examples</a>
   </div>
 
   <!-- CONTENT -->
@@ -452,7 +466,7 @@ console.<span class="c-func">log</span>(cost.totalCostUsd); <span class="c-comme
 
 <span class="c-comment">// Find cheapest alternative for same token count</span>
 <span class="c-keyword">const</span> alt = <span class="c-func">findCheapest</span>(<span class="c-string">"gpt-4o"</span>, <span class="c-num">10_000</span>, <span class="c-num">2_000</span>);
-console.<span class="c-func">log</span>(<span class="c-string">\`Switch to \${alt.model} → save \${((cost.totalCostUsd - alt.costUsd) / cost.totalCostUsd * 100).toFixed(0)}%\`</span>);
+console.<span class="c-func">log</span>(<span class="c-string">"Switch to " + alt.model + " → save " + ((cost.totalCostUsd - alt.costUsd) / cost.totalCostUsd * 100).toFixed(0) + "%"</span>);
 
 <span class="c-comment">// All 23 model prices</span>
 console.<span class="c-func">log</span>(<span class="c-var">PRICES</span>[<span class="c-string">"claude-sonnet-4-6"</span>]); <span class="c-comment">// → { provider: "anthropic", input: 3, output: 15, ... }</span></pre>
@@ -863,7 +877,70 @@ api: `
 "How much have we spent on LLMs this month?"  → get_summary
 "Which model costs the most?"                 → get_model_breakdown
 "Are we within budget?"                       → check_budget
-"Show recent agent traces"                    → get_traces</pre>`,
+"Show recent agent traces"                    → get_traces</pre>
+
+<h2>track_llm_call — detailed example</h2>
+<p>Use this when your LLM calls don't go through the SDK proxy (e.g., direct curl, third-party tools).</p>
+<pre><span class="c-comment">// Tell your AI assistant:</span>
+"Track this LLM call:
+  model: gpt-4o
+  provider: openai
+  prompt_tokens: 1500
+  completion_tokens: 800
+  total_cost_usd: 0.0118
+  latency_ms: 1230
+  team: backend
+  environment: production"
+
+<span class="c-comment">// Response:</span>
+✅ Tracked: gpt-4o | 1500→800 tokens | $0.0118 | 1230ms</pre>
+
+<h2>get_model_breakdown — real-world output</h2>
+<pre><span class="c-comment">// Ask: "Show model costs for the last 7 days"</span>
+
+🤖 <strong>Model Breakdown</strong> (last 7 days)
+
+| Model              | Provider  | Cost     | Requests | Avg Latency |
+|--------------------|-----------|----------|----------|-------------|
+| gpt-4o             | openai    | $32.45   | 8,234    | 1,230ms     |
+| claude-sonnet-4-6  | anthropic | $12.18   | 3,456    | 890ms       |
+| gpt-4o-mini        | openai    | $0.87    | 15,678   | 340ms       |
+| gemini-2.0-flash   | google    | $0.12    | 4,200    | 180ms       |</pre>
+
+<h2>optimize_prompt — before &amp; after</h2>
+<pre><span class="c-comment">// Ask: "Optimize this prompt: I would like you to please carefully
+// analyze the following code and could you please provide detailed
+// suggestions for improvement. It is important to note that..."</span>
+
+🔧 <strong>Prompt Optimizer</strong> (gpt-4o)
+
+| Metric    | Before | After | Saved          |
+|-----------|--------|-------|----------------|
+| Tokens    | 52     | 18    | 34 (65%)       |
+| Est. cost | $0.26  | $0.09 | $0.17          |
+
+<strong>Optimized prompt:</strong>
+"Analyze the following code and provide improvement suggestions.
+The code should be maintainable and readable. Review each function."
+
+<strong>Tips:</strong>
+- Remove filler words/phrases to save ~34 tokens (65%)
+💡 Cheapest model: gemini-2.0-flash at $0.000004</pre>
+
+<h2>estimate_costs — model comparison</h2>
+<pre><span class="c-comment">// Ask: "Compare costs for a 2000-token prompt across all models"</span>
+
+💰 <strong>Cost Comparison</strong> (2,000 input + 2,000 output tokens)
+
+| Model              | Provider  | Cost     | vs Cheapest   |
+|--------------------|-----------|----------|---------------|
+| gemini-1.5-flash   | google    | $0.0008  | baseline      |
+| deepseek-v3        | deepseek  | $0.0027  | +238%         |
+| gpt-4o-mini        | openai    | $0.0015  | +88%          |
+| claude-haiku-4-5   | anthropic | $0.0096  | +1100%        |
+| gpt-4o             | openai    | $0.0250  | +3025%        |
+| claude-sonnet-4-6  | anthropic | $0.0360  | +4400%        |
+| claude-opus-4-6    | anthropic | $0.1800  | +22400%       |</pre>`,
 
 members: `
 <h1>Team members</h1>
@@ -916,7 +993,633 @@ curl -X PUT https://api.vantageaiops.com/v1/admin/team-budgets/backend \\
 GET /v1/admin/team-budgets
 
 <span class="c-comment"># Full org overview — all teams + budgets + members</span>
-GET /v1/admin/overview</pre>`
+GET /v1/admin/overview</pre>`,
+
+"local-proxy": `
+<h1>Local Proxy — Privacy-First LLM Tracking</h1>
+<p>The VantageAI Local Proxy runs <strong>on your machine</strong>. Your API keys and prompts <strong>never leave your environment</strong> — only anonymized statistics (token counts, costs, latency) are sent to the dashboard.</p>
+
+<div class="info-box">🔒 <strong style="color:var(--text)">Zero-trust architecture.</strong> Your LLM API keys, prompt content, response text, and PII stay on your machine. VantageAI only receives numbers — model name, token counts, cost in USD, and latency in milliseconds.</div>
+
+<h2>How it works</h2>
+<pre><span class="c-comment">Your App</span>
+    │
+    ▼
+<span class="c-func">localhost:4891</span>  ← Local Proxy (on YOUR machine)
+    │                    │
+    ▼                    ▼
+<span class="c-var">Real LLM API</span>        <span class="c-func">Extract stats locally</span>
+(OpenAI/Anthropic)       │
+    │                    ▼
+    │              <span class="c-keyword">Strip ALL text & keys</span>
+    │                    │
+    ▼                    ▼
+<span class="c-string">Full response</span>      <span class="c-comment">Only numbers</span> → api.vantageaiops.com
+back to your app        (tokens, cost, latency)</pre>
+
+<h2>What stays local vs what is sent</h2>
+<table class="api-table"><thead><tr><th>🔒 Stays on your machine (NEVER sent)</th><th>📊 Sent to VantageAI dashboard</th></tr></thead><tbody>
+<tr><td>Your LLM API keys (sk-..., sk-ant-...)</td><td>Model name (e.g., gpt-4o)</td></tr>
+<tr><td>Full prompt text and content</td><td>Provider (e.g., openai)</td></tr>
+<tr><td>Full response text and content</td><td>Token counts (prompt, completion)</td></tr>
+<tr><td>System prompts</td><td>Calculated cost in USD</td></tr>
+<tr><td>PII, user data, business logic</td><td>Latency in milliseconds</td></tr>
+<tr><td>Any content from your conversations</td><td>HTTP status code, team/env tags</td></tr>
+</tbody></table>
+
+<h2>Quick start (2 minutes)</h2>
+<div class="step-row"><div class="step-num">1</div><div class="step-body">Start the local proxy</div></div>
+<pre><span class="c-comment"># No install needed — runs via npx</span>
+VANTAGE_API_KEY=<span class="c-string">vnt_your_key</span> npx vantageai-local-proxy
+
+<span class="c-comment"># Or with options</span>
+npx vantageai-local-proxy --api-key <span class="c-string">vnt_your_key</span> --privacy <span class="c-string">strict</span> --team <span class="c-string">backend</span></pre>
+
+<div class="step-row"><div class="step-num">2</div><div class="step-body">Point your LLM client to localhost — <strong>one line change</strong></div></div>
+<div class="tab-row"><div class="tab active" onclick="switchTab('lp',this,'lp-py')">Python (OpenAI)</div><div class="tab" onclick="switchTab('lp',this,'lp-ts')">TypeScript (OpenAI)</div><div class="tab" onclick="switchTab('lp',this,'lp-ant')">Python (Anthropic)</div><div class="tab" onclick="switchTab('lp',this,'lp-curl')">cURL</div></div>
+
+<div id="lp-py" class="tab-content active"><pre><span class="c-keyword">from</span> openai <span class="c-keyword">import</span> <span class="c-var">OpenAI</span>
+
+client = <span class="c-var">OpenAI</span>(
+    <span class="c-var">api_key</span>=<span class="c-string">"sk-your-real-key"</span>,            <span class="c-comment"># stays local — never sent to Vantage</span>
+    <span class="c-var">base_url</span>=<span class="c-string">"http://localhost:4891/v1"</span>,   <span class="c-comment"># ← only change needed</span>
+)
+
+<span class="c-comment"># Use exactly as before — every call auto-tracked</span>
+response = client.chat.completions.<span class="c-func">create</span>(
+    <span class="c-var">model</span>=<span class="c-string">"gpt-4o"</span>,
+    <span class="c-var">messages</span>=[{<span class="c-string">"role"</span>: <span class="c-string">"user"</span>, <span class="c-string">"content"</span>: <span class="c-string">"Analyze this quarterly report..."</span>}]
+)
+<span class="c-comment"># ✅ Your prompt stays local</span>
+<span class="c-comment"># ✅ Dashboard shows: gpt-4o | 340→120 tokens | $0.0047 | 890ms</span></pre></div>
+
+<div id="lp-ts" class="tab-content"><pre><span class="c-keyword">import</span> <span class="c-var">OpenAI</span> <span class="c-keyword">from</span> <span class="c-string">"openai"</span>;
+
+<span class="c-keyword">const</span> client = <span class="c-keyword">new</span> <span class="c-var">OpenAI</span>({
+  <span class="c-var">apiKey</span>: <span class="c-string">"sk-your-real-key"</span>,            <span class="c-comment">// stays local</span>
+  <span class="c-var">baseURL</span>: <span class="c-string">"http://localhost:4891/v1"</span>,   <span class="c-comment">// ← only change</span>
+});
+
+<span class="c-keyword">const</span> res = <span class="c-keyword">await</span> client.chat.completions.<span class="c-func">create</span>({
+  <span class="c-var">model</span>: <span class="c-string">"gpt-4o"</span>,
+  <span class="c-var">messages</span>: [{ <span class="c-var">role</span>: <span class="c-string">"user"</span>, <span class="c-var">content</span>: <span class="c-string">"Hello!"</span> }],
+});
+<span class="c-comment">// Dashboard auto-updates with stats only — no text sent</span></pre></div>
+
+<div id="lp-ant" class="tab-content"><pre><span class="c-keyword">import</span> anthropic
+
+client = anthropic.<span class="c-var">Anthropic</span>(
+    <span class="c-var">api_key</span>=<span class="c-string">"sk-ant-your-real-key"</span>,       <span class="c-comment"># stays local</span>
+    <span class="c-var">base_url</span>=<span class="c-string">"http://localhost:4891"</span>,     <span class="c-comment"># ← only change</span>
+)
+
+response = client.messages.<span class="c-func">create</span>(
+    <span class="c-var">model</span>=<span class="c-string">"claude-sonnet-4-6"</span>,
+    <span class="c-var">max_tokens</span>=<span class="c-num">1024</span>,
+    <span class="c-var">messages</span>=[{<span class="c-string">"role"</span>: <span class="c-string">"user"</span>, <span class="c-string">"content"</span>: <span class="c-string">"Summarize this contract..."</span>}]
+)
+<span class="c-comment"># Contract text NEVER leaves your machine</span></pre></div>
+
+<div id="lp-curl" class="tab-content"><pre><span class="c-comment"># Works with any HTTP client — just change the URL</span>
+curl http://localhost:<span class="c-num">4891</span>/v1/chat/completions \\
+  -H <span class="c-string">"Authorization: Bearer sk-your-real-key"</span> \\
+  -H <span class="c-string">"Content-Type: application/json"</span> \\
+  -d <span class="c-string">'{
+    "model": "gpt-4o",
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'</span>
+
+<span class="c-comment"># Check what data the proxy sends</span>
+curl http://localhost:<span class="c-num">4891</span>/privacy
+
+<span class="c-comment"># Health check</span>
+curl http://localhost:<span class="c-num">4891</span>/health</pre></div>
+
+<div class="step-row"><div class="step-num">3</div><div class="step-body">View stats on your dashboard — no text, only numbers</div></div>
+<p>Open <a href="/app.html" style="color:var(--accent)">vantageaiops.com/app.html</a>. You'll see cost, tokens, latency, and model data — but <strong>never</strong> your prompt or response content.</p>
+
+<h2>Privacy levels</h2>
+<table class="api-table"><thead><tr><th>Level</th><th>Text sent?</th><th>Prompt hash?</th><th>Best for</th></tr></thead><tbody>
+<tr><td><code>strict</code> (default)</td><td>❌ None</td><td>❌ No</td><td>Compliance, regulated industries, maximum security</td></tr>
+<tr><td><code>standard</code></td><td>❌ None</td><td>✅ SHA-256 (non-reversible)</td><td>Dedup detection without exposing content</td></tr>
+<tr><td><code>relaxed</code></td><td>⚠️ First 100 chars</td><td>✅ Yes</td><td>Internal debugging only — <strong>NOT for production</strong></td></tr>
+</tbody></table>
+
+<h2>CLI options</h2>
+<table class="api-table"><thead><tr><th>Flag</th><th>Env var</th><th>Default</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>--api-key</code></td><td><code>VANTAGE_API_KEY</code></td><td>—</td><td>Your Vantage key (required)</td></tr>
+<tr><td><code>--port</code></td><td><code>VANTAGE_PROXY_PORT</code></td><td>4891</td><td>Local proxy port</td></tr>
+<tr><td><code>--privacy</code></td><td><code>VANTAGE_PRIVACY</code></td><td>strict</td><td>Privacy level: strict | standard | relaxed</td></tr>
+<tr><td><code>--team</code></td><td><code>VANTAGE_TEAM</code></td><td>—</td><td>Team tag for all events</td></tr>
+<tr><td><code>--env</code></td><td><code>VANTAGE_ENV</code></td><td>production</td><td>Environment tag</td></tr>
+<tr><td><code>--debug</code></td><td><code>VANTAGE_DEBUG</code></td><td>false</td><td>Log each tracked call to terminal</td></tr>
+<tr><td><code>--redact-models</code></td><td>—</td><td>false</td><td>Replace model names with generic tiers</td></tr>
+</tbody></table>
+
+<h2>Security guarantees</h2>
+<div class="info-box">
+<strong>1.</strong> API keys are never forwarded — they route directly from proxy to LLM API<br>
+<strong>2.</strong> Text is stripped immediately in memory — never queued or persisted<br>
+<strong>3.</strong> The proxy self-validates — <code>assertNoSensitiveData()</code> checks for leaked key patterns<br>
+<strong>4.</strong> No external dependencies for privacy — sanitization runs entirely in-process<br>
+<strong>5.</strong> Fully open source — audit <code>privacy.ts</code> yourself
+</div>
+
+<div class="warn-box">⚠️ <strong>When to use Local Proxy vs SDK:</strong> Use the Local Proxy when you want <strong>zero code changes</strong> and maximum isolation (just change base_url). Use the SDK when you want <strong>in-process tracking</strong> with streaming support and richer metadata.</div>
+`,
+
+"privacy-modes": `
+<h1>SDK Privacy Modes</h1>
+<p>If you use the VantageAI SDK directly (not the Local Proxy), you can control exactly what data is sent to the dashboard using <strong>privacy modes</strong>.</p>
+
+<h2>Three modes</h2>
+<table class="api-table"><thead><tr><th>Mode</th><th>Prompt text</th><th>Response text</th><th>Prompt hash</th><th>Best for</th></tr></thead><tbody>
+<tr><td><code>full</code> (default)</td><td>✅ First 600 chars</td><td>✅ First 600 chars</td><td>✅ MD5</td><td>Full observability, internal tools</td></tr>
+<tr><td><code>stats-only</code></td><td>❌ Stripped</td><td>❌ Stripped</td><td>❌ Stripped</td><td>Maximum privacy, compliance</td></tr>
+<tr><td><code>hashed</code></td><td>❌ Stripped</td><td>❌ Stripped</td><td>✅ Kept</td><td>Privacy + dedup detection</td></tr>
+</tbody></table>
+
+<h2>Usage — one line change</h2>
+<div class="tab-row"><div class="tab active" onclick="switchTab('pm',this,'pm-ts')">TypeScript</div><div class="tab" onclick="switchTab('pm',this,'pm-py')">Python</div></div>
+
+<div id="pm-ts" class="tab-content active"><pre><span class="c-keyword">import</span> * <span class="c-keyword">as</span> <span class="c-var">vantage</span> <span class="c-keyword">from</span> <span class="c-string">"vantageaiops"</span>;
+<span class="c-keyword">import</span> <span class="c-var">OpenAI</span> <span class="c-keyword">from</span> <span class="c-string">"openai"</span>;
+
+<span class="c-comment">// Add privacy: "stats-only" — that's it</span>
+<span class="c-var">vantage</span>.<span class="c-func">init</span>({
+  <span class="c-var">apiKey</span>: <span class="c-string">"vnt_your_key"</span>,
+  <span class="c-var">privacy</span>: <span class="c-string">"stats-only"</span>,   <span class="c-comment">// ← no prompt/response text sent</span>
+});
+
+<span class="c-keyword">const</span> openai = <span class="c-var">vantage</span>.<span class="c-func">createOpenAIProxy</span>(<span class="c-keyword">new</span> <span class="c-var">OpenAI</span>(), <span class="c-var">vantage</span>.<span class="c-func">getClient</span>());
+
+<span class="c-comment">// All calls tracked with stats only — no text leaves your app</span>
+<span class="c-keyword">const</span> res = <span class="c-keyword">await</span> openai.chat.completions.<span class="c-func">create</span>({
+  <span class="c-var">model</span>: <span class="c-string">"gpt-4o"</span>,
+  <span class="c-var">messages</span>: [{ <span class="c-var">role</span>: <span class="c-string">"user"</span>, <span class="c-var">content</span>: <span class="c-string">"Sensitive business data here..."</span> }],
+});
+
+<span class="c-comment">// Dashboard sees: gpt-4o | 45→120 tokens | $0.0034 | 780ms</span>
+<span class="c-comment">// Dashboard does NOT see: "Sensitive business data here..."</span></pre></div>
+
+<div id="pm-py" class="tab-content"><pre><span class="c-keyword">import</span> vantageaiops <span class="c-keyword">as</span> vantage
+<span class="c-keyword">from</span> vantageaiops.proxy.openai_proxy <span class="c-keyword">import</span> <span class="c-var">OpenAI</span>
+
+<span class="c-comment"># Add privacy="stats-only"</span>
+vantage.<span class="c-func">init</span>(
+    <span class="c-var">api_key</span>=<span class="c-string">"vnt_your_key"</span>,
+    <span class="c-var">privacy</span>=<span class="c-string">"stats-only"</span>,   <span class="c-comment"># ← no text sent</span>
+)
+
+client = <span class="c-var">OpenAI</span>(<span class="c-var">api_key</span>=<span class="c-string">"sk-..."</span>)
+
+<span class="c-comment"># Your prompts and responses stay in your app</span>
+response = client.chat.completions.<span class="c-func">create</span>(
+    <span class="c-var">model</span>=<span class="c-string">"gpt-4o"</span>,
+    <span class="c-var">messages</span>=[{<span class="c-string">"role"</span>: <span class="c-string">"user"</span>, <span class="c-string">"content"</span>: <span class="c-string">"Classify this patient record..."</span>}]
+)</pre></div>
+
+<h2>What each mode sends</h2>
+<pre><span class="c-comment">// With privacy: "full" (default) — dashboard sees:</span>
+{
+  model: <span class="c-string">"gpt-4o"</span>,
+  prompt_tokens: <span class="c-num">45</span>,
+  completion_tokens: <span class="c-num">120</span>,
+  cost_total_usd: <span class="c-num">0.0034</span>,
+  latency_ms: <span class="c-num">780</span>,
+  request_preview: <span class="c-string">"Classify this patient record for..."</span>,   <span class="c-comment">// ← visible</span>
+  response_preview: <span class="c-string">"Based on the symptoms, the patient..."</span>, <span class="c-comment">// ← visible</span>
+  prompt_hash: <span class="c-string">"a3f2c1d9e8b7"</span>
+}
+
+<span class="c-comment">// With privacy: "stats-only" — dashboard sees:</span>
+{
+  model: <span class="c-string">"gpt-4o"</span>,
+  prompt_tokens: <span class="c-num">45</span>,
+  completion_tokens: <span class="c-num">120</span>,
+  cost_total_usd: <span class="c-num">0.0034</span>,
+  latency_ms: <span class="c-num">780</span>,
+  request_preview: <span class="c-string">""</span>,    <span class="c-comment">// ← stripped</span>
+  response_preview: <span class="c-string">""</span>,   <span class="c-comment">// ← stripped</span>
+  prompt_hash: <span class="c-string">""</span>         <span class="c-comment">// ← stripped</span>
+}</pre>
+
+<h2>Local Proxy vs SDK privacy — when to use which</h2>
+<table class="api-table"><thead><tr><th>Feature</th><th>Local Proxy (strict)</th><th>SDK (stats-only)</th></tr></thead><tbody>
+<tr><td>Code changes needed</td><td>Change <code>base_url</code> only</td><td>Add <code>privacy: "stats-only"</code></td></tr>
+<tr><td>Prompt text sent</td><td>❌ Never</td><td>❌ Never</td></tr>
+<tr><td>API key sent to Vantage</td><td>❌ Never</td><td>❌ Never (only vnt_ key)</td></tr>
+<tr><td>Streaming support</td><td>Pass-through (basic stats)</td><td>Full (accurate token counts)</td></tr>
+<tr><td>Works with all providers</td><td>✅ Any HTTP LLM API</td><td>OpenAI + Anthropic proxies</td></tr>
+<tr><td>Runs as separate process</td><td>Yes (localhost server)</td><td>No (in-process)</td></tr>
+<tr><td>Best for</td><td>Zero-trust, zero-code-change</td><td>Teams already using SDK</td></tr>
+</tbody></table>
+
+<div class="info-box">💡 <strong style="color:var(--text)">Recommendation:</strong> Use <strong>Local Proxy</strong> for zero-code-change deployments and maximum isolation. Use <strong>SDK privacy modes</strong> when you already use the SDK and want accurate streaming token counts.</div>
+`,
+
+"mcp-workflows": `
+<h1>MCP Workflow Examples</h1>
+<p>Real-world conversation examples showing how to use VantageAI MCP tools effectively in your AI assistant. Copy these patterns for your daily workflow.</p>
+
+<h2>🌅 Morning cost check</h2>
+<p>Start your day by understanding where your AI budget stands.</p>
+<pre><span class="c-comment">You:</span> <span class="c-string">"Good morning. How's our AI spend looking?"</span>
+<span class="c-comment">→ MCP calls:</span> <span class="c-func">get_summary</span>
+
+📊 <strong>VantageAI Summary</strong>
+| Metric            | Value       |
+|-------------------|-------------|
+| MTD Spend         | $145.23     |
+| Today Spend       | $3.87       |
+| Today Requests    | 1,234       |
+| Budget Used       | 58.1%       |
+
+<span class="c-comment">You:</span> <span class="c-string">"Which model is driving the most cost?"</span>
+<span class="c-comment">→ MCP calls:</span> <span class="c-func">get_model_breakdown</span> (days=7)
+
+| Model              | Cost    | Requests |
+|--------------------|---------|----------|
+| gpt-4o             | $89.50  | 12,340   |
+| claude-sonnet-4-6  | $42.18  | 5,670    |
+| gpt-4o-mini        | $1.87   | 28,900   |
+
+<span class="c-comment">You:</span> <span class="c-string">"Can we switch the search feature to a cheaper model?"</span>
+<span class="c-comment">→ MCP calls:</span> <span class="c-func">find_cheapest_model</span> (input_tokens=2000, output_tokens=500, tier=mid)
+
+💡 Cheapest mid-tier: <strong>gpt-4o-mini</strong> at $0.0006/call
+   vs current gpt-4o at $0.0100/call — <strong>save 94%</strong></pre>
+
+<h2>🚀 Pre-merge CI gate</h2>
+<p>Before merging a PR, check if your AI spend is within budget.</p>
+<pre><span class="c-comment">You:</span> <span class="c-string">"I'm about to merge this PR. Are we within budget?"</span>
+<span class="c-comment">→ MCP calls:</span> <span class="c-func">get_cost_gate</span> (period=today)
+
+🚦 <strong>CI Cost Gate</strong> — ✅ PASSED
+| Period | today         |
+| Spend  | $3.87         |
+| Budget | $50.00        |
+| Status | Within budget |
+
+<span class="c-comment">You:</span> <span class="c-string">"What about for the week?"</span>
+<span class="c-comment">→ MCP calls:</span> <span class="c-func">get_cost_gate</span> (period=week)
+
+🚦 <strong>CI Cost Gate</strong> — ⚠️ APPROACHING LIMIT
+| Period | week          |
+| Spend  | $42.30        |
+| Budget | $50.00        |
+| Status | 84.6% used    |</pre>
+
+<h2>✂️ Prompt optimization</h2>
+<p>Reduce costs by optimizing your prompts before sending to expensive models.</p>
+<pre><span class="c-comment">You:</span> <span class="c-string">"This prompt is too expensive. Optimize it:
+I would like you to please carefully analyze the following code
+and could you please provide detailed suggestions for improvement.
+It is important to note that the code should be maintainable.
+Please kindly review each function and provide your assessment."</span>
+
+<span class="c-comment">→ MCP calls:</span> <span class="c-func">optimize_prompt</span> (prompt=..., model=gpt-4o)
+
+🔧 <strong>Prompt Optimizer</strong> (gpt-4o)
+| Metric    | Before | After | Saved          |
+|-----------|--------|-------|----------------|
+| Tokens    | 52     | 18    | 34 (65%)       |
+| Est. cost | $0.26  | $0.09 | $0.17          |
+
+<strong>Optimized:</strong> "Analyze the code. Provide improvement suggestions
+focused on maintainability. Review each function."
+
+<span class="c-comment">You:</span> <span class="c-string">"What would it cost across different models?"</span>
+<span class="c-comment">→ MCP calls:</span> <span class="c-func">estimate_costs</span> (prompt=optimized_text)
+
+| Model              | Cost       | Savings vs GPT-4o |
+|--------------------|------------|-------------------|
+| gemini-1.5-flash   | $0.000007  | 99.9%             |
+| gpt-4o-mini        | $0.000014  | 99.8%             |
+| claude-haiku-4-5   | $0.000086  | 98.9%             |
+| gpt-4o             | $0.000090  | baseline          |
+
+<span class="c-comment">You:</span> <span class="c-string">"Use gpt-4o-mini for this. What about compressing the context
+of our conversation to save even more?"</span>
+<span class="c-comment">→ MCP calls:</span> <span class="c-func">compress_context</span> (messages=[...], max_tokens=2000)
+
+✅ Compressed: 4,200 → 1,850 tokens (56% reduction)
+   Kept last 5 messages intact, summarized 12 older messages</pre>
+
+<h2>🔍 Agent trace debugging</h2>
+<p>Find out why an agent workflow was expensive.</p>
+<pre><span class="c-comment">You:</span> <span class="c-string">"My research agent is too expensive. Show me recent traces."</span>
+<span class="c-comment">→ MCP calls:</span> <span class="c-func">get_traces</span> (limit=5)
+
+🔍 <strong>Recent Agent Traces</strong>
+| Trace ID         | Spans | Total Cost | Agent          |
+|------------------|-------|------------|----------------|
+| abc123def456...  | 4     | $0.034     | code-review    |
+| fed987cba654...  | 7     | $0.121     | research-agent |
+| xyz789abc012...  | 2     | $0.008     | summarizer     |
+
+<span class="c-comment">You:</span> <span class="c-string">"The research-agent with 7 spans at $0.12 is too much.
+Which team is using it?"</span>
+<span class="c-comment">→ MCP calls:</span> <span class="c-func">get_team_breakdown</span> (days=1)
+
+👥 <strong>Team Breakdown</strong> (last 1 day)
+| Team     | Cost    | Requests |
+|----------|---------|----------|
+| research | $0.45   | 89       |
+| backend  | $0.12   | 234      |
+| frontend | $0.03   | 45       |
+
+<span class="c-comment">You:</span> <span class="c-string">"The research team is 75% of today's cost.
+Are they over their team budget?"</span>
+<span class="c-comment">→ MCP calls:</span> <span class="c-func">check_budget</span>
+
+💰 <strong>Budget Status</strong>
+⚠️ Research team: $0.45 today ($13.50/month pace) vs $10/month budget</pre>
+
+<h2>📊 Weekly team report</h2>
+<p>Generate a cost report for your standup or weekly review.</p>
+<pre><span class="c-comment">You:</span> <span class="c-string">"Give me a full cost report for our weekly standup"</span>
+<span class="c-comment">→ MCP calls:</span> <span class="c-func">get_kpis</span> + <span class="c-func">get_model_breakdown</span>(days=7) + <span class="c-func">get_team_breakdown</span>(days=7)
+
+📈 <strong>Weekly AI Cost Report</strong>
+
+<strong>KPIs:</strong>
+| Total Cost (7d)    | $32.45           |
+| Total Tokens       | 4.2M             |
+| Total Requests     | 12,345           |
+| Avg Latency        | 890ms            |
+| Efficiency Score   | 78/100           |
+
+<strong>Top models by cost:</strong>
+1. gpt-4o — $18.50 (57%) — consider switching batch jobs to mini
+2. claude-sonnet — $8.20 (25%) — good for complex tasks
+3. gpt-4o-mini — $2.10 (6%) — efficient for simple tasks
+
+<strong>Teams:</strong>
+1. backend — $15.30 (within $20 budget ✅)
+2. research — $12.00 (over $10 budget ⚠️)
+3. frontend — $3.20 (within $5 budget ✅)
+
+<span class="c-comment">You:</span> <span class="c-string">"What would we save if we moved all gpt-4o calls to gpt-4o-mini?"</span>
+<span class="c-comment">→ MCP calls:</span> <span class="c-func">analyze_tokens</span> (text=average_prompt, model=gpt-4o)
+
+💡 Switching gpt-4o → gpt-4o-mini for 8,234 calls:
+   Current: $18.50/week → Projected: $1.11/week
+   <strong>Savings: $17.39/week ($904/year)</strong></pre>
+
+<h2>🛡️ Token analysis before sending</h2>
+<p>Estimate cost before making an expensive call.</p>
+<pre><span class="c-comment">You:</span> <span class="c-string">"I'm about to send a 10,000-token prompt to GPT-4o.
+How much will it cost? Is there a cheaper option?"</span>
+<span class="c-comment">→ MCP calls:</span> <span class="c-func">analyze_tokens</span> (text=..., model=gpt-4o, output_tokens=2000)
+
+📊 <strong>Token Analysis</strong>
+| Input tokens      | 10,000           |
+| Output tokens     | 2,000            |
+| Model             | gpt-4o           |
+| Input cost        | $0.0250          |
+| Output cost       | $0.0200          |
+| <strong>Total cost</strong>  | <strong>$0.0450</strong>  |
+
+💡 Cheapest alternative: <strong>gemini-2.0-flash</strong> at $0.0018
+   (save $0.0432 — 96% cheaper)
+
+<span class="c-comment">You:</span> <span class="c-string">"Find me the cheapest frontier-tier model for this"</span>
+<span class="c-comment">→ MCP calls:</span> <span class="c-func">find_cheapest_model</span> (input=10000, output=2000, tier=frontier)
+
+| Model           | Provider  | Cost     |
+|-----------------|-----------|----------|
+| gemini-1.5-pro  | google    | $0.0225  |
+| gpt-4o          | openai    | $0.0450  |
+| claude-sonnet   | anthropic | $0.0600  |</pre>
+`,
+
+// ═══════════════════════════════════════════════════════════════════════
+//  CROSS-PLATFORM OTel DOCS
+// ═══════════════════════════════════════════════════════════════════════
+
+"otel-setup": `
+<h1>Cross-Platform OTel Setup</h1>
+<p>VantageAI receives <strong>live telemetry</strong> from your AI coding tools via <a href="https://opentelemetry.io/">OpenTelemetry</a>. No proxy. No SDK wrapper. Just point your tools at our collector endpoint.</p>
+
+<div class="callout callout-green">
+<strong>How it works:</strong> AI coding tools (Claude Code, Copilot, Gemini CLI, etc.) have built-in OpenTelemetry export. You set one environment variable to send telemetry to VantageAI. We receive tokens, cost, model, and developer identity — in real-time.
+</div>
+
+<h2>Supported Tools (Native OTel)</h2>
+<table class="doc-table">
+<tr><th>Tool</th><th>Config</th><th>Metrics Received</th></tr>
+<tr><td><strong>Claude Code</strong></td><td>1 env var</td><td>Tokens, cost (USD), commits, PRs, lines-of-code, active time</td></tr>
+<tr><td><strong>GitHub Copilot</strong></td><td>1 VS Code setting</td><td>Tokens, TTFT, tool calls, agent turns, sessions</td></tr>
+<tr><td><strong>Gemini CLI</strong></td><td>1 JSON setting</td><td>Tokens (5 types), API calls, file ops, compression</td></tr>
+<tr><td><strong>OpenAI Codex CLI</strong></td><td>1 TOML setting</td><td>Tokens, cost, commits, lines modified</td></tr>
+<tr><td><strong>Cline</strong></td><td>1 env var</td><td>Token usage, tool calls</td></tr>
+<tr><td><strong>OpenAI/Anthropic SDK</strong></td><td>Auto-instrumentation</td><td>All API calls — tokens, model, latency</td></tr>
+</table>
+
+<h2>Endpoint</h2>
+<pre>OTLP HTTP/JSON:  https://api.vantageaiops.com/v1/otel/v1/metrics
+OTLP HTTP/JSON:  https://api.vantageaiops.com/v1/otel/v1/logs
+Auth header:     Authorization: Bearer vnt_your_key</pre>
+
+<h2>Quick Setup (All Tools)</h2>
+<pre>export OTEL_EXPORTER_OTLP_ENDPOINT=https://api.vantageaiops.com/v1/otel
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer vnt_your_key"
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/json</pre>
+<p>Then enable telemetry per tool (see tool-specific pages).</p>
+`,
+
+"otel-claude": `
+<h1>Claude Code — OTel Setup</h1>
+<p>Claude Code has the <strong>richest OTel telemetry</strong> of any AI coding tool: tokens, cost in USD, commits, PRs, lines of code, and active time — all per developer.</p>
+
+<h2>Setup (3 env vars)</h2>
+<pre># Add to your shell profile (~/.zshrc or ~/.bashrc)
+export CLAUDE_CODE_ENABLE_TELEMETRY=1
+export OTEL_METRICS_EXPORTER=otlp
+export OTEL_LOGS_EXPORTER=otlp
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
+export OTEL_EXPORTER_OTLP_ENDPOINT=https://api.vantageaiops.com/v1/otel
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer vnt_your_key"
+
+# Optional: tag by team/department
+export OTEL_RESOURCE_ATTRIBUTES="team.id=backend,cost_center=eng-100"</pre>
+
+<h2>Admin Setup (org-wide, via MDM)</h2>
+<p>Admins can enforce telemetry for all developers via managed settings:</p>
+<pre>{
+  "env": {
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+    "OTEL_METRICS_EXPORTER": "otlp",
+    "OTEL_LOGS_EXPORTER": "otlp",
+    "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
+    "OTEL_EXPORTER_OTLP_ENDPOINT": "https://api.vantageaiops.com/v1/otel",
+    "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer vnt_your_key"
+  }
+}</pre>
+
+<h2>Metrics Received</h2>
+<table class="doc-table">
+<tr><th>Metric</th><th>Type</th><th>Data</th></tr>
+<tr><td><code>claude_code.token.usage</code></td><td>Counter</td><td>Input, output, cache read, cache creation tokens per model</td></tr>
+<tr><td><code>claude_code.cost.usage</code></td><td>Counter</td><td>Cost in USD per model</td></tr>
+<tr><td><code>claude_code.commit.count</code></td><td>Counter</td><td>Git commits created</td></tr>
+<tr><td><code>claude_code.pull_request.count</code></td><td>Counter</td><td>PRs created</td></tr>
+<tr><td><code>claude_code.lines_of_code.count</code></td><td>Counter</td><td>Lines added/removed</td></tr>
+<tr><td><code>claude_code.active_time.total</code></td><td>Counter</td><td>Active time in seconds</td></tr>
+<tr><td><code>claude_code.session.count</code></td><td>Counter</td><td>Sessions started</td></tr>
+</table>
+
+<h2>Events Received</h2>
+<table class="doc-table">
+<tr><th>Event</th><th>Data</th></tr>
+<tr><td><code>api_request</code></td><td>Model, cost, tokens, duration, cache tokens</td></tr>
+<tr><td><code>tool_result</code></td><td>Tool name, success/fail, duration</td></tr>
+<tr><td><code>user_prompt</code></td><td>Prompt length (content opt-in)</td></tr>
+</table>
+
+<div class="callout callout-blue">
+<strong>Privacy:</strong> User prompt content is NOT sent by default — only prompt length. Enable with <code>OTEL_LOG_USER_PROMPTS=1</code>.
+</div>
+`,
+
+"otel-copilot": `
+<h1>GitHub Copilot — OTel Setup</h1>
+<p>Copilot Chat exports tokens, latency, tool calls, and session data via OpenTelemetry.</p>
+
+<h2>Setup (VS Code settings.json)</h2>
+<pre>{
+  "github.copilot.chat.otel.enabled": true,
+  "github.copilot.chat.otel.exporterType": "otlp-http",
+  "github.copilot.chat.otel.otlpEndpoint": "https://api.vantageaiops.com/v1/otel"
+}</pre>
+<p>Set auth via environment variable:</p>
+<pre>export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer vnt_your_key"</pre>
+
+<h2>Alternative: Environment Variables</h2>
+<pre>export COPILOT_OTEL_ENABLED=true
+export COPILOT_OTEL_ENDPOINT=https://api.vantageaiops.com/v1/otel
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer vnt_your_key"</pre>
+
+<h2>Metrics Received</h2>
+<table class="doc-table">
+<tr><th>Metric</th><th>Data</th></tr>
+<tr><td><code>gen_ai.client.token.usage</code></td><td>Input/output tokens per model (histogram)</td></tr>
+<tr><td><code>gen_ai.client.operation.duration</code></td><td>API call latency in seconds</td></tr>
+<tr><td><code>copilot_chat.time_to_first_token</code></td><td>TTFT in seconds</td></tr>
+<tr><td><code>copilot_chat.tool.call.count</code></td><td>Tool invocations by name</td></tr>
+<tr><td><code>copilot_chat.session.count</code></td><td>Sessions started</td></tr>
+</table>
+
+<div class="callout callout-amber">
+<strong>Note:</strong> Copilot does not emit cost in USD. VantageAI calculates cost from token counts + our pricing database.
+</div>
+`,
+
+"otel-gemini": `
+<h1>Gemini CLI — OTel Setup</h1>
+<p>Gemini CLI exports tokens (5 types including thinking tokens), API calls, file operations, and compression stats.</p>
+
+<h2>Setup (~/.gemini/settings.json)</h2>
+<pre>{
+  "telemetry": {
+    "enabled": true,
+    "useCollector": true,
+    "otlpEndpoint": "https://api.vantageaiops.com/v1/otel",
+    "otlpProtocol": "http"
+  }
+}</pre>
+<p>Set auth via environment variable:</p>
+<pre>export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer vnt_your_key"</pre>
+
+<h2>Metrics Received</h2>
+<table class="doc-table">
+<tr><th>Metric</th><th>Data</th></tr>
+<tr><td><code>gemini_cli.token.usage</code></td><td>Input, output, thought, cache, tool tokens</td></tr>
+<tr><td><code>gemini_cli.api.request.count</code></td><td>API calls by model and status</td></tr>
+<tr><td><code>gemini_cli.tool.call.count</code></td><td>Tool invocations</td></tr>
+<tr><td><code>gemini_cli.file.operation.count</code></td><td>File creates/reads/updates</td></tr>
+<tr><td><code>gemini_cli.session.count</code></td><td>Sessions started</td></tr>
+</table>
+`,
+
+"otel-codex": `
+<h1>OpenAI Codex CLI — OTel Setup</h1>
+<p>Codex CLI exports tokens, cost, commits, and lines of code modified.</p>
+
+<h2>Setup (~/.codex/config.toml)</h2>
+<pre>[telemetry]
+enabled = true
+otlp_endpoint = "https://api.vantageaiops.com/v1/otel"</pre>
+<p>Set auth via environment variable:</p>
+<pre>export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer vnt_your_key"</pre>
+
+<h2>Metrics Received</h2>
+<p>Codex uses GenAI semantic conventions plus custom metrics for productivity:</p>
+<ul>
+<li><code>gen_ai.client.token.usage</code> — Input/output tokens</li>
+<li><code>codex.cost.usage</code> — Cost in USD</li>
+<li><code>codex.commit.count</code> — Git commits</li>
+<li><code>codex.lines_of_code.count</code> — Lines added/removed</li>
+</ul>
+`,
+
+"otel-cline": `
+<h1>Cline — OTel Setup</h1>
+<p>Cline (VS Code extension) exports token usage and tool calls via OpenTelemetry.</p>
+
+<h2>Setup (environment variables)</h2>
+<pre>export CLINE_OTEL_TELEMETRY_ENABLED=1
+export CLINE_OTEL_EXPORTER_OTLP_ENDPOINT=https://api.vantageaiops.com/v1/otel
+export CLINE_OTEL_EXPORTER_OTLP_PROTOCOL=http/json</pre>
+<p>Set auth:</p>
+<pre>export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer vnt_your_key"</pre>
+`,
+
+"xp-api": `
+<h1>Cross-Platform API Reference</h1>
+<p>Query aggregated data from all connected AI tools. All endpoints require <code>Authorization: Bearer vnt_your_key</code>.</p>
+
+<h2>GET /v1/cross-platform/summary</h2>
+<p>Total spend across all platforms with provider and source breakdown.</p>
+<pre>curl -H "Authorization: Bearer vnt_your_key" \\
+  https://api.vantageaiops.com/v1/cross-platform/summary?days=30</pre>
+<p>Response: <code>{ total_cost_usd, total_input_tokens, total_output_tokens, by_provider: [...], budget: {...} }</code></p>
+
+<h2>GET /v1/cross-platform/developers</h2>
+<p>Per-developer spend table with ROI metrics.</p>
+<pre>curl -H "Authorization: Bearer vnt_your_key" \\
+  https://api.vantageaiops.com/v1/cross-platform/developers?days=30</pre>
+<p>Response: <code>{ developers: [{ developer_email, total_cost, commits, pull_requests, lines_added, cost_per_pr, providers, ... }] }</code></p>
+
+<h2>GET /v1/cross-platform/developer/:email</h2>
+<p>Single developer drill-down: by provider, by model, daily trend, productivity.</p>
+
+<h2>GET /v1/cross-platform/live</h2>
+<p>Latest OTel events for real-time dashboard feed.</p>
+<pre>curl -H "Authorization: Bearer vnt_your_key" \\
+  https://api.vantageaiops.com/v1/cross-platform/live?limit=50</pre>
+
+<h2>GET /v1/cross-platform/models</h2>
+<p>Cost by model across all providers.</p>
+
+<h2>GET /v1/cross-platform/connections</h2>
+<p>OTel source freshness and billing API connection status.</p>
+
+<h2>GET /v1/cross-platform/budget</h2>
+<p>Budget policies and current spend per org/team/developer.</p>
+
+<h2>POST /v1/otel/v1/metrics</h2>
+<p>OTLP metrics ingestion endpoint. Accepts standard OTLP HTTP/JSON format.</p>
+<pre>curl -X POST -H "Authorization: Bearer vnt_your_key" \\
+  -H "Content-Type: application/json" \\
+  -d '{"resourceMetrics": [...]}' \\
+  https://api.vantageaiops.com/v1/otel/v1/metrics</pre>
+
+<h2>POST /v1/otel/v1/logs</h2>
+<p>OTLP logs/events ingestion. Accepts api_request, tool_result, user_prompt events.</p>
+`
+
 };
 
 function switchTab(group, el, targetId) {

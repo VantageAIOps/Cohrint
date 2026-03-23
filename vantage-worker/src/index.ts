@@ -47,6 +47,9 @@
  *   POST /v1/optimizer/analyze           (token count + cost estimate)
  *   POST /v1/optimizer/estimate          (cross-model cost comparison)
  *   GET  /v1/optimizer/stats             (optimizer usage stats)
+ *   POST /v1/otel/v1/metrics             (OTLP metrics — Claude Code, Copilot, Gemini CLI)
+ *   POST /v1/otel/v1/logs                (OTLP events — api_request, tool_result, etc.)
+ *   POST /v1/otel/v1/traces              (OTLP traces — future)
  *
  * Cron Triggers:
  *   Every 10 min  — anomaly detection (Z-score cost spike alerts)
@@ -64,6 +67,8 @@ import { admin }      from './routes/admin';
 import { superadmin } from './routes/superadmin';
 import { platform }   from './routes/platform';
 import { optimizer }  from './routes/optimizer';
+import { otel }       from './routes/otel';
+import { crossplatform } from './routes/crossplatform';
 import { runAnomalyDetection } from './lib/anomaly';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -92,6 +97,8 @@ app.route('/v1/admin',      admin);
 app.route('/v1/superadmin', superadmin);
 app.route('/v1/platform',   platform);
 app.route('/v1/optimizer',  optimizer);
+app.route('/v1/otel',       otel);      // OpenTelemetry collector (Claude Code, Copilot, Gemini CLI)
+app.route('/v1/cross-platform', crossplatform); // Cross-platform cost dashboard API
 
 // ── 404 fallback ──────────────────────────────────────────────────────────────
 app.notFound((c) => c.json({
