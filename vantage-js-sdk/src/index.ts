@@ -1,5 +1,5 @@
 export { VantageClient } from "./client.js";
-export type { VantageClientOptions } from "./client.js";
+export type { VantageClientOptions, PrivacyMode } from "./client.js";
 export { createOpenAIProxy } from "./proxy/openai.js";
 export { createAnthropicProxy } from "./proxy/anthropic.js";
 export { trace } from "./proxy/universal.js";

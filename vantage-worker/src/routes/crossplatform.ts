@@ -24,12 +24,29 @@ const crossplatform = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 // and Bearer tokens (API/SDK/tests)
 crossplatform.use('*', authMiddleware);
 
+// SQLite datetime('now') produces 'YYYY-MM-DD HH:MM:SS' (no T, no Z).
+// All date comparisons must use the same format to avoid string comparison bugs.
+function sqliteDateSince(days: number): string {
+  const d = new Date(Date.now() - days * 86400000);
+  return d.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+}
+
+function sqliteTodayStart(): string {
+  const d = new Date();
+  return d.toISOString().split('T')[0] + ' 00:00:00';
+}
+
+function sqliteMonthStart(): string {
+  const d = new Date();
+  return d.toISOString().slice(0, 7) + '-01 00:00:00';
+}
+
 // ── GET /summary — total spend across all platforms ─────────────────────────
 
 crossplatform.get('/summary', async (c) => {
   const orgId = c.get('orgId');
   const days = parseInt(c.req.query('days') ?? '30', 10);
-  const since = new Date(Date.now() - days * 86400000).toISOString();
+  const since = sqliteDateSince(days);
 
   // Total spend
   const total = await c.env.DB.prepare(`
@@ -67,7 +84,7 @@ crossplatform.get('/summary', async (c) => {
   `).bind(orgId, since).all();
 
   // Today's spend
-  const todayStart = new Date().toISOString().split('T')[0] + 'T00:00:00Z';
+  const todayStart = sqliteTodayStart();
   const today = await c.env.DB.prepare(`
     SELECT COALESCE(SUM(cost_usd), 0) as today_cost,
            COALESCE(SUM(input_tokens + output_tokens), 0) as today_tokens
@@ -81,7 +98,7 @@ crossplatform.get('/summary', async (c) => {
     WHERE org_id = ? AND scope = 'org' LIMIT 1
   `).bind(orgId).first() as { monthly_limit_usd: number } | null;
 
-  const monthStart = new Date().toISOString().slice(0, 7) + '-01T00:00:00Z';
+  const monthStart = sqliteMonthStart();
   const monthSpend = await c.env.DB.prepare(`
     SELECT COALESCE(SUM(cost_usd), 0) as month_cost
     FROM cross_platform_usage
@@ -116,7 +133,7 @@ crossplatform.get('/summary', async (c) => {
 crossplatform.get('/developers', async (c) => {
   const orgId = c.get('orgId');
   const days = parseInt(c.req.query('days') ?? '30', 10);
-  const since = new Date(Date.now() - days * 86400000).toISOString();
+  const since = sqliteDateSince(days);
 
   const developers = await c.env.DB.prepare(`
     SELECT
@@ -161,7 +178,7 @@ crossplatform.get('/developer/:email', async (c) => {
   const orgId = c.get('orgId');
   const email = decodeURIComponent(c.req.param('email'));
   const days = parseInt(c.req.query('days') ?? '30', 10);
-  const since = new Date(Date.now() - days * 86400000).toISOString();
+  const since = sqliteDateSince(days);
 
   // By provider
   const byProvider = await c.env.DB.prepare(`
@@ -239,7 +256,7 @@ crossplatform.get('/live', async (c) => {
 crossplatform.get('/models', async (c) => {
   const orgId = c.get('orgId');
   const days = parseInt(c.req.query('days') ?? '30', 10);
-  const since = new Date(Date.now() - days * 86400000).toISOString();
+  const since = sqliteDateSince(days);
 
   const models = await c.env.DB.prepare(`
     SELECT model, provider,
@@ -283,7 +300,7 @@ crossplatform.get('/connections', async (c) => {
 
 crossplatform.get('/budget', async (c) => {
   const orgId = c.get('orgId');
-  const monthStart = new Date().toISOString().slice(0, 7) + '-01T00:00:00Z';
+  const monthStart = sqliteMonthStart();
 
   const policies = await c.env.DB.prepare(`
     SELECT * FROM budget_policies WHERE org_id = ?

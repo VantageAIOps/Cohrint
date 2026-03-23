@@ -1,6 +1,8 @@
 import { VantageEvent } from "./models/event.js";
 import { EventQueue } from "./utils/queue.js";
 
+export type PrivacyMode = "full" | "stats-only" | "hashed";
+
 export interface VantageClientOptions {
   apiKey: string;
   org?: string;
@@ -11,6 +13,13 @@ export interface VantageClientOptions {
   flushInterval?: number;
   batchSize?: number;
   debug?: boolean;
+  /**
+   * Privacy mode controls what data is sent to VantageAI servers:
+   *  - "full"       — sends everything including prompt/response previews (default, existing behavior)
+   *  - "stats-only" — sends ONLY token counts, cost, latency, model. NO text whatsoever.
+   *  - "hashed"     — like stats-only but includes SHA-256 prompt hash for dedup detection
+   */
+  privacy?: PrivacyMode;
 }
 
 export class VantageClient {
@@ -18,6 +27,7 @@ export class VantageClient {
   readonly environment: string;
   readonly team: string;
   readonly project: string;
+  readonly privacy: PrivacyMode;
   private readonly queue: EventQueue;
   private readonly debug: boolean;
 
@@ -26,6 +36,7 @@ export class VantageClient {
     this.environment = opts.environment ?? "production";
     this.team = opts.team ?? "";
     this.project = opts.project ?? "";
+    this.privacy = opts.privacy ?? "full";
     this.debug = opts.debug ?? false;
 
     this.queue = new EventQueue(
@@ -44,6 +55,19 @@ export class VantageClient {
     if (!event.environment) event.environment = this.environment;
     if (!event.team) event.team = this.team;
     if (!event.project) event.project = this.project;
+
+    // Apply privacy mode — strip sensitive text before queueing
+    if (this.privacy === "stats-only") {
+      event.requestPreview = "";
+      event.responsePreview = "";
+      event.systemPreview = "";
+      event.promptHash = "";
+    } else if (this.privacy === "hashed") {
+      event.requestPreview = "";
+      event.responsePreview = "";
+      event.systemPreview = "";
+      // promptHash is kept — it's a non-reversible SHA hash
+    }
 
     this.queue.enqueue(event);
   }
