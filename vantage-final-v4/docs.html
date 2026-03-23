@@ -852,17 +852,13 @@ function show(id, el) {
 // Init with quickstart
 document.getElementById("docs-content").innerHTML = DOCS.quickstart;
 
-// ── Auth gate — redirect to sign-in if no active session ──
+// ── Optional: pre-fill org hint in code blocks if user is signed in ──
 (async function() {
   try {
     const res = await fetch('https://api.vantageaiops.com/v1/auth/session', {
       credentials: 'include',
     });
-    if (!res.ok) {
-      window.location.replace('/auth.html?next=' + encodeURIComponent(window.location.href));
-      return;
-    }
-    // Optionally pre-fill org ID hint in code blocks
+    if (!res.ok) return; // Not signed in — docs are public, no redirect needed
     const sess = await res.json();
     const orgHint = `vnt_${sess.org_id}_…`;
     document.querySelectorAll('pre, code').forEach(el => {
@@ -872,7 +868,7 @@ document.getElementById("docs-content").innerHTML = DOCS.quickstart;
       }
     });
   } catch {
-    window.location.replace('/auth.html?next=' + encodeURIComponent(window.location.href));
+    // Network error — docs still work without auth
   }
 })();
 </script>
