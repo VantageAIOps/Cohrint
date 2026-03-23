@@ -13,17 +13,17 @@
  */
 (function() {
   var KEY = 'vantage_theme';
-  var theme = localStorage.getItem(KEY) || 'dark';
+  var theme = localStorage.getItem(KEY) || 'light';
   document.documentElement.setAttribute('data-theme', theme);
 
   window.vantageTheme = {
-    get: function() { return localStorage.getItem(KEY) || 'dark'; },
+    get: function() { return localStorage.getItem(KEY) || 'light'; },
     set: function(t) {
       document.documentElement.setAttribute('data-theme', t);
       localStorage.setItem(KEY, t);
       // Update all toggle buttons on the page
       document.querySelectorAll('[data-theme-toggle]').forEach(function(btn) {
-        btn.textContent = t === 'light' ? '☀' : '☾';
+        btn.textContent = t === 'dark' ? '☾' : '☀';
         btn.title = t === 'light' ? 'Switch to dark theme' : 'Switch to light theme';
       });
     },

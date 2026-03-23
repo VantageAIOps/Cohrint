@@ -2670,7 +2670,7 @@ function setTheme(theme) {
 async function loadSettingsView() {
   const org = _session?.org_id || window._orgId;
   // Reflect current theme in toggle buttons
-  setTheme(localStorage.getItem('vantage_theme') || 'dark');
+  setTheme(localStorage.getItem('vantage_theme') || 'light');
   // Always populate from localStorage even without session
   const dp = localStorage.getItem('default_period') || '30';
   const dpSel = document.getElementById('set-default-period');
