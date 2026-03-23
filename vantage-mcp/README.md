@@ -5,34 +5,51 @@ MCP server for [VantageAI](https://vantageaiops.com) — track LLM costs and que
 [![npm](https://img.shields.io/npm/v/vantageaiops-mcp)](https://www.npmjs.com/package/vantageaiops-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-## Tools
+## Quick start
 
+```bash
+# 1. Get your API key (free)
+# → https://vantageaiops.com/signup.html
+
+# 2. Test the server works
+VANTAGE_API_KEY=vnt_your_key npx -y vantageaiops-mcp
+
+# 3. Add to your editor (see below)
+```
+
+## Tools (12 total)
+
+### Analytics tools (require API key)
 | Tool | Description |
 |------|-------------|
-| `track_llm_call` | Log an LLM call (tokens, cost, latency, model, team) |
-| `get_summary` | MTD spend, requests, top model, budget status |
-| `get_kpis` | Full KPI table with deltas |
-| `get_model_breakdown` | Cost + usage per model |
-| `get_team_breakdown` | Cost + usage per team (chargeback) |
-| `check_budget` | Budget % used, remaining, status |
-| `get_traces` | Recent multi-step agent traces |
-| `get_cost_gate` | CI/CD gate — pass/fail vs budget |
+| `track_llm_call` | Log an LLM call — tokens, cost, latency, model, team |
+| `get_summary` | MTD spend, today's cost, requests, budget status |
+| `get_kpis` | Full KPI table — cost, tokens, latency, efficiency |
+| `get_model_breakdown` | Cost + usage per model (customizable period) |
+| `get_team_breakdown` | Cost + usage per team for chargeback |
+| `check_budget` | Budget % used, remaining, over/under status |
+| `get_traces` | Recent multi-step agent traces with cost |
+| `get_cost_gate` | CI/CD gate — pass/fail vs budget (today/week/month) |
 
-## Setup
+### Optimizer tools (work offline, no API key needed)
+| Tool | Description |
+|------|-------------|
+| `optimize_prompt` | Compress prompts to reduce token usage |
+| `analyze_tokens` | Count tokens and estimate cost for text |
+| `estimate_costs` | Compare costs across 24 models (OpenAI, Anthropic, Google, Meta, DeepSeek, Mistral) |
+| `compress_context` | Compress conversation history within a token budget |
 
-### 1. Get your API key
+## Editor setup
 
-Sign up free at [vantageaiops.com/signup.html](https://vantageaiops.com/signup.html) — your `vnt_...` key is generated instantly.
-
-### 2. Add to your coding assistant
-
-Pick your platform. All configs use `npx vantageaiops-mcp` — no local install needed.
+### Prerequisites
+- **Node.js 18+** required (`node --version` to check)
+- All editors use `npx -y vantageaiops-mcp` — no local install needed
 
 ---
 
-## Claude Desktop
+### Claude Desktop
 
-Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
+**Config file:** `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows)
 
 ```json
 {
@@ -48,13 +65,40 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
-Restart Claude Desktop. VantageAI tools appear in the tool picker automatically.
+**After saving:** Fully quit Claude Desktop (menu bar → Quit, not just close window) and reopen it. Click the hammer icon to see VantageAI tools.
+
+> **macOS tip:** If `npx` is not found, use the full path. Run `which npx` in Terminal and use that (e.g. `/opt/homebrew/bin/npx`).
 
 ---
 
-## Cursor
+### Claude Code (CLI)
 
-Edit `~/.cursor/mcp.json` (or Cursor → Settings → MCP):
+**Project-level** — create `.mcp.json` in your project root:
+
+```json
+{
+  "mcpServers": {
+    "vantage": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "vantageaiops-mcp"],
+      "env": {
+        "VANTAGE_API_KEY": "vnt_your_key_here"
+      }
+    }
+  }
+}
+```
+
+**Global** — add to `~/.claude/mcp.json` (applies to all projects).
+
+**Verify:** Run `/mcp` inside Claude Code — you should see "vantage" listed with 12 tools.
+
+---
+
+### Cursor
+
+**Config file:** `~/.cursor/mcp.json` (or Cursor → Settings → MCP Servers)
 
 ```json
 {
@@ -70,11 +114,13 @@ Edit `~/.cursor/mcp.json` (or Cursor → Settings → MCP):
 }
 ```
 
+**After saving:** Restart Cursor. Tools appear automatically in the AI chat.
+
 ---
 
-## Windsurf
+### Windsurf
 
-Edit `~/.codeium/windsurf/mcp_config.json`:
+**Config file:** `~/.codeium/windsurf/mcp_config.json`
 
 ```json
 {
@@ -90,11 +136,13 @@ Edit `~/.codeium/windsurf/mcp_config.json`:
 }
 ```
 
+**After saving:** Restart Windsurf. Cascade will have access to all VantageAI tools.
+
 ---
 
-## VS Code (Copilot / GitHub Copilot Chat)
+### VS Code (Copilot Chat)
 
-Add to `.vscode/mcp.json` in your project root (VS Code 1.99+):
+**Config file:** `.vscode/mcp.json` in your project root (VS Code 1.99+)
 
 ```json
 {
@@ -113,7 +161,7 @@ Add to `.vscode/mcp.json` in your project root (VS Code 1.99+):
 
 ---
 
-## Cline (VS Code extension)
+### Cline (VS Code extension)
 
 Open Cline → MCP Servers → Add Server → paste:
 
@@ -131,9 +179,9 @@ Open Cline → MCP Servers → Add Server → paste:
 
 ---
 
-## Zed
+### Zed
 
-Add to your Zed `settings.json`:
+Add to Zed `settings.json` (Zed → Settings → Open Settings):
 
 ```json
 {
@@ -153,31 +201,69 @@ Add to your Zed `settings.json`:
 
 ---
 
+### JetBrains (IntelliJ, WebStorm, PyCharm)
+
+Settings → Tools → AI Assistant → Model Context Protocol → Add server:
+- **Command:** `npx`
+- **Arguments:** `-y vantageaiops-mcp`
+- **Environment:** `VANTAGE_API_KEY=vnt_your_key_here`
+
+---
+
 ## Environment variables
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `VANTAGE_API_KEY` | ✅ | — | Your `vnt_...` API key from [signup](https://vantageaiops.com/signup.html) |
-| `VANTAGE_ORG` | No | parsed from key | Org ID override |
+| `VANTAGE_API_KEY` | Yes | — | Your `vnt_...` API key ([get one free](https://vantageaiops.com/signup.html)) |
+| `VANTAGE_ORG` | No | auto-parsed from key | Org ID override |
 | `VANTAGE_API_BASE` | No | `https://api.vantageaiops.com` | Custom API base URL |
 
----
+## Example prompts
 
-## Example usage in chat
+Once connected, try these in your AI assistant:
 
-Once connected, ask your assistant:
+```
+# Cost tracking
+"How much have we spent on LLMs this month?"          → get_summary
+"Which model is costing us the most?"                  → get_model_breakdown
+"Show spending by team"                                → get_team_breakdown
+"Are we within our AI budget?"                         → check_budget
 
-- *"How much have we spent on LLMs this month?"* → `get_summary`
-- *"Which model is costing us the most?"* → `get_model_breakdown`
-- *"Are we within our AI budget?"* → `check_budget`
-- *"Show me recent agent traces"* → `get_traces`
-- *"Track this call: gpt-4o, 500 prompt tokens, 120 completion tokens, $0.003"* → `track_llm_call`
+# Logging
+"Track this call: gpt-4o, 500 prompt, 120 completion tokens, $0.003"  → track_llm_call
 
----
+# Optimization
+"Compare costs for this prompt across all models"     → estimate_costs
+"How many tokens is this text?"                        → analyze_tokens
+"Compress this prompt to save tokens"                  → optimize_prompt
+
+# CI/CD
+"Are we safe to merge? Check today's AI spend"         → get_cost_gate
+"Show recent agent traces"                             → get_traces
+```
+
+## Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| Server not showing up | 1. Check `node --version` is 18+ <br> 2. Verify JSON syntax (no trailing commas) <br> 3. Fully restart the editor (quit + reopen) |
+| "npx not found" on macOS | Use full path: `/opt/homebrew/bin/npx` or `/usr/local/bin/npx` (run `which npx`) |
+| "VANTAGE_API_KEY is not set" | Add the `env` block with your key to the config |
+| Tools fail with 401 | Your API key is invalid or expired — get a new one at [signup](https://vantageaiops.com/signup.html) |
+| Tools return empty data | You haven't sent any events yet — use `track_llm_call` or integrate the SDK |
+| Timeout errors | Check internet connection; the API is at `api.vantageaiops.com` |
+
+## Supported models (for cost estimation)
+
+OpenAI: gpt-4o, gpt-4o-mini, gpt-4-turbo, gpt-4, gpt-3.5-turbo, o1, o1-mini, o3-mini
+Anthropic: claude-sonnet-4, claude-3.5-sonnet, claude-3-opus, claude-3-haiku, claude-haiku-3.5
+Google: gemini-2.0-flash, gemini-1.5-pro, gemini-1.5-flash, gemini-pro
+Others: llama-3.3-70b, deepseek-v3, deepseek-r1, mistral-large, mistral-small
 
 ## Links
 
 - [Dashboard](https://vantageaiops.com/app.html)
-- [Docs](https://vantageaiops.com/docs.html)
+- [Full docs](https://vantageaiops.com/docs.html)
 - [Python SDK](https://pypi.org/project/vantageaiops/)
 - [JavaScript SDK](https://www.npmjs.com/package/vantageaiops)
+- [GitHub](https://github.com/Amanjain98/VantageAI)

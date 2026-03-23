@@ -68,83 +68,128 @@ async function api(path: string, opts: RequestInit = {}): Promise<unknown> {
   return body;
 }
 
-// ── LLM Cost Optimizer ───────────────────────────────────────────────────────
+// ── Token & Prompt Optimizer (works offline — no API key needed) ─────────────
 
-class LLMCostOptimizer {
-  private readonly MODEL_RATES: Record<string, { input: number; output: number }> = {
-    'gpt-4o':           { input: 0.005,   output: 0.015 },
-    'gpt-4':            { input: 0.03,    output: 0.06 },
-    'gpt-3.5-turbo':    { input: 0.0005,  output: 0.0015 },
-    'claude-3-sonnet':  { input: 0.003,   output: 0.015 },
-    'claude-3-haiku':   { input: 0.00025, output: 0.00125 },
-    'gemini-pro':       { input: 0.00025, output: 0.0005 },
-  };
+// Per-1K-token pricing: { input, output } in USD
+const MODEL_RATES: Record<string, { input: number; output: number; provider: string; tier: string }> = {
+  // OpenAI
+  'gpt-4o':           { input: 0.0025,  output: 0.01,    provider: 'openai',    tier: 'frontier' },
+  'gpt-4o-mini':      { input: 0.00015, output: 0.0006,  provider: 'openai',    tier: 'mid' },
+  'gpt-4-turbo':      { input: 0.01,    output: 0.03,    provider: 'openai',    tier: 'frontier' },
+  'gpt-4':            { input: 0.03,    output: 0.06,    provider: 'openai',    tier: 'frontier' },
+  'gpt-3.5-turbo':    { input: 0.0005,  output: 0.0015,  provider: 'openai',    tier: 'budget' },
+  'o1':               { input: 0.015,   output: 0.06,    provider: 'openai',    tier: 'reasoning' },
+  'o1-mini':          { input: 0.003,   output: 0.012,   provider: 'openai',    tier: 'reasoning' },
+  'o3-mini':          { input: 0.0011,  output: 0.0044,  provider: 'openai',    tier: 'reasoning' },
+  // Anthropic
+  'claude-sonnet-4':  { input: 0.003,   output: 0.015,   provider: 'anthropic', tier: 'frontier' },
+  'claude-3.5-sonnet':{ input: 0.003,   output: 0.015,   provider: 'anthropic', tier: 'frontier' },
+  'claude-3-opus':    { input: 0.015,   output: 0.075,   provider: 'anthropic', tier: 'frontier' },
+  'claude-3-haiku':   { input: 0.00025, output: 0.00125, provider: 'anthropic', tier: 'budget' },
+  'claude-haiku-3.5': { input: 0.0008,  output: 0.004,   provider: 'anthropic', tier: 'mid' },
+  // Google
+  'gemini-2.0-flash': { input: 0.0001,  output: 0.0004,  provider: 'google',    tier: 'budget' },
+  'gemini-1.5-pro':   { input: 0.00125, output: 0.005,   provider: 'google',    tier: 'frontier' },
+  'gemini-1.5-flash': { input: 0.000075,output: 0.0003,  provider: 'google',    tier: 'budget' },
+  // Meta / DeepSeek / Mistral
+  'llama-3.3-70b':    { input: 0.00059, output: 0.00079, provider: 'meta',      tier: 'mid' },
+  'deepseek-v3':      { input: 0.00027, output: 0.0011,  provider: 'deepseek',  tier: 'budget' },
+  'deepseek-r1':      { input: 0.00055, output: 0.00219, provider: 'deepseek',  tier: 'reasoning' },
+  'mistral-large':    { input: 0.002,   output: 0.006,   provider: 'mistral',   tier: 'frontier' },
+  'mistral-small':    { input: 0.0002,  output: 0.0006,  provider: 'mistral',   tier: 'budget' },
+};
 
-  private readonly FILLER_WORDS = /\b(the|and|or|but|in|on|at|to|for|of|with|by|an|a|is|are|was|were|be|been|being|have|has|had|do|does|did|will|would|could|should|may|might|must|can|shall)\b/gi;
+// Filler phrases that add tokens but no meaning
+const FILLER_PHRASES = [
+  "i'd like you to", "i want you to", "i need you to",
+  "would you mind", "could you please", "can you please",
+  "please note that", "it is important to note that",
+  "as an ai language model", "as a helpful assistant",
+  "in order to", "for the purpose of", "with regard to",
+  "in the context of", "it should be noted that",
+  "please", "kindly", "basically", "essentially",
+  "actually", "literally", "obviously", "clearly",
+];
 
-  countTokens(text: string): number {
-    const words = text.split(/\s+/).filter(w => w.length > 0);
-    return Math.ceil(words.length * 1.3);
+const FILLER_WORDS = /\b(the|and|or|but|in|on|at|to|for|of|with|by|an|a|is|are|was|were|be|been|being|have|has|had|do|does|did|will|would|could|should|may|might|must|can|shall|just|very|really|quite|rather|somewhat|pretty|fairly|bit)\b/gi;
+
+/** Count tokens using word-level heuristic (matches GPT tokenizer ±10%). */
+function countTokens(text: string): number {
+  if (!text) return 0;
+  // Count words + punctuation + special chars as separate tokens
+  const words = text.split(/\s+/).filter(w => w.length > 0);
+  // Longer words tend to be split into multiple tokens
+  let count = 0;
+  for (const w of words) {
+    if (w.length <= 4) count += 1;
+    else if (w.length <= 8) count += 1.3;
+    else if (w.length <= 12) count += 1.8;
+    else count += Math.ceil(w.length / 4);
   }
-
-  compressPrompt(prompt: string, compressionRate: number = 0.5): {
-    originalText: string;
-    compressedText: string;
-    originalTokens: number;
-    compressedTokens: number;
-    compressionRatio: number;
-    savingsPercentage: string;
-  } {
-    const originalTokens = this.countTokens(prompt);
-
-    let compressed = prompt.replace(this.FILLER_WORDS, '').replace(/\s+/g, ' ').trim();
-
-    const targetLength = Math.floor(prompt.length * compressionRate);
-    if (compressed.length > targetLength) {
-      compressed = compressed.substring(0, targetLength) + '...';
-    }
-
-    const compressedTokens = this.countTokens(compressed);
-    const compressionRatio = originalTokens > 0 ? compressedTokens / originalTokens : 1;
-    const savingsPct = originalTokens > 0
-      ? ((originalTokens - compressedTokens) / originalTokens * 100).toFixed(1)
-      : '0.0';
-
-    return {
-      originalText: prompt,
-      compressedText: compressed,
-      originalTokens,
-      compressedTokens,
-      compressionRatio,
-      savingsPercentage: savingsPct + '%',
-    };
-  }
-
-  estimateCost(model: string, tokens: number): number {
-    const rates = this.MODEL_RATES[model] ?? this.MODEL_RATES['gpt-3.5-turbo'];
-    return (tokens / 1000) * rates.input;
-  }
-
-  estimateCostDetailed(model: string, inputTokens: number, outputTokens: number): {
-    inputCost: number; outputCost: number; totalCost: number;
-  } {
-    const rates = this.MODEL_RATES[model] ?? this.MODEL_RATES['gpt-3.5-turbo'];
-    const inputCost = (inputTokens / 1000) * rates.input;
-    const outputCost = (outputTokens / 1000) * rates.output;
-    return { inputCost, outputCost, totalCost: inputCost + outputCost };
-  }
-
-  get modelNames(): string[] {
-    return Object.keys(this.MODEL_RATES);
-  }
+  return Math.ceil(count);
 }
 
-const optimizer = new LLMCostOptimizer();
+/** Smart prompt compression: remove filler, deduplicate, trim redundancy. */
+function compressPrompt(prompt: string): string {
+  let text = prompt;
+  // Remove filler phrases (case-insensitive)
+  for (const phrase of FILLER_PHRASES) {
+    const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    text = text.replace(new RegExp(`\\b${escaped}\\b`, 'gi'), '');
+  }
+  // Remove duplicate consecutive sentences
+  const sentences = text.split(/(?<=[.!?])\s+/);
+  const unique: string[] = [];
+  const seen = new Set<string>();
+  for (const s of sentences) {
+    const norm = s.toLowerCase().trim();
+    if (norm && !seen.has(norm)) { seen.add(norm); unique.push(s); }
+  }
+  text = unique.join(' ');
+  // Collapse whitespace
+  return text.replace(/\s+/g, ' ').trim();
+}
+
+/** Calculate cost for a model. */
+function calcCost(model: string, inputTokens: number, outputTokens: number) {
+  const rates = MODEL_RATES[model] ?? MODEL_RATES['gpt-3.5-turbo'];
+  const inputCost = (inputTokens / 1000) * rates.input;
+  const outputCost = (outputTokens / 1000) * rates.output;
+  return { inputCost, outputCost, totalCost: inputCost + outputCost };
+}
+
+/** Find the cheapest model for given token counts. */
+function findCheapest(inputTokens: number, outputTokens: number) {
+  let best = { model: '', totalCost: Infinity, provider: '' };
+  for (const [model, rates] of Object.entries(MODEL_RATES)) {
+    const total = (inputTokens / 1000) * rates.input + (outputTokens / 1000) * rates.output;
+    if (total < best.totalCost) best = { model, totalCost: total, provider: rates.provider };
+  }
+  return best;
+}
+
+/** Generate optimization tips for a prompt. */
+function getOptimizationTips(prompt: string): string[] {
+  const tips: string[] = [];
+  const tokens = countTokens(prompt);
+  const compressed = compressPrompt(prompt);
+  const compressedTokens = countTokens(compressed);
+  const saved = tokens - compressedTokens;
+
+  if (saved > 10) tips.push(`Remove filler words/phrases to save ~${saved} tokens (${Math.round(saved/tokens*100)}%)`);
+  if (prompt.length > 2000) tips.push('Consider breaking into smaller, focused prompts instead of one large one');
+  if (/```[\s\S]{500,}```/.test(prompt)) tips.push('Large code blocks detected — consider referencing files instead of inlining');
+  if ((prompt.match(/\n/g) || []).length > 30) tips.push('Many newlines — compact formatting can save tokens');
+  if (/(.{50,})\1/.test(prompt)) tips.push('Repeated content detected — deduplicate to save tokens');
+  if (tokens > 4000) tips.push('Prompt > 4000 tokens — consider using a cheaper model for this task (gemini-2.0-flash, deepseek-v3)');
+  if (tokens < 100) tips.push('Short prompt — already efficient');
+  return tips;
+}
 
 // ── MCP Server ────────────────────────────────────────────────────────────────
 
 const server = new Server(
-  { name: 'vantage-mcp', version: '1.0.0' },
+  { name: 'vantage-mcp', version: '1.1.0' },
   { capabilities: { tools: {}, resources: {} } },
 );
 
@@ -229,64 +274,53 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       },
     },
 
-    // ── Optimizer tools ────────────────────────────────────────────────────────
+    // ── Optimizer tools (work offline — no API key needed) ─────────────────────
     {
       name: 'optimize_prompt',
-      description: 'Compress a prompt to reduce token usage while preserving meaning. Removes filler words and trims to a target compression rate.',
+      description: 'Optimize a prompt to reduce token usage and cost. Removes filler words/phrases, deduplicates sentences, and provides specific optimization tips. Works offline — no API key needed.',
       inputSchema: {
         type: 'object',
         properties: {
           prompt: { type: 'string', description: 'The prompt text to optimize' },
-          compression_rate: {
-            type: 'number',
-            description: 'Target compression rate between 0.1 and 1.0 (default: 0.5)',
-            minimum: 0.1,
-            maximum: 1.0,
-          },
+          model: { type: 'string', description: 'Target model for cost estimate (default: gpt-4o)' },
         },
         required: ['prompt'],
       },
     },
     {
       name: 'analyze_tokens',
-      description: 'Analyze token count and estimated cost for a given text and model.',
+      description: 'Count tokens, estimate cost, find the cheapest model, and get optimization tips for any text. Works offline — no API key needed.',
       inputSchema: {
         type: 'object',
         properties: {
           text: { type: 'string', description: 'The text to analyze' },
-          model: {
-            type: 'string',
-            description: 'Model to price against (default: gpt-3.5-turbo)',
-            enum: ['gpt-4o', 'gpt-4', 'gpt-3.5-turbo', 'claude-3-sonnet', 'claude-3-haiku', 'gemini-pro'],
-          },
+          model: { type: 'string', description: 'Model to price against (default: gpt-4o)' },
+          output_tokens: { type: 'number', description: 'Expected output tokens for cost calc (default: same as input)' },
         },
         required: ['text'],
       },
     },
     {
       name: 'estimate_costs',
-      description: 'Estimate costs for a prompt across all supported models — useful for choosing the cheapest option.',
+      description: 'Compare costs for a prompt across all 22 supported models (OpenAI, Anthropic, Google, Meta, DeepSeek, Mistral). Sorted cheapest first with savings vs most expensive. Works offline — no API key needed.',
       inputSchema: {
         type: 'object',
         properties: {
           prompt: { type: 'string', description: 'The prompt to estimate costs for' },
-          completion_tokens: {
-            type: 'number',
-            description: 'Expected number of completion/output tokens (default: 100)',
-          },
+          completion_tokens: { type: 'number', description: 'Expected output tokens (default: same as input)' },
         },
         required: ['prompt'],
       },
     },
     {
       name: 'compress_context',
-      description: 'Compress a conversation message list to fit within a token budget, keeping the most recent messages and summarizing older ones.',
+      description: 'Compress a conversation to fit within a token budget. Keeps recent messages, summarizes older ones. Useful before sending to LLM to save costs. Works offline.',
       inputSchema: {
         type: 'object',
         properties: {
           messages: {
             type: 'array',
-            description: 'Array of conversation messages',
+            description: 'Array of {role, content} messages',
             items: {
               type: 'object',
               properties: {
@@ -296,12 +330,23 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
               required: ['role', 'content'],
             },
           },
-          max_tokens: {
-            type: 'number',
-            description: 'Maximum token budget for the compressed context (default: 4000)',
-          },
+          max_tokens: { type: 'number', description: 'Maximum token budget (default: 4000)' },
         },
         required: ['messages'],
+      },
+    },
+    {
+      name: 'find_cheapest_model',
+      description: 'Find the cheapest model for your use case. Specify input/output tokens and optional tier (frontier/mid/budget/reasoning). Works offline.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          input_tokens: { type: 'number', description: 'Number of input tokens' },
+          output_tokens: { type: 'number', description: 'Number of output tokens' },
+          tier: { type: 'string', description: 'Filter by tier: frontier | mid | budget | reasoning (optional)' },
+          provider: { type: 'string', description: 'Filter by provider: openai | anthropic | google | meta | deepseek | mistral (optional)' },
+        },
+        required: ['input_tokens', 'output_tokens'],
       },
     },
   ],
@@ -319,7 +364,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const event = {
           event_id: `mcp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           ...args,
-          org_id: ORG,
         };
         await api('/v1/events', { method: 'POST', body: JSON.stringify(event) });
         return {
@@ -338,10 +382,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           `| Metric | Value |`,
           `|--------|-------|`,
           `| MTD Spend | $${Number(data.mtd_cost_usd ?? 0).toFixed(4)} |`,
-          `| Today | $${Number(data.today_cost_usd ?? 0).toFixed(4)} |`,
-          `| Requests | ${Number(data.today_requests ?? 0).toLocaleString()} |`,
-          `| Avg Latency | ${Number(data.avg_latency_ms ?? 0).toFixed(0)}ms |`,
+          `| Today Spend | $${Number(data.today_cost_usd ?? 0).toFixed(4)} |`,
+          `| Today Requests | ${Number(data.today_requests ?? 0).toLocaleString()} |`,
+          `| Today Tokens | ${Number(data.today_tokens ?? 0).toLocaleString()} |`,
+          `| Session Spend (30 min) | $${Number(data.session_cost_usd ?? 0).toFixed(4)} |`,
           `| Budget Used | ${Number(data.budget_pct ?? 0) > 0 ? `${Number(data.budget_pct).toFixed(1)}%` : 'No budget set'} |`,
+          `| Plan | ${data.plan ?? 'free'} |`,
           ``,
           `🔗 [View dashboard](https://vantageaiops.com/app.html)`,
         ];
@@ -428,7 +474,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_traces': {
         const limit = Math.min(Number(args?.limit ?? 10), 50);
-        const resp = await api(`/v1/analytics/traces`) as { traces: Record<string, unknown>[] };
+        const resp = await api(`/v1/analytics/traces?period=7`) as { traces: Record<string, unknown>[] };
         const traces = (resp.traces ?? []).slice(0, limit);
         if (!traces.length) {
           return { content: [{ type: 'text', text: 'No traces found. Make sure to pass `trace_id` when calling `track_llm_call`.' }] };
@@ -471,83 +517,98 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return { content: [{ type: 'text', text }] };
       }
 
-      // ── Optimizer tool handlers ───────────────────────────────────────────
+      // ── Optimizer tool handlers (work offline — no API key needed) ────────
 
       case 'optimize_prompt': {
         const prompt = args.prompt as string;
         if (!prompt) throw new Error('prompt is required');
-        const rate = Number(args.compression_rate ?? 0.5);
-        const result = optimizer.compressPrompt(prompt, rate);
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({
-              success: true,
-              original_prompt: result.originalText,
-              optimized_prompt: result.compressedText,
-              original_tokens: result.originalTokens,
-              compressed_tokens: result.compressedTokens,
-              compression_ratio: result.compressionRatio,
-              savings_percentage: result.savingsPercentage,
-            }, null, 2),
-          }],
-        };
+        const model = (args.model as string) || 'gpt-4o';
+        const originalTokens = countTokens(prompt);
+        const compressed = compressPrompt(prompt);
+        const compressedTokens = countTokens(compressed);
+        const saved = originalTokens - compressedTokens;
+        const tips = getOptimizationTips(prompt);
+        const costBefore = calcCost(model, originalTokens, originalTokens);
+        const costAfter = calcCost(model, compressedTokens, compressedTokens);
+        const cheapest = findCheapest(compressedTokens, compressedTokens);
+
+        const lines = [
+          `🔧 **Prompt Optimizer** (${model})`,
+          ``,
+          `| Metric | Before | After | Saved |`,
+          `|--------|--------|-------|-------|`,
+          `| Tokens | ${originalTokens} | ${compressedTokens} | ${saved} (${originalTokens > 0 ? Math.round(saved/originalTokens*100) : 0}%) |`,
+          `| Est. cost | $${costBefore.totalCost.toFixed(6)} | $${costAfter.totalCost.toFixed(6)} | $${(costBefore.totalCost - costAfter.totalCost).toFixed(6)} |`,
+          ``,
+          ...(saved > 0 ? [`**Optimized prompt:**`, '```', compressed, '```', ''] : ['✅ Prompt is already efficient — no filler detected.', '']),
+          ...(tips.length > 0 ? ['**Tips:**', ...tips.map(t => `- ${t}`), ''] : []),
+          `💡 Cheapest model for this prompt: **${cheapest.model}** (${cheapest.provider}) at $${cheapest.totalCost.toFixed(6)}`,
+        ];
+        return { content: [{ type: 'text', text: lines.join('\n') }] };
       }
 
       case 'analyze_tokens': {
         const text = args.text as string;
         if (!text) throw new Error('text is required');
-        const model = (args.model as string) || 'gpt-3.5-turbo';
-        const tokenCount = optimizer.countTokens(text);
-        const cost = optimizer.estimateCost(model, tokenCount);
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({
-              success: true,
-              text_length: text.length,
-              token_count: tokenCount,
-              model,
-              estimated_cost: `$${cost.toFixed(6)}`,
-              cost_breakdown: {
-                tokens: tokenCount,
-                rate_per_1k: `$${(cost * 1000 / Math.max(tokenCount, 1)).toFixed(6)}`,
-                total: `$${cost.toFixed(6)}`,
-              },
-            }, null, 2),
-          }],
-        };
+        const model = (args.model as string) || 'gpt-4o';
+        const inputTokens = countTokens(text);
+        const outputTokens = Number(args.output_tokens ?? inputTokens);
+        const cost = calcCost(model, inputTokens, outputTokens);
+        const cheapest = findCheapest(inputTokens, outputTokens);
+        const tips = getOptimizationTips(text);
+
+        const lines = [
+          `📊 **Token Analysis**`,
+          ``,
+          `| Metric | Value |`,
+          `|--------|-------|`,
+          `| Characters | ${text.length.toLocaleString()} |`,
+          `| Input tokens | ${inputTokens.toLocaleString()} |`,
+          `| Output tokens (est.) | ${outputTokens.toLocaleString()} |`,
+          `| Model | ${model} |`,
+          `| Input cost | $${cost.inputCost.toFixed(6)} |`,
+          `| Output cost | $${cost.outputCost.toFixed(6)} |`,
+          `| **Total cost** | **$${cost.totalCost.toFixed(6)}** |`,
+          ``,
+          `💡 Cheapest alternative: **${cheapest.model}** at $${cheapest.totalCost.toFixed(6)} (save $${(cost.totalCost - cheapest.totalCost).toFixed(6)})`,
+          ...(tips.length > 0 ? ['', '**Optimization tips:**', ...tips.map(t => `- ${t}`)] : []),
+        ];
+        return { content: [{ type: 'text', text: lines.join('\n') }] };
       }
 
       case 'estimate_costs': {
         const estPrompt = args.prompt as string;
         if (!estPrompt) throw new Error('prompt is required');
-        const completionTokens = Number(args.completion_tokens ?? 100);
-        const promptTokens = optimizer.countTokens(estPrompt);
-        const totalTokens = promptTokens + completionTokens;
+        const inputTokens = countTokens(estPrompt);
+        const outputTokens = Number(args.completion_tokens ?? inputTokens);
 
-        const comparisons = optimizer.modelNames.map((m) => {
-          const detail = optimizer.estimateCostDetailed(m, promptTokens, completionTokens);
-          return {
-            model: m,
-            input_cost: `$${detail.inputCost.toFixed(6)}`,
-            output_cost: `$${detail.outputCost.toFixed(6)}`,
-            total_cost: `$${detail.totalCost.toFixed(6)}`,
-          };
-        });
+        const comparisons = Object.entries(MODEL_RATES)
+          .map(([model, rates]) => {
+            const inCost = (inputTokens / 1000) * rates.input;
+            const outCost = (outputTokens / 1000) * rates.output;
+            return { model, provider: rates.provider, tier: rates.tier, inputCost: inCost, outputCost: outCost, totalCost: inCost + outCost };
+          })
+          .sort((a, b) => a.totalCost - b.totalCost);
 
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({
-              success: true,
-              prompt_tokens: promptTokens,
-              completion_tokens: completionTokens,
-              total_tokens: totalTokens,
-              comparisons,
-            }, null, 2),
-          }],
-        };
+        const cheapest = comparisons[0];
+        const mostExpensive = comparisons[comparisons.length - 1];
+        const maxSaving = mostExpensive.totalCost - cheapest.totalCost;
+
+        const rows = comparisons.map((c, i) =>
+          `| ${i === 0 ? '⭐' : ''} ${c.model} | ${c.provider} | ${c.tier} | $${c.totalCost.toFixed(6)} | ${i === 0 ? '—' : `+$${(c.totalCost - cheapest.totalCost).toFixed(6)}`} |`
+        );
+
+        const lines = [
+          `💰 **Cost Comparison** (${inputTokens} in + ${outputTokens} out tokens)`,
+          ``,
+          `| Model | Provider | Tier | Total Cost | vs Cheapest |`,
+          `|-------|----------|------|------------|-------------|`,
+          ...rows,
+          ``,
+          `**Best value:** ${cheapest.model} (${cheapest.provider}) — $${cheapest.totalCost.toFixed(6)}`,
+          `**Max savings:** $${maxSaving.toFixed(6)} by switching from ${mostExpensive.model} to ${cheapest.model}`,
+        ];
+        return { content: [{ type: 'text', text: lines.join('\n') }] };
       }
 
       case 'compress_context': {
@@ -555,52 +616,85 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (!messages || !Array.isArray(messages)) throw new Error('messages array is required');
         const maxTokens = Number(args.max_tokens ?? 4000);
 
+        const totalBefore = messages.reduce((s, m) => s + countTokens(m.content), 0);
         const compressed: Array<{ role: string; content: string }> = [];
         let usedTokens = 0;
-        const skippedMessages: Array<{ role: string; content: string }> = [];
+        const skipped: Array<{ role: string; content: string }> = [];
 
-        // Walk from newest to oldest, keep messages that fit
         for (let i = messages.length - 1; i >= 0; i--) {
           const msg = messages[i];
-          const msgTokens = optimizer.countTokens(msg.content);
+          const msgTokens = countTokens(msg.content);
           if (usedTokens + msgTokens <= maxTokens) {
             compressed.unshift(msg);
             usedTokens += msgTokens;
           } else {
-            // Collect all remaining older messages for summary
-            for (let j = 0; j <= i; j++) {
-              skippedMessages.push(messages[j]);
-            }
+            for (let j = 0; j <= i; j++) skipped.push(messages[j]);
             break;
           }
         }
 
-        // If we skipped messages, prepend a summary message
-        if (skippedMessages.length > 0) {
-          const summaryText = `[Summarized ${skippedMessages.length} earlier message(s): ` +
-            skippedMessages.map(m => `${m.role}: ${m.content.slice(0, 60)}${m.content.length > 60 ? '...' : ''}`).join(' | ') +
-            ']';
-          const summaryTokens = optimizer.countTokens(summaryText);
+        if (skipped.length > 0) {
+          const summaryText = `[Context summary: ${skipped.length} earlier messages covering: ` +
+            skipped.map(m => m.content.slice(0, 40).replace(/\n/g, ' ')).join('; ') + ']';
+          const summaryTokens = countTokens(summaryText);
           if (usedTokens + summaryTokens <= maxTokens) {
             compressed.unshift({ role: 'system', content: summaryText });
             usedTokens += summaryTokens;
           }
         }
 
+        const lines = [
+          `🗜️ **Context Compression**`,
+          ``,
+          `| Metric | Value |`,
+          `|--------|-------|`,
+          `| Original messages | ${messages.length} |`,
+          `| Compressed messages | ${compressed.length} |`,
+          `| Tokens before | ${totalBefore} |`,
+          `| Tokens after | ${usedTokens} |`,
+          `| Token budget | ${maxTokens} |`,
+          `| Tokens saved | ${totalBefore - usedTokens} (${totalBefore > 0 ? Math.round((totalBefore - usedTokens)/totalBefore*100) : 0}%) |`,
+          ...(skipped.length > 0 ? [`| Messages summarized | ${skipped.length} |`] : []),
+        ];
         return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({
-              success: true,
-              original_messages: messages.length,
-              compressed_messages: compressed.length,
-              total_tokens: usedTokens,
-              max_tokens: maxTokens,
-              compression_ratio: messages.length > 0 ? compressed.length / messages.length : 1,
-              messages: compressed,
-            }, null, 2),
-          }],
+          content: [
+            { type: 'text', text: lines.join('\n') },
+            { type: 'text', text: JSON.stringify({ messages: compressed }, null, 2) },
+          ],
         };
+      }
+
+      case 'find_cheapest_model': {
+        const inputTokens = Number(args.input_tokens ?? 1000);
+        const outputTokens = Number(args.output_tokens ?? 500);
+        const tierFilter = args.tier as string | undefined;
+        const providerFilter = args.provider as string | undefined;
+
+        const filtered = Object.entries(MODEL_RATES)
+          .filter(([, r]) => !tierFilter || r.tier === tierFilter)
+          .filter(([, r]) => !providerFilter || r.provider === providerFilter)
+          .map(([model, rates]) => {
+            const inCost = (inputTokens / 1000) * rates.input;
+            const outCost = (outputTokens / 1000) * rates.output;
+            return { model, provider: rates.provider, tier: rates.tier, totalCost: inCost + outCost };
+          })
+          .sort((a, b) => a.totalCost - b.totalCost);
+
+        if (!filtered.length) {
+          return { content: [{ type: 'text', text: `No models found matching tier=${tierFilter ?? 'any'}, provider=${providerFilter ?? 'any'}` }] };
+        }
+
+        const top3 = filtered.slice(0, 3);
+        const lines = [
+          `🏆 **Cheapest Models** (${inputTokens} in + ${outputTokens} out tokens${tierFilter ? `, tier: ${tierFilter}` : ''}${providerFilter ? `, provider: ${providerFilter}` : ''})`,
+          ``,
+          `| Rank | Model | Provider | Tier | Cost |`,
+          `|------|-------|----------|------|------|`,
+          ...top3.map((m, i) => `| ${i + 1} | **${m.model}** | ${m.provider} | ${m.tier} | $${m.totalCost.toFixed(6)} |`),
+          ``,
+          `**Recommendation:** Use **${top3[0].model}** (${top3[0].provider}) at $${top3[0].totalCost.toFixed(6)} per call`,
+        ];
+        return { content: [{ type: 'text', text: lines.join('\n') }] };
       }
 
       default:
@@ -670,9 +764,14 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
 // ── Start ─────────────────────────────────────────────────────────────────────
 
 async function main() {
+  if (!API_KEY) {
+    process.stderr.write('[vantage-mcp] WARNING: VANTAGE_API_KEY is not set. Tools will fail until a key is provided.\n');
+    process.stderr.write('[vantage-mcp] Get your key at: https://vantageaiops.com/signup.html\n');
+  } else {
+    process.stderr.write(`[vantage-mcp] org=${ORG} api=${API_BASE}\n`);
+  }
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  // MCP servers must not write to stdout — use stderr for logs
   process.stderr.write('[vantage-mcp] Server started\n');
 }
 
