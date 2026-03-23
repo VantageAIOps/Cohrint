@@ -122,7 +122,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cross-browser-desktop-${{ github.ref_name }}-${{ github.run_number }}
+          name: cross-browser-desktop-${{ github.run_number }}
           path: /tmp/cross-browser-desktop.txt
 
   # ── 2. Mobile + tablet devices ────────────────────────────────────────────────
@@ -198,7 +198,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cross-browser-mobile-${{ github.ref_name }}-${{ github.run_number }}
+          name: cross-browser-mobile-${{ github.run_number }}
           path: /tmp/cross-browser-mobile.txt
 
   # ── 3. Summary ────────────────────────────────────────────────────────────────
