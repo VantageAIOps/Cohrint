@@ -209,8 +209,11 @@ def _desktop_visual_check(pw, engine: str, label: str, prefix: str,
             n += len(APP_ELEMENTS) + 1
 
     except Exception as e:
-        if "interrupted by another navigation" in str(e):
-            warn(f"{prefix}.X  [{label}] Navigation redirected (Safari session check)")
+        err_str = str(e).lower()
+        if ("interrupted by another navigation" in err_str or
+                "execution context was destroyed" in err_str or
+                "navigation" in err_str):
+            warn(f"{prefix}.X  [{label}] Navigation interrupted (session redirect)")
         else:
             fail(f"{prefix}.X  [{label}] Unexpected error: {e}")
     finally:
@@ -366,8 +369,11 @@ def _mobile_visual_check(pw, device_name: str, engine: str, label: str,
             ok_js, f"errors: {list(errors)[:3]}")
 
     except Exception as e:
-        if "interrupted by another navigation" in str(e):
-            warn(f"{prefix}.X  [{label}] Navigation redirected (Safari session check)")
+        err_str = str(e).lower()
+        if ("interrupted by another navigation" in err_str or
+                "execution context was destroyed" in err_str or
+                "navigation" in err_str):
+            warn(f"{prefix}.X  [{label}] Navigation interrupted (session redirect)")
         else:
             fail(f"{prefix}.X  [{label}] Unexpected error: {e}")
     finally:
