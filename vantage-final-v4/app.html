@@ -363,15 +363,15 @@ button{font-family:var(--sans);cursor:pointer}
       <div class="sh-row"><span>Command palette</span><div class="sh-keys"><span class="sh-key">⌘</span><span class="sh-key">K</span></div></div>
       <div class="sh-row"><span>This help</span><div class="sh-keys"><span class="sh-key">?</span></div></div>
       <div class="sh-row"><span>Cost Intelligence</span><div class="sh-keys"><span class="sh-key">1</span></div></div>
-      <div class="sh-row"><span>Token Analytics</span><div class="sh-keys"><span class="sh-key">2</span></div></div>
-      <div class="sh-row"><span>Model Comparison</span><div class="sh-keys"><span class="sh-key">3</span></div></div>
+      <div class="sh-row"><span>Model Comparison</span><div class="sh-keys"><span class="sh-key">2</span></div></div>
+      <div class="sh-row"><span>Agent Traces</span><div class="sh-keys"><span class="sh-key">3</span></div></div>
       <div class="sh-row"><span>Performance</span><div class="sh-keys"><span class="sh-key">4</span></div></div>
       <div class="sh-row"><span>Quality & Eval</span><div class="sh-keys"><span class="sh-key">5</span></div></div>
-      <div class="sh-row"><span>AI Intelligence</span><div class="sh-keys"><span class="sh-key">6</span></div></div>
-      <div class="sh-row"><span>Reporting</span><div class="sh-keys"><span class="sh-key">7</span></div></div>
+      <div class="sh-row"><span>Reporting</span><div class="sh-keys"><span class="sh-key">6</span></div></div>
+      <div class="sh-row"><span>Team Members</span><div class="sh-keys"><span class="sh-key">7</span></div></div>
       <div class="sh-row"><span>Security</span><div class="sh-keys"><span class="sh-key">8</span></div></div>
-      <div class="sh-row"><span>Developer</span><div class="sh-keys"><span class="sh-key">9</span></div></div>
-      <div class="sh-row"><span>Agent Traces</span><div class="sh-keys"><span class="sh-key">0</span></div></div>
+      <div class="sh-row"><span>Token Optimizer</span><div class="sh-keys"><span class="sh-key">9</span></div></div>
+      <div class="sh-row"><span>Developer</span><div class="sh-keys"><span class="sh-key">0</span></div></div>
       <div class="sh-row"><span>Refresh data</span><div class="sh-keys"><span class="sh-key">R</span></div></div>
     </div>
   </div>
@@ -534,20 +534,18 @@ button{font-family:var(--sans);cursor:pointer}
     <div class="sb-section">Core</div>
     <button class="sb-item active" onclick="nav('allspend',this)"><span class="ico">&#127760;</span><span>All AI Spend</span><span class="sb-badge" style="background:var(--ac)">LIVE</span></button>
     <button class="sb-item" onclick="nav('cost',this)"><span class="ico">&#128176;</span><span>Cost Intelligence</span></button>
-    <button class="sb-item" onclick="nav('tokens',this)"><span class="ico">&#128290;</span><span>Token Analytics</span></button>
     <button class="sb-item" onclick="nav('models',this)"><span class="ico">&#9878;</span><span>Model Comparison</span></button>
-    <button class="sb-item" onclick="nav('perf',this)"><span class="ico">&#9889;</span><span>Performance & Latency</span></button>
-    <div class="sb-section">Intelligence</div>
-    <button class="sb-item" onclick="nav('quality',this)"><span class="ico">&#127919;</span><span>Quality & Evaluation</span></button>
-    <button class="sb-item" onclick="nav('ai',this)"><span class="ico">&#129504;</span><span>AI Intelligence Layer</span></button>
     <button class="sb-item" onclick="nav('traces',this)"><span class="ico">&#128279;</span><span>Agent Traces</span></button>
-    <div class="sb-section">Enterprise</div>
+    <div class="sb-section">Analytics</div>
+    <button class="sb-item" onclick="nav('perf',this)"><span class="ico">&#9889;</span><span>Performance & Latency</span></button>
+    <button class="sb-item" onclick="nav('quality',this)"><span class="ico">&#127919;</span><span>Quality & Evaluation</span></button>
+    <div class="sb-section">Team</div>
     <button class="sb-item" onclick="nav('reports',this)"><span class="ico">&#128202;</span><span>Enterprise Reporting</span></button>
-    <button class="sb-item" onclick="nav('security',this)"><span class="ico">&#128274;</span><span>Security & Governance</span></button>
     <button class="sb-item" id="sb-members" onclick="nav('members',this)"><span class="ico">&#128101;</span><span>Team Members</span></button>
-    <div class="sb-section">Platform</div>
-    <button class="sb-item" onclick="nav('devx',this)"><span class="ico">&#128295;</span><span>Developer Experience</span><span class="sb-badge">3</span></button>
+    <button class="sb-item" onclick="nav('security',this)"><span class="ico">&#128274;</span><span>Security & Governance</span></button>
+    <div class="sb-section">Tools</div>
     <button class="sb-item" onclick="nav('optimizer',this)"><span class="ico">&#128640;</span><span>Token Optimizer</span><span class="sb-badge" style="background:var(--gn)">NEW</span></button>
+    <button class="sb-item" onclick="nav('devx',this)"><span class="ico">&#128295;</span><span>Developer Experience</span><span class="sb-badge">3</span></button>
     <button class="sb-item" id="sb-settings" onclick="nav('settings',this)"><span class="ico">&#9881;</span><span>Settings</span></button>
     <button class="sb-item" id="sb-account" onclick="nav('account',this)"><span class="ico">&#128100;</span><span>Account</span></button>
     <div class="sb-bottom">
@@ -617,7 +615,23 @@ button{font-family:var(--sans);cursor:pointer}
         </div>
       </div>
 
-      <!-- Row 4: Connection Status -->
+      <!-- Row 4: Token Efficiency & Optimization (merged from Token Analytics) -->
+      <div class="g2">
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Token Efficiency</span><span class="tag tag-blue">ANALYTICS</span></div>
+          <div class="kpi-grid" style="grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+            <div class="kpi" style="padding:10px"><div class="kpi-lbl">Efficiency Score</div><div class="kpi-val" style="font-size:20px;color:var(--ac)" id="xp-eff-score">--</div></div>
+            <div class="kpi" style="padding:10px"><div class="kpi-lbl">Cache Hit Rate</div><div class="kpi-val" style="font-size:20px" id="xp-cache-rate">--</div></div>
+          </div>
+          <canvas id="xpTokenBreakdownChart" height="140"></canvas>
+        </div>
+        <div class="card card-p">
+          <div class="card-hdr"><span class="card-title">Optimization Opportunities</span><span class="tag tag-amber" id="xp-savings-tag">SAVE $--/mo</span></div>
+          <div id="xp-opt-tips" style="font-size:12px;color:var(--mu)">Analyzing spend patterns...</div>
+        </div>
+      </div>
+
+      <!-- Row 5: Connection Status -->
       <div class="card card-p mb">
         <div class="card-hdr"><span class="card-title">Data Sources</span><span class="tag tag-gray">CONNECTION STATUS</span></div>
         <div id="xp-connections"></div>
@@ -915,42 +929,70 @@ button{font-family:var(--sans);cursor:pointer}
     ═══════════════════════════════════════════════════════════════════════ -->
     <div class="view" id="view-reports">
       <div class="view-title">&#128202; Enterprise Reporting</div>
-      <div class="view-sub muted">CFO-ready dashboards, departmental chargeback and automated executive summaries</div>
+      <div class="view-sub muted">CFO-ready dashboards, departmental chargeback and executive summaries — powered by real API data</div>
 
-      <div class="g3">
-        <div class="kpi"><div class="kpi-lbl">Total AI spend YTD</div><div class="kpi-val mono">$38.4K</div><div class="kpi-ch flat">Q1 2026</div></div>
-        <div class="kpi"><div class="kpi-lbl">Budget remaining</div><div class="kpi-val mono" style="color:var(--am)">$21.6K</div><div class="kpi-ch flat">of $60K annual</div></div>
-        <div class="kpi"><div class="kpi-lbl">Cost per request</div><div class="kpi-val mono">$0.048</div><div class="kpi-ch dn">&#8679; 14% more efficient</div></div>
+      <!-- Gate: shown only for team/enterprise plans -->
+      <div id="rpt-gate" style="display:none;text-align:center;padding:60px 20px;color:var(--mu)">
+        <div style="font-size:48px;margin-bottom:16px">&#128202;</div>
+        <div style="font-size:16px;font-weight:500;margin-bottom:8px;color:var(--tx)">Enterprise Reporting requires a Team or Enterprise plan</div>
+        <div style="font-size:13px;margin-bottom:20px">Upgrade to access departmental chargeback, executive summaries, and CSV/PDF exports.</div>
+        <a href="/signup.html" class="btn btn-primary">Upgrade plan</a>
       </div>
 
-      <div class="g21">
-        <div class="card card-p">
-          <div class="card-hdr"><span class="card-title">Monthly spend — YTD</span></div>
-          <canvas id="ytdChart" height="200"></canvas>
+      <div id="rpt-content" style="display:none">
+        <!-- KPI row — populated from API -->
+        <div class="g4" id="rpt-kpis">
+          <div class="kpi"><div class="kpi-lbl">Total spend (period)</div><div class="kpi-val mono" id="rpt-total-cost">--</div><div class="kpi-ch" id="rpt-total-sub">Loading...</div></div>
+          <div class="kpi"><div class="kpi-lbl">Budget remaining</div><div class="kpi-val mono" id="rpt-budget-remaining" style="color:var(--am)">--</div><div class="kpi-ch" id="rpt-budget-sub">--</div></div>
+          <div class="kpi"><div class="kpi-lbl">Cost per request</div><div class="kpi-val mono" id="rpt-cpr">--</div><div class="kpi-ch" id="rpt-cpr-sub">--</div></div>
+          <div class="kpi"><div class="kpi-lbl">Active developers</div><div class="kpi-val mono" id="rpt-dev-count">--</div><div class="kpi-ch" id="rpt-dev-sub">--</div></div>
         </div>
-        <div class="card card-p">
-          <div class="card-hdr"><span class="card-title">ROI metrics</span></div>
-          <div id="roi-metrics"></div>
-        </div>
-      </div>
 
-      <div class="card card-p mb">
-        <div class="card-hdr">
-          <span class="card-title">Departmental chargeback report</span>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-ghost" style="font-size:11px">&#128196; Export CSV</button>
-            <button class="btn btn-ghost" style="font-size:11px">&#128247; Export PDF</button>
+        <div class="g21">
+          <div class="card card-p">
+            <div class="card-hdr"><span class="card-title">Daily spend trend</span><span class="tag tag-blue" id="rpt-trend-tag">30 DAYS</span></div>
+            <canvas id="ytdChart" height="200"></canvas>
+          </div>
+          <div class="card card-p">
+            <div class="card-hdr"><span class="card-title">ROI metrics</span><span class="tag tag-green">LIVE DATA</span></div>
+            <div id="roi-metrics"></div>
           </div>
         </div>
-        <table class="tbl">
-          <thead><tr><th>Department</th><th>MTD Spend</th><th>Requests</th><th>Top model</th><th>Cost/request</th><th>Efficiency</th><th>Budget %</th><th>YoY</th></tr></thead>
-          <tbody id="chargeback-body"></tbody>
-        </table>
-      </div>
 
-      <div class="card card-p mb">
-        <div class="card-hdr"><span class="card-title">Scheduled reports</span><button class="btn btn-primary" style="font-size:11px">+ New report</button></div>
-        <div id="scheduled-reports"></div>
+        <div class="card card-p mb">
+          <div class="card-hdr">
+            <span class="card-title">Team chargeback report</span>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-ghost" style="font-size:11px" onclick="exportChargebackCSV()">&#128196; Export CSV</button>
+            </div>
+          </div>
+          <table class="tbl">
+            <thead><tr><th>Team</th><th>MTD Spend</th><th>Requests</th><th>Tokens</th><th>Avg Latency</th><th>Cost/request</th><th>Budget</th><th>Budget %</th></tr></thead>
+            <tbody id="chargeback-body"></tbody>
+          </table>
+        </div>
+
+        <div class="card card-p mb">
+          <div class="card-hdr">
+            <span class="card-title">Top developer spend</span>
+            <span class="tag tag-gray">CROSS-PLATFORM</span>
+          </div>
+          <table class="tbl">
+            <thead><tr><th>Developer</th><th>Spend</th><th>Providers</th><th>Commits</th><th>PRs</th><th>Lines</th><th>Cost/PR</th><th>Lines/$</th></tr></thead>
+            <tbody id="rpt-dev-body"></tbody>
+          </table>
+        </div>
+
+        <div class="g2">
+          <div class="card card-p">
+            <div class="card-hdr"><span class="card-title">Spend by provider</span></div>
+            <canvas id="rptProviderChart" height="180"></canvas>
+          </div>
+          <div class="card card-p">
+            <div class="card-hdr"><span class="card-title">Top models by cost</span></div>
+            <div id="rpt-model-rows"></div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1628,16 +1670,7 @@ curl -X POST https://api.vantageaiops.com/v1/events \
 /* ════════════════════════════════════════════════════════════════════════════
    DATA LAYER — Synthetic but realistic demo data
 ═══════════════════════════════════════════════════════════════════════════ */
-const TEAMS = ["Product","Engineering","Content","Data","Growth"];
-const ENDPOINTS = ["/chat/complete","/summarize","/classify","/embed","/analyze","/generate","/translate","/extract"];
-const DEMO_MODELS = [
-  {name:"gpt-4o",         provider:"openai",    color:"#74aa9c", cost:2840, pct:39, p50:843,  p95:1820, p99:3200, err:0.3},
-  {name:"claude-sonnet-4-6",provider:"anthropic",color:"#d97757",cost:1120, pct:20, p50:920,  p95:1940, p99:3400, err:0.2},
-  {name:"gemini-2.0-flash",provider:"google",   color:"#4285f4", cost:580,  pct:16, p50:480,  p95:1100, p99:2100, err:0.4},
-  {name:"gpt-4o-mini",    provider:"openai",    color:"#a8cdc4", cost:420,  pct:12, p50:620,  p95:1400, p99:2600, err:0.5},
-  {name:"llama-3.3-70b",  provider:"meta",      color:"#a78bfa", cost:281,  pct:8,  p50:540,  p95:1200, p99:2200, err:0.6},
-  {name:"claude-haiku-4-5",provider:"anthropic",color:"#e8b4a0",cost:180,  pct:5,  p50:380,  p95:850,  p99:1600, err:0.3},
-];
+/* Dead demo constants removed — all views now use real API data */
 
 let period = 30;
 let charts = {};
@@ -1691,11 +1724,10 @@ function updateStatus(){
   el.textContent = `API: ${API_BASE} (${_session ? 'connected' : 'no session'})`;
 }
 
-function rnd(min,max){return Math.random()*(max-min)+min}
-function ri(min,max){return Math.floor(rnd(min,max))}
+/* rnd/ri removed — no more random demo data */
 function fmt(n){if(n>=1e6)return"$"+(n/1e6).toFixed(2)+"M";if(n>=1000)return"$"+(n/1000).toFixed(1)+"K";if(n>=1)return"$"+n.toFixed(2);if(n>=.01)return"$"+n.toFixed(4);return"$"+n.toFixed(6)}
 function fmtNum(n){if(n>=1e9)return(n/1e9).toFixed(1)+"B";if(n>=1e6)return(n/1e6).toFixed(1)+"M";if(n>=1000)return(n/1000).toFixed(0)+"K";return n.toString()}
-function mult(){return period===7?.25:period===90?3:1}
+/* mult() removed — no more synthetic multipliers */
 
 const days30 = Array.from({length:30},(_,i)=>{const d=new Date();d.setDate(d.getDate()-29+i);return d.toLocaleDateString('en',{month:'short',day:'numeric'})});
 function daysSlice(){return days30.slice(-period)}
@@ -2212,47 +2244,66 @@ async function init_allspend(){
       } catch(e) { /* silent refresh failure */ }
     }, 30000);
   }
+
+  // ── Token Efficiency & Optimization (merged from Token Analytics) ────────
+  try {
+    const kpis = await apiFetch(`/v1/analytics/kpis?period=${days}`).catch(()=>null);
+    const effScore = kpis?.efficiency_score ?? '--';
+    document.getElementById('xp-eff-score').textContent = typeof effScore === 'number' ? effScore + '/100' : effScore;
+
+    // Cache hit rate from summary data
+    if (summary) {
+      const totalIn = summary.total_input_tokens || 0;
+      const cached = summary.total_cached_tokens || 0;
+      const cacheRate = totalIn > 0 ? Math.round((cached / totalIn) * 100) : 0;
+      const cacheEl = document.getElementById('xp-cache-rate');
+      cacheEl.textContent = cacheRate + '%';
+      cacheEl.style.color = cacheRate >= 40 ? 'var(--ac)' : cacheRate >= 20 ? 'var(--am)' : 'var(--re)';
+    }
+
+    // Token breakdown chart (input vs output vs cached)
+    if (summary && (summary.total_input_tokens || summary.total_output_tokens)) {
+      const inputTok = (summary.total_input_tokens || 0) - (summary.total_cached_tokens || 0);
+      const outputTok = summary.total_output_tokens || 0;
+      const cachedTok = summary.total_cached_tokens || 0;
+      mkChart('xpTokenBreakdownChart', 'doughnut', {
+        labels: ['Input tokens', 'Output tokens', 'Cached tokens'],
+        datasets: [{ data: [inputTok, outputTok, cachedTok], backgroundColor: ['#0098ff', '#00d4a1', '#a78bfa'], borderWidth: 0 }]
+      }, { cutout: '50%', plugins: { legend: { display: true, position: 'bottom', labels: { color: '#6b7b8a', font: { size: 10 }, boxWidth: 8, padding: 6 } } } });
+    }
+
+    // Optimization tips
+    const tips = [];
+    if (summary) {
+      const totalIn = summary.total_input_tokens || 0;
+      const cached = summary.total_cached_tokens || 0;
+      const cacheRate = totalIn > 0 ? (cached / totalIn) : 0;
+      if (cacheRate < 0.3) tips.push({ icon: '💾', text: 'Cache hit rate is low (' + Math.round(cacheRate*100) + '%). Standardize system prompts across requests to increase cache reuse.', save: 'up to 30%' });
+      const totalCost = summary.total_cost_usd || 0;
+      if (modelList.length > 0) {
+        const topModel = modelList[0];
+        if (topModel.cost > totalCost * 0.6) tips.push({ icon: '🔄', text: topModel.model + ' accounts for ' + Math.round((topModel.cost/totalCost)*100) + '% of spend. Consider a cheaper model for non-critical tasks.', save: 'up to 50%' });
+      }
+      if (typeof effScore === 'number' && effScore < 60) tips.push({ icon: '✂️', text: 'Efficiency score is ' + effScore + '/100. Use prompt compression to reduce input tokens by 10-30%.', save: '10-30%' });
+    }
+    if (tips.length === 0) tips.push({ icon: '✅', text: 'Spend patterns look healthy. Keep monitoring for anomalies.', save: '' });
+
+    const tipsEl = document.getElementById('xp-opt-tips');
+    tipsEl.innerHTML = tips.map(t => `<div style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--b1)">
+      <span style="font-size:16px">${t.icon}</span>
+      <div style="flex:1"><div style="margin-bottom:2px">${t.text}</div>${t.save ? '<span class="tag tag-amber" style="font-size:9px">SAVE '+t.save+'</span>' : ''}</div>
+    </div>`).join('');
+
+    const totalSavings = tips.filter(t=>t.save).length > 0 ? 'OPPORTUNITIES' : 'ALL CLEAR';
+    document.getElementById('xp-savings-tag').textContent = totalSavings;
+  } catch(e) { console.warn('Token efficiency init failed:', e); }
 }
 window.init_allspend=init_allspend;
 
 /* ════════════════════════════════════════════════════════════════════════════
    MODULE 2 — TOKEN ANALYTICS
 ═══════════════════════════════════════════════════════════════════════════ */
-window.init_tokens=function(){
-  document.getElementById("tok-total").textContent=fmtNum(Math.round(182e6*mult()));
-  document.getElementById("tok-eff").textContent="74/100";
-  document.getElementById("tok-cache").textContent=Math.round(21)+'%';
-  document.getElementById("tok-waste").textContent=fmtNum(Math.round(38e6*mult()));
-
-  const lbl=daysSlice();
-  const p=Array.from({length:period},()=>ri(4,9)*mult());
-  const c=Array.from({length:period},()=>ri(1,3)*mult());
-  const ca=Array.from({length:period},()=>ri(0,2)*mult());
-  mkChart("tokenChart","bar",{labels:lbl,datasets:[
-    {label:"Prompt",data:p,backgroundColor:"rgba(0,152,255,.45)",stack:"s"},
-    {label:"Completion",data:c,backgroundColor:"rgba(0,212,161,.5)",stack:"s"},
-    {label:"Cached",data:ca,backgroundColor:"rgba(167,139,250,.4)",stack:"s"},
-  ]},{plugins:{legend:{display:true,labels:{color:"#6b7b8a",font:{size:11},boxWidth:10}}},scales:{x:{display:false},y:{display:false}}});
-
-  // System prompt analysis
-  document.getElementById("prompt-analysis").innerHTML=`
-    ${[{ep:"/chat",toks:2400,pct:68,color:"var(--re)"},{ep:"/analyze",toks:1820,pct:52,color:"var(--am)"},{ep:"/summarize",toks:980,pct:28,color:"var(--ac)"},{ep:"/classify",toks:420,pct:12,color:"var(--ac)"}].map(r=>`
-    <div class="model-row">
-      <div style="font-size:12px;width:90px;font-family:var(--mono)">${r.ep}</div>
-      <div class="bar-wrap"><div class="bar-fill" style="width:${r.pct}%;background:${r.color}40;border-right:2px solid ${r.color}"></div></div>
-      <div class="mono" style="font-size:11px;min-width:54px;text-align:right;color:${r.color}">${r.toks.toLocaleString()} tok</div>
-      <div class="mono muted" style="font-size:10px;min-width:30px;text-align:right">${r.pct}%</div>
-    </div>`).join("")}
-    <div class="warn-box" style="margin-top:12px">&#9888; <strong>/chat</strong> system prompt is 2,400 tokens — recommended &lt;500 tokens for this use case</div>`;
-
-  mkChart("effEndpointChart","bar",{labels:ENDPOINTS,datasets:[{data:[58,42,71,88,65,79,82,74],backgroundColor:[58,42,71,88,65,79,82,74].map(v=>v>=75?"rgba(0,212,161,.5)":v>=55?"rgba(245,158,11,.5)":"rgba(248,113,113,.5)"),borderRadius:4}]},{indexAxis:"y",scales:{x:{max:100,ticks:{color:"#6b7b8a",font:{size:10}}},y:{ticks:{color:"#e8edf2",font:{size:11}}}}});
-
-  document.getElementById("opt-tips").innerHTML=`
-    <div class="efficiency-tip"><span>&#128308;</span><span style="flex:1">Trim <strong>/chat</strong> system prompt from 2,400 → 500 tokens. Enable caching.</span><span class="eff-save">-$${(340*mult()).toFixed(0)}/mo</span></div>
-    <div class="efficiency-tip"><span>&#128992;</span><span style="flex:1">Switch <strong>/summarize</strong> to Gemini Flash — same quality at 40× less cost</span><span class="eff-save">-$${(680*mult()).toFixed(0)}/mo</span></div>
-    <div class="efficiency-tip"><span>&#128993;</span><span style="flex:1">Cache <strong>/classify</strong> — identical 500-token context repeated 12k times/mo</span><span class="eff-save">-$${(220*mult()).toFixed(0)}/mo</span></div>
-    <div class="success-box" style="margin-top:12px">Total recoverable: <strong style="color:var(--ac)">$${(1240*mult()).toFixed(0)}/month</strong> (${Math.round(1240/4821*100)}% of current spend)</div>`;
-};
+window.init_tokens=function(){ /* merged into All AI Spend */ };
 
 /* ════════════════════════════════════════════════════════════════════════════
    MODULE 3 — MODEL COMPARISON
@@ -2298,9 +2349,9 @@ function updateComparison(){
 }
 window.init_models=function(){
   updateComparison();
-  // Scatter: quality vs cost (simulated)
-  const scatterData=VANTAGE_MODELS.slice(0,12).map(m=>({x:rnd(5,9.5),y:((+m.input+m.output)/2),label:m.label}));
-  mkChart("scatterChart","scatter",{datasets:[{data:scatterData,backgroundColor:"rgba(0,212,161,.5)",borderColor:"var(--ac)",pointRadius:6}]},{scales:{x:{title:{display:true,text:"Quality score",color:"#6b7b8a"},ticks:{color:"#6b7b8a"},grid:{color:"rgba(255,255,255,.05)"}},y:{title:{display:true,text:"Avg $/M tokens",color:"#6b7b8a"},ticks:{color:"#6b7b8a"},grid:{color:"rgba(255,255,255,.05)"}}}});
+  // Scatter chart — quality scores require real evaluation data
+  const scatterCtx = document.getElementById("scatterChart");
+  if (scatterCtx) scatterCtx.parentElement.innerHTML = '<div style="color:var(--mu);text-align:center;padding:40px;font-size:13px">Quality vs price scatter requires evaluation scores. Send quality metrics to enable this chart.</div>';
 
   const provCounts={};VANTAGE_MODELS.forEach(m=>{provCounts[m.provider]=(provCounts[m.provider]||0)+1});
   mkChart("providerChart","doughnut",{labels:Object.keys(provCounts),datasets:[{data:Object.values(provCounts),backgroundColor:Object.keys(provCounts).map(p=>PROVIDER_META?PROVIDER_META[p]?.color||"#888":"#888"),borderWidth:0}]},{plugins:{legend:{display:true,position:"right",labels:{color:"#6b7b8a",font:{size:11},boxWidth:10}}}});
@@ -2316,16 +2367,18 @@ window.filterModels=function(tier){
 ═══════════════════════════════════════════════════════════════════════════ */
 window.init_perf=async function(){
   const cfg = getConfig();
-  const lbl=daysSlice();
-  const p50=Array.from({length:period},()=>ri(600,1100));
-  const p95=Array.from({length:period},()=>ri(1400,2500));
-  const p99=Array.from({length:period},()=>ri(2800,5000));
-  mkChart("latencyChart","line",{labels:lbl,datasets:[lineDs(p50,"rgb(0,212,161)"),lineDs(p95,"rgb(245,158,11)"),lineDs(p99,"rgb(248,113,113)")]},{plugins:{legend:{display:true,labels:{color:"#6b7b8a",font:{size:11}}}},scales:{x:{display:false},y:{display:false}}});
+  const [modelData, kpis] = await Promise.all([
+    loadModels(cfg.org, period),
+    loadKpis(cfg.org, period),
+  ]);
 
-  // Use real model data for latency chart when available
-  const modelData = await loadModels(cfg.org, period);
-  const realModels = modelData?.models;
-  if (realModels && realModels.length > 0) {
+  // Summary KPIs from real data
+  const avgLat = kpis?.avg_latency_ms || 0;
+  document.querySelectorAll('#view-perf .kpi-val')[0].textContent = avgLat.toFixed(0) + 'ms';
+
+  // Model latency chart — real data only
+  const realModels = modelData?.models || [];
+  if (realModels.length > 0) {
     mkChart("modelLatencyChart","bar",{labels:realModels.map(m=>m.model),datasets:[
       {label:"avg",data:realModels.map(m=>Math.round(m.avg_latency_ms||0)),backgroundColor:"rgba(0,212,161,.5)",borderRadius:3},
     ]},{plugins:{legend:{display:true,labels:{color:"#6b7b8a",font:{size:11}}}},scales:{x:{ticks:{color:"#6b7b8a",font:{size:9}}},y:{display:false}}});
@@ -2334,67 +2387,51 @@ window.init_perf=async function(){
       const lat = Math.round(m.avg_latency_ms||0);
       return `<tr>
         <td><span class="prov prov-${m.provider}">${m.model}</span></td>
-        <td class="mono">${lat}ms</td><td class="mono">—</td><td class="mono">—</td>
-        <td class="mono">—</td>
+        <td class="mono">${lat}ms</td><td class="mono">\u2014</td><td class="mono">\u2014</td>
+        <td class="mono">\u2014</td>
         <td class="mono">${fmtNum(m.requests||0)}</td>
         <td><span class="tag tag-green">&#10003; Within SLA</span></td>
       </tr>`;
     }).join("");
   } else {
-    mkChart("modelLatencyChart","bar",{labels:DEMO_MODELS.map(m=>m.name.split("-").slice(-1)[0]),datasets:[
-      {label:"p50",data:DEMO_MODELS.map(m=>m.p50),backgroundColor:"rgba(0,212,161,.5)",borderRadius:3},
-      {label:"p95",data:DEMO_MODELS.map(m=>m.p95),backgroundColor:"rgba(245,158,11,.5)",borderRadius:3},
-      {label:"p99",data:DEMO_MODELS.map(m=>m.p99),backgroundColor:"rgba(248,113,113,.5)",borderRadius:3},
-    ]},{plugins:{legend:{display:true,labels:{color:"#6b7b8a",font:{size:11}}}},scales:{x:{ticks:{color:"#6b7b8a",font:{size:9}}},y:{display:false}}});
-
-    document.getElementById("sla-body").innerHTML=DEMO_MODELS.map(m=>`<tr>
-      <td><span class="prov prov-${m.provider}">${m.name}</span></td>
-      <td class="mono">${m.p50}ms</td><td class="mono">${m.p95}ms</td><td class="mono">${m.p99}ms</td>
-      <td class="mono ${m.err>0.8?'':''}">${m.err}%</td>
-      <td class="mono">${fmtNum(ri(5000,50000))}</td>
-      <td><span class="tag tag-green">&#10003; Within SLA</span></td>
-    </tr>`).join("");
+    document.getElementById("sla-body").innerHTML = `<tr><td colspan="7" style="color:var(--mu);text-align:center;padding:20px">No model latency data yet. Send events with latency_ms to see performance metrics.</td></tr>`;
   }
 
-  const errData=Array.from({length:period},()=>rnd(.1,1.2));
-  mkChart("errorChart","line",{labels:lbl,datasets:[lineDs(errData,"rgb(248,113,113)")]});
-  mkChart("ttftChart","bar",{labels:["<100ms","100-300ms","300-600ms","600ms-1s",">1s"],datasets:[barDs([5,32,45,14,4],"rgb(0,152,255)")]});
+  // Latency trend — use real timeseries if available
+  const ts = await loadTimeseries(cfg.org, period).catch(()=>null);
+  const series = ts?.series || [];
+  if (series.length > 0 && kpis?.avg_latency_ms > 0) {
+    const lbl = series.map(s => { const d = new Date(s.date); return d.toLocaleDateString([], {month:'short',day:'numeric'}); });
+    mkChart("latencyChart","line",{labels:lbl,datasets:[
+      {label:"Requests",data:series.map(s=>s.requests||0),borderColor:"rgb(0,212,161)",backgroundColor:"rgba(0,212,161,.1)",fill:true,tension:.3,pointRadius:0},
+    ]},{plugins:{legend:{display:true,labels:{color:"#6b7b8a",font:{size:11}}}},scales:{x:{display:false},y:{display:false}}});
+  } else {
+    const ctx = document.getElementById("latencyChart");
+    if (ctx) ctx.parentElement.innerHTML = '<div style="color:var(--mu);text-align:center;padding:40px;font-size:13px">Latency trend data appears after events with latency_ms are tracked.</div>';
+  }
+
+  // Error rate — no fake data, honest empty state
+  const errCtx = document.getElementById("errorChart");
+  if (errCtx) errCtx.parentElement.innerHTML = '<div style="color:var(--mu);text-align:center;padding:40px;font-size:13px">Error rate tracking available when events include error status codes.</div>';
+
+  // TTFT — no fake data
+  const ttftCtx = document.getElementById("ttftChart");
+  if (ttftCtx) ttftCtx.parentElement.innerHTML = '<div style="color:var(--mu);text-align:center;padding:40px;font-size:13px">Time-to-first-token metrics available with OTel-enabled tools (Copilot, Claude Code).</div>';
 };
 
 /* ════════════════════════════════════════════════════════════════════════════
    MODULE 5 — QUALITY & EVALUATION
 ═══════════════════════════════════════════════════════════════════════════ */
 window.init_quality=function(){
-  document.getElementById("ab-body").innerHTML=[
-    {name:"Prompt v12 vs v11",a:"GPT-4o",b:"Claude Sonnet",metric:"Quality score",status:"Running",winner:"—"},
-    {name:"Gemini vs GPT-4o",a:"Gemini Pro",b:"GPT-4o",metric:"Cost efficiency",status:"Complete",winner:"Gemini Pro ✓"},
-    {name:"Haiku vs Sonnet",a:"Claude Haiku",b:"Claude Sonnet",metric:"Speed + quality",status:"Running",winner:"—"},
-  ].map(r=>`<tr>
-    <td>${r.name}</td><td><span class="prov prov-openai">${r.a}</span></td><td><span class="prov prov-anthropic">${r.b}</span></td>
-    <td class="muted small">${r.metric}</td>
-    <td><span class="tag ${r.status==='Running'?'tag-green':'tag-gray'}">${r.status}</span></td>
-    <td class="mono ${r.winner!=='—'?'':'muted'}" style="font-size:11px">${r.winner}</td>
-  </tr>`).join("");
+  // A/B tests — no backend exists yet
+  document.getElementById("ab-body").innerHTML = `<tr><td colspan="6" style="color:var(--mu);text-align:center;padding:20px">A/B testing requires quality scoring events. Send events with hallucination_score, faithfulness_score, etc. to enable comparisons.</td></tr>`;
 
-  mkChart("qualityChart","line",{labels:daysSlice(),datasets:[
-    lineDs(Array.from({length:period},()=>rnd(7.8,9.2)),"rgb(0,212,161)"),
-    lineDs(Array.from({length:period},()=>rnd(7.4,8.8)),"rgb(0,152,255)"),
-  ]},{plugins:{legend:{display:false}},scales:{x:{display:false},y:{min:6,max:10,ticks:{color:"#6b7b8a",font:{size:10}},grid:{color:"rgba(255,255,255,.04)"}}}});
+  // Quality trend — empty
+  const ctx = document.getElementById("qualityChart");
+  if (ctx) ctx.parentElement.innerHTML = '<div style="color:var(--mu);text-align:center;padding:40px;font-size:13px">Quality trend appears when events include quality scores (hallucination, faithfulness, relevancy).</div>';
 
-  const EVALS=["Customer support","Code review","Summarisation","Classification","Translation","RAG Q&A"];
-  document.getElementById("eval-body").innerHTML=EVALS.map(e=>{
-    const [a,b,c]=[rnd(7.5,9.8),rnd(7.5,9.8),rnd(7.5,9.8)];
-    const avg=((a+b+c)/3).toFixed(1);
-    const delta=(rnd(-.5,.5)).toFixed(2);
-    return`<tr>
-      <td>${e}</td>
-      <td><span class="prov prov-openai">gpt-4o</span></td>
-      <td><div class="score-bar"><div class="bar-wrap"><div class="bar-fill" style="width:${a/10*100}%;background:var(--ac)"></div></div><span class="mono" style="font-size:10px">${a.toFixed(1)}</span></div></td>
-      <td><div class="score-bar"><div class="bar-wrap"><div class="bar-fill" style="width:${b/10*100}%;background:var(--bl)"></div></div><span class="mono" style="font-size:10px">${b.toFixed(1)}</span></div></td>
-      <td><div class="score-bar"><div class="bar-wrap"><div class="bar-fill" style="width:${c/10*100}%;background:var(--pu)"></div></div><span class="mono" style="font-size:10px">${c.toFixed(1)}</span></div></td>
-      <td class="mono" style="color:var(--ac)">${avg}</td>
-      <td class="mono" style="color:${+delta>0?'var(--ac)':'var(--re)'};font-size:11px">${+delta>0?'+':''}${delta}</td>
-    </tr>`;}).join("");
+  // Eval table — empty
+  document.getElementById("eval-body").innerHTML = `<tr><td colspan="7" style="color:var(--mu);text-align:center;padding:20px">No evaluation data yet. Quality scores can be patched onto events after the fact via PATCH /v1/events/:id/scores.</td></tr>`;
 };
 window.cmpToggle=function(_,el){document.querySelectorAll(".toggle-btn").forEach(b=>b.classList.remove("active"));el.classList.add("active")};
 
@@ -2402,117 +2439,244 @@ window.cmpToggle=function(_,el){document.querySelectorAll(".toggle-btn").forEach
    MODULE 6 — AI INTELLIGENCE LAYER
 ═══════════════════════════════════════════════════════════════════════════ */
 window.init_ai=function(){
-  document.getElementById("router-rules").innerHTML=[
-    {endpoint:"/summarize",condition:"tokens < 2000",route:"Gemini Flash",saving:"94%"},
-    {endpoint:"/classify",condition:"all requests",route:"Claude Haiku",saving:"88%"},
-    {endpoint:"/chat",condition:"quality > 8.5 required",route:"GPT-4o",saving:"0%"},
-    {endpoint:"/embed",condition:"all requests",route:"text-embedding-3-small",saving:"72%"},
-  ].map(r=>`
-    <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--b1);font-size:12px">
-      <span class="mono" style="min-width:100px;color:var(--bl)">${r.endpoint}</span>
-      <span class="muted" style="flex:1">${r.condition}</span>
-      <span class="tag tag-green">&#8594; ${r.route}</span>
-      <span class="mono" style="color:var(--ac);min-width:40px;text-align:right">${r.saving}</span>
-    </div>`).join("");
+  // Router rules — no smart router exists yet
+  document.getElementById("router-rules").innerHTML = `<div style="color:var(--mu);text-align:center;padding:30px;font-size:13px">
+    AI model router is coming soon. It will automatically route requests to the cheapest model that meets your quality threshold.<br><br>
+    <span style="font-size:11px">Use the <strong>Model Comparison</strong> tab to manually compare model costs today.</span>
+  </div>`;
 
-  mkChart("routerChart","line",{labels:daysSlice(),datasets:[
-    lineDs(Array.from({length:period},()=>ri(50,80)),"rgb(0,212,161)",true),
-    lineDs(Array.from({length:period},()=>ri(20,50)),"rgb(0,152,255)",true),
-  ]},{scales:{x:{display:false},y:{display:false,beginAtZero:true}}});
+  // Router chart — empty
+  const routerCtx = document.getElementById("routerChart");
+  if (routerCtx) routerCtx.parentElement.innerHTML = '<div style="color:var(--mu);text-align:center;padding:40px;font-size:13px">Router savings data will appear once AI routing is enabled.</div>';
 
-  document.getElementById("optimizer-results").innerHTML=[
-    {endpoint:"/chat",before:2400,after:720,saving:"70%"},
-    {endpoint:"/analyze",before:1820,after:480,saving:"74%"},
-    {endpoint:"/summarize",before:980,after:340,saving:"65%"},
-  ].map(r=>`
-    <div style="padding:10px 0;border-bottom:1px solid var(--b1)">
-      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
-        <span class="mono" style="color:var(--bl)">${r.endpoint}</span>
-        <span class="tag tag-green">&#8595; ${r.saving} tokens</span>
-      </div>
-      <div style="display:flex;gap:10px;font-size:11px;color:var(--mu)">
-        <span>Before: <strong style="color:var(--re)">${r.before} tok</strong></span>
-        <span>After: <strong style="color:var(--ac)">${r.after} tok</strong></span>
-      </div>
-    </div>`).join("");
-
-  document.getElementById("cache-recs").innerHTML=[
-    {endpoint:"/classify",hitRate:0,potential:89,saving:220},
-    {endpoint:"/embed",hitRate:12,potential:71,saving:180},
-    {endpoint:"/chat",hitRate:21,potential:45,saving:340},
-  ].map(r=>`
-    <div style="padding:10px 0;border-bottom:1px solid var(--b1)">
-      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
-        <span class="mono" style="color:var(--bl)">${r.endpoint}</span>
-        <span class="eff-save">$${r.saving}/mo</span>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center;font-size:11px">
-        <span class="muted">Current:</span><div class="bar-wrap" style="width:60px"><div class="bar-fill" style="width:${r.hitRate}%;background:var(--mu)"></div></div>
-        <span class="mono">${r.hitRate}%</span>
-        <span class="muted">Potential:</span><div class="bar-wrap" style="width:60px"><div class="bar-fill" style="width:${r.potential}%;background:var(--ac)"></div></div>
-        <span class="mono" style="color:var(--ac)">${r.potential}%</span>
-      </div>
-    </div>`).join("");
+  // Optimizer results — empty
+  document.getElementById("optimizer-results").innerHTML = `<div style="color:var(--mu);text-align:center;padding:20px;font-size:13px">
+    Use the <strong>Token Optimizer</strong> in the sidebar to compress prompts and estimate savings.
+  </div>`;
 };
 
 /* ════════════════════════════════════════════════════════════════════════════
    MODULE 7 — ENTERPRISE REPORTING
 ═══════════════════════════════════════════════════════════════════════════ */
-window.init_reports=function(){
-  const months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].slice(0,new Date().getMonth()+1);
-  const ytdData=months.map((_,i)=>ri(8000,18000));
-  mkChart("ytdChart","bar",{labels:months,datasets:[barDs(ytdData,"rgb(0,212,161)")]},{scales:{x:{ticks:{color:"#6b7b8a"}},y:{display:false,beginAtZero:true}}});
+// Store chargeback data for CSV export
+let _chargebackData = [];
 
-  document.getElementById("roi-metrics").innerHTML=[
-    {label:"Cost per 1K tokens","value":"$0.048","trend":"dn","chg":"-14%"},
-    {label:"Requests automated","value":"284K","trend":"dn","chg":"+22%"},
-    {label:"Eng hours saved/mo","value":"420h","trend":"dn","chg":"+12%"},
-    {label:"AI ROI multiple","value":"8.4×","trend":"dn","chg":"+1.2×"},
-  ].map(r=>`
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--b1)">
-      <span class="small muted">${r.label}</span>
-      <div style="display:flex;align-items:center;gap:8px">
+window.init_reports = async function() {
+  // Gate: only show for team/enterprise plans
+  try {
+    const overview = await apiFetch('/v1/admin/overview?period=30');
+    const plan = overview?.org?.plan || 'free';
+    const members = overview?.members || [];
+
+    if (plan === 'free' && members.length <= 1) {
+      document.getElementById('rpt-gate').style.display = 'block';
+      document.getElementById('rpt-content').style.display = 'none';
+      return;
+    }
+    document.getElementById('rpt-gate').style.display = 'none';
+    document.getElementById('rpt-content').style.display = 'block';
+
+    // Fetch all reporting data in parallel
+    const days = 30;
+    const [kpis, timeseries, teams, xpSummary, xpDevs, xpModels] = await Promise.all([
+      apiFetch(`/v1/analytics/kpis?period=${days}`).catch(()=>null),
+      apiFetch(`/v1/analytics/timeseries?period=${days}`).catch(()=>null),
+      apiFetch(`/v1/analytics/teams?period=${days}`).catch(()=>null),
+      apiFetch(`/v1/cross-platform/summary?days=${days}`).catch(()=>null),
+      apiFetch(`/v1/cross-platform/developers?days=${days}`).catch(()=>null),
+      apiFetch(`/v1/cross-platform/models?days=${days}`).catch(()=>null),
+    ]);
+
+    document.getElementById('rpt-trend-tag').textContent = days + ' DAYS';
+
+    // ── KPI Cards (real data) ──────────────────────────────────────────
+    const totalCost = kpis?.total_cost_usd || xpSummary?.total_cost_usd || 0;
+    const totalReqs = kpis?.total_requests || xpSummary?.total_records || 0;
+    const cpr = totalReqs > 0 ? totalCost / totalReqs : 0;
+    const budgetUsd = overview.org?.budget_usd || xpSummary?.budget?.monthly_limit_usd || 0;
+    const mtdCost = overview.org?.mtd_cost_usd || xpSummary?.budget?.month_spend_usd || 0;
+    const budgetRemaining = budgetUsd > 0 ? budgetUsd - mtdCost : 0;
+    const devCount = xpDevs?.developers?.length || members.length;
+
+    document.getElementById('rpt-total-cost').textContent = '$' + totalCost.toFixed(2);
+    document.getElementById('rpt-total-sub').textContent = days + '-day period';
+
+    if (budgetUsd > 0) {
+      const budgetColor = budgetRemaining < 0 ? 'var(--re)' : budgetRemaining < budgetUsd * 0.2 ? 'var(--am)' : 'var(--ac)';
+      document.getElementById('rpt-budget-remaining').innerHTML = `<span style="color:${budgetColor}">$${budgetRemaining.toFixed(2)}</span>`;
+      document.getElementById('rpt-budget-sub').textContent = `of $${budgetUsd.toFixed(0)} monthly`;
+    } else {
+      document.getElementById('rpt-budget-remaining').textContent = '—';
+      document.getElementById('rpt-budget-sub').textContent = 'No budget set';
+    }
+
+    document.getElementById('rpt-cpr').textContent = '$' + cpr.toFixed(4);
+    document.getElementById('rpt-cpr-sub').textContent = fmtNum(totalReqs) + ' requests';
+    document.getElementById('rpt-dev-count').textContent = devCount;
+    document.getElementById('rpt-dev-sub').textContent = (overview.teams?.length || 0) + ' teams';
+
+    // ── Daily Spend Trend Chart (real timeseries) ──────────────────────
+    const series = timeseries?.series || [];
+    if (series.length > 0) {
+      const labels = series.map(s => { const d = new Date(s.date); return d.toLocaleDateString([], {month:'short',day:'numeric'}); });
+      const costData = series.map(s => s.cost_usd || 0);
+      mkChart('ytdChart', 'bar', {
+        labels,
+        datasets: [{
+          label: 'Daily spend ($)',
+          data: costData,
+          backgroundColor: 'rgba(0,212,161,0.6)',
+          borderRadius: 3,
+        }]
+      }, {
+        scales: {
+          x: { grid: { display: false }, ticks: { color: '#6b7b8a', font: { size: 10 }, maxRotation: 45 } },
+          y: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#6b7b8a', font: { size: 10 }, callback: v => '$' + v.toFixed(2) } }
+        },
+        plugins: { legend: { display: false } }
+      });
+    }
+
+    // ── ROI Metrics (real computed data) ────────────────────────────────
+    const totalTokens = kpis?.total_tokens || 0;
+    const avgLatency = kpis?.avg_latency_ms || 0;
+    const effScore = kpis?.efficiency_score || 0;
+    const costPer1k = totalTokens > 0 ? (totalCost / totalTokens * 1000) : 0;
+    const devList = xpDevs?.developers || [];
+    const totalCommits = devList.reduce((s, d) => s + (d.commits || 0), 0);
+    const totalPRs = devList.reduce((s, d) => s + (d.pull_requests || 0), 0);
+    const totalLines = devList.reduce((s, d) => s + (d.lines_added || 0) + (d.lines_removed || 0), 0);
+    const costPerPR = totalPRs > 0 ? totalCost / totalPRs : 0;
+    const linesPerDollar = totalCost > 0 ? totalLines / totalCost : 0;
+
+    const roiData = [
+      { label: 'Cost per 1K tokens', value: '$' + costPer1k.toFixed(4) },
+      { label: 'Total requests', value: fmtNum(totalReqs) },
+      { label: 'Total tokens', value: fmtNum(totalTokens) },
+      { label: 'Avg latency', value: avgLatency.toFixed(0) + 'ms' },
+      { label: 'Efficiency score', value: effScore + '/100' },
+      { label: 'Commits tracked', value: fmtNum(totalCommits) },
+      { label: 'PRs tracked', value: fmtNum(totalPRs) },
+      { label: 'Cost per PR', value: costPerPR > 0 ? '$' + costPerPR.toFixed(2) : '—' },
+      { label: 'Lines per dollar', value: linesPerDollar > 0 ? fmtNum(Math.round(linesPerDollar)) : '—' },
+    ];
+    document.getElementById('roi-metrics').innerHTML = roiData.map(r =>
+      `<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--b1)">
+        <span class="small muted">${r.label}</span>
         <span class="mono" style="font-size:14px;font-weight:500">${r.value}</span>
-        <span class="small dn">${r.chg}</span>
-      </div>
-    </div>`).join("");
+      </div>`
+    ).join('');
 
-  const depts=[
-    {name:"Product",spend:1840,req:42000,model:"gpt-4o",cpr:0.044,eff:78,budget:2500},
-    {name:"Engineering",spend:1350,req:28000,model:"claude-sonnet",cpr:0.048,eff:82,budget:2000},
-    {name:"Content",spend:960,req:22000,model:"gemini-flash",cpr:0.044,eff:65,budget:1200},
-    {name:"Data",spend:580,req:15000,model:"llama-70b",cpr:0.039,eff:88,budget:800},
-    {name:"Growth",spend:280,req:8000,model:"gpt-4o-mini",cpr:0.035,eff:71,budget:500},
-  ];
-  document.getElementById("chargeback-body").innerHTML=depts.map(d=>{
-    const pct=Math.round(d.spend/d.budget*100);
-    return`<tr>
-      <td style="font-weight:500">${d.name}</td>
-      <td class="mono">$${(d.spend*mult()).toFixed(0)}</td>
-      <td class="mono">${fmtNum(d.req)}</td>
-      <td><span class="prov prov-openai">${d.model}</span></td>
-      <td class="mono">$${d.cpr}</td>
-      <td><div class="score-bar"><div class="bar-wrap"><div class="bar-fill" style="width:${d.eff}%;background:${d.eff>75?'var(--ac)':d.eff>55?'var(--am)':'var(--re)'}"></div></div><span class="mono" style="font-size:10px">${d.eff}</span></div></td>
-      <td><div class="score-bar"><div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${pct>85?'var(--re)':pct>60?'var(--am)':'var(--ac)'}"></div></div><span class="mono" style="font-size:10px">${pct}%</span></div></td>
-      <td class="mono small" style="color:var(--ac)">+18% YoY</td>
-    </tr>`;}).join("");
+    // ── Team Chargeback Table (real data) ──────────────────────────────
+    const teamList = teams?.teams || overview.teams || [];
+    _chargebackData = teamList;
+    if (teamList.length > 0) {
+      document.getElementById('chargeback-body').innerHTML = teamList.map(t => {
+        const spend = t.cost_usd || 0;
+        const reqs = t.requests || 0;
+        const tokens = t.tokens || 0;
+        const lat = t.avg_latency_ms || 0;
+        const teamCpr = reqs > 0 ? (spend / reqs) : 0;
+        const budget = t.budget_usd || 0;
+        const budgetPct = t.budget_pct || (budget > 0 ? Math.round(spend / budget * 100) : 0);
+        const budgetColor = budgetPct > 85 ? 'var(--re)' : budgetPct > 60 ? 'var(--am)' : 'var(--ac)';
+        return `<tr>
+          <td style="font-weight:500">${t.team || 'unassigned'}</td>
+          <td class="mono">$${spend.toFixed(2)}</td>
+          <td class="mono">${fmtNum(reqs)}</td>
+          <td class="mono">${fmtNum(tokens)}</td>
+          <td class="mono">${lat.toFixed(0)}ms</td>
+          <td class="mono">$${teamCpr.toFixed(4)}</td>
+          <td class="mono">${budget > 0 ? '$' + budget.toFixed(0) : '—'}</td>
+          <td>${budget > 0
+            ? `<div class="score-bar"><div class="bar-wrap"><div class="bar-fill" style="width:${Math.min(budgetPct,100)}%;background:${budgetColor}"></div></div><span class="mono" style="font-size:10px">${budgetPct}%</span></div>`
+            : '<span class="muted small">No budget</span>'}</td>
+        </tr>`;
+      }).join('');
+    } else {
+      document.getElementById('chargeback-body').innerHTML = `<tr><td colspan="8" style="color:var(--mu);text-align:center;padding:20px;font-size:13px">No team data. Assign teams to members or use <code>team</code> tags in events.</td></tr>`;
+    }
 
-  document.getElementById("scheduled-reports").innerHTML=[
-    {name:"Weekly exec summary",schedule:"Every Mon 9am",last:"Mon Mar 10",format:"PDF"},
-    {name:"Monthly cost report",schedule:"1st of month",last:"Mar 1",format:"PDF+CSV"},
-    {name:"Chargeback report",schedule:"Last Fri of month",last:"Feb 28",format:"CSV"},
-  ].map(r=>`
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--b1)">
-      <div>
-        <div style="font-size:13px;font-weight:500">${r.name}</div>
-        <div class="small muted">${r.schedule} &bull; Last: ${r.last}</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <span class="tag tag-gray">${r.format}</span>
-        <button class="btn btn-ghost" style="font-size:11px">Run now</button>
-      </div>
-    </div>`).join("");
+    // ── Developer Spend Table (real cross-platform data) ───────────────
+    if (devList.length > 0) {
+      document.getElementById('rpt-dev-body').innerHTML = devList.slice(0, 20).map(d => {
+        const providerTags = (d.providers || []).map(p =>
+          `<span class="tag tag-gray" style="font-size:9px;margin:1px">${(XP_PROVIDER_NAMES[p]||p).split(' ')[0]}</span>`
+        ).join('');
+        return `<tr>
+          <td><strong>${d.developer_email || 'unknown'}</strong></td>
+          <td class="mono"><strong>$${(d.total_cost||0).toFixed(4)}</strong></td>
+          <td>${providerTags || '—'}</td>
+          <td class="mono">${d.commits || 0}</td>
+          <td class="mono">${d.pull_requests || 0}</td>
+          <td class="mono">${fmtNum((d.lines_added||0) + (d.lines_removed||0))}</td>
+          <td class="mono" style="color:${d.cost_per_pr ? 'var(--ac)' : 'var(--mu)'}">${d.cost_per_pr ? '$' + d.cost_per_pr.toFixed(2) : '—'}</td>
+          <td class="mono">${d.lines_per_dollar ? fmtNum(Math.round(d.lines_per_dollar)) : '—'}</td>
+        </tr>`;
+      }).join('');
+    } else {
+      document.getElementById('rpt-dev-body').innerHTML = `<tr><td colspan="8" style="color:var(--mu);text-align:center;padding:20px;font-size:13px">No developer data. Enable OTel on AI coding tools to track per-developer spend.</td></tr>`;
+    }
+
+    // ── Provider Doughnut Chart (real data) ─────────────────────────────
+    const providers = xpSummary?.by_provider || [];
+    if (providers.length > 0) {
+      const labels = providers.map(p => XP_PROVIDER_NAMES[p.provider] || p.provider);
+      const data = providers.map(p => p.cost || 0);
+      const colors = providers.map(p => XP_PROVIDER_COLORS[p.provider] || '#6b7b8a');
+      mkChart('rptProviderChart', 'doughnut', { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] }, {
+        cutout: '55%',
+        plugins: { legend: { display: true, position: 'bottom', labels: { color: '#6b7b8a', font: { size: 11 }, boxWidth: 10, padding: 8 } } }
+      });
+    }
+
+    // ── Top Models Rows (real data) ─────────────────────────────────────
+    const modelList = xpModels?.models || [];
+    if (modelList.length > 0) {
+      const maxCost = Math.max(...modelList.map(m => m.cost || 0), 0.001);
+      document.getElementById('rpt-model-rows').innerHTML = modelList.slice(0, 10).map(m => {
+        const pct = Math.round(((m.cost||0) / maxCost) * 100);
+        const color = XP_PROVIDER_COLORS[m.provider] || '#6b7b8a';
+        return `<div class="model-row">
+          <div class="model-dot" style="background:${color}"></div>
+          <div style="flex:1;font-size:12px">${m.model||'unknown'} <span class="muted" style="font-size:10px">${XP_PROVIDER_NAMES[m.provider]||m.provider}</span></div>
+          <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${color}40;border-right:2px solid ${color}"></div></div>
+          <div class="mono" style="font-size:11px;min-width:60px;text-align:right">$${(m.cost||0).toFixed(4)}</div>
+        </div>`;
+      }).join('');
+    } else {
+      document.getElementById('rpt-model-rows').innerHTML = `<div style="color:var(--mu);text-align:center;padding:30px;font-size:13px">No model data yet.</div>`;
+    }
+
+  } catch(e) {
+    console.warn('Enterprise reports init failed:', e);
+    // If admin API fails (non-admin user), show gate
+    document.getElementById('rpt-gate').style.display = 'block';
+    document.getElementById('rpt-content').style.display = 'none';
+  }
 };
+
+// CSV export for chargeback
+function exportChargebackCSV() {
+  if (!_chargebackData.length) return;
+  const header = 'Team,MTD Spend ($),Requests,Tokens,Avg Latency (ms),Cost/Request ($),Budget ($),Budget %';
+  const rows = _chargebackData.map(t => {
+    const spend = (t.cost_usd||0).toFixed(2);
+    const reqs = t.requests||0;
+    const tokens = t.tokens||0;
+    const lat = (t.avg_latency_ms||0).toFixed(0);
+    const cpr = reqs > 0 ? (t.cost_usd / reqs).toFixed(4) : '0';
+    const budget = (t.budget_usd||0).toFixed(0);
+    const pct = t.budget_pct || (t.budget_usd > 0 ? Math.round(t.cost_usd / t.budget_usd * 100) : 0);
+    return `${t.team||'unassigned'},${spend},${reqs},${tokens},${lat},${cpr},${budget},${pct}%`;
+  });
+  const csv = [header, ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `vantage-chargeback-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+}
 
 /* ════════════════════════════════════════════════════════════════════════════
    MODULE 8 — SECURITY & GOVERNANCE
@@ -2613,24 +2777,11 @@ window.init_devx=function(){
     <td><button class="btn btn-ghost" style="font-size:10px;padding:4px 8px">Test</button></td>
   </tr>`).join("");
 
-  // Live event stream
+  // Live event stream — real events come from SSE API, no fake generator
   const streamEl=document.getElementById("event-stream");
-  const provs=["openai","anthropic","google","meta"];
-  const mods=["gpt-4o","claude-sonnet-4-6","gemini-2.0-flash","llama-3.3-70b"];
-  function addEvent(){
-    const p=provs[ri(0,provs.length)];
-    const m=mods[ri(0,mods.length)];
-    const cost=(rnd(.0001,.005)).toFixed(5);
-    const lat=ri(200,2000);
-    const line=document.createElement("div");
-    line.style.cssText="border-bottom:1px solid rgba(255,255,255,.04);padding:2px 0";
-    const t=new Date().toLocaleTimeString("en",{hour12:false});
-    line.innerHTML=`<span style="color:var(--di)">${t}</span> <span style="color:var(--bl)">/chat</span> <span style="color:var(--mu)">${m}</span> <span style="color:var(--ac)">$${cost}</span> <span style="color:var(--di)">${lat}ms</span>`;
-    streamEl.insertBefore(line,streamEl.firstChild);
-    while(streamEl.children.length>30)streamEl.removeChild(streamEl.lastChild);
+  if (streamEl && !streamEl.children.length) {
+    streamEl.innerHTML = '<div style="color:var(--mu);text-align:center;padding:20px;font-size:12px">Live events will appear here when your API key is connected and events are flowing.</div>';
   }
-  addEvent();
-  setInterval(addEvent,2200);
 };
 
 window.sdkTab=function(tab,el){
@@ -3102,48 +3253,14 @@ function markAllRead() {
 
 // ── Demo data toggle ──────────────────────────────────
 let _demoDataActive = false;
-
+function toggleSeedData() {
+  // Demo data removed — all views use real API data
+  console.info('Demo data has been removed. All views now use real API data.');
+}
 function showSeedPanel() { document.getElementById('seed-panel').style.display = 'flex'; }
 function hideSeedPanel()  { document.getElementById('seed-panel').style.display = 'none'; }
-
-async function toggleSeedData() {
-  if (_demoDataActive) {
-    // Turn off — clear IndexedDB seed data and reload with real data
-    _demoDataActive = false;
-    if (window.vantageData?.openDB) {
-      try {
-        const db = await window.vantageData.openDB();
-        const tx = db.transaction(['events', 'meta'], 'readwrite');
-        tx.objectStore('events').clear();
-        tx.objectStore('meta').clear();
-        await new Promise(r => { tx.oncomplete = r; });
-      } catch(e) { /* ok */ }
-    }
-    document.getElementById('demo-pill').style.display = 'none';
-    document.getElementById('seed-toggle-btn').style.color = 'var(--mu)';
-    document.getElementById('seed-toggle-btn').innerHTML = '&#127806; Demo data';
-    rebuildAll();
-    return;
-  }
-  // Turn on — show confirmation panel first
-  showSeedPanel();
-}
-
-async function runSeed() {
-  if (!window.vantageData) return;
-  const content = document.getElementById('seed-panel-content');
-  content.innerHTML = `<div id="seed-progress-wrap"></div>`;
-  await window.vantageData.seedWithUI('seed-progress-wrap', 90);
-  _demoDataActive = true;
-  document.getElementById('demo-pill').style.display = '';
-  document.getElementById('seed-toggle-btn').style.color = 'var(--am)';
-  document.getElementById('seed-toggle-btn').innerHTML = '&#127806; Demo ON';
-  setTimeout(() => { hideSeedPanel(); rebuildAll(); }, 1500);
-}
-
-async function checkSeedStatus() {
-  // Never auto-load seed data. Users must explicitly click the toggle.
-}
+async function runSeed() { console.info('Demo seed removed — use real API data.'); }
+async function checkSeedStatus() { /* no-op */ }
 
 // ── PWA + auto-reload on SW update ────────────────────
 if ('serviceWorker' in navigator) {
@@ -3238,7 +3355,7 @@ async function checkPlanUsage() {
 const CMD_ITEMS = [
   { group:'Views', ico:'🌐', label:'All AI Spend (Live)', action:()=>navTo('allspend'), kbd:'0' },
   { group:'Views', ico:'💰', label:'Cost Intelligence', action:()=>navTo('cost'), kbd:'1' },
-  { group:'Views', ico:'📊', label:'Token Analytics', action:()=>navTo('tokens'), kbd:'2' },
+  { group:'Views', ico:'⚖', label:'Model Comparison', action:()=>navTo('models'), kbd:'2' },
   { group:'Views', ico:'⚖', label:'Model Comparison', action:()=>navTo('models'), kbd:'3' },
   { group:'Views', ico:'⚡', label:'Performance & Latency', action:()=>navTo('perf'), kbd:'4' },
   { group:'Views', ico:'🎯', label:'Quality & Evaluation', action:()=>navTo('quality'), kbd:'5' },
@@ -3471,38 +3588,44 @@ function showTraceDetail(idx) {
 }
 
 function initTraceSpanChart(traces) {
-  const ctx = document.getElementById('traceSpanChart');
-  if (!ctx) return;
-  if (charts.traceSpan) charts.traceSpan.destroy();
-  if (!traces || !traces.length) {
+  try {
+    const ctx = document.getElementById('traceSpanChart');
+    if (!ctx) return;
+    if (charts.traceSpan) { try { charts.traceSpan.destroy(); } catch(_){} charts.traceSpan = null; }
+    if (!Array.isArray(traces) || !traces.length) {
+      charts.traceSpan = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: ['No data'], datasets: [{ data: [0], backgroundColor: ['rgba(255,255,255,.04)'], borderRadius: 4 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } }
+      });
+      return;
+    }
+    const top = traces.slice(0, 10);
+    const traceLabels = top.map(t => String(t.name || t.trace_id || 'trace').slice(0, 20));
+    const traceCosts = top.map(t => { const n = Number(t.cost); return Number.isFinite(n) ? n : 0; });
     charts.traceSpan = new Chart(ctx, {
       type: 'bar',
-      data: { labels: ['No data'], datasets: [{ data: [0], backgroundColor: ['rgba(255,255,255,.04)'], borderRadius: 4 }] },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } }
-    });
-    return;
-  }
-  const traceLabels = traces.slice(0, 10).map(t => (t.name || String(t.trace_id || '').slice(0, 12)));
-  const traceCosts = traces.slice(0, 10).map(t => Number(t.cost || 0));
-  charts.traceSpan = new Chart(ctx, {
-    type: 'bar',
-    data: { labels: traceLabels, datasets: [{ label: 'Cost ($)', data: traceCosts, backgroundColor: '#00d4a1', borderRadius: 4 }] },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color:'#6b7b8a', font:{size:10} } },
-        y: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color:'#6b7b8a', font:{size:10} } },
+      data: { labels: traceLabels, datasets: [{ label: 'Cost ($)', data: traceCosts, backgroundColor: '#00d4a1', borderRadius: 4 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color:'#6b7b8a', font:{size:10} } },
+          y: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color:'#6b7b8a', font:{size:10}, callback: v => '$'+v.toFixed(4) } },
+        }
       }
-    }
-  });
+    });
+  } catch(e) { console.warn('Trace span chart init failed:', e); }
 }
 
 window.init_traces = async function() {
-  const resp = await loadTraces(7);
-  const traces = resp?.traces || [];
-  renderTraceList(traces);
-  setTimeout(() => initTraceSpanChart(traces), 100);
+  try {
+    const resp = await loadTraces(7);
+    const traces = Array.isArray(resp?.traces) ? resp.traces : [];
+    renderTraceList(traces);
+    // Wait for view layout to settle before Chart.js measures the canvas
+    requestAnimationFrame(() => initTraceSpanChart(traces));
+  } catch(e) { console.warn('Trace init failed:', e); }
 };
 
 // ── Start SSE after session loads ──────────────────
@@ -3519,7 +3642,7 @@ document.addEventListener('keydown', e => {
   if (e.key === '?') { document.getElementById('sh-modal').classList.toggle('open'); return; }
   if (e.key === 'Escape') { document.getElementById('sh-modal').classList.remove('open'); return; }
   // Number keys → views
-  const viewMap = { '1':'cost','2':'tokens','3':'models','4':'perf','5':'quality','6':'ai','7':'reports','8':'security','9':'devx','0':'traces' };
+  const viewMap = { '1':'cost','2':'models','3':'traces','4':'perf','5':'quality','6':'reports','7':'members','8':'security','9':'optimizer','0':'devx' };
   if (viewMap[e.key]) { navTo(viewMap[e.key]); return; }
   // R → refresh
   if (e.key === 'r' || e.key === 'R') { refreshData(); return; }
