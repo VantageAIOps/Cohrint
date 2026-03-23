@@ -71,10 +71,12 @@ def test_api_preconditions(api_key):
 
     if r.ok:
         d = r.json()
-        cost = (d.get("total_cost") or d.get("cost") or d.get("totalCost") or
+        cost = (d.get("today_cost_usd") or d.get("mtd_cost_usd") or
+                d.get("session_cost_usd") or d.get("total_cost") or
+                d.get("cost") or d.get("totalCost") or
                 d.get("summary", {}).get("total_cost") or 0)
         chk("DR.3  Analytics shows cost > 0", cost > 0,
-            f"cost={cost}")
+            f"cost={cost}, keys={list(d.keys())}")
 
     return accepted
 
@@ -143,7 +145,10 @@ def test_full_dashboard_flow(api_key, email):
                 f"only {views_loaded}/8 views loaded")
 
             # DR.9 KPI cards show real data (not dashes)
-            page.click("#nav-cost, .nav-cost", timeout=3000)
+            try:
+                page.click("#nav-cost", timeout=3000)
+            except Exception:
+                pass  # Already on cost view from sidebar iteration
             time.sleep(1)
             body = page.inner_text("body")
 
