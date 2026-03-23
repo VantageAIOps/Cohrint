@@ -25,6 +25,10 @@
 18. [Pricing & Plan Logic](#18-pricing--plan-logic)
 19. [Operational Runbook](#19-operational-runbook)
 20. [Research References & Reading List](#20-research-references--reading-list)
+21. [MCP Server — Tools Reference & Examples](#21-mcp-server--tools-reference--examples)
+22. [Local Proxy Gateway — Privacy-First LLM Tracking](#22-local-proxy-gateway--privacy-first-llm-tracking)
+23. [SDK Privacy Modes](#23-sdk-privacy-modes)
+24. [Cross-Platform OTel Collector (v2)](#24-cross-platform-otel-collector-v2)
 
 ---
 
@@ -1687,4 +1691,643 @@ Polling-over-SSE: 2s poll interval, 25s max connection, auto-reconnect
 
 ---
 
-*Last updated: March 2026 — Update this document when any system boundary changes (new endpoints, schema changes, new client types, algorithm updates).*
+---
+
+## 21. MCP Server — Tools Reference & Examples
+
+The VantageAI MCP Server exposes all analytics and optimization tools to AI coding assistants (Claude Desktop, Cursor, Windsurf, VS Code Copilot, Cline). Once configured, your AI assistant can query costs, track calls, optimize prompts, and check budgets — all from natural language.
+
+### 21.1 Setup
+
+Add to your `.mcp.json` (Claude Desktop) or IDE MCP config:
+
+```json
+{
+  "mcpServers": {
+    "vantage": {
+      "command": "npx",
+      "args": ["-y", "vantageaiops-mcp"],
+      "env": {
+        "VANTAGE_API_KEY": "vnt_yourorg_abc123def456"
+      }
+    }
+  }
+}
+```
+
+**Environment variables:**
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `VANTAGE_API_KEY` | Yes | — | Your Vantage API key (`vnt_...`) |
+| `VANTAGE_API_BASE` | No | `https://api.vantageaiops.com` | Custom API endpoint |
+| `VANTAGE_ORG` | No | Parsed from key | Override org ID |
+
+### 21.2 Analytics Tools (require API key + real data)
+
+#### `get_summary` — Quick cost overview
+
+**When to use:** Start of any session to understand current spend status.
+
+**Example prompt:**
+> "How much have I spent on LLMs today?"
+
+**What it returns:**
+
+| Metric | Value |
+|--------|-------|
+| MTD Spend | $45.23 |
+| Today Spend | $3.87 |
+| Today Requests | 1,234 |
+| Today Tokens | 2,450,000 |
+| Session Spend (30 min) | $0.42 |
+| Budget Used | 45.2% |
+
+---
+
+#### `get_kpis` — Detailed KPI metrics
+
+**When to use:** Weekly reviews, standup prep, or when you need latency/efficiency data.
+
+**Example prompt:**
+> "Give me the full KPI breakdown for our AI usage"
+
+**What it returns:** Total cost, total tokens, total requests, avg latency, efficiency score, streaming request count.
+
+---
+
+#### `get_model_breakdown` — Cost per model
+
+**When to use:** Identify which models are costing the most, find optimization opportunities.
+
+**Example prompts:**
+> "Which model is our most expensive? Show me model breakdown for the last 7 days"
+
+> "Compare GPT-4o vs Claude Sonnet costs this month"
+
+**Parameters:**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `days` | number | 30 | Look-back window (1-365) |
+
+**Sample output:**
+
+| Model | Provider | Cost | Requests | Avg Latency |
+|-------|----------|------|----------|-------------|
+| gpt-4o | openai | $32.45 | 8,234 | 1,230ms |
+| claude-sonnet-4-6 | anthropic | $12.18 | 3,456 | 890ms |
+| gpt-4o-mini | openai | $0.87 | 15,678 | 340ms |
+
+---
+
+#### `get_team_breakdown` — Cost per team
+
+**When to use:** Chargeback reporting, finding which team/feature drives the most spend.
+
+**Example prompts:**
+> "Show me cost breakdown by team for the last 30 days"
+
+> "Which feature is burning through our budget?"
+
+**Parameters:**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `days` | number | 30 | Look-back window (1-365) |
+
+---
+
+#### `check_budget` — Budget status
+
+**When to use:** Before launching expensive batch jobs, during sprint planning, or when you suspect overspend.
+
+**Example prompts:**
+> "Are we within budget this month?"
+
+> "How much budget do we have left?"
+
+**Sample output:**
+
+| | |
+|-|-|
+| MTD Spend | $45.23 |
+| Budget | $100.00 |
+| Used | 45.2% |
+| Remaining | $54.77 |
+
+---
+
+#### `get_traces` — Agent call traces
+
+**When to use:** Debug multi-step agent workflows, find expensive agent chains.
+
+**Example prompts:**
+> "Show me the last 5 agent traces"
+
+> "Which agent trace was most expensive?"
+
+**Parameters:**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `limit` | number | 10 | Number of traces (1-50) |
+
+**Sample output:**
+
+| Trace ID | Spans | Total Cost | Agent |
+|----------|-------|------------|-------|
+| abc123def456... | 4 spans | $0.0342 | code-review |
+| fed987cba654... | 7 spans | $0.1205 | research-agent |
+
+---
+
+#### `get_cost_gate` — CI/CD budget gate
+
+**When to use:** In CI pipelines before merging, automated budget checks.
+
+**Example prompts:**
+> "Run the cost gate check for today"
+
+> "Can we merge? Check if we're within budget this week"
+
+**Parameters:**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `period` | string | `today` | `today`, `week`, or `month` |
+
+**Sample output:**
+```
+🚦 CI Cost Gate — ✅ PASSED
+Period: today | Spend: $3.87 | Budget: $50.00 | Status: Within budget
+```
+
+---
+
+#### `track_llm_call` — Manual event logging
+
+**When to use:** When your LLM calls aren't going through the SDK proxy (e.g., direct API calls, third-party tools).
+
+**Example prompt:**
+> "Track this: I just used GPT-4o, 1500 input tokens, 800 output tokens, cost $0.023, took 1200ms, team backend"
+
+**Parameters:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `model` | string | Yes | e.g., `gpt-4o`, `claude-sonnet-4-6` |
+| `provider` | string | Yes | `openai`, `anthropic`, `google`, etc. |
+| `prompt_tokens` | number | Yes | Input token count |
+| `completion_tokens` | number | Yes | Output token count |
+| `total_cost_usd` | number | Yes | Cost in USD |
+| `latency_ms` | number | No | End-to-end latency |
+| `team` | string | No | Team/feature name |
+| `environment` | string | No | `production`, `staging`, `development` |
+| `trace_id` | string | No | For grouping multi-step agent calls |
+| `span_depth` | number | No | Depth in agent call tree (0 = root) |
+| `tags` | object | No | Arbitrary key-value tags |
+
+**Important:** This is the only MCP tool that writes data. All other tools are read-only.
+
+---
+
+### 21.3 Optimizer Tools (work offline — no API key needed)
+
+These tools run entirely locally with no network calls. They're useful for reducing costs before making LLM calls.
+
+#### `optimize_prompt` — Compress a prompt
+
+**When to use:** Before sending a large prompt to an expensive model.
+
+**Example prompt:**
+> "Optimize this prompt for cost: 'I would like you to please analyze the following code and could you please provide suggestions for improvement. It is important to note that the code should be maintainable and readable. Please kindly review each function.'"
+
+**What it does:**
+1. Removes filler words ("I would like you to", "please kindly", "it is important to note")
+2. Deduplicates repeated sentences
+3. Compresses whitespace
+4. Shows token savings and cost comparison
+5. Suggests the cheapest model for the task
+
+**Sample output:**
+
+| Metric | Before | After | Saved |
+|--------|--------|-------|-------|
+| Tokens | 52 | 18 | 34 (65%) |
+| Est. cost | $0.000260 | $0.000090 | $0.000170 |
+
+---
+
+#### `analyze_tokens` — Count tokens and estimate cost
+
+**When to use:** Before deciding which model to use, or to understand why a call was expensive.
+
+**Example prompts:**
+> "How many tokens is this text and what would it cost on GPT-4o vs Claude?"
+
+> "Analyze this prompt — how much would 500 output tokens cost?"
+
+**Parameters:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `text` | string | Yes | Text to analyze |
+| `model` | string | No | Model to price against (default: `gpt-4o`) |
+| `output_tokens` | number | No | Expected output tokens (default: same as input) |
+
+---
+
+#### `estimate_costs` — Compare costs across all models
+
+**When to use:** Choosing the right model for a task, cost planning.
+
+**Example prompt:**
+> "Compare the cost of this prompt across all models: [paste your prompt]"
+
+**What it returns:** Cost comparison across all 22 supported models (OpenAI, Anthropic, Google, Meta, DeepSeek, Mistral) sorted cheapest first, with savings vs most expensive.
+
+---
+
+#### `compress_context` — Fit conversation into token budget
+
+**When to use:** Long conversations approaching context limits, before summarizing history.
+
+**Example prompt:**
+> "Compress this conversation to fit within 4000 tokens"
+
+**Parameters:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `messages` | array | Yes | Array of `{role, content}` messages |
+| `max_tokens` | number | No | Token budget (default: 4000) |
+
+**What it does:** Keeps recent messages intact, summarizes/truncates older ones to fit within budget.
+
+---
+
+#### `find_cheapest_model` — Model recommendation
+
+**When to use:** Choosing a model for a new feature or batch job.
+
+**Example prompts:**
+> "What's the cheapest frontier-tier model for 2000 input and 500 output tokens?"
+
+> "Find me the cheapest Anthropic model for my use case"
+
+**Parameters:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `input_tokens` | number | Yes | Expected input tokens |
+| `output_tokens` | number | Yes | Expected output tokens |
+| `tier` | string | No | `frontier`, `mid`, `budget`, `reasoning` |
+| `provider` | string | No | Filter by provider |
+
+---
+
+### 21.4 MCP Workflow Examples
+
+#### Daily Cost Check Workflow
+```
+You: "Good morning. How's our AI spend looking?"
+→ MCP calls: get_summary
+→ Returns: MTD $45, today $3.87, budget 45% used
+
+You: "Which model is driving the most cost?"
+→ MCP calls: get_model_breakdown (days=7)
+→ Returns: GPT-4o at $32.45, then Claude Sonnet at $12.18
+
+You: "Can we switch to a cheaper model for the search feature?"
+→ MCP calls: find_cheapest_model (input_tokens=2000, output_tokens=500, tier=mid)
+→ Returns: gpt-4o-mini at $0.0006 vs gpt-4o at $0.0100 — save 94%
+```
+
+#### Pre-Merge CI Gate Workflow
+```
+You: "I'm about to merge this PR. Are we within budget?"
+→ MCP calls: get_cost_gate (period=today)
+→ Returns: ✅ PASSED — $3.87 of $50 budget used
+
+You: "What about for the week?"
+→ MCP calls: get_cost_gate (period=week)
+→ Returns: ⚠️ $42 of $50 — approaching limit
+```
+
+#### Prompt Optimization Workflow
+```
+You: "This prompt is too expensive. Optimize it: [paste 500-word prompt]"
+→ MCP calls: optimize_prompt (prompt=..., model=gpt-4o)
+→ Returns: 180 → 95 tokens (47% saving), optimized text, tips
+
+You: "What would it cost across different models?"
+→ MCP calls: estimate_costs (prompt=optimized_text)
+→ Returns: Table of all 22 models sorted by cost
+
+You: "Use gpt-4o-mini then. Track this call when it runs."
+→ (SDK auto-tracks if using proxy, or user calls track_llm_call manually)
+```
+
+#### Agent Debugging Workflow
+```
+You: "My agent workflow is too expensive. Show me the traces."
+→ MCP calls: get_traces (limit=5)
+→ Returns: 5 traces with span count and total cost
+
+You: "The research-agent trace with 7 spans costs $0.12. Break it down by team."
+→ MCP calls: get_team_breakdown (days=1)
+→ Returns: research team at $0.45 today, backend at $0.12
+```
+
+---
+
+## 22. Local Proxy Gateway — Privacy-First LLM Tracking
+
+### 22.1 The Problem
+
+Traditional LLM observability requires routing API keys and prompts through a third-party server. This creates security concerns:
+- Your LLM API keys pass through external infrastructure
+- Your prompts (which may contain PII, business logic, code) are stored externally
+- Compliance teams may block external data routing
+
+### 22.2 The Solution: Local Proxy
+
+The VantageAI Local Proxy runs **on the client's machine** (localhost). It:
+
+1. Intercepts LLM API calls locally
+2. Forwards them directly to OpenAI/Anthropic/Google using **your keys**
+3. Extracts **only statistics** (tokens, cost, latency, model, status code)
+4. Strips ALL sensitive data (prompts, responses, API keys)
+5. Sends only anonymized stats to the VantageAI dashboard
+
+```
+Your App → localhost:4891 → Real LLM API (OpenAI/Anthropic)
+                ↓
+        Extract stats locally
+                ↓
+        Strip ALL sensitive data
+                ↓
+        Send ONLY numbers → api.vantageaiops.com/v1/events
+```
+
+### 22.3 What Stays Local vs What Is Sent
+
+| Stays on your machine (NEVER sent) | Sent to VantageAI dashboard |
+|---|---|
+| Your LLM API keys (OpenAI, Anthropic, etc.) | Model name (e.g., `gpt-4o`) |
+| Full prompt text and content | Provider (e.g., `openai`) |
+| Full response text and content | Token counts (prompt, completion) |
+| System prompts | Calculated cost in USD |
+| PII, user data, business logic in prompts | Latency in milliseconds |
+| | HTTP status code |
+| | Team and environment tags |
+
+### 22.4 Privacy Levels
+
+| Level | Text | Prompt Hash | Use Case |
+|-------|------|-------------|----------|
+| `strict` (default) | No text at all | No | Maximum privacy, compliance-sensitive environments |
+| `standard` | No text | SHA-256 hash (non-reversible) | Dedup detection without exposing content |
+| `relaxed` | First 100 chars | Yes | Internal debugging (NOT for production) |
+
+### 22.5 Setup & Usage
+
+#### Install and run:
+```bash
+# Via npx (no install needed)
+VANTAGE_API_KEY=vnt_yourorg_abc123 npx vantageai-local-proxy
+
+# Or install globally
+npm install -g vantageai-local-proxy
+vantage-proxy --api-key vnt_yourorg_abc123 --privacy strict
+```
+
+#### Point your LLM client to the local proxy:
+
+**OpenAI (Python):**
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="sk-your-real-key",          # stays local
+    base_url="http://localhost:4891/v1"   # routes through local proxy
+)
+
+# Every call is now auto-tracked — stats only go to dashboard
+response = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": "Hello!"}]
+)
+```
+
+**OpenAI (JavaScript):**
+```javascript
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: "sk-your-real-key",             // stays local
+  baseURL: "http://localhost:4891/v1",    // routes through local proxy
+});
+
+const response = await client.chat.completions.create({
+  model: "gpt-4o",
+  messages: [{ role: "user", content: "Hello!" }],
+});
+```
+
+**Anthropic (Python):**
+```python
+import anthropic
+
+client = anthropic.Anthropic(
+    api_key="sk-ant-your-real-key",
+    base_url="http://localhost:4891"
+)
+
+response = client.messages.create(
+    model="claude-sonnet-4-6",
+    max_tokens=1024,
+    messages=[{"role": "user", "content": "Hello!"}]
+)
+```
+
+#### CLI Options:
+
+| Flag | Env Var | Default | Description |
+|------|---------|---------|-------------|
+| `--api-key` | `VANTAGE_API_KEY` | — | Your Vantage key (required) |
+| `--port` | `VANTAGE_PROXY_PORT` | `4891` | Local proxy port |
+| `--privacy` | `VANTAGE_PRIVACY` | `strict` | Privacy level |
+| `--team` | `VANTAGE_TEAM` | — | Team tag for all events |
+| `--env` | `VANTAGE_ENV` | `production` | Environment tag |
+| `--api-base` | `VANTAGE_API_BASE` | `https://api.vantageaiops.com` | Vantage API endpoint |
+| `--debug` | `VANTAGE_DEBUG` | `false` | Enable debug logging |
+| `--redact-models` | — | `false` | Redact model names to generic tiers |
+| `--batch-size` | — | `20` | Stats batch size |
+| `--flush-interval` | — | `5000` | Flush interval in ms |
+
+#### Verify privacy:
+```bash
+# Check what data the proxy sends
+curl http://localhost:4891/privacy
+
+# Health check
+curl http://localhost:4891/health
+```
+
+### 22.6 Security Guarantees
+
+1. **API keys are never forwarded to VantageAI** — they're used locally to call the real LLM API
+2. **Prompts/responses are sanitized immediately** — text is stripped before queuing, never lingers in memory
+3. **The proxy validates its own output** — `assertNoSensitiveData()` checks for API key patterns in sanitized events
+4. **No external dependencies for privacy logic** — sanitization runs entirely in-process
+5. **Open source** — audit the `privacy.ts` file yourself
+
+---
+
+## 23. SDK Privacy Modes
+
+For teams using the JS/Python SDK directly (not the local proxy), the SDK now supports privacy modes that control what data is sent to VantageAI.
+
+### 23.1 Configuration
+
+```javascript
+import { VantageClient, createOpenAIProxy } from "vantageaiops";
+import OpenAI from "openai";
+
+const vantage = new VantageClient({
+  apiKey: "vnt_yourorg_abc123",
+  privacy: "stats-only",   // ← NEW: no prompt/response text sent
+});
+
+const openai = createOpenAIProxy(new OpenAI({ apiKey: "sk-..." }), vantage);
+
+// All calls auto-tracked with stats only — no text leaves the machine
+const response = await openai.chat.completions.create({
+  model: "gpt-4o",
+  messages: [{ role: "user", content: "Sensitive business data here" }],
+});
+```
+
+### 23.2 Privacy Modes
+
+| Mode | `requestPreview` | `responsePreview` | `systemPreview` | `promptHash` | Use Case |
+|------|-------------------|-------------------|-----------------|--------------|----------|
+| `full` (default) | First 600 chars | First 600 chars | First 200 chars | Yes | Full observability, internal tools |
+| `stats-only` | Stripped | Stripped | Stripped | Stripped | Maximum privacy, compliance |
+| `hashed` | Stripped | Stripped | Stripped | SHA hash kept | Privacy + dedup detection |
+
+### 23.3 Comparison: SDK Privacy vs Local Proxy
+
+| Feature | SDK with `stats-only` | Local Proxy (`strict`) |
+|---|---|---|
+| Prompt text sent | No | No |
+| API key sent to Vantage | No (Vantage key only) | No (Vantage key only) |
+| Requires code changes | 1 line (`privacy: "stats-only"`) | 0 lines (just change `base_url`) |
+| Works with all providers | OpenAI + Anthropic (via proxy wrappers) | Any provider (generic HTTP proxy) |
+| Streaming support | Full | Pass-through (limited stats) |
+| Runs as separate process | No (in-process) | Yes (localhost server) |
+
+**Recommendation:** Use the **Local Proxy** for zero-code-change deployments and maximum isolation. Use **SDK privacy modes** when you already use the SDK and want fine-grained control.
+
+---
+
+## 24. Cross-Platform OTel Collector (v2)
+
+### Overview
+
+VantageAI v2 introduces a **4-layer architecture** for tracking ALL AI spending across an organization:
+
+1. **Layer 1 — OTel Telemetry** (real-time): Receives live OpenTelemetry from 7+ AI coding tools
+2. **Layer 2 — Local File Scanner** (near real-time): CLI agent reads tool session files from developer machines
+3. **Layer 3 — Billing APIs** (hourly): Pulls from provider admin/billing APIs
+4. **Layer 4 — Browser Extension** (real-time): Tracks web AI tools (ChatGPT, Claude Console, Gemini)
+
+### OTel Collector Endpoint
+
+**Endpoints:**
+- `POST /v1/otel/v1/metrics` — OTLP metrics ingestion (HTTP/JSON)
+- `POST /v1/otel/v1/logs` — OTLP event/log ingestion (HTTP/JSON)
+- `POST /v1/otel/v1/traces` — OTLP traces (placeholder for future)
+
+**Auth:** `Authorization: Bearer vnt_your_key` via `OTEL_EXPORTER_OTLP_HEADERS`
+
+**Supported Tools (Native OTel):**
+
+| Tool | `service.name` | Config | Key Metrics |
+|---|---|---|---|
+| Claude Code | `claude-code` | `CLAUDE_CODE_ENABLE_TELEMETRY=1` | Tokens, cost, commits, PRs, lines, active time |
+| GitHub Copilot | `copilot-chat` | `github.copilot.chat.otel.enabled=true` | Tokens, TTFT, tool calls, sessions |
+| Gemini CLI | `gemini-cli` | `telemetry.enabled=true` | Tokens (5 types), API calls, file ops |
+| OpenAI Codex | `codex-cli` | `~/.codex/config.toml` | Tokens, cost, commits, lines |
+| Cline | `cline` | `CLINE_OTEL_TELEMETRY_ENABLED=1` | Tokens, tool calls |
+| OpenCode | `opencode` | OTel env vars | Tokens |
+| Kiro | `kiro` | OTel env vars | LLM calls |
+
+**Provider Detection:** `detectProvider()` in `otel.ts` matches `service.name` to determine provider. Falls back to `custom_api` for auto-instrumented OpenAI/Anthropic SDK calls.
+
+**Metric Parsing:** The collector handles both Counter (Sum) and Histogram data points. Copilot uses histograms; Claude Code uses counters. Both are normalized into the same `cross_platform_usage` schema.
+
+### Database Schema (D1)
+
+**Tables added in migration `0001_cross_platform_usage.sql`:**
+
+- `cross_platform_usage` — Unified schema for all sources (OTel + billing API + SDK). Key fields: `provider`, `source`, `developer_email`, `model`, `input_tokens`, `output_tokens`, `cost_usd`, `commits`, `pull_requests`, `lines_added`, `active_time_s`
+- `otel_events` — Lightweight audit log of all OTel events (api_request, tool_result, user_prompt)
+- `provider_connections` — Encrypted credentials for billing API connectors
+- `budget_policies` — Per-org/team/developer budget rules with enforcement levels
+
+### Cross-Platform API Endpoints
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /v1/cross-platform/summary?days=N` | Total spend, by provider, budget status |
+| `GET /v1/cross-platform/developers?days=N` | Per-developer table with ROI metrics |
+| `GET /v1/cross-platform/developer/:email?days=N` | Drill-down: by provider, model, trend, productivity |
+| `GET /v1/cross-platform/live?limit=N` | Latest OTel events (real-time feed) |
+| `GET /v1/cross-platform/models?days=N` | Cost by model across all providers |
+| `GET /v1/cross-platform/connections` | OTel source freshness + billing API status |
+| `GET /v1/cross-platform/budget` | Budget policies + current spend |
+
+### Org-Wide OTel Deployment
+
+For enterprise admins deploying OTel across all developers:
+
+1. **Create a VantageAI API key** in the dashboard
+2. **Distribute via MDM** (for Claude Code):
+   ```json
+   {
+     "env": {
+       "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+       "OTEL_METRICS_EXPORTER": "otlp",
+       "OTEL_LOGS_EXPORTER": "otlp",
+       "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
+       "OTEL_EXPORTER_OTLP_ENDPOINT": "https://api.vantageaiops.com/v1/otel",
+       "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer vnt_ORG_KEY",
+       "OTEL_RESOURCE_ATTRIBUTES": "team.id=TEAM,cost_center=CC"
+     }
+   }
+   ```
+3. **For Copilot**, distribute VS Code settings via Settings Sync or GPO
+4. **For Gemini CLI**, distribute `~/.gemini/settings.json` via config management
+
+### Dashboard Module
+
+The "All AI Spend" module (`view-allspend`) is the new default landing page in `app.html`. Features:
+- 4 KPI cards (total spend, tokens, developers, budget %)
+- Provider doughnut chart with breakdown rows
+- Per-developer table with commits, PRs, lines, cost/PR
+- Model cost breakdown
+- Live OTel event feed (auto-refreshes every 30 seconds)
+- Data source connection status
+
+### Test Coverage
+
+- `tests/suites/17_otel/test_otel_collector.py` — 41 checks (auth, ingestion, API queries)
+- `tests/suites/17_otel/test_otel_e2e.py` — 78 checks (multi-platform simulation, ROI metrics, edge cases)
+- Total: **119 checks** covering OTel + cross-platform features
+
+---
+
+*Last updated: 23 March 2026 — v2 cross-platform OTel collector, 4-layer architecture, new dashboard module, 119 test checks.*

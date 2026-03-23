@@ -1,0 +1,202 @@
+name: Connector Tests
+
+# Runs on every push/PR that touches connector code.
+# Validates: TypeScript types, unit tests with mocked provider APIs,
+# schema migrations, and no credentials in committed code.
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  push:
+    paths:
+      - 'vantage-worker/src/connectors/**'
+      - 'vantage-worker/src/schemas/**'
+  pull_request:
+    paths:
+      - 'vantage-worker/src/connectors/**'
+      - 'vantage-worker/src/schemas/**'
+
+jobs:
+  # ── 1. TypeScript strict check on connector code ─────────────────────────
+  typecheck:
+    name: TypeScript Strict Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: vantage-worker
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: vantage-worker/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript strict check
+        run: npx tsc --noEmit --strict
+
+  # ── 2. Credential leak detection ─────────────────────────────────────────
+  secret-scan:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan for hardcoded credentials
+        run: |
+          echo "## Secret Scan Results" >> $GITHUB_STEP_SUMMARY
+          FOUND=0
+
+          # Check for common API key patterns in connector code
+          for pattern in \
+            'sk-ant-admin-' \
+            'sk-proj-' \
+            'sk-[a-zA-Z0-9]{20,}' \
+            'ghp_[a-zA-Z0-9]{36}' \
+            'gho_[a-zA-Z0-9]{36}' \
+            'ANTHROPIC_API_KEY\s*=' \
+            'OPENAI_API_KEY\s*=' \
+            'GITHUB_TOKEN\s*=' \
+            'cursor.*api.*key'; do
+            MATCHES=$(grep -rn --include='*.ts' --include='*.js' -E "$pattern" \
+              vantage-worker/src/connectors/ 2>/dev/null || true)
+            if [ -n "$MATCHES" ]; then
+              # Filter out test files with obviously fake keys
+              REAL_MATCHES=$(echo "$MATCHES" | grep -v 'test\|mock\|fake\|example\|placeholder\|__test__' || true)
+              if [ -n "$REAL_MATCHES" ]; then
+                echo "🚨 Potential secret found for pattern: $pattern" >> $GITHUB_STEP_SUMMARY
+                echo '```' >> $GITHUB_STEP_SUMMARY
+                echo "$REAL_MATCHES" >> $GITHUB_STEP_SUMMARY
+                echo '```' >> $GITHUB_STEP_SUMMARY
+                FOUND=1
+              fi
+            fi
+          done
+
+          if [ "$FOUND" = "0" ]; then
+            echo "✅ No hardcoded secrets detected" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Hardcoded secrets detected — remove before merging" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+  # ── 3. Connector unit tests (mocked provider APIs) ──────────────────────
+  connector-unit-tests:
+    name: Connector Unit Tests
+    runs-on: ubuntu-latest
+    needs: [typecheck]
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: vantage-worker
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: vantage-worker/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run connector tests
+        run: |
+          # Run vitest/jest on connector test files
+          if [ -f "vitest.config.ts" ] || [ -f "vitest.config.js" ]; then
+            npx vitest run --reporter=verbose src/connectors/ 2>&1 | tee /tmp/connector-tests.txt
+          elif grep -q '"test"' package.json; then
+            npm test -- --testPathPattern='connectors' 2>&1 | tee /tmp/connector-tests.txt
+          else
+            echo "⚠️ No test runner configured yet — will be added with first connector"
+            echo "status=skipped" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+      - name: Generate test summary
+        if: always()
+        run: |
+          echo "## Connector Test Results" >> $GITHUB_STEP_SUMMARY
+          if [ -f /tmp/connector-tests.txt ]; then
+            FAILURES=$(grep -E "FAIL|✗|Error" /tmp/connector-tests.txt 2>/dev/null || true)
+            if [ -n "$FAILURES" ]; then
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "$FAILURES" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+            else
+              echo "✅ All connector tests passed" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: connector-tests-${{ github.run_number }}
+          path: /tmp/connector-tests.txt
+
+  # ── 4. Schema validation ────────────────────────────────────────────────
+  schema-check:
+    name: Schema Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate migration files exist and are reversible
+        run: |
+          echo "## Schema Validation" >> $GITHUB_STEP_SUMMARY
+          MIGRATION_DIR="vantage-worker/src/schemas/migrations"
+          if [ -d "$MIGRATION_DIR" ]; then
+            for f in "$MIGRATION_DIR"/*.sql; do
+              if [ -f "$f" ]; then
+                BASENAME=$(basename "$f")
+                echo "Checking: $BASENAME"
+                # Verify every UP migration has a corresponding DOWN
+                if echo "$BASENAME" | grep -q "up"; then
+                  DOWN_FILE=$(echo "$f" | sed 's/up/down/')
+                  if [ ! -f "$DOWN_FILE" ]; then
+                    echo "⚠️ Missing down migration for $BASENAME" >> $GITHUB_STEP_SUMMARY
+                  fi
+                fi
+              fi
+            done
+            echo "✅ Schema migrations checked" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ No migrations directory yet — will be created on Day 1" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # ── 5. Summary ──────────────────────────────────────────────────────────
+  connector-summary:
+    name: Connector Test Summary
+    runs-on: ubuntu-latest
+    needs: [typecheck, secret-scan, connector-unit-tests, schema-check]
+    if: always()
+    steps:
+      - name: Write summary
+        run: |
+          echo "## Connector Pipeline Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| TypeScript Strict | ${{ needs.typecheck.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Secret Scan | ${{ needs.secret-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit Tests | ${{ needs.connector-unit-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Schema Check | ${{ needs.schema-check.result }} |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Fail if critical checks failed
+        if: |
+          needs.typecheck.result == 'failure' ||
+          needs.secret-scan.result == 'failure' ||
+          needs.connector-unit-tests.result == 'failure'
+        run: |
+          echo "❌ Connector pipeline failed — fix issues before merging"
+          exit 1

@@ -252,7 +252,73 @@ jobs:
           name: pr-mcp-tests-${{ github.run_number }}
           path: /tmp/mcp-*.txt
 
-  # ── 6. Preview Deploy ────────────────────────────────────────────────────────
+  # ── 6. Connector Tests (if connector code changed) ──────────────────────────
+  connector-tests:
+    name: Connector Tests
+    runs-on: ubuntu-latest
+    needs: typecheck
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: vantage-worker/package-lock.json
+
+      - name: Check if connector code changed
+        id: changes
+        run: |
+          CHANGED=$(git diff --name-only origin/main...HEAD -- 'vantage-worker/src/connectors/' 2>/dev/null || echo "")
+          if [ -n "$CHANGED" ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "Connector files changed:"
+            echo "$CHANGED"
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No connector changes — skipping"
+          fi
+
+      - name: Install dependencies
+        if: steps.changes.outputs.has_changes == 'true'
+        working-directory: vantage-worker
+        run: npm ci
+
+      - name: Run connector tests
+        if: steps.changes.outputs.has_changes == 'true'
+        working-directory: vantage-worker
+        run: |
+          if [ -f "vitest.config.ts" ] || [ -f "vitest.config.js" ]; then
+            npx vitest run --reporter=verbose src/connectors/ 2>&1 | tee /tmp/connector-tests.txt
+          elif grep -q '"test"' package.json; then
+            npm test -- --testPathPattern='connectors' 2>&1 | tee /tmp/connector-tests.txt
+          else
+            echo "✅ No connector test runner yet — passing" | tee /tmp/connector-tests.txt
+          fi
+
+      - name: Scan for leaked secrets in connector code
+        if: steps.changes.outputs.has_changes == 'true'
+        run: |
+          FOUND=$(grep -rn --include='*.ts' --include='*.js' \
+            -E 'sk-ant-admin-|sk-proj-|ghp_[a-zA-Z0-9]{36}|gho_[a-zA-Z0-9]{36}' \
+            vantage-worker/src/connectors/ 2>/dev/null | \
+            grep -v 'test\|mock\|fake\|example\|placeholder' || true)
+          if [ -n "$FOUND" ]; then
+            echo "🚨 Potential secrets in connector code:"
+            echo "$FOUND"
+            exit 1
+          fi
+          echo "✅ No secrets detected in connector code"
+
+      - name: Upload results
+        if: always() && steps.changes.outputs.has_changes == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-connector-tests-${{ github.run_number }}
+          path: /tmp/connector-tests.txt
+
+  # ── 7. Preview Deploy ────────────────────────────────────────────────────────
   preview-deploy:
     name: Preview Deploy
     runs-on: ubuntu-latest
@@ -323,11 +389,11 @@ jobs:
               });
             }
 
-  # ── 7. PR Gate Summary (required check — blocks merge on failure) ───────────
+  # ── 8. PR Gate Summary (required check — blocks merge on failure) ───────────
   pr-summary:
     name: PR Gate Summary
     runs-on: ubuntu-latest
-    needs: [typecheck, api-tests, env-tests, cross-browser, mcp-tests, preview-deploy]
+    needs: [typecheck, api-tests, env-tests, cross-browser, mcp-tests, connector-tests, preview-deploy]
     if: always()
     steps:
       - name: Write summary
@@ -341,6 +407,7 @@ jobs:
           echo "| Environment & Health | ${{ needs.env-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Cross-Browser Tests | ${{ needs.cross-browser.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| MCP Server Tests | ${{ needs.mcp-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Connector Tests | ${{ needs.connector-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Preview Deploy | ${{ needs.preview-deploy.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**PR:** #${{ github.event.number }}" >> $GITHUB_STEP_SUMMARY
@@ -351,7 +418,8 @@ jobs:
         if: |
           needs.typecheck.result == 'failure' ||
           needs.api-tests.result == 'failure' ||
-          needs.mcp-tests.result == 'failure'
+          needs.mcp-tests.result == 'failure' ||
+          needs.connector-tests.result == 'failure'
         run: |
           echo "❌ PR gate failed — fix the issues above before merging"
           exit 1

@@ -42,7 +42,7 @@ jobs:
       - name: Install Vantage SDK
         run: pip install requests
 
-      - name: Fetch PR cost from Vantage
+      - name: Fetch PR cost + cross-platform spend from Vantage
         id: cost
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -60,15 +60,16 @@ jobs:
 
           if not api_key:
               print("::warning ::VANTAGE_API_KEY not set — skipping cost gate")
-              print(f"pr_cost=0.00")
-              print(f"daily_cost=0.00")
-              print(f"status=skipped")
               with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
                   f.write("pr_cost=0.00\n")
                   f.write("daily_cost=0.00\n")
+                  f.write("cross_platform_cost=0.00\n")
+                  f.write("budget_pct=0\n")
                   f.write("status=skipped\n")
               sys.exit(0)
 
+          # Fetch PR-specific cost
+          pr_cost = daily_cost = 0.0
           url = f"{api_base}/v1/analytics/cost?org=ci&tag_branch={branch}&period=7d"
           req = urllib.request.Request(url, headers={"Authorization": f"Bearer {api_key}"})
           try:
@@ -77,16 +78,33 @@ jobs:
                   pr_cost    = float(data.get('total_cost_usd', 0))
                   daily_cost = float(data.get('today_cost_usd', 0))
           except Exception as e:
-              print(f"::warning ::Could not fetch cost data: {e}")
-              pr_cost = daily_cost = 0.0
+              print(f"::warning ::Could not fetch PR cost data: {e}")
+
+          # Fetch cross-platform org spend (v2 feature)
+          cross_cost = 0.0
+          budget_pct = 0
+          try:
+              xp_url = f"{api_base}/v1/cross-platform/summary/ci"
+              xp_req = urllib.request.Request(xp_url, headers={"Authorization": f"Bearer {api_key}"})
+              with urllib.request.urlopen(xp_req, timeout=10) as resp:
+                  xp_data = json.loads(resp.read())
+                  cross_cost = float(xp_data.get('total_cost_usd', 0))
+                  budget_pct = int(xp_data.get('budget_pct', 0))
+          except Exception:
+              pass  # Cross-platform endpoints may not exist yet
 
           exceeded = pr_cost > pr_limit
           status = "exceeded" if exceeded else "ok"
 
           print(f"PR #{pr_num} cost: ${pr_cost:.4f} (limit: ${pr_limit:.2f}) → {status}")
+          if cross_cost > 0:
+              print(f"Cross-platform org spend today: ${cross_cost:.2f} ({budget_pct}% of budget)")
+
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
               f.write(f"pr_cost={pr_cost:.4f}\n")
               f.write(f"daily_cost={daily_cost:.4f}\n")
+              f.write(f"cross_platform_cost={cross_cost:.2f}\n")
+              f.write(f"budget_pct={budget_pct}\n")
               f.write(f"status={status}\n")
           EOF
 
@@ -98,33 +116,71 @@ jobs:
             const status    = '${{ steps.cost.outputs.status }}';
             const prCost    = '${{ steps.cost.outputs.pr_cost }}';
             const dailyCost = '${{ steps.cost.outputs.daily_cost }}';
+            const crossCost = '${{ steps.cost.outputs.cross_platform_cost }}';
+            const budgetPct = '${{ steps.cost.outputs.budget_pct }}';
             const prLimit   = process.env.PR_BUDGET_USD || '5.00';
             const icon      = status === 'ok' ? '✅' : status === 'skipped' ? 'ℹ️' : '🚨';
+
+            const rows = [
+              `| PR spend (branch) | **$${prCost}** |`,
+              `| Today's API spend | $${dailyCost} |`,
+              `| PR budget limit | $${prLimit} |`,
+              `| Status | **${status.toUpperCase()}** |`,
+            ];
+
+            // Add cross-platform data if available
+            if (parseFloat(crossCost) > 0) {
+              rows.push(`| --- | --- |`);
+              rows.push(`| **All AI spend today** (Copilot+Cursor+API) | **$${crossCost}** |`);
+              rows.push(`| Org budget used | ${budgetPct}% |`);
+            }
+
+            const budgetWarning = parseInt(budgetPct) >= 80
+              ? `\n> ⚠️ **Org AI budget is ${budgetPct}% used.** Consider optimizing before merging more AI-heavy changes.`
+              : '';
+
             const body = [
               `## ${icon} VantageAI Cost Report`,
               '',
               `| Metric | Value |`,
               `|---|---|`,
-              `| PR spend (branch) | **$${prCost}** |`,
-              `| Today's total spend | $${dailyCost} |`,
-              `| PR budget limit | $${prLimit} |`,
-              `| Status | **${status.toUpperCase()}** |`,
+              ...rows,
               '',
               status === 'exceeded'
                 ? `> ⚠️ **This PR has exceeded its AI cost budget.** Review LLM usage before merging.\n> Set \`PR_BUDGET_USD\` repository variable to adjust the limit.`
                 : status === 'skipped'
                 ? `> ℹ️ Set \`VANTAGE_API_KEY\` repository secret to enable live cost tracking.`
-                : `> 💚 Cost within budget. Safe to merge.`,
+                : `> Cost within budget. Safe to merge.`,
+              budgetWarning,
               '',
               `*Powered by [VantageAI](https://vantageaiops.com) · [View dashboard](https://vantageaiops.com/app.html)*`,
             ].join('\n');
 
-            await github.rest.issues.createComment({
+            // Update existing comment or create new one (avoid spam)
+            const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
-              repo:  context.repo.repo,
+              repo: context.repo.repo,
               issue_number: context.issue.number,
-              body,
             });
+            const existing = comments.find(c =>
+              c.body?.includes('VantageAI Cost Report') && c.user?.login === 'github-actions[bot]'
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
 
       - name: Fail if budget exceeded
         if: steps.cost.outputs.status == 'exceeded'
