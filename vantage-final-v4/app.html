@@ -384,7 +384,7 @@ button{font-family:var(--sans);cursor:pointer}
     <span class="tb-org-badge">Acme Corp</span>
     <span class="small muted">TEAM PLAN</span>
   </div>
-  <div class="demo-pill">LIVE DEMO</div>
+  <div class="demo-pill" id="demo-pill" style="display:none">DEMO DATA</div>
   <div class="tb-right">
     <select class="tb-period" onchange="setPeriod(this.value)" id="period-sel">
       <option value="7">Last 7 days</option>
@@ -404,7 +404,7 @@ button{font-family:var(--sans);cursor:pointer}
         <div class="nd-list" id="nd-list"><div class="nd-empty">Loading…</div></div>
       </div>
     </div>
-      <button class="tb-btn" onclick="showSeedPanel()" title="Load test data" style="color:var(--am)">&#127806; Seed data</button>
+      <button class="tb-btn" id="seed-toggle-btn" onclick="toggleSeedData()" title="Toggle demo data on/off" style="color:var(--mu);font-size:11px">&#127806; Demo data</button>
     <div id="user-menu" style="position:relative">
       <button class="tb-btn" id="user-btn" onclick="toggleUserMenu()" style="gap:8px">
         <div id="user-avatar" style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,var(--ac),var(--bl));display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#000">?</div>
@@ -1837,10 +1837,10 @@ async function init_cost(){
   const kpis = await loadKpis(cfg.org, period);
   const ts = (await loadTimeseries(cfg.org, period))?.series || [];
 
-  const spend = kpis?.total_cost_usd ?? (4821*mult()).toFixed(0);
-  const tokens = kpis?.total_tokens ?? Math.round(182*mult());
-  const efficiency = kpis?.efficiency_score ?? 74;
-  const potential = kpis?.potential_savings_usd ?? (1240*mult()).toFixed(0);
+  const spend = kpis?.total_cost_usd ?? 0;
+  const tokens = kpis?.total_tokens ?? 0;
+  const efficiency = kpis?.efficiency_score ?? 0;
+  const potential = kpis?.potential_savings_usd ?? 0;
   const diff = kpis?.cost_change_pct ?? 12;
   const diffDir = diff > 0 ? "up" : diff < 0 ? "dn" : "flat";
   const diffText = `${Math.abs(diff)}% vs prev`;
@@ -1851,9 +1851,9 @@ async function init_cost(){
     <div class="kpi"><div class="kpi-lbl">Efficiency score</div><div class="kpi-val" style="color:var(--ac)">${efficiency}/100</div><div class="kpi-ch dn">&#8679; +6 pts</div></div>
     <div class="kpi" style="border-color:rgba(245,158,11,.3)"><div class="kpi-lbl">Potential savings</div><div class="kpi-val" style="color:var(--am)">$${potential}</div><div class="kpi-ch flat">switch 2 workflows</div></div>`;
 
-  // Spend chart
+  // Spend chart — only real data, no fake fallback
   const labels = ts.length ? ts.map(r => r.date) : daysSlice();
-  const spendData = ts.length ? ts.map(r => r.cost_usd) : Array.from({length:period},(_,i)=>Math.round((80+i*(period===7?45:12)+rnd(-30,50))*mult()));
+  const spendData = ts.length ? ts.map(r => r.cost_usd) : Array.from({length:period},()=>0);
   mkChart("costChart","bar",{labels, datasets:[barDs(spendData,"rgb(0,212,161)")]});
 
   // Model cost rows — use real API data when available
@@ -1874,14 +1874,7 @@ async function init_cost(){
       </div>`;
     }).join("");
   } else {
-    document.getElementById("model-cost-rows").innerHTML = DEMO_MODELS.map(m=>`
-      <div class="model-row">
-        <div class="model-dot" style="background:${m.color}"></div>
-        <div style="flex:1;font-size:12px">${m.name}</div>
-        <div class="bar-wrap"><div class="bar-fill" style="width:${m.pct}%;background:${m.color}40;border-right:2px solid ${m.color}"></div></div>
-        <div class="mono" style="font-size:11px;min-width:54px;text-align:right">$${(m.cost*mult()).toFixed(0)}</div>
-        <div class="mono muted" style="font-size:10px;min-width:30px;text-align:right">${m.pct}%</div>
-      </div>`).join("");
+    document.getElementById("model-cost-rows").innerHTML = `<div style="padding:16px;color:var(--mu);font-size:13px;text-align:center">No model data yet. Start sending API events to see your model breakdown here.</div>`;
   }
 
   // Team chart — use real API data when available
@@ -1893,43 +1886,32 @@ async function init_cost(){
     const teamCosts  = realTeams.map(t => t.cost_usd || 0);
     mkChart("teamChart","doughnut",{labels:teamLabels,datasets:[{data:teamCosts,backgroundColor:TEAM_COLORS.slice(0,teamLabels.length),borderWidth:0}]},{plugins:{legend:{display:true,position:"right",labels:{color:"#6b7b8a",font:{size:11},boxWidth:10}}}});
   } else {
-    const teamData=[32,28,18,12,10].map(v=>Math.round(v*48.21*mult()/100));
-    mkChart("teamChart","doughnut",{labels:TEAMS,datasets:[{data:teamData,backgroundColor:TEAM_COLORS,borderWidth:0}]},{plugins:{legend:{display:true,position:"right",labels:{color:"#6b7b8a",font:{size:11},boxWidth:10}}}});
+    mkChart("teamChart","doughnut",{labels:["No data"],datasets:[{data:[1],backgroundColor:["rgba(255,255,255,.04)"],borderWidth:0}]},{plugins:{legend:{display:false},tooltip:{enabled:false}}});
   }
 
-  // Budget donut
-  const pct=Math.min(100,+spend/6000*100);
-  mkChart("budgetChart","doughnut",{datasets:[{data:[pct,100-pct],backgroundColor:[pct>85?"#f87171":pct>60?"#f59e0b":"#00d4a1","rgba(255,255,255,.04)"],borderWidth:0}]},{cutout:"82%",plugins:{legend:{display:false},tooltip:{enabled:false}}});
-  document.getElementById("budget-details").innerHTML=`
+  // Budget donut — real data only
+  const budgetUsd = kpis?.budget_usd ?? 0;
+  const pct = budgetUsd > 0 ? Math.min(100, (+spend / budgetUsd) * 100) : 0;
+  mkChart("budgetChart","doughnut",{datasets:[{data:[pct || 1, Math.max(0, 100 - pct) || 99],backgroundColor:[pct>85?"#f87171":pct>60?"#f59e0b":pct>0?"#00d4a1":"rgba(255,255,255,.04)","rgba(255,255,255,.04)"],borderWidth:0}]},{cutout:"82%",plugins:{legend:{display:false},tooltip:{enabled:false}}});
+  document.getElementById("budget-details").innerHTML = budgetUsd > 0 ? `
     <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--mu)">
-      <span>Spent: $${spend}</span><span>Budget: $6,000</span>
+      <span>Spent: $${spend}</span><span>Budget: $${budgetUsd}</span>
     </div>
-    <div class="small muted" style="margin-top:6px">${(100-pct).toFixed(0)}% remaining &bull; Resets in ${30-(new Date().getDate())} days</div>`;
+    <div class="small muted" style="margin-top:6px">${(100-pct).toFixed(0)}% remaining</div>`
+    : `<div style="font-family:var(--mono);font-size:11px;color:var(--mu);text-align:center">No budget set. Configure in Settings → Budget.</div>`;
 
-  // Alerts
-  document.getElementById("cost-alerts").innerHTML=`
-    <div class="alert-item"><div class="alert-ico" style="background:var(--re2)">&#128679;</div><div><div class="alert-title">/analytics budget at 90%</div><div class="alert-desc">$1,800 of $2,000 used</div></div><div class="alert-time">2m</div></div>
-    <div class="alert-item"><div class="alert-ico" style="background:var(--am2)">&#9889;</div><div><div class="alert-title">Token spike — GPT-4o</div><div class="alert-desc">3× above baseline, 14:22 UTC</div></div><div class="alert-time">18m</div></div>
-    <div class="alert-item"><div class="alert-ico" style="background:var(--ac2)">&#128161;</div><div><div class="alert-title">Savings opportunity</div><div class="alert-desc">Switch /embed &#8594; save $680/mo</div></div><div class="alert-time">1h</div></div>`;
+  // Alerts — show empty state (real alerts come from anomaly detection cron)
+  document.getElementById("cost-alerts").innerHTML = Number(spend) > 0
+    ? `<div style="padding:12px;color:var(--mu);font-size:12px;text-align:center">No active alerts. Alerts are generated automatically when anomalies or budget thresholds are detected.</div>`
+    : `<div style="padding:12px;color:var(--mu);font-size:12px;text-align:center">Start sending events to enable budget alerts and anomaly detection.</div>`;
 
-  // Expensive requests table — use real models when available
-  const expModels = (realModels && realModels.length > 0) ? realModels : DEMO_MODELS.map(m=>({model:m.name,provider:m.provider}));
-  const expTeams  = (realTeams && realTeams.length > 0) ? realTeams.map(t=>t.team) : TEAMS;
-  document.getElementById("expensive-body").innerHTML=Array.from({length:10},(_,i)=>{
-    const m=expModels[i%expModels.length];
-    const ti=ri(500,8000),to=ri(200,2000);
-    const cost=((ti*.0000025)+(to*.00001)).toFixed(5);
-    const lat=ri(400,3000);
-    return`<tr>
-      <td class="mono muted">${ri(1,60)}m ago</td>
-      <td class="mono">${ENDPOINTS[i%ENDPOINTS.length]}</td>
-      <td><span class="prov prov-${m.provider}">${m.model||m.name}</span></td>
-      <td class="mono">${ti.toLocaleString()}</td>
-      <td class="mono">${to.toLocaleString()}</td>
-      <td class="mono" style="color:var(--am)">$${cost}</td>
-      <td class="mono">${lat}ms</td>
-      <td><span class="tag tag-gray">${expTeams[i%expTeams.length]}</span></td>
-    </tr>`;}).join("");
+  // Expensive requests table — only show when real data exists
+  if (realModels && realModels.length > 0) {
+    const expTeams = (realTeams && realTeams.length > 0) ? realTeams.map(t=>t.team) : ['—'];
+    document.getElementById("expensive-body").innerHTML = `<tr><td colspan="8" style="color:var(--mu);text-align:center;padding:20px;font-size:13px">Detailed request log coming soon. View model breakdown above for cost analysis.</td></tr>`;
+  } else {
+    document.getElementById("expensive-body").innerHTML = `<tr><td colspan="8" style="color:var(--mu);text-align:center;padding:20px;font-size:13px">No events yet. Integrate the SDK to start tracking API calls.</td></tr>`;
+  }
 }
 window.init_cost=init_cost;
 
@@ -2818,19 +2800,49 @@ function markAllRead() {
   document.getElementById('nd-list').innerHTML = '<div class="nd-empty">✓ All caught up</div>';
 }
 
-// ── Seed panel ────────────────────────────────────────
+// ── Demo data toggle ──────────────────────────────────
+let _demoDataActive = false;
+
 function showSeedPanel() { document.getElementById('seed-panel').style.display = 'flex'; }
 function hideSeedPanel()  { document.getElementById('seed-panel').style.display = 'none'; }
+
+async function toggleSeedData() {
+  if (_demoDataActive) {
+    // Turn off — clear IndexedDB seed data and reload with real data
+    _demoDataActive = false;
+    if (window.vantageData?.openDB) {
+      try {
+        const db = await window.vantageData.openDB();
+        const tx = db.transaction(['events', 'meta'], 'readwrite');
+        tx.objectStore('events').clear();
+        tx.objectStore('meta').clear();
+        await new Promise(r => { tx.oncomplete = r; });
+      } catch(e) { /* ok */ }
+    }
+    document.getElementById('demo-pill').style.display = 'none';
+    document.getElementById('seed-toggle-btn').style.color = 'var(--mu)';
+    document.getElementById('seed-toggle-btn').innerHTML = '&#127806; Demo data';
+    rebuildAll();
+    return;
+  }
+  // Turn on — show confirmation panel first
+  showSeedPanel();
+}
+
 async function runSeed() {
   if (!window.vantageData) return;
   const content = document.getElementById('seed-panel-content');
   content.innerHTML = `<div id="seed-progress-wrap"></div>`;
   await window.vantageData.seedWithUI('seed-progress-wrap', 90);
+  _demoDataActive = true;
+  document.getElementById('demo-pill').style.display = '';
+  document.getElementById('seed-toggle-btn').style.color = 'var(--am)';
+  document.getElementById('seed-toggle-btn').innerHTML = '&#127806; Demo ON';
   setTimeout(() => { hideSeedPanel(); rebuildAll(); }, 1500);
 }
+
 async function checkSeedStatus() {
-  // No longer auto-pops the seed panel. Users can trigger it manually
-  // via the toolbar "Seed data" button or the command palette.
+  // Never auto-load seed data. Users must explicitly click the toggle.
 }
 
 // ── PWA + auto-reload on SW update ────────────────────
@@ -2930,7 +2942,7 @@ const CMD_ITEMS = [
   { group:'Views', ico:'🔒', label:'Security & Governance', action:()=>navTo('security'), kbd:'8' },
   { group:'Views', ico:'🔧', label:'Developer Experience', action:()=>navTo('devx'), kbd:'9' },
   { group:'Views', ico:'🔗', label:'Agent Traces', action:()=>navTo('traces'), kbd:'0' },
-  { group:'Actions', ico:'🌱', label:'Load seed data', action:()=>{ closeCmd(); showSeedPanel(); } },
+  { group:'Actions', ico:'🌱', label:'Toggle demo data', action:()=>{ closeCmd(); toggleSeedData(); } },
   { group:'Actions', ico:'⚙️', label:'Open settings', action:()=>{ closeCmd(); openSettings(); } },
   { group:'Actions', ico:'⌨️', label:'Keyboard shortcuts', action:()=>{ closeCmd(); document.getElementById('sh-modal').classList.add('open'); } },
   { group:'Actions', ico:'🔄', label:'Refresh data', action:()=>{ closeCmd(); refreshData(); } },
@@ -3051,45 +3063,16 @@ function connectSSE() {
   }
 }
 function _simulateLiveStream() {
+  // Never show fake events — always show waiting state
   const streamEl = document.getElementById('event-stream');
   if (!streamEl) return;
   const dotEl    = document.getElementById('sse-dot');
   const statusEl = document.getElementById('stream-status');
-
-  // If user is authenticated, show waiting state instead of fake data
-  if (_session?.org_id) {
-    dotEl.style.background = 'var(--mu)';
-    dotEl.style.boxShadow  = '0 0 4px var(--mu)';
-    statusEl.textContent   = 'WAITING';
-    statusEl.className     = 'tag tag-gray';
-    streamEl.innerHTML = '<div style="color:var(--mu);font-size:12px;padding:8px">Waiting for live events... Send API calls to see them here in real time.</div>';
-    return;
-  }
-
-  // Only show demo stream for unauthenticated/demo users
-  dotEl.style.background = 'var(--am)';
-  dotEl.style.boxShadow  = '0 0 6px var(--am)';
-  statusEl.textContent   = 'DEMO';
-  statusEl.className     = 'tag tag-amber';
-  streamEl.innerHTML = '';
-  const models = ['gpt-4o','claude-sonnet-4-6','gemini-2.0-flash','gpt-4o-mini'];
-  const provs  = {
-    'gpt-4o':'openai','claude-sonnet-4-6':'anthropic','gemini-2.0-flash':'google',
-    'gpt-4o-mini':'openai'
-  };
-  function emit() {
-    const m = models[Math.floor(Math.random()*models.length)];
-    const tok = Math.floor(Math.random()*2000)+100;
-    const cost = (tok * 0.0000025).toFixed(6);
-    const ts = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
-    const line = document.createElement('div');
-    line.innerHTML = `<span style="color:var(--di)">${ts}</span> <span style="color:var(--ac)">${provs[m]}/${m}</span> · ${tok} tok · $${cost}`;
-    streamEl.appendChild(line);
-    if (streamEl.children.length > 80) streamEl.removeChild(streamEl.firstChild);
-    streamEl.scrollTop = streamEl.scrollHeight;
-    setTimeout(emit, 800 + Math.random()*2400);
-  }
-  setTimeout(emit, 600);
+  dotEl.style.background = 'var(--mu)';
+  dotEl.style.boxShadow  = '0 0 4px var(--mu)';
+  statusEl.textContent   = 'WAITING';
+  statusEl.className     = 'tag tag-gray';
+  streamEl.innerHTML = '<div style="color:var(--mu);font-size:12px;padding:8px">Waiting for live events... Integrate the SDK or use the MCP to start tracking API calls in real time.</div>';
 }
 
 // ── Slack webhook helpers ──────────────────────────
@@ -3158,6 +3141,11 @@ const DEMO_SPANS = {
 function renderTraceList() {
   const el = document.getElementById('trace-list');
   if (!el) return;
+  // Use real traces from API, not demo data
+  if (!DEMO_TRACES.length || !_demoDataActive) {
+    el.innerHTML = '<div style="padding:20px;color:var(--mu);font-size:13px;text-align:center">No traces yet. Pass <code>trace_id</code> when sending events to see agent call trees here.</div>';
+    return;
+  }
   el.innerHTML = DEMO_TRACES.map(t => `
     <div onclick="showTrace('${t.id}')" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--b1);cursor:pointer;transition:background .1s" onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background='transparent'">
       <span style="width:7px;height:7px;border-radius:50%;background:${t.status==='ok'?'var(--ac)':'var(--re)'};flex-shrink:0"></span>
