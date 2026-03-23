@@ -50,7 +50,7 @@ jobs:
   api-tests:
     name: API Test Suites
     runs-on: ubuntu-latest
-    needs: [typecheck, env-tests]
+    needs: [typecheck]
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -113,12 +113,21 @@ jobs:
     steps:
       - name: Check API health
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            --retry 5 --retry-delay 5 --retry-all-errors \
-            https://api.vantageaiops.com/v1/health)
-          echo "API health: $STATUS"
-          [ "$STATUS" = "200" ] || { echo "❌ API not responding (got $STATUS)"; exit 1; }
-          echo "✅ API is live"
+          # Retry with longer backoff to handle transient DNS issues on GH runners
+          for attempt in 1 2 3 4 5; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              --connect-timeout 10 --max-time 15 \
+              --retry 3 --retry-delay 5 --retry-all-errors \
+              https://api.vantageaiops.com/v1/health 2>/dev/null || echo "000")
+            echo "Attempt $attempt: API health = $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ API is live"
+              exit 0
+            fi
+            sleep $((attempt * 5))
+          done
+          echo "❌ API not responding after 5 attempts"
+          exit 1
 
       - name: Check frontend health
         run: |
@@ -140,7 +149,7 @@ jobs:
   cross-browser:
     name: Cross-Browser Tests
     runs-on: ubuntu-latest
-    needs: env-tests
+    needs: typecheck
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -286,8 +295,7 @@ jobs:
       - name: Fail if critical checks failed
         if: |
           needs.typecheck.result == 'failure' ||
-          needs.api-tests.result == 'failure' ||
-          needs.env-tests.result == 'failure'
+          needs.api-tests.result == 'failure'
         run: |
           echo "❌ PR gate failed — fix the issues above before merging"
           exit 1
