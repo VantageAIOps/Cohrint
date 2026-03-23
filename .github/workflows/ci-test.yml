@@ -1,13 +1,14 @@
 name: VantageAI Test Suite
 
-# Runs the full test suite on both version branches and production (main).
+# Runs the full test suite as post-deploy validation on main.
 #
 # Triggers:
-#   - After CF Worker or Pages deploy on main    → full post-deploy validation
+#   - After CF Worker or Pages deploy on main    → post-deploy validation
 #   - After ci-version pipeline runs on v* branch → redundant safety net
-#   - On PRs from v* to main                     → fast pre-merge check
 #   - Nightly at 02:00 UTC on main               → regression monitoring
 #   - Manual dispatch                             → on-demand
+#
+# NOTE: PRs to main are validated by ci-pr-gate.yml (separate workflow)
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -22,14 +23,7 @@ on:
     types:
       - completed
 
-  # Fast check on PRs from version → main
-  pull_request:
-    branches:
-      - main
-    paths:
-      - "vantage-worker/**"
-      - "vantage-final-v4/**"
-      - "tests/**"
+  # PRs are now handled by ci-pr-gate.yml
 
   # Nightly regression on main
   schedule:

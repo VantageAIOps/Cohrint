@@ -109,7 +109,13 @@ def test_playwright_onboarding():
 
     with sync_playwright() as pw:
         from helpers.browser import make_browser_ctx, collect_console_errors, signin_ui
-        browser, ctx, page = make_browser_ctx(pw)
+        try:
+            browser, ctx, page = make_browser_ctx(pw)
+        except Exception as e:
+            if "Executable doesn't exist" in str(e):
+                warn("ON.8  Chromium not installed — skipping browser onboarding tests")
+                return
+            raise
         errors = collect_console_errors(page)
 
         try:

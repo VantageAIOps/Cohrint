@@ -1,0 +1,293 @@
+name: PR Gate
+
+# Runs on every PR to main. All required checks must pass before merge.
+#
+# Jobs:
+#   1. TypeScript Check          — compile check on worker code
+#   2. API Test Suites           — core API tests against live environment
+#   3. Environment & Health Tests — verify API + frontend are reachable
+#   4. Cross-Browser Tests       — Chrome, Firefox, Safari via Playwright
+#   5. Preview Deploy            — deploy frontend preview, post URL as PR comment
+#   6. PR Gate Summary           — fail if any critical job failed
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  actions: read
+
+jobs:
+  # ── 1. TypeScript type check ─────────────────────────────────────────────────
+  typecheck:
+    name: TypeScript Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: vantage-worker/package-lock.json
+
+      - name: Install dependencies
+        working-directory: vantage-worker
+        run: npm ci
+
+      - name: Run TypeScript check
+        working-directory: vantage-worker
+        run: npx tsc --noEmit
+
+  # ── 2. API + core test suites (no browser) ──────────────────────────────────
+  api-tests:
+    name: API Test Suites
+    runs-on: ubuntu-latest
+    needs: [typecheck, env-tests]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r tests/requirements.txt
+
+      - name: Run API + core suites (no browser)
+        env:
+          HEADLESS: "1"
+          VANTAGE_SITE_URL: "https://vantageaiops.com"
+          VANTAGE_API_URL: "https://api.vantageaiops.com"
+        run: |
+          python tests/run_suite.py --no-browser --clean 2>&1 | tee /tmp/api-test-output.txt
+          EXIT=${PIPESTATUS[0]}
+          exit $EXIT
+
+      - name: Generate failure summary
+        if: always()
+        run: |
+          echo "## API Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if grep -q "passed.*failed" /tmp/api-test-output.txt 2>/dev/null; then
+            grep -E "(passed|failed|skipped)" /tmp/api-test-output.txt | tail -5 | while read line; do
+              echo "$line" >> $GITHUB_STEP_SUMMARY
+            done
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          FAILURES=$(grep -E "^  ✗|^       └─" /tmp/api-test-output.txt 2>/dev/null || true)
+          if [ -n "$FAILURES" ]; then
+            echo "### Failures" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "$FAILURES" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ All tests passed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-api-tests-${{ github.run_number }}
+          path: |
+            /tmp/api-test-output.txt
+            tests/artifacts/
+            tests/test-results/
+
+  # ── 3. Environment & Health Tests ────────────────────────────────────────────
+  env-tests:
+    name: Environment & Health Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check API health
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            --retry 5 --retry-delay 5 --retry-all-errors \
+            https://api.vantageaiops.com/v1/health)
+          echo "API health: $STATUS"
+          [ "$STATUS" = "200" ] || { echo "❌ API not responding (got $STATUS)"; exit 1; }
+          echo "✅ API is live"
+
+      - name: Check frontend health
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            --retry 3 --retry-delay 5 \
+            https://vantageaiops.com/)
+          echo "Frontend: $STATUS"
+          [ "$STATUS" = "200" ] || { echo "❌ Frontend not responding (got $STATUS)"; exit 1; }
+          echo "✅ Frontend is live"
+
+      - name: Check auth endpoint
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            https://vantageaiops.com/auth)
+          echo "Auth page: $STATUS"
+          [ "$STATUS" = "200" ] || { echo "⚠️ Auth page returned $STATUS"; }
+
+  # ── 4. Cross-Browser Tests (desktop only for speed) ─────────────────────────
+  cross-browser:
+    name: Cross-Browser Tests
+    runs-on: ubuntu-latest
+    needs: env-tests
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r tests/requirements.txt
+
+      - name: Install browsers
+        run: python -m playwright install chromium firefox webkit --with-deps
+
+      - name: Run cross-browser desktop tests
+        env:
+          HEADLESS: "1"
+          VANTAGE_SITE_URL: "https://vantageaiops.com"
+          VANTAGE_API_URL: "https://api.vantageaiops.com"
+          CB_ALL_DEVICES: "0"
+        run: |
+          python tests/run_suite.py --category 15_cross_browser --clean 2>&1 | tee /tmp/cross-browser-output.txt
+          EXIT=${PIPESTATUS[0]}
+          exit $EXIT
+
+      - name: Generate failure summary
+        if: always()
+        run: |
+          echo "## Cross-Browser Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          FAILURES=$(grep -E "^  ✗|^       └─" /tmp/cross-browser-output.txt 2>/dev/null || true)
+          if [ -n "$FAILURES" ]; then
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "$FAILURES" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ All cross-browser tests passed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-cross-browser-${{ github.run_number }}
+          path: /tmp/cross-browser-output.txt
+
+  # ── 5. Preview Deploy ────────────────────────────────────────────────────────
+  preview-deploy:
+    name: Preview Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Deploy preview to Cloudflare Pages
+        id: deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          BRANCH="${{ github.head_ref }}"
+          # Deploy using the root wrangler.toml (has pages_build_output_dir)
+          # --config flag ensures we don't pick up vantage-worker/wrangler.toml
+          npx wrangler@latest pages deploy ./vantage-final-v4 \
+            --project-name=vantageai \
+            --branch="$BRANCH" \
+            --config=wrangler.toml \
+            --commit-dirty=true 2>&1 | tee /tmp/deploy-output.txt || true
+          # Extract preview URL from output
+          PREVIEW_URL=$(grep -oE 'https://[a-z0-9-]+\.vantageai\.pages\.dev' /tmp/deploy-output.txt | head -1 || true)
+          if [ -z "$PREVIEW_URL" ]; then
+            SLUG=$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | head -c 28)
+            PREVIEW_URL="https://${SLUG}.vantageai.pages.dev"
+          fi
+          echo "preview_url=$PREVIEW_URL" >> $GITHUB_OUTPUT
+          echo "Preview URL: $PREVIEW_URL"
+
+      - name: Post preview URL as PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const url = '${{ steps.deploy.outputs.preview_url }}';
+            const body = `### Preview Deployed\n\n` +
+              `**URL:** ${url}\n\n` +
+              `Verify the changes visually before merging.\n\n` +
+              `---\n_Deployed by PR Gate workflow_`;
+
+            // Check if we already commented (avoid spam on re-pushes)
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c =>
+              c.body?.includes('Preview Deployed') && c.user?.login === 'github-actions[bot]'
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+  # ── 6. PR Gate Summary (required check — blocks merge on failure) ───────────
+  pr-summary:
+    name: PR Gate Summary
+    runs-on: ubuntu-latest
+    needs: [typecheck, api-tests, env-tests, cross-browser, preview-deploy]
+    if: always()
+    steps:
+      - name: Write summary
+        run: |
+          echo "## PR Gate Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| TypeScript Check | ${{ needs.typecheck.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| API Test Suites | ${{ needs.api-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment & Health | ${{ needs.env-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Cross-Browser Tests | ${{ needs.cross-browser.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Preview Deploy | ${{ needs.preview-deploy.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**PR:** #${{ github.event.number }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`${{ github.head_ref }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.event.pull_request.head.sha }}\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Fail if critical checks failed
+        if: |
+          needs.typecheck.result == 'failure' ||
+          needs.api-tests.result == 'failure' ||
+          needs.env-tests.result == 'failure'
+        run: |
+          echo "❌ PR gate failed — fix the issues above before merging"
+          exit 1
