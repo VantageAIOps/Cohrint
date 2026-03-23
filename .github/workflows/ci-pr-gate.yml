@@ -208,17 +208,21 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           BRANCH="${{ github.head_ref }}"
-          OUTPUT=$(npx wrangler pages deploy ./vantage-final-v4 \
+          # Deploy using the root wrangler.toml (has pages_build_output_dir)
+          # --config flag ensures we don't pick up vantage-worker/wrangler.toml
+          npx wrangler@latest pages deploy ./vantage-final-v4 \
             --project-name=vantageai \
-            --branch="$BRANCH" 2>&1)
-          echo "$OUTPUT"
+            --branch="$BRANCH" \
+            --config=wrangler.toml \
+            --commit-dirty=true 2>&1 | tee /tmp/deploy-output.txt || true
           # Extract preview URL from output
-          PREVIEW_URL=$(echo "$OUTPUT" | grep -oP 'https://[a-z0-9-]+\.vantageai\.pages\.dev' | head -1 || true)
+          PREVIEW_URL=$(grep -oE 'https://[a-z0-9-]+\.vantageai\.pages\.dev' /tmp/deploy-output.txt | head -1 || true)
           if [ -z "$PREVIEW_URL" ]; then
             SLUG=$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | head -c 28)
             PREVIEW_URL="https://${SLUG}.vantageai.pages.dev"
           fi
           echo "preview_url=$PREVIEW_URL" >> $GITHUB_OUTPUT
+          echo "Preview URL: $PREVIEW_URL"
 
       - name: Post preview URL as PR comment
         uses: actions/github-script@v7
