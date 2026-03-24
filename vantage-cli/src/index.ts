@@ -582,17 +582,25 @@ function printHelp(): void {
 function printSessionHelp(): void {
   console.log("");
   console.log(bold("  Session Commands"));
-  console.log(dim("  " + "-".repeat(50)));
-  console.log(`  ${cyan("/opt-auto")}          Optimize prompts >=5 words (default)`);
-  console.log(`  ${cyan("/opt-off")}           Disable optimization`);
-  console.log(`  ${cyan("/opt-ask")}           Ask before optimizing`);
+  console.log(dim("  " + "-".repeat(55)));
+  console.log(bold("  Optimization:"));
+  console.log(`  ${cyan("/opt-auto")}          Optimize prompts ≥5 words (default)`);
+  console.log(`  ${cyan("/opt-off")}           Disable optimization entirely`);
+  console.log(`  ${cyan("/opt-ask")}           Ask before each optimization`);
   console.log(`  ${cyan("/opt-always")}        Optimize everything`);
-  console.log(`  ${cyan("/cost")}              Show session cost`);
-  console.log(`  ${cyan("/summary")}           Dashboard stats`);
+  console.log(bold("  Dashboard:"));
+  console.log(`  ${cyan("/cost")}              Show session cost & savings`);
+  console.log(`  ${cyan("/summary")}           Dashboard stats from API`);
+  console.log(`  ${cyan("/budget")}            Budget status & alerts`);
+  console.log(bold("  Session:"));
   console.log(`  ${cyan("/exit-session")}      Return to VantageAI REPL`);
+  console.log(`  ${cyan("/help")}              Show this help`);
   console.log("");
-  console.log(dim("  Agent commands (/compact, /clear, @file, !cmd) pass through directly."));
-  console.log(dim("  Short answers (y/n/numbers/paths) pass through without optimization."));
+  console.log(dim("  Agent commands pass through directly:"));
+  console.log(dim("    /compact, /clear, /diff, /mcp, @file, !shell, y, n, 1, 2, paths"));
+  console.log("");
+  console.log(dim("  The agent's stderr is inherited — file approval prompts,"));
+  console.log(dim("  git confirmations, and MCP dialogs show directly to you."));
   console.log("");
 }
 

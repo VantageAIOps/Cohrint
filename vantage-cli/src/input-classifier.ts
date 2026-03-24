@@ -26,7 +26,8 @@ export interface ProcessedInput {
 const AGENT_COMMANDS: Record<string, string[]> = {
   claude: ["/compact", "/clear", "/diff", "/help", "/status", "/review", "/simplify",
            "/theme", "/model", "/memory", "/hooks", "/permissions", "/doctor", "/login",
-           "/logout", "/config", "/cost", "/vim", "/terminal-setup", "/btw"],
+           "/logout", "/config", "/cost", "/vim", "/terminal-setup", "/btw", "/mcp",
+           "/install-github-app", "/listen"],
   gemini: ["/clear", "/compress", "/chat", "/help", "/stats", "/model", "/tools", "/memory",
            "/restore", "/search", "/mcp"],
   aider: ["/clear", "/help", "/add", "/drop", "/ls", "/diff", "/undo", "/commit",
@@ -40,6 +41,7 @@ const AGENT_COMMANDS: Record<string, string[]> = {
 const VANTAGE_COMMANDS = [
   "/exit-session", "/exit", "/cost", "/summary", "/stats", "/budget",
   "/help", "/quit", "/opt-on", "/opt-off", "/opt-ask", "/opt-auto",
+  "/opt-never", "/opt-always", "/agents", "/status",
 ];
 
 /** Short answer patterns — y/n, numbers, paths, single words */

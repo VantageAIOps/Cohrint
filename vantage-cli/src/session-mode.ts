@@ -45,9 +45,11 @@ export class AgentSession {
     this._ended = false;
 
     try {
+      // stdin: pipe (we write to it), stdout: pipe (we read from it),
+      // stderr: inherit (agent prompts like "Allow edit? (y/n)" show directly to user)
       this.child = spawn(cmd, interactiveArgs, {
-        stdio: ["pipe", "pipe", "pipe"],
-        env: { ...process.env },
+        stdio: ["pipe", "pipe", "inherit"],
+        env: { ...process.env, TERM: process.env.TERM || "xterm-256color" },
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -66,9 +68,8 @@ export class AgentSession {
       this.totalOutputTokens += Math.ceil(chunk.length / 4);
     });
 
-    this.child.stderr?.on("data", (chunk: Buffer) => {
-      process.stderr.write(chunk);
-    });
+    // stderr is inherited — agent prompts (file approval, etc.) show directly
+    // No need to listen for stderr data
 
     this.child.on("error", (err) => {
       if ((err as NodeJS.ErrnoException).code === "ENOENT") {
