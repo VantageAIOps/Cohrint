@@ -47,12 +47,52 @@ jobs:
             echo "    Add a PAT with repo scope to Settings > Secrets > BACKUP_REPO_TOKEN"
             exit 0
           fi
+
+          # Detect token type: fine-grained PATs start with "github_pat_"
+          # Classic PATs start with "ghp_"
+          TOKEN_PREFIX="${BACKUP_REPO_TOKEN:0:4}"
+          if [[ "$BACKUP_REPO_TOKEN" == github_pat_* ]]; then
+            AUTH_HEADER="Bearer ${BACKUP_REPO_TOKEN}"
+            echo "Token type: fine-grained PAT"
+          else
+            AUTH_HEADER="token ${BACKUP_REPO_TOKEN}"
+            echo "Token type: classic PAT"
+          fi
+
+          # Check token validity first
+          TOKEN_CHECK=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: ${AUTH_HEADER}" \
+            https://api.github.com/user)
+          echo "Token auth check: $TOKEN_CHECK"
+          if [ "$TOKEN_CHECK" != "200" ]; then
+            echo "❌ Token is invalid or expired (user endpoint returned $TOKEN_CHECK)"
+            echo "   Token prefix: ${TOKEN_PREFIX}..."
+            echo "   Fix: create a new PAT at https://github.com/settings/tokens"
+            echo "   Required scope: 'repo' (full) for classic PAT"
+            echo "   Or: 'Contents: Read and write' for fine-grained PAT with Vantage-AI repo access"
+            exit 1
+          fi
+
+          # Check backup repo access
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "Authorization: token ${BACKUP_REPO_TOKEN}" \
+            -H "Authorization: ${AUTH_HEADER}" \
             https://api.github.com/repos/Amanjain98/Vantage-AI)
           echo "Backup repo API status: $STATUS"
-          [ "$STATUS" = "200" ] && echo "✅ Backup repo reachable" || \
-            { echo "❌ Cannot reach backup repo (status $STATUS)"; exit 1; }
+
+          if [ "$STATUS" = "200" ]; then
+            echo "✅ Backup repo reachable"
+          elif [ "$STATUS" = "404" ]; then
+            echo "❌ Backup repo returned 404 — token can authenticate but cannot see Amanjain98/Vantage-AI"
+            echo "   This means the token is missing 'repo' scope (classic) or"
+            echo "   the fine-grained PAT doesn't include Amanjain98/Vantage-AI in its repository list."
+            echo "   Fix:"
+            echo "   - Classic PAT: ensure 'repo' scope is checked"
+            echo "   - Fine-grained PAT: add Vantage-AI to 'Repository access' and grant 'Contents: Read and write'"
+            exit 1
+          else
+            echo "❌ Unexpected status $STATUS"
+            exit 1
+          fi
 
       - name: Push mirror to backup repo
         env:
@@ -60,8 +100,10 @@ jobs:
         run: |
           if [ -z "$BACKUP_REPO_TOKEN" ]; then exit 0; fi
           cd repo-mirror
+          # x-access-token works for both classic and fine-grained PATs in git operations
           git remote set-url origin \
             https://x-access-token:${BACKUP_REPO_TOKEN}@github.com/Amanjain98/Vantage-AI.git
+          echo "Pushing mirror..."
           git push --mirror --force 2>&1 | tail -20
           echo "✅ Mirror push complete"
 
