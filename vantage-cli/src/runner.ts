@@ -11,6 +11,12 @@ export interface RunResult {
 const MAX_OUTPUT_BYTES = 5 * 1024 * 1024; // 5MB output cap
 const DEFAULT_TIMEOUT_MS = 300_000; // 5 minute timeout
 
+/** Env vars that could be used to inject code into child processes */
+const BLOCKED_ENV = ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'DYLD_INSERT_LIBRARIES', 'PYTHONPATH', 'NODE_OPTIONS'];
+const safeEnv = Object.fromEntries(
+  Object.entries(process.env).filter(([k]) => !BLOCKED_ENV.includes(k))
+);
+
 /**
  * Spawn the agent process, streaming stdout/stderr to the terminal in real time.
  * Accumulates stdout for token counting after exit.
@@ -30,7 +36,7 @@ export function runAgent(
     try {
       child = spawn(spawnArgs.command, spawnArgs.args, {
         stdio: ["ignore", "pipe", "pipe"],
-        env: { ...process.env, ...(spawnArgs.env ?? {}) },
+        env: { ...safeEnv, ...(spawnArgs.env ?? {}) },
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -121,7 +127,7 @@ export function runAgentBuffered(
     try {
       child = spawn(spawnArgs.command, spawnArgs.args, {
         stdio: ["ignore", "pipe", "pipe"],
-        env: { ...process.env, ...(spawnArgs.env ?? {}) },
+        env: { ...safeEnv, ...(spawnArgs.env ?? {}) },
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

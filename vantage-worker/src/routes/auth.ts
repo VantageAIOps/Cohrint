@@ -25,6 +25,15 @@ function randomHex(bytes = 8): string {
 
 // ── POST /v1/auth/signup — public, creates org + owner key ───────────────────
 auth.post('/signup', async (c) => {
+  // Rate limit signup: 10 per IP per hour
+  const ip = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For') ?? 'unknown';
+  const rlKey = `rl:signup:${ip}`;
+  const count = parseInt(await c.env.KV.get(rlKey) ?? '0', 10);
+  if (count >= 10) {
+    return c.json({ error: 'Too many signup attempts. Try again later.' }, 429);
+  }
+  await c.env.KV.put(rlKey, String(count + 1), { expirationTtl: 3600 });
+
   let body: { email?: string; name?: string; org?: string };
   try { body = await c.req.json(); }
   catch { return c.json({ error: 'Invalid JSON body' }, 400); }
@@ -72,6 +81,15 @@ auth.post('/signup', async (c) => {
 
 // ── POST /v1/auth/recover — public, sends recovery email ─────────────────────
 auth.post('/recover', async (c) => {
+  // Rate limit recovery: 5 per IP per hour
+  const ip = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For') ?? 'unknown';
+  const rlKey = `rl:recover:${ip}`;
+  const count = parseInt(await c.env.KV.get(rlKey) ?? '0', 10);
+  if (count >= 5) {
+    return c.json({ error: 'Too many recovery attempts. Try again later.' }, 429);
+  }
+  await c.env.KV.put(rlKey, String(count + 1), { expirationTtl: 3600 });
+
   let body: { email?: string };
   try { body = await c.req.json(); }
   catch { return c.json({ error: 'Invalid JSON body' }, 400); }
@@ -82,12 +100,14 @@ auth.post('/recover', async (c) => {
   // Always return 200 — don't leak whether email exists
   // Wrap entire lookup+send in try/catch so a D1 schema/connectivity issue
   // never turns into a 500 (recovery endpoint must be resilient).
+  let resolvedOrgId = 'unknown';
   try {
     const org = await c.env.DB.prepare(
       'SELECT id, name, api_key_hint FROM orgs WHERE email = ?'
     ).bind(email).first<{ id: string; name: string; api_key_hint: string }>();
 
     if (org) {
+      resolvedOrgId = org.id;
       // Generate a one-time recovery token (1-hour TTL) so user can get a new key directly
       const token   = randomHex(24);
       const kvKey   = `recover:${token}`;
@@ -114,6 +134,7 @@ auth.post('/recover', async (c) => {
       ).bind(email).first<{ id: string; org_id: string; api_key_hint: string; org_name: string }>();
 
       if (member) {
+        resolvedOrgId = member.org_id;
         const { subject, html } = keyRecoveryEmail({
           orgId:   member.org_id,
           orgName: member.org_name || member.org_id,
@@ -123,6 +144,10 @@ auth.post('/recover', async (c) => {
         await sendEmail(c.env.RESEND_API_KEY, { to: email, subject, html });
       }
     }
+    // Audit log: recovery attempted
+    c.executionCtx.waitUntil(
+      logAudit(c.env.DB, resolvedOrgId, 'account.recovery_attempted', email, '', '')
+    );
   } catch (err) {
     console.error('[recover] D1/email error — returning 200 to avoid leaking info', err);
     // Still return 200 — don't expose internal errors to caller
@@ -173,6 +198,10 @@ auth.post('/recover/redeem', async (c) => {
   let payload: { orgId: string; type: string };
   try { payload = JSON.parse(raw); }
   catch { return c.json({ error: 'invalid' }, 400); }
+
+  if (!payload.orgId || typeof payload.orgId !== 'string' || !payload.type || payload.type !== 'owner') {
+    return c.json({ error: 'invalid' }, 400);
+  }
 
   // Consume the token immediately (single-use)
   await c.env.KV.delete(`recover:${token}`);
