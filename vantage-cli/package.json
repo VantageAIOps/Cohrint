@@ -1,17 +1,33 @@
 {
   "name": "vantageai-cli",
-  "version": "1.0.0",
-  "description": "Transparent AI agent wrapper — optimize prompts, stream output, track costs",
+  "version": "2.1.0",
+  "description": "Transparent AI agent wrapper — optimize prompts, stream output, track costs across Claude Code, Codex, Gemini, Aider",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
     "vantage": "./dist/index.js"
   },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "ai", "llm", "claude", "codex", "gemini", "aider", "cli",
+    "prompt-optimizer", "cost-tracking", "token-savings",
+    "vantage", "vantageai", "opentelemetry"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Amanjain98/VantageAI.git",
+    "directory": "vantage-cli"
+  },
+  "homepage": "https://vantageaiops.com",
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --clean",
     "dev": "tsx src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
   },
   "devDependencies": {
     "tsup": "^8.0.0",
