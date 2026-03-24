@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
 import { authMiddleware, adminOnly, sha256hex } from '../middleware/auth';
 import { sendEmail, memberInviteEmail, keyRecoveryEmail } from '../lib/email';
+import { logAudit } from './admin.js';
 
 const auth = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -239,6 +240,13 @@ auth.post('/members', authMiddleware, adminOnly, async (c) => {
     sendEmail(c.env.RESEND_API_KEY, { to: email, subject, html })
   );
 
+  // Audit log: member invited
+  const inviterEmail = '';
+  const inviterRole = c.get('role') ?? '';
+  c.executionCtx.waitUntil(
+    logAudit(c.env.DB, orgId, 'member.invited', inviterEmail, inviterRole, email)
+  );
+
   return c.json({
     ok:         true,
     member_id:  memberId,
@@ -297,6 +305,14 @@ auth.delete('/members/:id', authMiddleware, adminOnly, async (c) => {
   await c.env.DB.prepare(
     'DELETE FROM org_members WHERE id = ? AND org_id = ?'
   ).bind(memberId, orgId).run();
+
+  // Audit log: member revoked
+  const deleterEmail = '';
+  const deleterRole = c.get('role') ?? '';
+  c.executionCtx.waitUntil(
+    logAudit(c.env.DB, orgId, 'member.revoked', deleterEmail, deleterRole, memberId)
+  );
+
   return c.json({ ok: true });
 });
 
@@ -332,6 +348,13 @@ auth.post('/members/:id/rotate', authMiddleware, adminOnly, async (c) => {
   });
   c.executionCtx.waitUntil(
     sendEmail(c.env.RESEND_API_KEY, { to: member.email, subject: `[VantageAI] Your API key has been rotated`, html: rotateHtml })
+  );
+
+  // Audit log: member key rotated
+  const rotatorEmail = '';
+  const rotatorRole = c.get('role') ?? '';
+  c.executionCtx.waitUntil(
+    logAudit(c.env.DB, orgId, 'key.rotated', rotatorEmail, rotatorRole, memberId)
   );
 
   return c.json({
@@ -518,6 +541,12 @@ auth.post('/rotate', authMiddleware, async (c) => {
   await c.env.DB.prepare(
     'UPDATE orgs SET api_key_hash = ?, api_key_hint = ? WHERE id = ?'
   ).bind(keyHash, keyHint, orgId).run();
+
+  // Audit log: owner key rotated
+  const ownerEmail = '';
+  c.executionCtx.waitUntil(
+    logAudit(c.env.DB, orgId, 'owner.key.rotated', ownerEmail, role)
+  );
 
   return c.json({
     ok:      true,

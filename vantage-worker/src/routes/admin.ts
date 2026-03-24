@@ -2,6 +2,26 @@ import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
 import { authMiddleware, adminOnly } from '../middleware/auth';
 
+export async function logAudit(
+  db: D1Database,
+  orgId: string,
+  action: string,
+  actorEmail: string,
+  actorRole: string,
+  resource: string = '',
+  detail: string = '',
+  ipAddress: string = '',
+) {
+  try {
+    await db.prepare(`
+      INSERT INTO audit_events (org_id, actor_email, actor_role, action, resource, detail, ip_address)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(orgId, actorEmail, actorRole, action, resource, detail, ipAddress).run();
+  } catch {
+    // Audit logging should never block the main operation
+  }
+}
+
 const admin = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 admin.use('*', authMiddleware, adminOnly);
@@ -85,6 +105,70 @@ admin.get('/overview', async (c) => {
     teams,
     members,
     period_days: period,
+  });
+});
+
+// ── GET /v1/admin/audit — fetch audit log ─────────────────────────────────
+admin.get('/audit', async (c) => {
+  const orgId = c.get('orgId');
+  const role = c.get('role');
+  if (role !== 'owner' && role !== 'admin') {
+    return c.json({ error: 'Audit log requires owner or admin role' }, 403);
+  }
+
+  const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10), 200);
+  const { results } = await c.env.DB.prepare(`
+    SELECT action, actor_email, actor_role, resource, detail, ip_address, created_at
+    FROM audit_events
+    WHERE org_id = ?
+    ORDER BY created_at DESC
+    LIMIT ?
+  `).bind(orgId, limit).all();
+
+  return c.json({ events: results });
+});
+
+// ── GET /v1/admin/security — security overview stats ──────────────────────
+admin.get('/security', async (c) => {
+  const orgId = c.get('orgId');
+  const role = c.get('role');
+  if (role !== 'owner' && role !== 'admin') {
+    return c.json({ error: 'Security view requires owner or admin role' }, 403);
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const dayAgo = now - 86400;
+
+  // Count audit events today
+  const auditToday = await c.env.DB.prepare(`
+    SELECT COUNT(*) as count FROM audit_events WHERE org_id = ? AND created_at >= ?
+  `).bind(orgId, dayAgo).first() as { count: number } | null;
+
+  // Count active members
+  const memberCount = await c.env.DB.prepare(`
+    SELECT COUNT(*) as count FROM org_members WHERE org_id = ?
+  `).bind(orgId).first() as { count: number } | null;
+
+  // Get org plan
+  const org = await c.env.DB.prepare(`
+    SELECT plan, budget_usd FROM orgs WHERE id = ?
+  `).bind(orgId).first() as { plan: string; budget_usd: number } | null;
+
+  const plan = org?.plan || 'free';
+  const retentionDays = plan === 'enterprise' ? 'unlimited' : plan === 'team' ? 90 : 7;
+
+  return c.json({
+    audit_events_today: auditToday?.count ?? 0,
+    active_members: (memberCount?.count ?? 0) + 1, // +1 for owner
+    plan,
+    retention_days: retentionDays,
+    security_features: {
+      api_key_hashing: 'SHA-256',
+      session_security: 'HTTP-only, SameSite=Lax, Secure',
+      data_encryption: 'AES-256 at rest (Cloudflare D1)',
+      access_control: 'RBAC (owner/admin/member/viewer)',
+      rate_limiting: true,
+    }
   });
 });
 

@@ -1004,9 +1004,9 @@ button{font-family:var(--sans);cursor:pointer}
       <div class="view-sub muted">API key management, audit logs, RBAC, data retention and compliance controls</div>
 
       <div class="g3">
-        <div class="kpi"><div class="kpi-lbl">Active API keys</div><div class="kpi-val">7</div><div class="kpi-ch flat">3 teams</div></div>
-        <div class="kpi"><div class="kpi-lbl">Audit events today</div><div class="kpi-val">284</div><div class="kpi-ch flat">All normal</div></div>
-        <div class="kpi"><div class="kpi-lbl">Compliance</div><div class="kpi-val" style="color:var(--ac)">100%</div><div class="kpi-ch dn">SOC2 compliant</div></div>
+        <div class="kpi"><div class="kpi-lbl">Active API keys</div><div class="kpi-val" id="sec-keys">--</div><div class="kpi-ch flat" id="sec-keys-sub"></div></div>
+        <div class="kpi"><div class="kpi-lbl">Audit events today</div><div class="kpi-val" id="sec-audit">--</div><div class="kpi-ch flat" id="sec-audit-sub"></div></div>
+        <div class="kpi"><div class="kpi-lbl">Plan</div><div class="kpi-val" id="sec-plan" style="color:var(--ac)">--</div><div class="kpi-ch flat" id="sec-plan-sub"></div></div>
       </div>
 
       <div class="g2">
@@ -2687,12 +2687,30 @@ function exportChargebackCSV() {
    MODULE 8 — SECURITY & GOVERNANCE
 ═══════════════════════════════════════════════════════════════════════════ */
 window.init_security=async function(){
-  // Security view — show real data from API, no fake audit logs or keys
+  let secData = null;
+  let auditEvents = [];
+
+  // Fetch real security data and audit log in parallel
   try {
-    const overview = await apiFetch('/v1/admin/overview');
+    const [secRes, auditRes, overview] = await Promise.all([
+      apiFetch('/v1/admin/security').catch(() => null),
+      apiFetch('/v1/admin/audit').catch(() => null),
+      apiFetch('/v1/admin/overview').catch(() => null),
+    ]);
+    secData = secRes;
+    auditEvents = auditRes?.events || [];
     const members = overview?.members || [];
-    
-    // API Keys — show actual member key hints (no fake keys)
+
+    // ── KPI cards — real data ──
+    document.getElementById("sec-keys").textContent = secData?.active_members ?? '--';
+    document.getElementById("sec-keys-sub").textContent = members.length > 0 ? `${members.length} members` : 'Owner only';
+    document.getElementById("sec-audit").textContent = secData?.audit_events_today ?? 0;
+    document.getElementById("sec-audit-sub").textContent = auditEvents.length > 0 ? 'View below' : 'No events';
+    const plan = secData?.plan || _session?.org?.plan || 'free';
+    document.getElementById("sec-plan").textContent = plan.charAt(0).toUpperCase() + plan.slice(1);
+    document.getElementById("sec-plan-sub").textContent = `Retention: ${secData?.retention_days ?? 7}d`;
+
+    // ── API Keys — show actual member key hints ──
     document.getElementById("keys-body").innerHTML = members.length > 0
       ? members.map(m => `<tr>
           <td class="mono" style="font-size:11px">${m.api_key_hint || '\u2014'}</td>
@@ -2704,7 +2722,7 @@ window.init_security=async function(){
         </tr>`).join("")
       : `<tr><td colspan="7" style="color:var(--mu);text-align:center;padding:20px">No member keys. Owner key is managed in Account settings.</td></tr>`;
 
-    // RBAC — show real members with roles
+    // ── RBAC — show real members with roles ──
     document.getElementById("rbac-body").innerHTML = members.length > 0
       ? members.map(m => `<tr>
           <td class="mono" style="font-size:11px">${m.email || '\u2014'}</td>
@@ -2719,11 +2737,25 @@ window.init_security=async function(){
     document.getElementById("rbac-body").innerHTML = `<tr><td colspan="5" style="color:var(--mu);text-align:center;padding:20px">Admin access required to view roles.</td></tr>`;
   }
 
-  // Audit log — empty state (real audit log requires server-side implementation)
-  document.getElementById("audit-body").innerHTML = `<tr><td colspan="6" style="color:var(--mu);text-align:center;padding:20px">Audit logging coming soon. Activity will be tracked automatically.</td></tr>`;
+  // ── Audit log — real events from /v1/admin/audit ──
+  if (auditEvents.length > 0) {
+    document.getElementById("audit-body").innerHTML = auditEvents.map(e => {
+      const time = new Date(e.created_at * 1000).toLocaleString();
+      return `<tr>
+        <td class="mono muted small">${time}</td>
+        <td>${e.action}</td>
+        <td>${e.actor_email || '\u2014'}</td>
+        <td>${e.actor_role || '\u2014'}</td>
+        <td class="muted small">${e.resource || '\u2014'}</td>
+        <td class="muted small">${e.detail || '\u2014'}</td>
+      </tr>`;
+    }).join("");
+  } else {
+    document.getElementById("audit-body").innerHTML = `<tr><td colspan="6" style="color:var(--mu);text-align:center;padding:20px">No audit events yet. Actions like member invites, key rotations, and role changes are logged here automatically.</td></tr>`;
+  }
 
-  // Retention settings — based on actual plan
-  const plan = _session?.plan || _session?.org?.plan || 'free';
+  // ── Retention settings — based on actual plan from API ──
+  const plan = secData?.plan || _session?.plan || _session?.org?.plan || 'free';
   document.getElementById("retention-settings").innerHTML = [
     {tier:"Free",retention:"7 days",detail:"Request logs and events", active: plan==='free'},
     {tier:"Team",retention:"90 days",detail:"All data including traces", active: plan==='team'},
@@ -2737,12 +2769,13 @@ window.init_security=async function(){
       <div class="small muted">${r.detail}</div>
     </div>`).join("");
 
-  // Compliance — static info (not fake, this is actual product status)
+  // ── Compliance — real security features from API or static product truth ──
+  const features = secData?.security_features || {};
   document.getElementById("compliance-status").innerHTML = [
-    {name:"Data Encryption",status:"AES-256 at rest, TLS in transit",icon:"\u{1F512}",color:"var(--ac)"},
-    {name:"Data Residency",status:"Cloudflare global edge",icon:"\u{1F30D}",color:"var(--ac)"},
-    {name:"Access Control",status:"Role-based (RBAC)",icon:"\u{1F511}",color:"var(--ac)"},
-    {name:"API Security",status:"SHA-256 hashed keys",icon:"\u{1F6E1}",color:"var(--ac)"},
+    {name:"Data Encryption",status:features.data_encryption || "AES-256 at rest (Cloudflare D1)",icon:"\u{1F512}",color:"var(--ac)"},
+    {name:"Session Security",status:features.session_security || "HTTP-only, SameSite=Lax, Secure",icon:"\u{1F30D}",color:"var(--ac)"},
+    {name:"Access Control",status:features.access_control || "RBAC (owner/admin/member/viewer)",icon:"\u{1F511}",color:"var(--ac)"},
+    {name:"API Security",status:features.api_key_hashing ? `${features.api_key_hashing} hashed keys` : "SHA-256 hashed keys",icon:"\u{1F6E1}",color:"var(--ac)"},
   ].map(r => `
     <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--b1)">
       <span>${r.icon}</span>
