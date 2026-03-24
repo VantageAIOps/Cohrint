@@ -433,6 +433,9 @@ footer a:hover{color:var(--text)}
     <span style="color:var(--dim)">·</span>
     <span>$</span> npm install vantageaiops
     <button class="copy-btn" onclick="copyInstall('npm install vantageaiops', this)">copy</button>
+    <span style="color:var(--dim)">·</span>
+    <span>$</span> npx vantageai-cli
+    <button class="copy-btn" onclick="copyInstall('npx vantageai-cli', this)">copy</button>
   </div>
 </div>
 
@@ -443,10 +446,10 @@ footer a:hover{color:var(--text)}
 
 <!-- STATS -->
 <div class="stats-strip">
-  <div class="stat-item reveal"><div class="stat-num">34<span>%</span></div><div class="stat-lbl">avg token waste in prompts — our optimizer cuts it automatically</div></div>
-  <div class="stat-item reveal"><div class="stat-num">24</div><div class="stat-lbl">LLM models compared in real-time to find the cheapest for your task</div></div>
-  <div class="stat-item reveal"><div class="stat-num">6</div><div class="stat-lbl">quality dimensions tracked per call — hallucination, faithfulness, toxicity &amp; more</div></div>
-  <div class="stat-item reveal"><div class="stat-num"><span>$</span>0</div><div class="stat-lbl">to get started — full optimizer + analytics, no credit card</div></div>
+  <div class="stat-item reveal"><div class="stat-num">13<span>+</span></div><div class="stat-lbl">AI coding tools tracked via OTel — Claude Code, Copilot, Gemini CLI, Cursor, Codex &amp; more</div></div>
+  <div class="stat-item reveal"><div class="stat-num">40<span>%</span></div><div class="stat-lbl">avg token savings from our 5-layer prompt optimizer — filler removal, verbose rewrites, dedup</div></div>
+  <div class="stat-item reveal"><div class="stat-num">22</div><div class="stat-lbl">LLM models with live pricing — auto cost estimation even when your tool doesn't report costs</div></div>
+  <div class="stat-item reveal"><div class="stat-num"><span>$</span>0</div><div class="stat-lbl">to get started — optimizer, CLI wrapper, dashboard analytics — no credit card</div></div>
 </div>
 
 <!-- HOW IT WORKS -->
@@ -490,6 +493,10 @@ footer a:hover{color:var(--text)}
     <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(0,152,255,.1)">📈</div><div class="feat-title">Exec ROI dashboard</div><div class="feat-desc">Translate token costs into business outcomes — cost per resolved ticket, per summary, per customer interaction. Built for CTOs and CFOs who want signal, not noise.</div><div class="feat-tag">→ business metrics, not raw tokens</div></div>
     <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(248,113,113,.1)">🚨</div><div class="feat-title">Anomaly detection</div><div class="feat-desc">Automatic Z-score analysis runs every 10 minutes on your spend data. Detects cost spikes, traffic surges, latency degradation and runaway agents — alerts via Slack or email before damage is done.</div><div class="feat-tag">→ cron-based · Z-score · Slack alerts</div></div>
     <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(245,158,11,.1)">🛡️</div><div class="feat-title">Security & data governance</div><div class="feat-desc">API keys hashed with SHA-256, role-based access control (owner/admin/member/viewer), team-scoped data isolation, and AES-256 encryption at rest on Cloudflare's global edge.</div><div class="feat-tag">→ RBAC · encryption · data isolation</div></div>
+    <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(0,212,161,.1)">🌐</div><div class="feat-title">Cross-platform OTel collector</div><div class="feat-desc">Auto-track spend across 13+ AI coding tools via OpenTelemetry. Claude Code, GitHub Copilot, Gemini CLI, Codex, Cursor, Cline, Aider, Roo Code — all in one dashboard. Zero code changes.</div><div class="feat-tag">→ OTel telemetry · auto cost estimation · per-developer ROI</div></div>
+    <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(167,139,250,.1)">⌨️</div><div class="feat-title">VantageAI CLI</div><div class="feat-desc">Transparent terminal wrapper for any AI CLI. Optimizes prompts before sending (40% savings), streams output in real-time, tracks costs. Switch between Claude, Gemini, Codex with /slash commands.</div><div class="feat-tag">→ zero latency · /session mode · /compare agents</div></div>
+    <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(0,152,255,.1)">🔒</div><div class="feat-title">Local proxy — zero trust</div><div class="feat-desc">Run the VantageAI proxy on your machine. Your API keys and prompts never leave your environment — only anonymized stats (token counts, costs, latency) are sent to the dashboard.</div><div class="feat-tag">→ strict · standard · relaxed privacy modes</div></div>
+    <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(245,158,11,.1)">👥</div><div class="feat-title">Developer productivity ROI</div><div class="feat-desc">Track cost per PR, cost per commit, and lines of code per dollar for every developer. Correlate AI spend with actual code output. Enterprise chargeback reporting built in.</div><div class="feat-tag">→ cost/PR · cost/commit · lines/$ · team budgets</div></div>
   </div>
 </section>
 
@@ -506,6 +513,11 @@ footer a:hover{color:var(--text)}
     <div class="int-card reveal"><div class="int-logo">🟨</div><div class="int-name">TypeScript / JS</div><div class="int-how">createOpenAIProxy() wraps any existing client with zero changes</div><span class="int-badge badge-sdk">SDK</span></div>
     <div class="int-card reveal"><div class="int-logo">◆</div><div class="int-name">Zed</div><div class="int-how">Context server config — one JSON block in settings</div><span class="int-badge badge-mcp">MCP SERVER</span></div>
     <div class="int-card reveal"><div class="int-logo">⬛</div><div class="int-name">JetBrains</div><div class="int-how">AI Assistant MCP plugin — IntelliJ, PyCharm, WebStorm</div><span class="int-badge badge-mcp">MCP SERVER</span></div>
+    <div class="int-card reveal"><div class="int-logo">⌨️</div><div class="int-name">VantageAI CLI</div><div class="int-how">Transparent wrapper — optimize, forward, track. Works with any AI CLI agent.</div><span class="int-badge badge-cli" style="background:rgba(0,212,161,.1);color:#00d4a1">CLI TOOL</span></div>
+    <div class="int-card reveal"><div class="int-logo">📡</div><div class="int-name">OTel Collector</div><div class="int-how">Native OpenTelemetry ingestion — auto-track 13+ AI coding tools</div><span class="int-badge badge-otel" style="background:rgba(167,139,250,.1);color:#a78bfa">OTEL</span></div>
+    <div class="int-card reveal"><div class="int-logo">🔒</div><div class="int-name">Local Proxy</div><div class="int-how">Privacy-first HTTP proxy — your keys and prompts never leave your machine</div><span class="int-badge badge-proxy" style="background:rgba(245,158,11,.1);color:#f59e0b">PROXY</span></div>
+    <div class="int-card reveal"><div class="int-logo">🤖</div><div class="int-name">Aider</div><div class="int-how">Track aider costs via CLI wrapper or OTel telemetry</div><span class="int-badge badge-cli" style="background:rgba(0,212,161,.1);color:#00d4a1">CLI</span></div>
+    <div class="int-card reveal"><div class="int-logo">📟</div><div class="int-name">Codex CLI</div><div class="int-how">Track OpenAI Codex usage via OTel or CLI wrapper</div><span class="int-badge badge-otel" style="background:rgba(167,139,250,.1);color:#a78bfa">OTEL</span></div>
   </div>
 </section>
 
@@ -518,6 +530,7 @@ footer a:hover{color:var(--text)}
       <div class="code-tab active" onclick="switchTab('python',this)">Python</div>
       <div class="code-tab" onclick="switchTab('typescript',this)">TypeScript</div>
       <div class="code-tab" onclick="switchTab('mcp',this)">MCP (Cursor)</div>
+      <div class="code-tab" onclick="switchTab('cli',this)">CLI Wrapper</div>
     </div>
     <div class="code-block">
       <div class="code-snippet active" id="tab-python"><pre><span class="c-comment"># Before</span>
@@ -571,6 +584,24 @@ response = client.chat.completions.<span class="c-func">create</span>(
 <span class="c-comment">// "How much did I spend on AI this week?"</span>
 <span class="c-comment">// "Which model is cheapest for my summarisation workflow?"</span>
 <span class="c-comment">// "Show requests wasting the most tokens"</span></pre></div>
+      <div class="code-snippet" id="tab-cli"><pre><span class="c-comment"># Install globally</span>
+<span class="c-keyword">$</span> npx vantageai-cli
+
+<span class="c-comment"># Pipe mode — optimize + forward to Claude</span>
+<span class="c-keyword">$</span> echo <span class="c-string">"Could you please explain kubernetes pods"</span> | vantage
+<span class="c-comment">  ⚡ Optimized: 16 → 12 tokens (saved 4, -25%)</span>
+
+<span class="c-comment">  A Kubernetes pod is the smallest deployable unit...</span>
+
+<span class="c-comment">  💰 Cost: $0.0065 | 💾 Saved: 4 tokens</span>
+
+<span class="c-comment"># REPL mode — switch agents on the fly</span>
+<span class="c-keyword">$</span> vantage
+<span class="c-var">vantage</span> [claude] ▸ explain load balancers
+<span class="c-var">vantage</span> [claude] ▸ <span class="c-keyword">/gemini</span> summarize this in 2 lines
+<span class="c-var">vantage</span> [claude] ▸ <span class="c-keyword">/compare</span> what is DNS
+<span class="c-var">vantage</span> [claude] ▸ <span class="c-keyword">/session</span>  <span class="c-comment"># interactive mode with /compact, /clear</span>
+<span class="c-var">vantage</span> [claude] ▸ <span class="c-keyword">/summary</span> <span class="c-comment"># dashboard stats in terminal</span></pre></div>
     </div>
   </div>
 </section>
@@ -578,41 +609,149 @@ response = client.chat.completions.<span class="c-func">create</span>(
 <!-- DEMO -->
 <section id="demo" style="padding-top:0">
   <div class="sec-label">// live demo</div>
-  <div class="sec-title">See it in action — <em>sample data</em></div>
+  <div class="sec-title">See it in action — <em>interactive preview</em></div>
   <div class="demo-wrap">
     <div class="demo-bar">
       <div class="demo-dot" style="background:#f87171"></div>
       <div class="demo-dot" style="background:#fbbf24"></div>
       <div class="demo-dot" style="background:#34d399"></div>
       <div class="demo-url">vantageaiops.com / app.html</div>
-      <div class="demo-tag">LIVE DEMO</div>
+      <div class="demo-tag">INTERACTIVE</div>
     </div>
     <div class="demo-body">
       <div class="demo-sidebar">
-        <div class="d-nav active">◈ Overview</div>
-        <div class="d-nav">◎ Usage</div>
-        <div class="d-nav">⟁ Pricing</div>
-        <div class="d-nav">⊡ Efficiency</div>
-        <div class="d-nav">◷ Alerts <span style="margin-left:auto;background:rgba(248,113,113,.15);color:var(--red);font-family:var(--mono);font-size:9px;padding:1px 7px;border-radius:10px">3</span></div>
-        <div class="d-nav">⊞ Teams</div>
+        <div class="d-nav active" onclick="demoTab('overview',this)">◈ All AI Spend</div>
+        <div class="d-nav" onclick="demoTab('cli',this)">⌨ CLI Wrapper</div>
+        <div class="d-nav" onclick="demoTab('optimizer',this)">🔧 Optimizer</div>
+        <div class="d-nav" onclick="demoTab('otel',this)">📡 OTel Collector</div>
+        <div class="d-nav" onclick="demoTab('compare',this)">⚖ Compare</div>
       </div>
       <div class="demo-main">
-        <div class="kpi-row">
-          <div class="kpi"><div class="kpi-lbl">MTD Spend</div><div class="kpi-val" id="kpi-spend">$4,821</div><div class="kpi-ch up">↑ 12%</div></div>
-          <div class="kpi"><div class="kpi-lbl">Tokens Used</div><div class="kpi-val">182M</div><div class="kpi-ch down">↓ eff +8%</div></div>
-          <div class="kpi"><div class="kpi-lbl">Efficiency</div><div class="kpi-val" style="color:var(--accent)">74/100</div><div class="kpi-ch down">↑ 6pts</div></div>
-          <div class="kpi" style="border-color:rgba(245,158,11,.25)"><div class="kpi-lbl">Potential Save</div><div class="kpi-val" style="color:var(--amber)">$1,240</div><div class="kpi-ch" style="color:var(--muted)">2 workflows</div></div>
+        <!-- Overview tab -->
+        <div class="demo-panel active" id="dp-overview">
+          <div class="kpi-row">
+            <div class="kpi"><div class="kpi-lbl">MTD Spend</div><div class="kpi-val" id="kpi-spend">$4,821</div><div class="kpi-ch up">↑ 12%</div></div>
+            <div class="kpi"><div class="kpi-lbl">Tokens Used</div><div class="kpi-val">182M</div><div class="kpi-ch down">↓ eff +8%</div></div>
+            <div class="kpi"><div class="kpi-lbl">Developers</div><div class="kpi-val" style="color:var(--accent)">14</div><div class="kpi-ch">5 providers</div></div>
+            <div class="kpi" style="border-color:rgba(245,158,11,.25)"><div class="kpi-lbl">Budget Used</div><div class="kpi-val" style="color:var(--amber)">64%</div><div class="kpi-ch" style="color:var(--muted)">$3,086 left</div></div>
+          </div>
+          <div class="chart-area">
+            <div class="chart-lbl">Daily spend by provider — last 30 days</div>
+            <div class="bars" id="demo-bars"></div>
+          </div>
+          <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap">
+            <div style="flex:1;min-width:140px;background:rgba(0,212,161,.06);border:1px solid rgba(0,212,161,.15);border-radius:8px;padding:10px 12px">
+              <div style="font-size:10px;color:var(--muted);font-family:var(--mono)">CLAUDE CODE</div>
+              <div style="font-size:16px;font-weight:600;color:var(--accent)">$2,140</div>
+              <div style="font-size:10px;color:var(--muted)">8 developers</div>
+            </div>
+            <div style="flex:1;min-width:140px;background:rgba(0,152,255,.06);border:1px solid rgba(0,152,255,.15);border-radius:8px;padding:10px 12px">
+              <div style="font-size:10px;color:var(--muted);font-family:var(--mono)">COPILOT</div>
+              <div style="font-size:16px;font-weight:600;color:#0098ff">$1,430</div>
+              <div style="font-size:10px;color:var(--muted)">12 developers</div>
+            </div>
+            <div style="flex:1;min-width:140px;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.15);border-radius:8px;padding:10px 12px">
+              <div style="font-size:10px;color:var(--muted);font-family:var(--mono)">GEMINI CLI</div>
+              <div style="font-size:16px;font-weight:600;color:#a78bfa">$820</div>
+              <div style="font-size:10px;color:var(--muted)">6 developers</div>
+            </div>
+            <div style="flex:1;min-width:140px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.15);border-radius:8px;padding:10px 12px">
+              <div style="font-size:10px;color:var(--muted);font-family:var(--mono)">CURSOR + API</div>
+              <div style="font-size:16px;font-weight:600;color:#f87171">$431</div>
+              <div style="font-size:10px;color:var(--muted)">4 developers</div>
+            </div>
+          </div>
         </div>
-        <div class="chart-area">
-          <div class="chart-lbl">Daily token spend — last 30 days</div>
-          <div class="bars" id="demo-bars"></div>
+        <!-- CLI tab -->
+        <div class="demo-panel" id="dp-cli" style="display:none">
+          <div style="background:#0d1117;border-radius:8px;padding:16px;font-family:var(--mono);font-size:12px;line-height:1.8;color:#e6edf3">
+            <div style="color:#7d8590">$ echo "Could you please explain kubernetes" | vantage</div>
+            <div style="color:#3fb950">  ⚡ Optimized: 8 → 6 tokens (saved 2, -25%)</div>
+            <div style="margin:8px 0;color:#e6edf3">A Kubernetes pod is the smallest deployable unit...</div>
+            <div style="color:#7d8590;border-top:1px solid #21262d;margin-top:8px;padding-top:8px">
+              +----- Cost & Optimization -----+<br>
+              Model:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; claude-sonnet-4-6<br>
+              Input tokens:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 6<br>
+              Output tokens:&nbsp;&nbsp;&nbsp;&nbsp; 42<br>
+              Cost:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span style="color:#3fb950">$0.000648</span><br>
+              Tokens saved:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span style="color:#3fb950">2 tokens</span><br>
+              +-------------------------------+
+            </div>
+            <div style="margin-top:12px;color:#7d8590">$ vantage</div>
+            <div><span style="color:#58a6ff">vantage</span> <span style="color:#7d8590">[claude]</span> ▸ /gemini what is DNS<br>
+            <span style="color:#7d8590">[Gemini responds...]</span><br>
+            <span style="color:#58a6ff">vantage</span> <span style="color:#7d8590">[claude]</span> ▸ /compare explain caching<br>
+            <span style="color:#7d8590">[Runs on all agents, shows cost comparison table]</span><br>
+            <span style="color:#58a6ff">vantage</span> <span style="color:#7d8590">[claude]</span> ▸ /session<br>
+            <span style="color:#3fb950">  Starting Claude Code session...</span><br>
+            <span style="color:#7d8590">  claude></span> /compact<br>
+            <span style="color:#7d8590">  claude></span> explain this codebase
+            </div>
+          </div>
+        </div>
+        <!-- Optimizer tab -->
+        <div class="demo-panel" id="dp-optimizer" style="display:none">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:8px">BEFORE (39 tokens)</div>
+          <div style="background:rgba(248,113,113,.05);border:1px solid rgba(248,113,113,.15);border-radius:8px;padding:12px;font-size:13px;margin-bottom:12px;text-decoration:line-through;color:var(--muted)">I would like you to please analyze the quarterly revenue data. It is important to note that we need year-over-year growth. Could you please take into consideration the market trends.</div>
+          <div style="font-size:12px;color:var(--accent);margin-bottom:8px">AFTER (23 tokens) — <strong style="color:var(--accent)">41% saved</strong></div>
+          <div style="background:rgba(0,212,161,.05);border:1px solid rgba(0,212,161,.15);border-radius:8px;padding:12px;font-size:13px;margin-bottom:16px">Analyze quarterly revenue data. We need year-over-year growth. Consider market trends.</div>
+          <div style="font-size:11px;color:var(--muted)">
+            <div style="margin-bottom:6px">5-layer compression engine:</div>
+            <div>✂️ Removed: "I would like you to please", "It is important to note that", "Could you please"</div>
+            <div>🔄 Rewritten: "take into consideration" → "consider"</div>
+            <div>📊 Estimated savings per 1K calls: <span style="color:var(--accent)">-$0.048 on claude-sonnet-4-6</span></div>
+          </div>
+        </div>
+        <!-- OTel tab -->
+        <div class="demo-panel" id="dp-otel" style="display:none">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px">SUPPORTED AI CODING TOOLS (auto-tracked via OpenTelemetry)</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:12px"><span style="color:var(--accent)">●</span> Claude Code</div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:12px"><span style="color:#0098ff">●</span> GitHub Copilot</div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:12px"><span style="color:#a78bfa">●</span> Gemini CLI</div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:12px"><span style="color:#f59e0b">●</span> Cursor</div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:12px"><span style="color:#f87171">●</span> OpenAI Codex</div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:12px"><span style="color:var(--accent)">●</span> Cline</div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:12px"><span style="color:#0098ff">●</span> Aider</div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:12px"><span style="color:#a78bfa">●</span> Roo Code</div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:12px"><span style="color:#f59e0b">●</span> OpenCode</div>
+          </div>
+          <div style="margin-top:16px;font-size:12px;color:var(--muted)">
+            <div><strong>Setup:</strong> Set 3 env vars on any tool → all usage flows to VantageAI</div>
+            <div style="margin-top:6px;font-family:var(--mono);font-size:11px;color:var(--accent)">
+              CLAUDE_CODE_ENABLE_TELEMETRY=1<br>
+              OTEL_EXPORTER_OTLP_ENDPOINT=https://api.vantageaiops.com/v1/otel<br>
+              OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer vnt_your_key
+            </div>
+          </div>
+        </div>
+        <!-- Compare tab -->
+        <div class="demo-panel" id="dp-compare" style="display:none">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:10px">$ vantage /compare "explain kubernetes pods"</div>
+          <table style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)">
+            <thead><tr style="border-bottom:1px solid var(--border);text-align:left">
+              <th style="padding:6px 8px;color:var(--muted)">Agent</th>
+              <th style="padding:6px 8px;color:var(--muted)">Model</th>
+              <th style="padding:6px 8px;color:var(--muted)">Time</th>
+              <th style="padding:6px 8px;color:var(--muted)">Tokens</th>
+              <th style="padding:6px 8px;color:var(--muted)">Cost</th>
+            </tr></thead>
+            <tbody>
+              <tr style="border-bottom:1px solid var(--border);color:var(--accent)"><td style="padding:6px 8px">★ gemini</td><td>gemini-2.0-flash</td><td>1.2s</td><td>320</td><td>$0.0001</td></tr>
+              <tr style="border-bottom:1px solid var(--border)"><td style="padding:6px 8px">claude</td><td>claude-sonnet-4-6</td><td>2.1s</td><td>420</td><td>$0.0065</td></tr>
+              <tr style="border-bottom:1px solid var(--border)"><td style="padding:6px 8px">codex</td><td>gpt-4o</td><td>1.8s</td><td>380</td><td>$0.0048</td></tr>
+            </tbody>
+          </table>
+          <div style="margin-top:12px;padding:10px;background:rgba(0,212,161,.05);border-radius:6px;font-size:12px">
+            <span style="color:var(--accent);font-weight:600">💰 Cheapest: gemini</span> — saves $0.0064/call vs claude (98.5% cheaper)
+          </div>
         </div>
       </div>
     </div>
   </div>
   <div style="text-align:center;margin-top:24px;display:flex;gap:16px;justify-content:center;flex-wrap:wrap">
     <a href="/signup.html" class="btn-primary" style="font-size:13px;padding:12px 28px;text-decoration:none">Create free account →</a>
-    <a href="/app.html" class="btn-ghost" style="font-size:13px;padding:12px 28px;text-decoration:none">Try interactive demo →</a>
+    <a href="/app.html" class="btn-ghost" style="font-size:13px;padding:12px 28px;text-decoration:none">Open full dashboard →</a>
   </div>
   <p style="text-align:center;margin-top:12px;font-size:12px;color:var(--muted)">
     No credit card required · Free tier includes 10,000 events/month
@@ -730,6 +869,9 @@ response = client.chat.completions.<span class="c-func">create</span>(
         <tr><td>AI model auto-router</td><td class="vantage-col"><span class="chk">✓</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td></tr>
         <tr><td>Budget alerts (Slack/email)</td><td class="vantage-col"><span class="chk">✓</span></td><td><span class="chk">✓</span></td><td><span class="partial">partial</span></td><td><span class="chk">✓</span></td></tr>
         <tr><td>Exec ROI dashboard</td><td class="vantage-col"><span class="chk">✓</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="partial">partial</span></td></tr>
+        <tr><td>Cross-platform OTel (13+ tools)</td><td class="vantage-col"><span class="chk">✓</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td></tr>
+        <tr><td>CLI agent wrapper + optimizer</td><td class="vantage-col"><span class="chk">✓</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td></tr>
+        <tr><td>Privacy-first local proxy</td><td class="vantage-col"><span class="chk">✓</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td></tr>
         <tr><td>RBAC + audit logs + SOC2</td><td class="vantage-col"><span class="chk">✓</span></td><td><span class="partial">partial</span></td><td><span class="partial">partial</span></td><td><span class="chk">✓</span></td></tr>
         <tr><td>Free tier</td><td class="vantage-col"><span class="chk">✓ generous</span></td><td><span class="chk">✓</span></td><td><span class="chk">✓</span></td><td><span class="cross">—</span></td></tr>
         <tr><td>Team plan pricing</td><td class="vantage-col" style="color:var(--accent);font-family:var(--mono)">$99/mo</td><td style="font-family:var(--mono)">$80/mo</td><td style="font-family:var(--mono)">$39/mo</td><td style="font-family:var(--mono)">$15+/host</td></tr>
@@ -781,6 +923,14 @@ response = client.chat.completions.<span class="c-func">create</span>(
     <div class="faq-item">
       <div class="faq-q" onclick="toggleFaq(this)">How does the free tier compare to paid plans? <span class="faq-arrow">+</span></div>
       <div class="faq-a"><div class="faq-a-inner">The free tier gives you 10,000 requests/month, the core cost dashboard, 7-day log retention, and 1 user seat — no credit card required, forever. The Team plan ($99/mo) adds unlimited requests, cross-model pricing intelligence, efficiency scoring, budget alerts, team attribution, and up to 10 seats.</div></div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">What is the VantageAI CLI and how does it work? <span class="faq-arrow">+</span></div>
+      <div class="faq-a"><div class="faq-a-inner">The VantageAI CLI (`npx vantageai-cli`) is a transparent wrapper that sits between you and any AI coding tool (Claude Code, Codex, Gemini CLI, Aider). It optimizes your prompts before sending (saving 40%+ tokens), streams the agent's response in real-time with zero added latency, and tracks costs automatically. Use /session to enter interactive mode with full access to agent commands like /compact and /clear.</div></div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">How does cross-platform OTel tracking work? <span class="faq-arrow">+</span></div>
+      <div class="faq-a"><div class="faq-a-inner">VantageAI receives OpenTelemetry (OTel) data from 13+ AI coding tools. Most tools already emit telemetry — you just set 3 environment variables to point them at your VantageAI endpoint. Tools like Claude Code, GitHub Copilot, and Gemini CLI send token counts, session data, and cost metrics automatically. For tools that don't report costs, our pricing engine auto-calculates USD from token counts.</div></div>
     </div>
   </div>
 </section>
@@ -875,6 +1025,14 @@ function switchTab(id, el) {
   document.querySelectorAll(".code-tab").forEach(t => t.classList.remove("active"));
   document.getElementById("tab-"+id).classList.add("active");
   el.classList.add("active");
+}
+
+// ── Demo tabs ──────────────────────────────────────────────────────────────
+function demoTab(id, el) {
+  document.querySelectorAll('.demo-panel').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.d-nav').forEach(n => n.classList.remove('active'));
+  document.getElementById('dp-' + id).style.display = '';
+  el.classList.add('active');
 }
 
 // ── Scroll reveal ─────────────────────────────────────────────────────────────
