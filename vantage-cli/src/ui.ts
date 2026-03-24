@@ -60,21 +60,41 @@ export function printCostSummary(
   cost: VantageEvents["cost:calculated"],
   session: SessionState
 ): void {
+  const w = 30;
   const line = (label: string, value: string) =>
-    `  ${dim(label.padEnd(18))} ${value}`;
+    `  ${dim(label.padEnd(20))} ${value}`;
 
   console.log("");
-  console.log(dim("  +----- Cost Summary -----+"));
+  console.log(dim("  +" + "-".repeat(w) + "+"));
+  console.log(dim("  |") + bold("  Cost & Optimization ") + dim("      |"));
+  console.log(dim("  +" + "-".repeat(w) + "+"));
   console.log(line("Model:", cost.model));
   console.log(line("Input tokens:", cost.inputTokens.toLocaleString()));
   console.log(line("Output tokens:", cost.outputTokens.toLocaleString()));
   console.log(line("Cost:", green(`$${cost.costUsd.toFixed(6)}`)));
-  if (cost.savedUsd > 0) {
-    console.log(line("Saved:", green(`$${cost.savedUsd.toFixed(6)}`)));
+
+  // Optimization data
+  if (session.totalSavedTokens > 0) {
+    const savedThisPrompt = session.history.length > 0
+      ? session.history[session.history.length - 1]?.savedTokens ?? 0
+      : 0;
+    if (savedThisPrompt > 0) {
+      console.log(line("Tokens saved:", green(`${savedThisPrompt} tokens`)));
+    }
   }
-  console.log(line("Session total:", `$${session.totalCostUsd.toFixed(6)}`));
+  if (cost.savedUsd > 0) {
+    console.log(line("Cost saved:", green(`$${cost.savedUsd.toFixed(6)}`)));
+  }
+
+  console.log(dim("  +" + "-".repeat(w) + "+"));
+
+  // Session totals
+  console.log(line("Session cost:", `$${session.totalCostUsd.toFixed(6)}`));
+  if (session.totalSavedTokens > 0) {
+    console.log(line("Session saved:", green(`${session.totalSavedTokens.toLocaleString()} tokens`)));
+  }
   console.log(line("Prompts:", session.promptCount.toString()));
-  console.log(dim("  +-------------------------+"));
+  console.log(dim("  +" + "-".repeat(w) + "+"));
   console.log("");
 }
 
