@@ -10,17 +10,19 @@ export const aiderAdapter: AgentAdapter = {
 
   async detect(): Promise<boolean> {
     try {
-      execSync("which aider", { stdio: "ignore" });
+      execSync("which aider", { stdio: "ignore", timeout: 5000 });
       return true;
     } catch {
       return false;
     }
   },
 
-  buildCommand(prompt: string, _config?: AgentConfig): SpawnArgs {
+  buildCommand(prompt: string, config?: AgentConfig): SpawnArgs {
+    const cmd = config?.command || "aider";
+    const baseArgs = config?.args ?? ["--message"];
     return {
-      command: "aider",
-      args: ["--message", prompt, "--yes"],
+      command: cmd,
+      args: [...baseArgs, prompt, "--yes"],
     };
   },
 };

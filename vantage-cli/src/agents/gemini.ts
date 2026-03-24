@@ -10,17 +10,19 @@ export const geminiAdapter: AgentAdapter = {
 
   async detect(): Promise<boolean> {
     try {
-      execSync("which gemini", { stdio: "ignore" });
+      execSync("which gemini", { stdio: "ignore", timeout: 5000 });
       return true;
     } catch {
       return false;
     }
   },
 
-  buildCommand(prompt: string, _config?: AgentConfig): SpawnArgs {
+  buildCommand(prompt: string, config?: AgentConfig): SpawnArgs {
+    const cmd = config?.command || "gemini";
+    const baseArgs = config?.args ?? ["-p"];
     return {
-      command: "gemini",
-      args: ["-p", prompt],
+      command: cmd,
+      args: [...baseArgs, prompt],
     };
   },
 };

@@ -21,10 +21,13 @@ export function getAgent(name: string): AgentAdapter | undefined {
 
 export async function detectAll(): Promise<{ agent: AgentAdapter; detected: boolean }[]> {
   const results = await Promise.all(
-    ALL_AGENTS.map(async (agent) => ({
-      agent,
-      detected: await agent.detect(),
-    }))
+    ALL_AGENTS.map(async (agent) => {
+      try {
+        return { agent, detected: await agent.detect() };
+      } catch {
+        return { agent, detected: false };
+      }
+    })
   );
   return results;
 }
