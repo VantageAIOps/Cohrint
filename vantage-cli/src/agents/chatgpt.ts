@@ -7,20 +7,24 @@ export const chatgptAdapter: AgentAdapter = {
   binary: "chatgpt-cli",
   defaultModel: "gpt-4o",
   provider: "openai",
+  interactiveArgs: [],
+  exitCommand: "/quit",
 
   async detect(): Promise<boolean> {
     try {
-      execSync("which chatgpt-cli", { stdio: "ignore" });
+      execSync("which chatgpt-cli", { stdio: "ignore", timeout: 5000 });
       return true;
     } catch {
       return false;
     }
   },
 
-  buildCommand(prompt: string, _config?: AgentConfig): SpawnArgs {
+  buildCommand(prompt: string, config?: AgentConfig): SpawnArgs {
+    const cmd = config?.command || "chatgpt-cli";
+    const baseArgs = config?.args ?? [];
     return {
-      command: "chatgpt-cli",
-      args: [prompt],
+      command: cmd,
+      args: [...baseArgs, prompt],
     };
   },
 };

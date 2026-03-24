@@ -5,6 +5,7 @@ import { loadConfig, configExists, type VantageConfig } from "./config.js";
 import { runSetup } from "./setup.js";
 import { getAgent, detectAll, ALL_AGENTS } from "./agents/registry.js";
 import type { AgentAdapter } from "./agents/types.js";
+import { AgentSession, isAgentCommand } from "./session-mode.js";
 import { optimizePrompt } from "./optimizer.js";
 import { calculateCost, findCheapest, PRICES } from "./pricing.js";
 import { countTokens } from "./optimizer.js";
@@ -29,6 +30,141 @@ import {
 } from "./ui.js";
 
 const COST_TIMEOUT_MS = 2000;
+
+// ---------------------------------------------------------------------------
+// Dashboard helpers
+// ---------------------------------------------------------------------------
+
+function safeNum(v: unknown, fallback = 0): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function checkAnomaly(cost: import("./event-bus.js").VantageEvents["cost:calculated"]): void {
+  const sess = getSession();
+  if (sess.promptCount <= 2 || sess.totalCostUsd <= 0) return;
+  const avgCost = sess.totalCostUsd / sess.promptCount;
+  if (avgCost > 0 && Number.isFinite(avgCost) && cost.costUsd > avgCost * 3) {
+    console.log(yellow(`  ⚠ Anomaly: this prompt cost $${cost.costUsd.toFixed(4)} — ${(cost.costUsd / avgCost).toFixed(1)}x your session average`));
+  }
+}
+
+async function showDashboardSummary(config: VantageConfig): Promise<void> {
+  if (!config.vantageApiKey) {
+    console.log(yellow("  No API key configured. Run setup or set VANTAGE_API_KEY."));
+    return;
+  }
+  try {
+    const base = config.vantageApiBase || "https://api.vantageaiops.com";
+    const headers = {
+      "Authorization": `Bearer ${config.vantageApiKey}`,
+      "Content-Type": "application/json",
+    };
+
+    // Fetch summary + kpis in parallel
+    const [summaryRes, kpisRes] = await Promise.all([
+      fetch(`${base}/v1/analytics/summary`, { headers, signal: AbortSignal.timeout(10000) }),
+      fetch(`${base}/v1/analytics/kpis?period=30`, { headers, signal: AbortSignal.timeout(10000) }),
+    ]);
+
+    const summary = summaryRes.ok ? await summaryRes.json() as Record<string, unknown> : null;
+    const kpis = kpisRes.ok ? await kpisRes.json() as Record<string, unknown> : null;
+
+    console.log("");
+    console.log(bold(cyan("  Dashboard Summary")));
+    console.log(dim("  " + "-".repeat(45)));
+
+    if (summary) {
+      const todayCost = Number(summary.today_cost_usd ?? 0);
+      const mtdCost = Number(summary.mtd_cost_usd ?? 0);
+      const todayReqs = Number(summary.today_requests ?? 0);
+      const budgetPct = Number(summary.budget_pct ?? 0);
+      const budgetUsd = Number(summary.budget_usd ?? 0);
+
+      console.log(`  ${dim("Today spend:")}    ${green("$" + todayCost.toFixed(4))}`);
+      console.log(`  ${dim("MTD spend:")}      $${mtdCost.toFixed(4)}`);
+      console.log(`  ${dim("Today requests:")} ${todayReqs}`);
+      if (budgetUsd > 0) {
+        const color = budgetPct > 85 ? red : budgetPct > 60 ? yellow : green;
+        console.log(`  ${dim("Budget:")}         ${color(budgetPct + "%")} of $${budgetUsd}`);
+      }
+    }
+
+    if (kpis) {
+      const totalCost = Number(kpis.total_cost_usd ?? 0);
+      const totalTokens = Number(kpis.total_tokens ?? 0);
+      const totalReqs = Number(kpis.total_requests ?? 0);
+      const avgLatency = Number(kpis.avg_latency_ms ?? 0);
+      const effScore = Number(kpis.efficiency_score ?? 0);
+
+      console.log(`  ${dim("30d spend:")}      $${totalCost.toFixed(4)}`);
+      console.log(`  ${dim("30d tokens:")}     ${totalTokens.toLocaleString()}`);
+      console.log(`  ${dim("30d requests:")}   ${totalReqs.toLocaleString()}`);
+      console.log(`  ${dim("Avg latency:")}    ${avgLatency.toFixed(0)}ms`);
+      console.log(`  ${dim("Efficiency:")}     ${effScore}/100`);
+    }
+
+    // Local session stats
+    const session = getSession();
+    if (session.promptCount > 0) {
+      console.log(dim("  " + "-".repeat(45)));
+      console.log(`  ${dim("Local session:")}  ${session.promptCount} prompts, $${session.totalCostUsd.toFixed(4)}`);
+      if (session.totalSavedTokens > 0) {
+        console.log(`  ${dim("Tokens saved:")}   ${green(session.totalSavedTokens.toLocaleString())}`);
+      }
+    }
+
+    console.log(dim("  " + "-".repeat(45)));
+    console.log("");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(red(`  Failed to fetch dashboard: ${msg}`));
+  }
+}
+
+async function showBudgetStatus(config: VantageConfig): Promise<void> {
+  if (!config.vantageApiKey) {
+    console.log(yellow("  No API key configured."));
+    return;
+  }
+  try {
+    const base = config.vantageApiBase || "https://api.vantageaiops.com";
+    const res = await fetch(`${base}/v1/analytics/summary`, {
+      headers: { "Authorization": `Bearer ${config.vantageApiKey}` },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json() as Record<string, unknown>;
+
+    const budgetUsd = Number(data.budget_usd ?? 0);
+    const budgetPct = Number(data.budget_pct ?? 0);
+    const mtdCost = Number(data.mtd_cost_usd ?? 0);
+
+    console.log("");
+    if (budgetUsd <= 0) {
+      console.log(yellow("  No budget set. Configure in dashboard → Settings."));
+    } else {
+      const remaining = budgetUsd - mtdCost;
+      const color = budgetPct > 85 ? red : budgetPct > 60 ? yellow : green;
+      console.log(bold("  Budget Status"));
+      console.log(`  ${dim("Monthly budget:")} $${budgetUsd.toFixed(2)}`);
+      console.log(`  ${dim("MTD spend:")}      $${mtdCost.toFixed(4)}`);
+      console.log(`  ${dim("Used:")}           ${color(budgetPct.toFixed(1) + "%")}`);
+      console.log(`  ${dim("Remaining:")}      ${remaining > 0 ? green("$" + remaining.toFixed(2)) : red("OVER BUDGET")}`);
+
+      // Budget alerts
+      if (budgetPct >= 100) {
+        console.log(red("\n  ⚠ OVER BUDGET — spending exceeds monthly limit!"));
+      } else if (budgetPct >= 80) {
+        console.log(yellow("\n  ⚠ Budget warning — 80% threshold exceeded"));
+      }
+    }
+    console.log("");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(red(`  Failed to fetch budget: ${msg}`));
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Arg parser
@@ -56,6 +192,16 @@ function parseArgs() {
 // Core execution logic
 // ---------------------------------------------------------------------------
 
+function looksLikeStructuredData(text: string): boolean {
+  // Skip optimization for JSON, code blocks, URLs-heavy content
+  const trimmed = text.trim();
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) return true; // JSON
+  if (trimmed.startsWith("```")) return true; // code block
+  if ((text.match(/https?:\/\//g) || []).length > 2) return true; // URL-heavy
+  if ((text.match(/[{}()\[\];=<>]/g) || []).length > text.length * 0.1) return true; // code-like
+  return false;
+}
+
 async function executePrompt(
   prompt: string,
   agent: AgentAdapter,
@@ -68,9 +214,9 @@ async function executePrompt(
     timestamp: Date.now(),
   });
 
-  // Optimize prompt
+  // Optimize prompt (skip for structured data like JSON, code, URL-heavy content)
   let finalPrompt = prompt;
-  if (config.optimization.enabled) {
+  if (config.optimization.enabled && !looksLikeStructuredData(prompt)) {
     const result = optimizePrompt(prompt);
     if (result.savedTokens > 0) {
       finalPrompt = result.optimized;
@@ -161,6 +307,7 @@ async function startRepl(config: VantageConfig): Promise<void> {
   printBanner();
 
   let currentAgent = getAgent(config.defaultAgent) ?? ALL_AGENTS[0];
+  let activeSession: AgentSession | null = null;
 
   const rl = createInterface({
     input: process.stdin,
@@ -176,118 +323,223 @@ async function startRepl(config: VantageConfig): Promise<void> {
         return;
       }
 
-      // Special commands
-      if (line === "/quit" || line === "/exit" || line === "/q") {
-        await shutdown();
-        return;
-      }
-
-      if (line === "/help") {
-        printHelp();
-        prompt();
-        return;
-      }
-
-      if (line === "/cost") {
-        const session = getSession();
-        printSessionSummary(session);
-        prompt();
-        return;
-      }
-
-      if (line.startsWith("/default ")) {
-        const name = line.slice(9).trim();
-        const agent = getAgent(name);
-        if (agent) {
-          currentAgent = agent;
-          console.log(green(`  Default agent set to ${agent.displayName}`));
-        } else {
-          console.log(red(`  Unknown agent: ${name}`));
-          console.log(dim(`  Available: ${ALL_AGENTS.map((a) => a.name).join(", ")}`));
-        }
-        prompt();
-        return;
-      }
-
-      if (line.startsWith("/compare ")) {
-        const comparePrompt = line.slice(9).trim();
-        if (comparePrompt) {
-          await runCompare(comparePrompt, config);
-        } else {
-          console.log(yellow("  Usage: /compare <prompt>"));
-        }
-        prompt();
-        return;
-      }
-
-      // Agent prefix commands: /claude, /gemini, /codex, /aider, /chatgpt, etc.
-      const agentPrefixMatch = line.match(/^\/(\w+)\s+([\s\S]+)$/);
-      if (agentPrefixMatch) {
-        const [, agentName, rawAgentPrompt] = agentPrefixMatch;
-        const agentPrompt = rawAgentPrompt.trim();
-        const agent = getAgent(agentName);
-        if (agent && agentPrompt) {
-          const costPromise = waitForCost();
-          await executePrompt(agentPrompt, agent, config);
-          try {
-            const cost = await Promise.race([
-              costPromise,
-              new Promise<null>((resolve) => setTimeout(() => resolve(null), COST_TIMEOUT_MS)),
-            ]);
-            if (cost) {
-              printCostSummary(cost, getSession());
-            }
-          } catch {
-            // Cost calculation may not fire for all agents
-          }
-        } else if (!agent) {
-          console.log(red(`  Unknown agent: ${agentName}`));
-        }
-        prompt();
-        return;
-      }
-
-      // Switch agent without prompt (just /claude, /gemini, etc.)
-      const switchMatch = line.match(/^\/(\w+)$/);
-      if (switchMatch) {
-        const agent = getAgent(switchMatch[1]);
-        if (agent) {
-          currentAgent = agent;
-          console.log(green(`  Switched to ${agent.displayName}`));
-        }
-        prompt();
-        return;
-      }
-
-      // Normal prompt — use current default agent
-      const costPromise = waitForCost();
-      await executePrompt(line, currentAgent, config);
       try {
-        const cost = await Promise.race([
-          costPromise,
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), COST_TIMEOUT_MS)),
-        ]);
-        if (cost) {
-          printCostSummary(cost, getSession());
+        // Special commands
+        if (line === "/quit" || line === "/exit" || line === "/q") {
+          await shutdown();
+          return;
         }
-      } catch {
-        // Cost calculation may not fire for all agents
-      }
 
-      prompt();
+        if (line === "/help") {
+          printHelp();
+          prompt();
+          return;
+        }
+
+        if (line === "/cost") {
+          const session = getSession();
+          printSessionSummary(session);
+          prompt();
+          return;
+        }
+
+        if (line === "/summary" || line === "/stats") {
+          await showDashboardSummary(config);
+          prompt();
+          return;
+        }
+
+        if (line === "/budget") {
+          await showBudgetStatus(config);
+          prompt();
+          return;
+        }
+
+        if (line === "/session" || line.startsWith("/session ")) {
+          const sessionAgent = line.includes(" ")
+            ? getAgent(line.split(" ")[1]) ?? currentAgent
+            : currentAgent;
+
+          activeSession = new AgentSession(sessionAgent);
+          const started = await activeSession.start();
+
+          if (!started || !activeSession.isActive()) {
+            activeSession = null;
+            prompt();
+            return;
+          }
+
+          // Enter session sub-REPL with proper termination guard
+          let sessionExiting = false;
+          const sessionPrompt = () => {
+            if (sessionExiting || !activeSession?.isActive()) {
+              // Session ended (agent crashed or exited) — return to main REPL
+              if (!sessionExiting) {
+                sessionExiting = true;
+                activeSession = null;
+                console.log(dim("  Session ended. Returned to VantageAI REPL."));
+              }
+              prompt();
+              return;
+            }
+            rl.question(cyan(`  ${sessionAgent.name}> `), async (sessionInput) => {
+              try {
+                const sLine = sessionInput.trim();
+                if (!sLine) { sessionPrompt(); return; }
+
+                if (sLine === "/exit-session" || sLine === "/exit") {
+                  sessionExiting = true;
+                  await activeSession?.end();
+                  activeSession = null;
+                  console.log(dim("  Returned to VantageAI REPL."));
+                  prompt();
+                  return;
+                }
+
+                if (activeSession?.isActive()) {
+                  activeSession.sendLine(sLine);
+                  // Wait for output to stream before re-prompting
+                  setTimeout(sessionPrompt, 200);
+                } else {
+                  sessionExiting = true;
+                  activeSession = null;
+                  console.log(dim("  Session ended unexpectedly. Returned to VantageAI REPL."));
+                  prompt();
+                }
+              } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                console.error(red(`  Session error: ${msg}`));
+                if (activeSession?.isActive()) {
+                  sessionPrompt();
+                } else {
+                  sessionExiting = true;
+                  activeSession = null;
+                  prompt();
+                }
+              }
+            });
+          };
+
+          sessionPrompt();
+          return;
+        }
+
+        if (line.startsWith("/default ")) {
+          const name = line.slice(9).trim();
+          const agent = getAgent(name);
+          if (agent) {
+            currentAgent = agent;
+            console.log(green(`  Default agent set to ${agent.displayName}`));
+          } else {
+            console.log(red(`  Unknown agent: ${name}`));
+            console.log(dim(`  Available: ${ALL_AGENTS.map((a) => a.name).join(", ")}`));
+          }
+          prompt();
+          return;
+        }
+
+        if (line.startsWith("/compare ")) {
+          const comparePrompt = line.slice(9).trim();
+          if (comparePrompt) {
+            await runCompare(comparePrompt, config);
+          } else {
+            console.log(yellow("  Usage: /compare <prompt>"));
+          }
+          prompt();
+          return;
+        }
+
+        // Agent prefix commands: /claude, /gemini, /codex, /aider, /chatgpt, etc.
+        const agentPrefixMatch = line.match(/^\/(\w+)\s+([\s\S]+)$/);
+        if (agentPrefixMatch) {
+          const [, agentName, rawAgentPrompt] = agentPrefixMatch;
+          const agentPrompt = rawAgentPrompt.trim();
+          const agent = getAgent(agentName);
+          if (agent && agentPrompt) {
+            const costPromise = waitForCost();
+            await executePrompt(agentPrompt, agent, config);
+            try {
+              const cost = await Promise.race([
+                costPromise,
+                new Promise<null>((resolve) => setTimeout(() => resolve(null), COST_TIMEOUT_MS)),
+              ]);
+              if (cost) {
+                printCostSummary(cost, getSession());
+                checkAnomaly(cost);
+              }
+            } catch {
+              // Cost calculation may not fire for all agents
+            }
+          } else if (!agent) {
+            console.log(red(`  Unknown agent: ${agentName}`));
+          }
+          prompt();
+          return;
+        }
+
+        // Switch agent without prompt (just /claude, /gemini, etc.)
+        const switchMatch = line.match(/^\/(\w+)$/);
+        if (switchMatch) {
+          const agent = getAgent(switchMatch[1]);
+          if (agent) {
+            currentAgent = agent;
+            console.log(green(`  Switched to ${agent.displayName}`));
+          }
+          prompt();
+          return;
+        }
+
+        // Detect agent commands used outside session mode
+        if (line.startsWith("/") && !line.startsWith("/compare") && !line.startsWith("/default")) {
+          const cmd = line.split(/\s/)[0].toLowerCase();
+          if (isAgentCommand(currentAgent.name, line)) {
+            console.log(yellow(`  '${cmd}' is a ${currentAgent.displayName} command.`));
+            console.log(dim(`  Use /session to start an interactive session with agent commands.`));
+            prompt();
+            return;
+          }
+        }
+
+        // Normal prompt — use current default agent
+        const costPromise = waitForCost();
+        await executePrompt(line, currentAgent, config);
+        try {
+          const cost = await Promise.race([
+            costPromise,
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), COST_TIMEOUT_MS)),
+          ]);
+          if (cost) {
+            printCostSummary(cost, getSession());
+            checkAnomaly(cost);
+          }
+        } catch {
+          // Cost calculation may not fire for all agents
+        }
+
+        prompt();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(red(`  Error: ${msg}`));
+        prompt();
+      }
     });
   };
 
   const shutdown = async () => {
+    // Clean up active session first
+    if (activeSession?.isActive()) {
+      await activeSession.end().catch(() => {});
+      activeSession = null;
+    }
     rl.close();
-    await tracker?.flush();
+    await tracker?.flush().catch(() => {});
     printSessionSummary(getSession());
     process.exit(0);
   };
 
-  // Handle Ctrl+C — async-safe shutdown
+  // Handle Ctrl+C — clean up session + tracker before exit
   rl.on("SIGINT", () => {
-    shutdown().then(() => process.exit(0));
+    shutdown().catch(() => process.exit(1));
   });
 
   prompt();
@@ -304,6 +556,10 @@ function printHelp(): void {
   console.log(`  ${cyan("/chatgpt <prompt>")}   Run prompt with ChatGPT CLI`);
   console.log(`  ${cyan("/compare <prompt>")}   Compare all agents side by side`);
   console.log(`  ${cyan("/cost")}               Show session cost summary`);
+  console.log(`  ${cyan("/summary")}              Dashboard summary (spend, tokens, budget)`);
+  console.log(`  ${cyan("/budget")}               Check budget status and alerts`);
+  console.log(`  ${cyan("/session [agent]")}   Start interactive session (supports /compact, /clear, @file, !shell)`);
+  console.log(`  ${cyan("/exit-session")}      Return to VantageAI REPL from session`);
   console.log(`  ${cyan("/default <agent>")}    Set default agent`);
   console.log(`  ${cyan("/help")}               Show this help`);
   console.log(`  ${cyan("/quit")}               Exit VantageAI CLI`);
@@ -317,10 +573,32 @@ function printHelp(): void {
 // ---------------------------------------------------------------------------
 
 async function readStdin(): Promise<string> {
+  const MAX_STDIN_BYTES = 1024 * 1024; // 1MB max prompt from pipe
   const chunks: Buffer[] = [];
-  for await (const chunk of process.stdin) {
-    chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+  let totalBytes = 0;
+
+  // Timeout: if nothing comes in 10 seconds, bail
+  const timeout = setTimeout(() => {
+    process.stdin.destroy();
+  }, 10_000);
+
+  try {
+    for await (const chunk of process.stdin) {
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      totalBytes += buf.length;
+      if (totalBytes > MAX_STDIN_BYTES) {
+        clearTimeout(timeout);
+        console.error(dim("  Warning: prompt truncated at 1MB"));
+        break;
+      }
+      chunks.push(buf);
+    }
+  } catch {
+    // stdin destroyed by timeout or encoding error
   }
+  clearTimeout(timeout);
+
+  if (chunks.length === 0) return "";
   return Buffer.concat(chunks).toString("utf-8").trim();
 }
 
@@ -377,6 +655,7 @@ async function main(): Promise<void> {
       ]);
       if (cost) {
         printCostSummary(cost, getSession());
+        checkAnomaly(cost);
       }
     } catch {
       // Cost may not be available
@@ -402,6 +681,7 @@ async function main(): Promise<void> {
         ]);
         if (cost) {
           printCostSummary(cost, getSession());
+          checkAnomaly(cost);
         }
       } catch {
         // Cost may not be available
@@ -418,4 +698,10 @@ async function main(): Promise<void> {
 main().catch((err) => {
   console.error(red(`Fatal error: ${err instanceof Error ? err.message : String(err)}`));
   process.exit(1);
+});
+
+process.on("unhandledRejection", (reason) => {
+  const msg = reason instanceof Error ? reason.message : String(reason);
+  console.error(red(`  Unhandled error: ${msg}`));
+  // Don't exit — let the REPL continue
 });

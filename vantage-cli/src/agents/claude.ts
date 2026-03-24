@@ -7,20 +7,24 @@ export const claudeAdapter: AgentAdapter = {
   binary: "claude",
   defaultModel: "claude-sonnet-4-6",
   provider: "anthropic",
+  interactiveArgs: [],
+  exitCommand: "/quit",
 
   async detect(): Promise<boolean> {
     try {
-      execSync("which claude", { stdio: "ignore" });
+      execSync("which claude", { stdio: "ignore", timeout: 5000 });
       return true;
     } catch {
       return false;
     }
   },
 
-  buildCommand(prompt: string, _config?: AgentConfig): SpawnArgs {
+  buildCommand(prompt: string, config?: AgentConfig): SpawnArgs {
+    const cmd = config?.command || "claude";
+    const baseArgs = config?.args ?? ["-p"];
     return {
-      command: "claude",
-      args: ["-p", prompt],
+      command: cmd,
+      args: [...baseArgs, prompt],
     };
   },
 };

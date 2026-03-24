@@ -1682,6 +1682,9 @@ export CLINE_OTEL_EXPORTER_OTLP_PROTOCOL=http/json</pre>
 <tr><td><code>/codex prompt</code></td><td>Run with OpenAI Codex</td></tr>
 <tr><td><code>/compare prompt</code></td><td>Run on all agents, show cost comparison</td></tr>
 <tr><td><code>/cost</code></td><td>Show session totals</td></tr>
+<tr><td><code>/summary</code></td><td>Show dashboard spend, tokens, budget from API</td></tr>
+<tr><td><code>/budget</code></td><td>Check budget status with alerts</td></tr>
+<tr><td><code>/stats</code></td><td>Alias for /summary</td></tr>
 <tr><td><code>/help</code></td><td>Show all commands</td></tr>
 </tbody></table>
 
@@ -1689,6 +1692,13 @@ export CLINE_OTEL_EXPORTER_OTLP_PROTOCOL=http/json</pre>
 <p>1. You type a prompt → 2. CLI optimizes it (<1ms, local) → 3. Forwards to your AI tool → 4. Streams output in real-time → 5. Calculates cost + savings</p>
 
 <div class="info-box">Zero added latency: optimization is synchronous, tracking is async fire-and-forget.</div>
+
+<h2>Dashboard Integration</h2>
+<p>When configured with a VantageAI API key, the CLI automatically pushes cost data to your dashboard. Events include: model, provider, tokens, cost, latency, and agent name.</p>
+<div class="info-box">Set your API key in <code>~/.vantage/config.json</code> or via <code>VANTAGE_API_KEY</code> environment variable.</div>
+
+<h2>Anomaly Detection</h2>
+<p>The CLI warns when a prompt's cost exceeds 3x the session average, helping catch runaway token usage before it impacts your budget.</p>
 `
 
 };
