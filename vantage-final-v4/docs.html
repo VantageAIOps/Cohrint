@@ -127,6 +127,13 @@ footer a:hover{color:var(--text)}
 [data-theme="light"] .tab-content{background:var(--bg3);border-color:rgba(0,0,0,.12)}
 [data-theme="light"] .api-table th{border-bottom-color:rgba(0,0,0,.08)}
 [data-theme="light"] .api-table td{border-bottom-color:rgba(0,0,0,.05)}
+/* Light theme: syntax highlighting colors with proper contrast */
+[data-theme="light"] .c-string{color:#1a7a2e}
+[data-theme="light"] .c-keyword{color:#7c3aed}
+[data-theme="light"] .c-var{color:#1d4ed8}
+[data-theme="light"] .c-func{color:#047857}
+[data-theme="light"] .c-num{color:#b45309}
+[data-theme="light"] .c-comment{color:#6b7b8a}
 </style>
 <style>
 .docs-layout{display:grid;grid-template-columns:240px 1fr;gap:0;min-height:calc(100vh - 53px)}
@@ -168,7 +175,14 @@ pre{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;pad
 .api-table td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top}
 .api-table tr:last-child td{border-bottom:none}
 .api-table code{font-size:11px}
-@media(max-width:768px){.docs-layout{grid-template-columns:1fr}.docs-sidebar{display:none}.docs-content{padding:32px 24px}}
+.docs-mobile-toggle{display:none;position:fixed;bottom:20px;right:20px;z-index:200;width:48px;height:48px;border-radius:50%;background:var(--accent);color:#000;border:none;font-size:20px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.3);align-items:center;justify-content:center}
+@media(max-width:768px){
+  .docs-layout{grid-template-columns:1fr}
+  .docs-sidebar{display:none;position:fixed;top:53px;left:0;right:0;bottom:0;z-index:150;height:auto;padding-bottom:80px}
+  .docs-sidebar.mobile-open{display:block}
+  .docs-content{padding:32px 24px}
+  .docs-mobile-toggle{display:flex}
+}
 </style>
 </head>
 <body>
@@ -213,7 +227,7 @@ pre{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;pad
     </div>
 
     <div class="docs-nav-group">
-      <div class="docs-nav-sec" style="color:var(--ac)" onclick="toggleNavGroup(this)">Cross-Platform (NEW)</div>
+      <div class="docs-nav-sec" style="color:var(--accent)" onclick="toggleNavGroup(this)">Cross-Platform (NEW)</div>
       <a class="docs-nav-item" onclick="show('otel-setup',this)">OTel Setup (all tools)</a>
       <a class="docs-nav-item" onclick="show('otel-claude',this)">Claude Code</a>
       <a class="docs-nav-item" onclick="show('otel-copilot',this)">GitHub Copilot</a>
@@ -254,6 +268,7 @@ pre{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;pad
   <div class="docs-content" id="docs-content"></div>
 
 </div>
+<button class="docs-mobile-toggle" onclick="toggleMobileSidebar()" aria-label="Toggle docs menu">☰</button>
 </div>
 
 <footer>
@@ -1815,13 +1830,38 @@ function toggleNavGroup(sec) {
   group.classList.toggle('collapsed');
 }
 
+function toggleMobileSidebar() {
+  const sidebar = document.querySelector('.docs-sidebar');
+  const btn = document.querySelector('.docs-mobile-toggle');
+  sidebar.classList.toggle('mobile-open');
+  btn.textContent = sidebar.classList.contains('mobile-open') ? '✕' : '☰';
+}
+
 function show(id, el) {
   document.querySelectorAll(".docs-nav-item").forEach(n => n.classList.remove("active"));
   el.classList.add("active");
   const content = DOCS[id] || "<p>Coming soon.</p>";
   document.getElementById("docs-content").innerHTML = content;
   window.scrollTo(0, 0);
+  // Close mobile sidebar after selection
+  const sidebar = document.querySelector('.docs-sidebar');
+  if (sidebar.classList.contains('mobile-open')) toggleMobileSidebar();
 }
+
+// Keyboard accessibility for sidebar sections
+document.querySelectorAll('.docs-nav-sec').forEach(sec => {
+  sec.setAttribute('role', 'button');
+  sec.setAttribute('tabindex', '0');
+  sec.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleNavGroup(sec); }
+  });
+});
+document.querySelectorAll('.docs-nav-item').forEach(item => {
+  item.setAttribute('tabindex', '0');
+  item.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.click(); }
+  });
+});
 
 // Init with quickstart
 document.getElementById("docs-content").innerHTML = DOCS.quickstart;

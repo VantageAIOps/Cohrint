@@ -2069,7 +2069,9 @@ async function init_allspend(){
 
     if (budgetLimit > 0) {
       const budgetColor = budgetPct > 85 ? "var(--re)" : budgetPct > 60 ? "var(--am)" : "var(--ac)";
-      document.getElementById("xp-budget-pct").innerHTML = `<span style="color:${budgetColor}">${budgetPct}%</span>`;
+      const budgetEl = document.getElementById("xp-budget-pct");
+      budgetEl.textContent = budgetPct + "%";
+      budgetEl.style.color = budgetColor;
       document.getElementById("xp-budget-sub").textContent = `$${summary.budget.month_spend_usd.toFixed(2)} / $${budgetLimit}`;
     } else {
       document.getElementById("xp-budget-pct").textContent = "—";
