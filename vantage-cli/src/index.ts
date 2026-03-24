@@ -397,7 +397,18 @@ async function startRepl(config: VantageConfig): Promise<void> {
                 }
 
                 if (activeSession?.isActive()) {
-                  activeSession.sendLine(sLine);
+                  const processed = activeSession.sendLine(sLine);
+                  if (processed?.type === "vantage-command") {
+                    // Handle vantage commands internally
+                    const cmd = sLine.trim().toLowerCase();
+                    if (cmd === "/cost" || cmd === "/summary" || cmd === "/stats") {
+                      await showDashboardSummary(config);
+                    } else if (cmd === "/budget") {
+                      await showBudgetStatus(config);
+                    } else if (cmd === "/help") {
+                      printSessionHelp();
+                    }
+                  }
                   // Wait for output to stream before re-prompting
                   setTimeout(sessionPrompt, 200);
                 } else {
@@ -565,6 +576,23 @@ function printHelp(): void {
   console.log(`  ${cyan("/quit")}               Exit VantageAI CLI`);
   console.log("");
   console.log(dim("  Or just type a prompt to use the current default agent."));
+  console.log("");
+}
+
+function printSessionHelp(): void {
+  console.log("");
+  console.log(bold("  Session Commands"));
+  console.log(dim("  " + "-".repeat(50)));
+  console.log(`  ${cyan("/opt-auto")}          Optimize prompts >=5 words (default)`);
+  console.log(`  ${cyan("/opt-off")}           Disable optimization`);
+  console.log(`  ${cyan("/opt-ask")}           Ask before optimizing`);
+  console.log(`  ${cyan("/opt-always")}        Optimize everything`);
+  console.log(`  ${cyan("/cost")}              Show session cost`);
+  console.log(`  ${cyan("/summary")}           Dashboard stats`);
+  console.log(`  ${cyan("/exit-session")}      Return to VantageAI REPL`);
+  console.log("");
+  console.log(dim("  Agent commands (/compact, /clear, @file, !cmd) pass through directly."));
+  console.log(dim("  Short answers (y/n/numbers/paths) pass through without optimization."));
   console.log("");
 }
 
