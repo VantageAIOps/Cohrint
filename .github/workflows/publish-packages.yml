@@ -1,0 +1,154 @@
+name: Publish Packages
+
+# Auto-publish npm packages when version bumps land on main
+# Only publishes packages whose version differs from the registry
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'vantage-cli/**'
+      - 'vantage-mcp/**'
+      - 'vantage-js-sdk/**'
+      - 'vantage-local-proxy/**'
+  workflow_dispatch: # Manual trigger for force-publish
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  detect-changes:
+    name: Detect version changes
+    runs-on: ubuntu-latest
+    outputs:
+      cli: ${{ steps.check.outputs.cli }}
+      mcp: ${{ steps.check.outputs.mcp }}
+      sdk: ${{ steps.check.outputs.sdk }}
+      proxy: ${{ steps.check.outputs.proxy }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Check versions against registry
+        id: check
+        run: |
+          check_version() {
+            local dir=$1 npm_name=$2 output_key=$3
+            local local_ver=$(node -e "console.log(require('./${dir}/package.json').version)")
+            local registry_ver=$(npm view "$npm_name" version 2>/dev/null || echo "0.0.0")
+            echo "  ${npm_name}: local=${local_ver} registry=${registry_ver}"
+            if [ "$local_ver" != "$registry_ver" ]; then
+              echo "${output_key}=true" >> $GITHUB_OUTPUT
+              echo "  → WILL PUBLISH"
+            else
+              echo "${output_key}=false" >> $GITHUB_OUTPUT
+              echo "  → up to date"
+            fi
+          }
+
+          echo "Checking package versions..."
+          check_version "vantage-cli" "vantageai-cli" "cli"
+          check_version "vantage-mcp" "vantageaiops-mcp" "mcp"
+          check_version "vantage-js-sdk" "vantageaiops" "sdk"
+          check_version "vantage-local-proxy" "vantageai-local-proxy" "proxy"
+
+  publish-cli:
+    name: Publish vantageai-cli
+    needs: detect-changes
+    if: needs.detect-changes.outputs.cli == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Install, build, publish
+        working-directory: vantage-cli
+        run: |
+          npm ci
+          npm run build
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-mcp:
+    name: Publish vantageaiops-mcp
+    needs: detect-changes
+    if: needs.detect-changes.outputs.mcp == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Install, build, publish
+        working-directory: vantage-mcp
+        run: |
+          npm ci
+          npm run build
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-sdk:
+    name: Publish vantageaiops
+    needs: detect-changes
+    if: needs.detect-changes.outputs.sdk == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Install, build, publish
+        working-directory: vantage-js-sdk
+        run: |
+          npm ci
+          npm run build
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-proxy:
+    name: Publish vantageai-local-proxy
+    needs: detect-changes
+    if: needs.detect-changes.outputs.proxy == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Install, build, publish
+        working-directory: vantage-local-proxy
+        run: |
+          npm ci
+          npm run build
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  summary:
+    name: Publish Summary
+    needs: [detect-changes, publish-cli, publish-mcp, publish-sdk, publish-proxy]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summary
+        run: |
+          echo "## Package Publish Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Package | Changed | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| vantageai-cli | ${{ needs.detect-changes.outputs.cli }} | ${{ needs.publish-cli.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| vantageaiops-mcp | ${{ needs.detect-changes.outputs.mcp }} | ${{ needs.publish-mcp.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| vantageaiops | ${{ needs.detect-changes.outputs.sdk }} | ${{ needs.publish-sdk.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| vantageai-local-proxy | ${{ needs.detect-changes.outputs.proxy }} | ${{ needs.publish-proxy.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
