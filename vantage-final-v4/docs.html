@@ -135,6 +135,11 @@ footer a:hover{color:var(--text)}
 .docs-nav-item{display:block;padding:7px 20px;font-size:13px;color:var(--muted);cursor:pointer;transition:all .15s;border-left:2px solid transparent}
 .docs-nav-item:hover{color:var(--text);background:rgba(255,255,255,.03)}
 .docs-nav-item.active{color:var(--accent);border-left-color:var(--accent);background:rgba(0,212,161,.05)}
+.docs-nav-group{overflow:hidden;transition:max-height .25s ease}
+.docs-nav-group.collapsed .docs-nav-item{display:none}
+.docs-nav-sec{cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none}
+.docs-nav-sec::after{content:'▾';font-size:10px;transition:transform .2s}
+.docs-nav-group.collapsed .docs-nav-sec::after{transform:rotate(-90deg)}
 .docs-content{padding:48px 64px;max-width:820px}
 h1{font-family:var(--serif);font-size:42px;font-weight:400;letter-spacing:-.02em;margin-bottom:16px;line-height:1.1}
 h2{font-family:var(--serif);font-size:28px;font-weight:400;letter-spacing:-.01em;margin:48px 0 16px;padding-top:48px;border-top:1px solid var(--border)}
@@ -184,49 +189,65 @@ pre{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;pad
 
   <!-- SIDEBAR -->
   <div class="docs-sidebar">
-    <div class="docs-nav-sec">Getting started</div>
-    <a class="docs-nav-item active" onclick="show('quickstart',this)">Quickstart</a>
-    <a class="docs-nav-item" onclick="show('install',this)">Installation</a>
-    <a class="docs-nav-item" onclick="show('concepts',this)">Core concepts</a>
+    <div class="docs-nav-group">
+      <div class="docs-nav-sec" onclick="toggleNavGroup(this)">Getting started</div>
+      <a class="docs-nav-item active" onclick="show('quickstart',this)">Quickstart</a>
+      <a class="docs-nav-item" onclick="show('install',this)">Installation</a>
+      <a class="docs-nav-item" onclick="show('concepts',this)">Core concepts</a>
+    </div>
 
-    <div class="docs-nav-sec">SDKs</div>
-    <a class="docs-nav-item" onclick="show('python',this)">Python SDK</a>
-    <a class="docs-nav-item" onclick="show('typescript',this)">TypeScript / JS</a>
+    <div class="docs-nav-group">
+      <div class="docs-nav-sec" onclick="toggleNavGroup(this)">SDKs</div>
+      <a class="docs-nav-item" onclick="show('python',this)">Python SDK</a>
+      <a class="docs-nav-item" onclick="show('typescript',this)">TypeScript / JS</a>
+    </div>
 
-    <div class="docs-nav-sec">Editor integrations</div>
-    <a class="docs-nav-item" onclick="show('mcp',this)">MCP server</a>
-    <a class="docs-nav-item" onclick="show('cursor',this)">Cursor</a>
-    <a class="docs-nav-item" onclick="show('windsurf',this)">Windsurf</a>
-    <a class="docs-nav-item" onclick="show('claudecode',this)">Claude Code</a>
-    <a class="docs-nav-item" onclick="show('vscode',this)">VS Code</a>
-    <a class="docs-nav-item" onclick="show('zed',this)">Zed / JetBrains</a>
+    <div class="docs-nav-group">
+      <div class="docs-nav-sec" onclick="toggleNavGroup(this)">Editor integrations</div>
+      <a class="docs-nav-item" onclick="show('mcp',this)">MCP server</a>
+      <a class="docs-nav-item" onclick="show('cursor',this)">Cursor</a>
+      <a class="docs-nav-item" onclick="show('windsurf',this)">Windsurf</a>
+      <a class="docs-nav-item" onclick="show('claudecode',this)">Claude Code</a>
+      <a class="docs-nav-item" onclick="show('vscode',this)">VS Code</a>
+      <a class="docs-nav-item" onclick="show('zed',this)">Zed / JetBrains</a>
+    </div>
 
-    <div class="docs-nav-sec" style="color:var(--ac)">Cross-Platform (NEW)</div>
-    <a class="docs-nav-item" onclick="show('otel-setup',this)">OTel Setup (all tools)</a>
-    <a class="docs-nav-item" onclick="show('otel-claude',this)">Claude Code</a>
-    <a class="docs-nav-item" onclick="show('otel-copilot',this)">GitHub Copilot</a>
-    <a class="docs-nav-item" onclick="show('otel-gemini',this)">Gemini CLI</a>
-    <a class="docs-nav-item" onclick="show('otel-codex',this)">Codex CLI</a>
-    <a class="docs-nav-item" onclick="show('otel-cline',this)">Cline</a>
-    <a class="docs-nav-item" onclick="show('otel-pricing',this)">Pricing Engine</a>
-    <a class="docs-nav-item" onclick="show('xp-api',this)">Cross-Platform API</a>
+    <div class="docs-nav-group">
+      <div class="docs-nav-sec" style="color:var(--ac)" onclick="toggleNavGroup(this)">Cross-Platform (NEW)</div>
+      <a class="docs-nav-item" onclick="show('otel-setup',this)">OTel Setup (all tools)</a>
+      <a class="docs-nav-item" onclick="show('otel-claude',this)">Claude Code</a>
+      <a class="docs-nav-item" onclick="show('otel-copilot',this)">GitHub Copilot</a>
+      <a class="docs-nav-item" onclick="show('otel-gemini',this)">Gemini CLI</a>
+      <a class="docs-nav-item" onclick="show('otel-codex',this)">Codex CLI</a>
+      <a class="docs-nav-item" onclick="show('otel-cline',this)">Cline</a>
+      <a class="docs-nav-item" onclick="show('otel-pricing',this)">Pricing Engine</a>
+      <a class="docs-nav-item" onclick="show('xp-api',this)">Cross-Platform API</a>
+    </div>
 
-    <div class="docs-nav-sec">Privacy &amp; Security</div>
-    <a class="docs-nav-item" onclick="show('local-proxy',this)">Local Proxy (zero-trust)</a>
-    <a class="docs-nav-item" onclick="show('privacy-modes',this)">SDK privacy modes</a>
+    <div class="docs-nav-group">
+      <div class="docs-nav-sec" onclick="toggleNavGroup(this)">Privacy &amp; Security</div>
+      <a class="docs-nav-item" onclick="show('local-proxy',this)">Local Proxy (zero-trust)</a>
+      <a class="docs-nav-item" onclick="show('privacy-modes',this)">SDK privacy modes</a>
+    </div>
 
-    <div class="docs-nav-sec">CLI</div>
-    <a class="docs-nav-item" onclick="show('vantage-cli',this)">VantageAI CLI</a>
+    <div class="docs-nav-group">
+      <div class="docs-nav-sec" onclick="toggleNavGroup(this)">CLI</div>
+      <a class="docs-nav-item" onclick="show('vantage-cli',this)">VantageAI CLI</a>
+    </div>
 
-    <div class="docs-nav-sec">Features</div>
-    <a class="docs-nav-item" onclick="show('tagging',this)">Cost attribution tags</a>
-    <a class="docs-nav-item" onclick="show('alerts',this)">Budget alerts</a>
-    <a class="docs-nav-item" onclick="show('members',this)">Team members</a>
+    <div class="docs-nav-group">
+      <div class="docs-nav-sec" onclick="toggleNavGroup(this)">Features</div>
+      <a class="docs-nav-item" onclick="show('tagging',this)">Cost attribution tags</a>
+      <a class="docs-nav-item" onclick="show('alerts',this)">Budget alerts</a>
+      <a class="docs-nav-item" onclick="show('members',this)">Team members</a>
+    </div>
 
-    <div class="docs-nav-sec">Reference</div>
-    <a class="docs-nav-item" onclick="show('api',this)">REST API</a>
-    <a class="docs-nav-item" onclick="show('mcp-tools',this)">MCP tools</a>
-    <a class="docs-nav-item" onclick="show('mcp-workflows',this)">MCP workflow examples</a>
+    <div class="docs-nav-group">
+      <div class="docs-nav-sec" onclick="toggleNavGroup(this)">Reference</div>
+      <a class="docs-nav-item" onclick="show('api',this)">REST API</a>
+      <a class="docs-nav-item" onclick="show('mcp-tools',this)">MCP tools</a>
+      <a class="docs-nav-item" onclick="show('mcp-workflows',this)">MCP workflow examples</a>
+    </div>
   </div>
 
   <!-- CONTENT -->
@@ -246,98 +267,172 @@ const DOCS = {
 
 quickstart: `
 <h1>Quickstart</h1>
-<p>Add Vantage to your project in under 2 minutes. No account required to start — the free tier covers 10,000 requests/month.</p>
+<p>Get AI cost visibility in under 2 minutes. Choose your integration path:</p>
 
-<div class="step-row"><div class="step-num">1</div><div class="step-body">Install the SDK for your language</div></div>
+<h2>Path 1 — SDK (2 lines of code)</h2>
+<p>Best for: API-based apps using OpenAI, Anthropic, or Google SDKs directly.</p>
 <div class="tab-row"><div class="tab active" onclick="switchTab('qs',this,'qs-py')">Python</div><div class="tab" onclick="switchTab('qs',this,'qs-ts')">TypeScript</div></div>
-<div id="qs-py" class="tab-content active"><pre>pip install vantageaiops[openai]       # OpenAI support
-pip install vantageaiops[anthropic]    # Anthropic support
-pip install vantageaiops[all]          # Everything</pre></div>
-<div id="qs-ts" class="tab-content"><pre>npm install vantageaiops               # TypeScript / Node.js</pre></div>
+<div id="qs-py" class="tab-content active"><pre>pip install vantageaiops
 
-<div class="step-row"><div class="step-num">2</div><div class="step-body">Add two lines to your existing code</div></div>
-<div class="tab-row"><div class="tab active" onclick="switchTab('qs2',this,'qs2-py')">Python</div><div class="tab" onclick="switchTab('qs2',this,'qs2-ts')">TypeScript</div></div>
-<div id="qs2-py" class="tab-content active"><pre><span class="c-comment"># Before</span>
-<span class="c-keyword">from</span> openai <span class="c-keyword">import</span> <span class="c-var">OpenAI</span>
+<span class="c-kw">import</span> vantage
+<span class="c-kw">from</span> vantage.proxy.openai_proxy <span class="c-kw">import</span> OpenAI
 
-<span class="c-comment"># After — add these 2 lines</span>
-<span class="c-keyword">import</span> vantageaiops <span class="c-keyword">as</span> vantage
-<span class="c-keyword">from</span> vantageaiops.proxy.openai_proxy <span class="c-keyword">import</span> <span class="c-var">OpenAI</span>
+vantage.<span class="c-fn">init</span>(api_key=<span class="c-str">"vnt_your_key"</span>)
+client = OpenAI(api_key=<span class="c-str">"sk-..."</span>)
 
-vantage.<span class="c-func">init</span>(<span class="c-var">api_key</span>=<span class="c-string">"vnt_your_key"</span>)
-client = <span class="c-var">OpenAI</span>(<span class="c-var">api_key</span>=<span class="c-string">"sk-..."</span>)   <span class="c-comment"># identical to before</span>
-
-<span class="c-comment"># All your existing calls work unchanged</span>
-response = client.chat.completions.<span class="c-func">create</span>(
-    <span class="c-var">model</span>=<span class="c-string">"gpt-4o"</span>,
-    <span class="c-var">messages</span>=[{<span class="c-string">"role"</span>: <span class="c-string">"user"</span>, <span class="c-string">"content"</span>: <span class="c-string">"Hello!"</span>}]
+<span class="c-cm"># Every call is now tracked automatically</span>
+response = client.chat.completions.<span class="c-fn">create</span>(
+    model=<span class="c-str">"gpt-4o"</span>,
+    messages=[{<span class="c-str">"role"</span>: <span class="c-str">"user"</span>, <span class="c-str">"content"</span>: <span class="c-str">"Hello!"</span>}],
 )
-<span class="c-comment"># Vantage now logs: tokens, cost, latency, cheapest alternative</span></pre></div>
-<div id="qs2-ts" class="tab-content"><pre><span class="c-comment">// Before</span>
-<span class="c-keyword">import</span> <span class="c-var">OpenAI</span> <span class="c-keyword">from</span> <span class="c-string">"openai"</span>;
+<span class="c-cm"># ✓ Cost: $0.000110  ✓ Tokens: 12+8  ✓ Latency: 423ms</span></pre></div>
+<div id="qs-ts" class="tab-content"><pre>npm install vantageaiops
 
-<span class="c-comment">// After — add these 2 lines</span>
-<span class="c-keyword">import</span> * <span class="c-keyword">as</span> <span class="c-var">vantage</span> <span class="c-keyword">from</span> <span class="c-string">"vantageaiops"</span>;
-<span class="c-keyword">import</span> <span class="c-var">OpenAI</span> <span class="c-keyword">from</span> <span class="c-string">"openai"</span>;
+<span class="c-kw">import</span> { init, createOpenAIProxy } <span class="c-kw">from</span> <span class="c-str">"vantageaiops"</span>;
+<span class="c-kw">import</span> OpenAI <span class="c-kw">from</span> <span class="c-str">"openai"</span>;
 
-<span class="c-var">vantage</span>.<span class="c-func">init</span>({ <span class="c-var">apiKey</span>: <span class="c-string">"vnt_your_key"</span> });
-<span class="c-keyword">const</span> openai = <span class="c-var">vantage</span>.<span class="c-func">createOpenAIProxy</span>(<span class="c-keyword">new</span> <span class="c-var">OpenAI</span>(), <span class="c-var">vantage</span>.<span class="c-func">getClient</span>());
+<span class="c-fn">init</span>({ apiKey: <span class="c-str">"vnt_your_key"</span> });
+<span class="c-kw">const</span> openai = <span class="c-fn">createOpenAIProxy</span>(<span class="c-kw">new</span> OpenAI());
 
-<span class="c-comment">// All calls to openai.chat.completions.create(...) are now tracked automatically</span>
-<span class="c-keyword">const</span> res = <span class="c-keyword">await</span> openai.chat.completions.<span class="c-func">create</span>({
-  <span class="c-var">model</span>: <span class="c-string">"gpt-4o"</span>,
-  <span class="c-var">messages</span>: [{ <span class="c-var">role</span>: <span class="c-string">"user"</span>, <span class="c-var">content</span>: <span class="c-string">"Hello!"</span> }],
-});</pre></div>
+<span class="c-cm">// Every call tracked — cost, tokens, latency, model</span></pre></div>
 
-<div class="step-row"><div class="step-num">3</div><div class="step-body">Get your API key — free, no credit card</div></div>
-<p>Sign up at <a href="/signup.html" style="color:var(--accent)">vantageaiops.com</a> and copy your key from Settings → API Keys. Keys start with <code>vnt_</code>.</p>
+<h2>Path 2 — OTel (zero code changes)</h2>
+<p>Best for: tracking AI coding tools (Claude Code, Copilot, Gemini CLI, Cursor, Codex) across your org.</p>
+<pre><span class="c-cm"># Set 3 env vars on any developer machine</span>
+<span class="c-kw">export</span> CLAUDE_CODE_ENABLE_TELEMETRY=1
+<span class="c-kw">export</span> OTEL_EXPORTER_OTLP_ENDPOINT=<span class="c-str">https://api.vantageaiops.com/v1/otel</span>
+<span class="c-kw">export</span> OTEL_EXPORTER_OTLP_HEADERS=<span class="c-str">"Authorization=Bearer vnt_your_key"</span>
 
-<div class="info-box">💡 <strong style="color:var(--text)">No key? No problem.</strong> Vantage silently skips logging if <code>api_key</code> is missing or invalid. Your app won't break — you just won't see data in the dashboard.</div>`,
+<span class="c-cm"># Now all Claude Code usage is tracked automatically</span>
+<span class="c-cm"># Works with: Claude Code, Copilot, Gemini CLI, Codex, Cline, Aider + more</span></pre>
+
+<h2>Path 3 — CLI Wrapper (terminal users)</h2>
+<p>Best for: developers who use AI CLIs directly and want prompt optimization + cost tracking.</p>
+<pre><span class="c-cm"># Install and run</span>
+<span class="c-kw">$</span> npx vantageai-cli
+
+<span class="c-cm"># Or pipe prompts</span>
+<span class="c-kw">$</span> echo <span class="c-str">"explain kubernetes"</span> | vantage
+
+<span class="c-cm">  ⚡ Optimized: 8 → 6 tokens (saved 2, -25%)</span>
+<span class="c-cm">  [Claude responds...]</span>
+<span class="c-cm">  💰 Cost: $0.0065 | 💾 Saved: 2 tokens</span>
+
+<span class="c-cm"># Switch agents on the fly</span>
+vantage [claude] ▸ /gemini what is DNS
+vantage [claude] ▸ /compare explain caching
+vantage [claude] ▸ /session  <span class="c-cm"># interactive with /compact, /clear</span></pre>
+
+<div class="info-box">💡 All three paths send data to the same dashboard. Mix and match — use SDK for your API, OTel for your team's coding tools, CLI for your terminal.</div>
+`,
 
 install: `
 <h1>Installation</h1>
-<h2>Python</h2>
-<p>The Python SDK has zero required dependencies. Provider packages are optional extras.</p>
-<pre>pip install vantageaiops            # core only (no dependencies)
-pip install vantageaiops[openai]    # + OpenAI proxy
-pip install vantageaiops[anthropic] # + Anthropic proxy
-pip install vantageaiops[server]    # + FastAPI ingest server
-pip install vantageaiops[all]       # everything</pre>
-<p>Requires Python 3.10+.</p>
 
-<h2>TypeScript / JavaScript</h2>
-<pre>npm install vantageaiops            # ESM + CJS, works in Node 18+
-# peer deps (install whichever you use)
-npm install openai                # OpenAI proxy
-npm install @anthropic-ai/sdk     # Anthropic proxy</pre>
+<h2>SDK Packages</h2>
+<table class="api-table">
+<thead><tr><th>Package</th><th>Install</th><th>Use case</th></tr></thead>
+<tbody>
+<tr><td><code>vantageaiops</code></td><td><code>pip install vantageaiops</code></td><td>Python SDK — wrap OpenAI/Anthropic clients</td></tr>
+<tr><td><code>vantageaiops</code></td><td><code>npm install vantageaiops</code></td><td>TypeScript/JS SDK — wrap any LLM client</td></tr>
+<tr><td><code>vantageaiops-mcp</code></td><td><code>npx -y vantageaiops-mcp</code></td><td>MCP server for Cursor, Windsurf, Claude Code, VS Code</td></tr>
+<tr><td><code>vantageai-cli</code></td><td><code>npx vantageai-cli</code></td><td>CLI wrapper — optimize + forward + track</td></tr>
+<tr><td><code>vantageai-local-proxy</code></td><td><code>npx vantageai-local-proxy</code></td><td>Local privacy proxy — zero-trust tracking</td></tr>
+</tbody>
+</table>
 
-<h2>MCP server (for editors)</h2>
-<pre><span class="c-comment"># No install needed — run directly with npx:</span>
-npx -y vantageaiops-mcp</pre>`,
+<h2>OTel Integration (no packages needed)</h2>
+<p>For AI coding tools, just set environment variables:</p>
+<pre><span class="c-cm"># Claude Code</span>
+CLAUDE_CODE_ENABLE_TELEMETRY=1
+OTEL_EXPORTER_OTLP_ENDPOINT=https://api.vantageaiops.com/v1/otel
+OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer vnt_your_key"
+
+<span class="c-cm"># GitHub Copilot (VS Code settings)</span>
+"github.copilot.chat.otel.enabled": true
+
+<span class="c-cm"># Gemini CLI (~/.gemini/settings.json)</span>
+{ "telemetry": { "enabled": true } }</pre>
+
+<h2>Requirements</h2>
+<ul>
+<li><strong>Python SDK:</strong> Python 3.8+ (no native dependencies)</li>
+<li><strong>TypeScript SDK:</strong> Node.js 18+ (zero npm dependencies)</li>
+<li><strong>CLI:</strong> Node.js 18+ (zero npm dependencies)</li>
+<li><strong>OTel:</strong> No requirements — tools already emit telemetry</li>
+<li><strong>API key:</strong> Get one free at <a href="/signup.html">vantageaiops.com/signup</a></li>
+</ul>
+`,
 
 concepts: `
-<h1>Core concepts</h1>
-<h2>How the proxy works</h2>
-<p>Vantage uses a transparent proxy pattern — it wraps your LLM client and intercepts every API call. Your application code doesn't change. Vantage captures the request, response, and timing, then enqueues the data asynchronously.</p>
-<p>The key design constraint: <strong>zero latency impact</strong>. Events are queued in memory and flushed to the ingest server every 2 seconds by a background thread/timer. Your API calls are never blocked waiting for analytics.</p>
+<h1>Core Concepts</h1>
 
-<h2>Event model</h2>
-<p>Every LLM call produces one <code>VantageEvent</code> with these fields:</p>
-<table class="api-table"><thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>provider</code></td><td>string</td><td>openai | anthropic | google | mistral</td></tr>
-<tr><td><code>model</code></td><td>string</td><td>gpt-4o | claude-sonnet-4-6 etc.</td></tr>
-<tr><td><code>prompt_tokens</code></td><td>int</td><td>Input tokens billed</td></tr>
-<tr><td><code>completion_tokens</code></td><td>int</td><td>Output tokens billed</td></tr>
-<tr><td><code>cached_tokens</code></td><td>int</td><td>Tokens served from provider cache</td></tr>
-<tr><td><code>total_cost_usd</code></td><td>float</td><td>Actual cost in USD</td></tr>
-<tr><td><code>latency_ms</code></td><td>float</td><td>Wall-clock time for the API call</td></tr>
-<tr><td><code>cheapest_model</code></td><td>string</td><td>Model that would be cheapest for this usage</td></tr>
-<tr><td><code>potential_saving_usd</code></td><td>float</td><td>Cost delta vs cheapest model</td></tr>
-<tr><td><code>tags</code></td><td>dict</td><td>Your custom metadata (feature, team, user_id…)</td></tr>
-</tbody></table>
+<h2>4-Layer Architecture</h2>
+<p>VantageAI uses a 4-layer approach to capture <strong>100% of AI spend</strong> across your organization:</p>
 
-<h2>Data flow</h2>
-<pre>Your app → Vantage proxy → async queue → background flush → Ingest API → ClickHouse</pre>`,
+<table class="api-table">
+<thead><tr><th>Layer</th><th>How</th><th>Coverage</th><th>Latency</th></tr></thead>
+<tbody>
+<tr><td><strong>1. OTel Telemetry</strong></td><td>Native OpenTelemetry from 13+ AI tools</td><td>Claude Code, Copilot, Gemini CLI, Codex, Cline, Aider</td><td>Real-time</td></tr>
+<tr><td><strong>2. SDK Proxy</strong></td><td>Drop-in wrapper for LLM API clients</td><td>OpenAI, Anthropic, Google SDKs</td><td>Zero added</td></tr>
+<tr><td><strong>3. CLI Wrapper</strong></td><td>Transparent terminal wrapper</td><td>Any AI CLI (claude, gemini, codex, aider)</td><td>Zero added</td></tr>
+<tr><td><strong>4. Billing APIs</strong></td><td>Hourly sync from provider admin APIs</td><td>Cursor, OpenAI, Anthropic billing</td><td>Hourly</td></tr>
+</tbody>
+</table>
+
+<h2>Data Flow</h2>
+<pre>Developer machine                    VantageAI
+┌──────────────┐                    ┌──────────────┐
+│ Claude Code  │──OTel──────────────▸│              │
+│ Copilot      │──OTel──────────────▸│  /v1/otel    │
+│ Gemini CLI   │──OTel──────────────▸│              │
+│ Your API app │──SDK───────────────▸│  /v1/events  │──▸ Dashboard
+│ vantage CLI  │──tracking──────────▸│              │
+│ Local Proxy  │──stats─────────────▸│              │
+└──────────────┘                    └──────────────┘
+                                     Billing APIs ──▸ /v1/connectors</pre>
+
+<h2>Key Concepts</h2>
+
+<h3>Prompt Optimization (5-layer engine)</h3>
+<p>Every prompt can be compressed before sending to the LLM:</p>
+<ol>
+<li><strong>Filler phrases</strong> — removes "could you please", "it is important to note that" (32 patterns)</li>
+<li><strong>Verbose rewrites</strong> — "in order to" → "to", "due to the fact that" → "because" (42 patterns)</li>
+<li><strong>Filler words</strong> — strips "basically", "essentially", "literally" (17 words)</li>
+<li><strong>Deduplication</strong> — removes repeated sentences</li>
+<li><strong>Formatting</strong> — collapses whitespace, normalizes punctuation</li>
+</ol>
+<p>Result: <strong>40-60% token savings</strong> on verbose prompts. Works offline, <1ms.</p>
+
+<h3>Privacy Modes</h3>
+<table class="api-table">
+<thead><tr><th>Mode</th><th>What's sent</th><th>Use case</th></tr></thead>
+<tbody>
+<tr><td><code>full</code></td><td>Everything (tokens, cost, prompt preview)</td><td>Internal teams, debugging</td></tr>
+<tr><td><code>stats-only</code></td><td>Only numbers (tokens, cost, latency)</td><td>Enterprise, compliance</td></tr>
+<tr><td><code>hashed</code></td><td>Numbers + SHA-256 prompt hash</td><td>Dedup detection without text</td></tr>
+</tbody>
+</table>
+
+<h3>Cost Attribution</h3>
+<p>Every event can be tagged with dimensions for chargeback:</p>
+<ul>
+<li><strong>team</strong> — engineering, product, data</li>
+<li><strong>developer_email</strong> — per-person tracking from OTel</li>
+<li><strong>model</strong> — auto-detected from the request</li>
+<li><strong>provider</strong> — auto-detected (anthropic, openai, google)</li>
+<li><strong>cost_center</strong> — custom tag for billing</li>
+</ul>
+
+<h3>Budget & Anomaly Detection</h3>
+<ul>
+<li><strong>Budget policies</strong> — set monthly limits per org, team, or developer</li>
+<li><strong>Alert thresholds</strong> — 50%, 80%, 100% notifications via Slack/email</li>
+<li><strong>Anomaly detection</strong> — flags when cost exceeds 3x session average</li>
+<li><strong>CI/CD cost gate</strong> — <code>GET /v1/analytics/cost</code> returns pass/fail for pipelines</li>
+</ul>
+`,
 
 python: `
 <h1>Python SDK</h1>
@@ -1713,6 +1808,11 @@ function switchTab(group, el, targetId) {
   const target = document.getElementById(targetId);
   if(target) target.classList.add("active");
   el.classList.add("active");
+}
+
+function toggleNavGroup(sec) {
+  const group = sec.parentElement;
+  group.classList.toggle('collapsed');
 }
 
 function show(id, el) {
