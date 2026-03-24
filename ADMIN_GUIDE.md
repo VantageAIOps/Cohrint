@@ -29,6 +29,8 @@
 22. [Local Proxy Gateway — Privacy-First LLM Tracking](#22-local-proxy-gateway--privacy-first-llm-tracking)
 23. [SDK Privacy Modes](#23-sdk-privacy-modes)
 24. [Cross-Platform OTel Collector (v2)](#24-cross-platform-otel-collector-v2)
+25. [VantageAI CLI — AI Agent Wrapper](#25-vantageai-cli--ai-agent-wrapper)
+26. [Security & Governance](#26-security--governance)
 
 ---
 
@@ -2386,7 +2388,7 @@ The dashboard (`app.html`) has been restructured to use **only real API data**. 
 - AI Intelligence Layer — removed from sidebar (smart router not yet implemented)
 - Performance percentiles (p50/p95/p99) — requires per-request latency tracking
 
-### 25. VantageAI CLI — AI Agent Wrapper
+## 25. VantageAI CLI — AI Agent Wrapper
 
 The `vantage-cli` package (`vantage-cli/`) is a transparent terminal wrapper for AI coding tools (Claude Code, Codex, Gemini CLI, Aider). It adds zero-latency prompt optimization and cost tracking to any AI agent without changing the user's workflow.
 
@@ -2445,6 +2447,39 @@ The `vantage-cli` package (`vantage-cli/`) is a transparent terminal wrapper for
 
 **Test coverage:** `tests/suites/21_vantage_cli/` (suite 21) — 38+ checks (optimizer, pricing, pipe mode, config, security deny rules, dashboard integration, anomaly detection)
 
+## 26. Security & Governance
+
+### Audit Logging
+All security-critical actions are logged to the `audit_events` table:
+- Member invites, revocations, role changes
+- API key rotations (owner and member)
+- Budget policy changes
+
+**Endpoint:** `GET /v1/admin/audit?limit=50` (owner/admin only)
+
+**Table schema:**
+- `org_id`, `actor_email`, `actor_role` — who did it
+- `action` — what they did (member.invited, key.rotated, etc.)
+- `resource`, `detail` — what was affected
+- `ip_address`, `created_at` — when and where
+
+### Security Overview API
+`GET /v1/admin/security` returns:
+- `audit_events_today` — count of audit events in last 24h
+- `active_members` — count of org members + owner
+- `plan` — current org plan (free/team/enterprise)
+- `retention_days` — data retention based on plan (7/90/unlimited)
+- `security_features` — API key hashing, session security, encryption, RBAC, rate limiting
+
+### Dashboard
+The Security & Governance view in `app.html` shows:
+- Real-time KPIs from `/v1/admin/security` (no hardcoded values)
+- API keys table from `/v1/admin/overview` (real member data)
+- RBAC table with actual roles and permissions
+- Audit log table from `/v1/admin/audit`
+- Data retention policy based on actual plan
+- Security features summary from API
+
 ### Test Coverage
 
 - `tests/suites/17_otel/test_otel_collector.py` — 41 checks (auth, ingestion, API queries)
@@ -2453,8 +2488,10 @@ The `vantage-cli` package (`vantage-cli/`) is a transparent terminal wrapper for
 - `tests/suites/19_local_proxy/test_local_proxy.py` — 42+ checks (privacy engine, pricing accuracy, proxy integration, scanner coverage)
 - `tests/suites/20_dashboard_real_data/test_dashboard_real_data.py` — 42+ checks (enterprise reporting, cost intelligence, no fake data, cross-platform integration)
 - `tests/suites/21_vantage_cli/test_vantage_cli.py` — 38+ checks (optimizer engine, pricing engine, CLI pipe mode, config & file structure, dashboard integration, anomaly detection)
-- Total: **291+ checks** across 21 suites covering OTel + cross-platform + privacy + pricing + dashboard + CLI features
+- `tests/suites/22_landing_page/test_landing_page.py` — 41 checks (landing page content, v2 feature coverage, HTML structure)
+- `tests/suites/23_security_governance/` — audit logging, security overview API, RBAC, data retention
+- Total: **332+ checks** across 23 suites covering OTel + cross-platform + privacy + pricing + dashboard + CLI + landing page + security & governance features
 
 ---
 
-*Last updated: 24 March 2026 — v2.2 vantage-cli dashboard integration, anomaly detection, /summary & /budget commands, stability hardening. 291+ test checks across 21 suites.*
+*Last updated: 24 March 2026 — v2.3 security & governance (audit logging, security overview API, RBAC dashboard), landing page tests. 332+ test checks across 23 suites.*
