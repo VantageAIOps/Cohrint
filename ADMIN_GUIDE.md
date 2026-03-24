@@ -2409,7 +2409,24 @@ The `vantage-cli` package (`vantage-cli/`) is a transparent terminal wrapper for
 - `/codex <prompt>` — run with OpenAI Codex
 - `/compare <prompt>` — run on all agents, show cost comparison
 - `/cost` — show session totals
+- `/summary` (or `/stats`) — show dashboard spend, tokens, and budget from API
+- `/budget` — check budget status with alerts
 - `/help` — show all commands
+
+**Dashboard integration:**
+- Events are pushed to `/v1/events/batch` using the correct `EventIn` format (model, provider, tokens, cost, latency, agent name)
+- Tracking is async fire-and-forget — zero impact on response latency
+- Configure via `~/.vantage/config.json` or `VANTAGE_API_KEY` environment variable
+
+**Anomaly detection:**
+- The CLI warns when a prompt's cost exceeds 3x the session average, helping catch runaway token usage early
+
+**Stability:**
+- 5-minute timeout per agent invocation (prevents hung processes)
+- ENOENT handling for missing agent binaries (graceful error instead of crash)
+- 5 MB output cap (prevents memory exhaustion on large responses)
+- REPL crash recovery (catches unhandled rejections, keeps session alive)
+- Structured data detection (identifies JSON/code blocks in output for better cost attribution)
 
 **Setup wizard:** First run auto-detects installed AI tools and creates `~/.vantage/config.json`. The wizard validates binary paths and sets the default agent.
 
@@ -2423,10 +2440,10 @@ The `vantage-cli` package (`vantage-cli/`) is a transparent terminal wrapper for
 - `src/pricing.ts` — 15+ model pricing table with cost calculation
 - `src/event-bus.ts` — Typed EventEmitter for async processing
 - `src/agents/` — Adapter plugins for each AI CLI tool
-- `src/tracker.ts` — Async batch queue for dashboard reporting
+- `src/tracker.ts` — Async batch queue for dashboard reporting (`/v1/events/batch` EventIn format)
 - `src/security.ts` — 50 deny-rule engine for prompt sanitization
 
-**Test coverage:** `tests/suites/21_vantage_cli/` (suite 21) — 33+ checks (optimizer, pricing, pipe mode, config, security deny rules)
+**Test coverage:** `tests/suites/21_vantage_cli/` (suite 21) — 38+ checks (optimizer, pricing, pipe mode, config, security deny rules, dashboard integration, anomaly detection)
 
 ### Test Coverage
 
@@ -2435,9 +2452,9 @@ The `vantage-cli` package (`vantage-cli/`) is a transparent terminal wrapper for
 - `tests/suites/18_sdk_privacy/test_sdk_privacy.py` — 50+ checks (privacy modes, pricing engine, date format, dual-write)
 - `tests/suites/19_local_proxy/test_local_proxy.py` — 42+ checks (privacy engine, pricing accuracy, proxy integration, scanner coverage)
 - `tests/suites/20_dashboard_real_data/test_dashboard_real_data.py` — 42+ checks (enterprise reporting, cost intelligence, no fake data, cross-platform integration)
-- `tests/suites/21_vantage_cli/test_vantage_cli.py` — 33+ checks (optimizer engine, pricing engine, CLI pipe mode, config & file structure)
-- Total: **286+ checks** across 21 suites covering OTel + cross-platform + privacy + pricing + dashboard + CLI features
+- `tests/suites/21_vantage_cli/test_vantage_cli.py` — 38+ checks (optimizer engine, pricing engine, CLI pipe mode, config & file structure, dashboard integration, anomaly detection)
+- Total: **291+ checks** across 21 suites covering OTel + cross-platform + privacy + pricing + dashboard + CLI features
 
 ---
 
-*Last updated: 24 March 2026 — v2.1 vantage-cli security docs updated, 286+ test checks across 21 suites.*
+*Last updated: 24 March 2026 — v2.2 vantage-cli dashboard integration, anomaly detection, /summary & /budget commands, stability hardening. 291+ test checks across 21 suites.*

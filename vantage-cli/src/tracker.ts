@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { bus } from "./event-bus.js";
 import { calculateCost } from "./pricing.js";
 import { countTokens } from "./optimizer.js";
@@ -12,31 +13,49 @@ export interface TrackerConfig {
   debug: boolean;
 }
 
-interface TrackerEvent {
-  type: string;
-  agent: string;
+interface DashboardEvent {
+  event_id: string;
+  provider: string;
   model: string;
-  inputTokens: number;
-  outputTokens: number;
-  costUsd: number;
-  savedUsd: number;
-  durationMs: number;
-  timestamp: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  total_cost_usd: number;
+  latency_ms: number;
+  environment: string;
+  agent_name: string;
+  team: string;
 }
 
 export class Tracker {
-  private queue: TrackerEvent[] = [];
+  private queue: DashboardEvent[] = [];
   private timer: ReturnType<typeof setInterval> | null = null;
   private config: TrackerConfig;
   private sentIds = new Set<string>();
   private exitRegistered = false;
+  private lastSavedTokens = 0;
 
   constructor(config: TrackerConfig) {
     this.config = config;
     this.setupListeners();
   }
 
+  private resolveProvider(agent: string): string {
+    const map: Record<string, string> = {
+      claude: "anthropic",
+      codex: "openai",
+      gemini: "google",
+      aider: "anthropic",
+      chatgpt: "openai",
+    };
+    return map[agent] || "other";
+  }
+
   private setupListeners(): void {
+    bus.on("prompt:optimized", (data) => {
+      this.lastSavedTokens = data.savedTokens;
+    });
+
     bus.on("agent:completed", (data) => {
       const agent = getAgent(data.agent);
       const model = agent?.defaultModel ?? "unknown";
@@ -45,40 +64,49 @@ export class Tracker {
       const inputTokens = Math.ceil(outputTokens * 0.1);
       const costUsd = calculateCost(model, inputTokens, outputTokens);
 
+      // Calculate saved cost from optimization
+      const savedTokens = this.lastSavedTokens;
+      this.lastSavedTokens = 0; // reset for next prompt
+      const savedCost = savedTokens > 0 ? calculateCost(model, savedTokens, 0) : 0;
+
       bus.emit("cost:calculated", {
         agent: data.agent,
         model,
         inputTokens,
         outputTokens,
         costUsd,
-        savedUsd: 0,
+        savedUsd: savedCost,
       });
 
-      this.enqueue({
-        type: "agent:completed",
-        agent: data.agent,
+      const event: DashboardEvent = {
+        event_id: randomUUID(),
+        provider: this.resolveProvider(data.agent),
         model,
-        inputTokens,
-        outputTokens,
-        costUsd,
-        savedUsd: 0,
-        durationMs: data.durationMs,
-        timestamp: Date.now(),
-      });
+        prompt_tokens: inputTokens,
+        completion_tokens: outputTokens,
+        total_tokens: inputTokens + outputTokens,
+        total_cost_usd: costUsd,
+        latency_ms: data.durationMs,
+        environment: "production",
+        agent_name: data.agent,
+        team: "",
+      };
+
+      this.enqueue(event);
     });
   }
 
-  enqueue(event: TrackerEvent): void {
+  enqueue(event: DashboardEvent): void {
     if (this.config.privacy === "local-only") return;
 
     if (this.config.privacy === "strict" || this.config.privacy === "anonymized") {
       // Strip identifying info — keep only numeric metrics
-      delete (event as unknown as Record<string, unknown>).prompt;
-      delete (event as unknown as Record<string, unknown>).output;
+      event.agent_name = "anonymous";
+      event.team = "";
     }
 
     // Deduplication guard
-    const eventKey = `${event.type}:${event.agent}:${event.timestamp}`;
+    const eventKey = event.event_id;
     if (this.sentIds.has(eventKey)) return;
     this.sentIds.add(eventKey);
 
@@ -99,7 +127,7 @@ export class Tracker {
     }
 
     const batch = this.queue.splice(0, this.queue.length);
-    const url = `${this.config.apiBase}/v1/events`;
+    const url = `${this.config.apiBase}/v1/events/batch`;
 
     try {
       const response = await fetch(url, {
@@ -108,13 +136,18 @@ export class Tracker {
           "Content-Type": "application/json",
           Authorization: `Bearer ${this.config.apiKey}`,
         },
-        body: JSON.stringify({ events: batch }),
+        body: JSON.stringify({
+          events: batch,
+          sdk_version: "vantage-cli-1.0.0",
+          sdk_language: "typescript",
+        }),
       });
 
       bus.emit("cost:reported", { success: response.ok });
 
-      if (!response.ok && this.config.debug) {
-        console.error(`[vantage] Failed to report events: ${response.status}`);
+      if (!response.ok) {
+        const errBody = await response.text().catch(() => "");
+        console.error(`  [vantage] Dashboard sync failed (${response.status}): ${errBody.slice(0, 100)}`);
       }
     } catch (err) {
       bus.emit("cost:reported", { success: false });
@@ -123,7 +156,7 @@ export class Tracker {
       }
       // Re-queue failed events (skip any already confirmed sent)
       const unsent = batch.filter((e) => {
-        const key = `${e.type}:${e.agent}:${e.timestamp}`;
+        const key = e.event_id;
         return !this.sentIds.has(key);
       });
       this.queue.unshift(...unsent);
