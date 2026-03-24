@@ -34,13 +34,17 @@ const COST_TIMEOUT_MS = 2000;
 // Dashboard helpers
 // ---------------------------------------------------------------------------
 
+function safeNum(v: unknown, fallback = 0): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 function checkAnomaly(cost: import("./event-bus.js").VantageEvents["cost:calculated"]): void {
   const sess = getSession();
-  if (sess.promptCount > 2) {
-    const avgCost = sess.totalCostUsd / sess.promptCount;
-    if (cost.costUsd > avgCost * 3) {
-      console.log(yellow(`  ⚠ Anomaly: this prompt cost $${cost.costUsd.toFixed(4)} — ${(cost.costUsd / avgCost).toFixed(1)}x your session average`));
-    }
+  if (sess.promptCount <= 2 || sess.totalCostUsd <= 0) return;
+  const avgCost = sess.totalCostUsd / sess.promptCount;
+  if (avgCost > 0 && Number.isFinite(avgCost) && cost.costUsd > avgCost * 3) {
+    console.log(yellow(`  ⚠ Anomaly: this prompt cost $${cost.costUsd.toFixed(4)} — ${(cost.costUsd / avgCost).toFixed(1)}x your session average`));
   }
 }
 

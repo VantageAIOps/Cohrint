@@ -109,6 +109,11 @@ export class Tracker {
     const eventKey = event.event_id;
     if (this.sentIds.has(eventKey)) return;
     this.sentIds.add(eventKey);
+    // Cap dedup set to prevent memory leak in long sessions
+    if (this.sentIds.size > 10000) {
+      const arr = Array.from(this.sentIds);
+      this.sentIds = new Set(arr.slice(-5000));
+    }
 
     this.queue.push(event);
 
@@ -141,13 +146,14 @@ export class Tracker {
           sdk_version: "vantage-cli-1.0.0",
           sdk_language: "typescript",
         }),
+        signal: AbortSignal.timeout(15000),
       });
 
       bus.emit("cost:reported", { success: response.ok });
 
       if (!response.ok) {
-        const errBody = await response.text().catch(() => "");
-        console.error(`  [vantage] Dashboard sync failed (${response.status}): ${errBody.slice(0, 100)}`);
+        // Never log response body — could contain echoed credentials
+        console.error(`  [vantage] Dashboard sync failed: HTTP ${response.status}`);
       }
     } catch (err) {
       bus.emit("cost:reported", { success: false });

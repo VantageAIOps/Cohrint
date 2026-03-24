@@ -38,11 +38,12 @@ export function runAgent(
       return;
     }
 
-    // Timeout guard — kill process if it hangs
+    // Timeout guard — kill process if it hangs (grace = 10% of timeout, max 10s)
+    const grace = Math.min(Math.ceil(timeoutMs * 0.1), 10000);
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill("SIGTERM");
-      setTimeout(() => { if (!child.killed) child.kill("SIGKILL"); }, 5000);
+      setTimeout(() => { if (!child.killed) child.kill("SIGKILL"); }, grace);
     }, timeoutMs);
 
     if (child.pid) {
@@ -124,11 +125,12 @@ export function runAgentBuffered(
       return;
     }
 
-    // Timeout guard — kill process if it hangs
+    // Timeout guard — kill process if it hangs (grace = 10% of timeout, max 10s)
+    const grace = Math.min(Math.ceil(timeoutMs * 0.1), 10000);
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill("SIGTERM");
-      setTimeout(() => { if (!child.killed) child.kill("SIGKILL"); }, 5000);
+      setTimeout(() => { if (!child.killed) child.kill("SIGKILL"); }, grace);
     }, timeoutMs);
 
     if (child.pid) {
