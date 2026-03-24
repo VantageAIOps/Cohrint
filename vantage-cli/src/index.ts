@@ -397,7 +397,18 @@ async function startRepl(config: VantageConfig): Promise<void> {
                 }
 
                 if (activeSession?.isActive()) {
-                  activeSession.sendLine(sLine);
+                  const processed = activeSession.sendLine(sLine);
+                  if (processed?.type === "vantage-command") {
+                    // Handle vantage commands internally
+                    const cmd = sLine.trim().toLowerCase();
+                    if (cmd === "/cost" || cmd === "/summary" || cmd === "/stats") {
+                      await showDashboardSummary(config);
+                    } else if (cmd === "/budget") {
+                      await showBudgetStatus(config);
+                    } else if (cmd === "/help") {
+                      printSessionHelp();
+                    }
+                  }
                   // Wait for output to stream before re-prompting
                   setTimeout(sessionPrompt, 200);
                 } else {
@@ -565,6 +576,31 @@ function printHelp(): void {
   console.log(`  ${cyan("/quit")}               Exit VantageAI CLI`);
   console.log("");
   console.log(dim("  Or just type a prompt to use the current default agent."));
+  console.log("");
+}
+
+function printSessionHelp(): void {
+  console.log("");
+  console.log(bold("  Session Commands"));
+  console.log(dim("  " + "-".repeat(55)));
+  console.log(bold("  Optimization:"));
+  console.log(`  ${cyan("/opt-auto")}          Optimize prompts ≥5 words (default)`);
+  console.log(`  ${cyan("/opt-off")}           Disable optimization entirely`);
+  console.log(`  ${cyan("/opt-ask")}           Ask before each optimization`);
+  console.log(`  ${cyan("/opt-always")}        Optimize everything`);
+  console.log(bold("  Dashboard:"));
+  console.log(`  ${cyan("/cost")}              Show session cost & savings`);
+  console.log(`  ${cyan("/summary")}           Dashboard stats from API`);
+  console.log(`  ${cyan("/budget")}            Budget status & alerts`);
+  console.log(bold("  Session:"));
+  console.log(`  ${cyan("/exit-session")}      Return to VantageAI REPL`);
+  console.log(`  ${cyan("/help")}              Show this help`);
+  console.log("");
+  console.log(dim("  Agent commands pass through directly:"));
+  console.log(dim("    /compact, /clear, /diff, /mcp, @file, !shell, y, n, 1, 2, paths"));
+  console.log("");
+  console.log(dim("  The agent's stderr is inherited — file approval prompts,"));
+  console.log(dim("  git confirmations, and MCP dialogs show directly to you."));
   console.log("");
 }
 
