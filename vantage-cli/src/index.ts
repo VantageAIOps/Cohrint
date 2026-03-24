@@ -5,6 +5,7 @@ import { loadConfig, configExists, type VantageConfig } from "./config.js";
 import { runSetup } from "./setup.js";
 import { getAgent, detectAll, ALL_AGENTS } from "./agents/registry.js";
 import type { AgentAdapter } from "./agents/types.js";
+import { AgentSession, isAgentCommand } from "./session-mode.js";
 import { optimizePrompt } from "./optimizer.js";
 import { calculateCost, findCheapest, PRICES } from "./pricing.js";
 import { countTokens } from "./optimizer.js";
@@ -306,6 +307,7 @@ async function startRepl(config: VantageConfig): Promise<void> {
   printBanner();
 
   let currentAgent = getAgent(config.defaultAgent) ?? ALL_AGENTS[0];
+  let activeSession: AgentSession | null = null;
 
   const rl = createInterface({
     input: process.stdin,
@@ -350,6 +352,75 @@ async function startRepl(config: VantageConfig): Promise<void> {
         if (line === "/budget") {
           await showBudgetStatus(config);
           prompt();
+          return;
+        }
+
+        if (line === "/session" || line.startsWith("/session ")) {
+          const sessionAgent = line.includes(" ")
+            ? getAgent(line.split(" ")[1]) ?? currentAgent
+            : currentAgent;
+
+          activeSession = new AgentSession(sessionAgent);
+          const started = await activeSession.start();
+
+          if (!started || !activeSession.isActive()) {
+            activeSession = null;
+            prompt();
+            return;
+          }
+
+          // Enter session sub-REPL with proper termination guard
+          let sessionExiting = false;
+          const sessionPrompt = () => {
+            if (sessionExiting || !activeSession?.isActive()) {
+              // Session ended (agent crashed or exited) — return to main REPL
+              if (!sessionExiting) {
+                sessionExiting = true;
+                activeSession = null;
+                console.log(dim("  Session ended. Returned to VantageAI REPL."));
+              }
+              prompt();
+              return;
+            }
+            rl.question(cyan(`  ${sessionAgent.name}> `), async (sessionInput) => {
+              try {
+                const sLine = sessionInput.trim();
+                if (!sLine) { sessionPrompt(); return; }
+
+                if (sLine === "/exit-session" || sLine === "/exit") {
+                  sessionExiting = true;
+                  await activeSession?.end();
+                  activeSession = null;
+                  console.log(dim("  Returned to VantageAI REPL."));
+                  prompt();
+                  return;
+                }
+
+                if (activeSession?.isActive()) {
+                  activeSession.sendLine(sLine);
+                  // Wait for output to stream before re-prompting
+                  setTimeout(sessionPrompt, 200);
+                } else {
+                  sessionExiting = true;
+                  activeSession = null;
+                  console.log(dim("  Session ended unexpectedly. Returned to VantageAI REPL."));
+                  prompt();
+                }
+              } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                console.error(red(`  Session error: ${msg}`));
+                if (activeSession?.isActive()) {
+                  sessionPrompt();
+                } else {
+                  sessionExiting = true;
+                  activeSession = null;
+                  prompt();
+                }
+              }
+            });
+          };
+
+          sessionPrompt();
           return;
         }
 
@@ -418,6 +489,17 @@ async function startRepl(config: VantageConfig): Promise<void> {
           return;
         }
 
+        // Detect agent commands used outside session mode
+        if (line.startsWith("/") && !line.startsWith("/compare") && !line.startsWith("/default")) {
+          const cmd = line.split(/\s/)[0].toLowerCase();
+          if (isAgentCommand(currentAgent.name, line)) {
+            console.log(yellow(`  '${cmd}' is a ${currentAgent.displayName} command.`));
+            console.log(dim(`  Use /session to start an interactive session with agent commands.`));
+            prompt();
+            return;
+          }
+        }
+
         // Normal prompt — use current default agent
         const costPromise = waitForCost();
         await executePrompt(line, currentAgent, config);
@@ -444,15 +526,20 @@ async function startRepl(config: VantageConfig): Promise<void> {
   };
 
   const shutdown = async () => {
+    // Clean up active session first
+    if (activeSession?.isActive()) {
+      await activeSession.end().catch(() => {});
+      activeSession = null;
+    }
     rl.close();
-    await tracker?.flush();
+    await tracker?.flush().catch(() => {});
     printSessionSummary(getSession());
     process.exit(0);
   };
 
-  // Handle Ctrl+C — async-safe shutdown
+  // Handle Ctrl+C — clean up session + tracker before exit
   rl.on("SIGINT", () => {
-    shutdown().then(() => process.exit(0));
+    shutdown().catch(() => process.exit(1));
   });
 
   prompt();
@@ -471,6 +558,8 @@ function printHelp(): void {
   console.log(`  ${cyan("/cost")}               Show session cost summary`);
   console.log(`  ${cyan("/summary")}              Dashboard summary (spend, tokens, budget)`);
   console.log(`  ${cyan("/budget")}               Check budget status and alerts`);
+  console.log(`  ${cyan("/session [agent]")}   Start interactive session (supports /compact, /clear, @file, !shell)`);
+  console.log(`  ${cyan("/exit-session")}      Return to VantageAI REPL from session`);
   console.log(`  ${cyan("/default <agent>")}    Set default agent`);
   console.log(`  ${cyan("/help")}               Show this help`);
   console.log(`  ${cyan("/quit")}               Exit VantageAI CLI`);

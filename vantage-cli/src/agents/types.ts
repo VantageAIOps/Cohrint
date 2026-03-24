@@ -4,6 +4,10 @@ export interface AgentAdapter {
   binary: string;
   defaultModel: string;
   provider: string;
+  /** Args for interactive mode (no -p flag) — used by /session */
+  interactiveArgs?: string[];
+  /** Command to exit the agent's interactive session */
+  exitCommand?: string;
   detect(): Promise<boolean>;
   buildCommand(prompt: string, config?: AgentConfig): SpawnArgs;
 }

@@ -7,6 +7,8 @@ export const chatgptAdapter: AgentAdapter = {
   binary: "chatgpt-cli",
   defaultModel: "gpt-4o",
   provider: "openai",
+  interactiveArgs: [],
+  exitCommand: "/quit",
 
   async detect(): Promise<boolean> {
     try {

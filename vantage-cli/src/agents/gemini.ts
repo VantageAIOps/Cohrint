@@ -7,6 +7,8 @@ export const geminiAdapter: AgentAdapter = {
   binary: "gemini",
   defaultModel: "gemini-2.0-flash",
   provider: "google",
+  interactiveArgs: [],
+  exitCommand: "/quit",
 
   async detect(): Promise<boolean> {
     try {

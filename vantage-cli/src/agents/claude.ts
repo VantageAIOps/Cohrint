@@ -7,6 +7,8 @@ export const claudeAdapter: AgentAdapter = {
   binary: "claude",
   defaultModel: "claude-sonnet-4-6",
   provider: "anthropic",
+  interactiveArgs: [],
+  exitCommand: "/quit",
 
   async detect(): Promise<boolean> {
     try {

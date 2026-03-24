@@ -7,6 +7,8 @@ export const codexAdapter: AgentAdapter = {
   binary: "codex",
   defaultModel: "gpt-4o",
   provider: "openai",
+  interactiveArgs: [],
+  exitCommand: "/quit",
 
   async detect(): Promise<boolean> {
     try {
