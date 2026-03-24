@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>VantageAI — LLM Cost Tracking & AI API Cost Monitoring</title>
 <meta name="description" content="Track, analyse and reduce your LLM API costs in real time. One line of code gives you full visibility into OpenAI, Anthropic, Google and Mistral spending — with budget alerts and model comparison built in.">
-<meta name="keywords" content="LLM cost tracking, AI API cost monitoring, OpenAI cost tracker, Claude API pricing, GPT-4 cost calculator, AI spending dashboard, token cost analytics, LLM observability, AI budget alerts, model pricing comparison">
+<meta name="keywords" content="AI cost intelligence, AI FinOps, LLM cost tracking, AI API cost monitoring, OpenAI cost tracker, Claude API pricing, GPT-4 cost calculator, AI spending dashboard, token cost analytics, LLM observability, AI budget alerts, model pricing comparison, zero-instrumentation">
 <meta name="author" content="VantageAI">
 <meta name="robots" content="index, follow">
 
@@ -428,7 +428,7 @@ footer a:hover{color:var(--text)}
   <div class="hero-glow"></div>
   <div class="hero-badge">↗ Open source · Free forever · No credit card</div>
   <h1>Know exactly what your<br><em>AI actually costs</em></h1>
-  <p class="hero-sub">Token optimization, prompt compression, model cost comparison, hallucination scoring, budget alerts and live recommendations — all in one platform. One line to install.</p>
+  <p class="hero-sub">AI cost intelligence and FinOps for engineering teams — token optimization, prompt compression, model cost comparison, hallucination scoring, budget alerts and live recommendations. One line to install.</p>
   <div class="hero-actions">
     <a href="/signup.html" class="btn-primary">Start for free →</a>
     <a href="#demo" class="btn-ghost"><span>▶</span> Live demo</a>
@@ -453,7 +453,7 @@ footer a:hover{color:var(--text)}
 <!-- STATS -->
 <div class="stats-strip">
   <div class="stat-item reveal"><div class="stat-num">13<span>+</span></div><div class="stat-lbl">AI coding tools tracked via OTel — Claude Code, Copilot, Gemini CLI, Cursor, Codex &amp; more</div></div>
-  <div class="stat-item reveal"><div class="stat-num">40<span>%</span></div><div class="stat-lbl">avg token savings from our 5-layer prompt optimizer — filler removal, verbose rewrites, dedup</div></div>
+  <div class="stat-item reveal"><div class="stat-num">40<span>%</span></div><div class="stat-lbl">avg token savings from our AI-powered prompt optimizer — filler removal, verbose rewrites, dedup</div></div>
   <div class="stat-item reveal"><div class="stat-num">22</div><div class="stat-lbl">LLM models with live pricing — auto cost estimation even when your tool doesn't report costs</div></div>
   <div class="stat-item reveal"><div class="stat-num"><span>$</span>0</div><div class="stat-lbl">to get started — optimizer, CLI wrapper, dashboard analytics — no credit card</div></div>
 </div>
@@ -493,15 +493,15 @@ footer a:hover{color:var(--text)}
     <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(0,212,161,.1)">💡</div><div class="feat-title">Live recommendations</div><div class="feat-desc">Real-time suggestions to cut costs: switch overpriced models, enable prompt caching, trim bloated system prompts. Automated anomaly detection alerts you to cost spikes instantly.</div><div class="feat-tag">→ actionable savings, not just charts</div></div>
     <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(245,158,11,.1)">⚡</div><div class="feat-title">Efficiency scorer</div><div class="feat-desc">Every API call gets an efficiency score. Flags bloated system prompts, redundant context, and inefficient few-shot examples. Shows exactly where to optimize.</div><div class="feat-tag">→ per-call optimization tips</div></div>
     <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(0,152,255,.1)">🔗</div><div class="feat-title">Agent trace explorer</div><div class="feat-desc">Visualize multi-step agent workflows as call trees. See cost, latency and model per span. Debug expensive chains and find which agent step burns the most budget.</div><div class="feat-tag">→ trace_id + span_depth tracking</div></div>
-    <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(248,113,113,.1)">🔔</div><div class="feat-title">Budget alerts & governance</div><div class="feat-desc">Set spend caps by team or feature. Slack/email alerts before budgets blow. Anomaly detection catches runaway agents before they hit your invoice.</div><div class="feat-tag">→ Z-score anomaly detection</div></div>
+    <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(248,113,113,.1)">🔔</div><div class="feat-title">Budget alerts & governance</div><div class="feat-desc">Set spend caps by team or feature. Slack/email alerts before budgets blow. Anomaly detection catches runaway agents before they hit your invoice.</div><div class="feat-tag">→ intelligent anomaly detection</div></div>
     <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(167,139,250,.1)">🤖</div><div class="feat-title">MCP — ask your AI about costs</div><div class="feat-desc">Connect to Claude, Cursor, Windsurf, VS Code or any MCP-compatible editor. Ask "how much did we spend this month?" and get real answers. 13 tools including cost optimizer.</div><div class="feat-tag">→ npx vantageaiops-mcp · zero install</div></div>
     <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(0,212,161,.1)">🏷️</div><div class="feat-title">Cost attribution & chargeback</div><div class="feat-desc">Break down AI spend by team, feature, user or customer. Tag every call with custom dimensions. Built-in team budgets with per-team alerts and RBAC scoping.</div><div class="feat-tag">→ team · feature · user · custom tags</div></div>
     <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(0,152,255,.1)">📈</div><div class="feat-title">Exec ROI dashboard</div><div class="feat-desc">Translate token costs into business outcomes — cost per resolved ticket, per summary, per customer interaction. Built for CTOs and CFOs who want signal, not noise.</div><div class="feat-tag">→ business metrics, not raw tokens</div></div>
-    <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(248,113,113,.1)">🚨</div><div class="feat-title">Anomaly detection</div><div class="feat-desc">Automatic Z-score analysis runs every 10 minutes on your spend data. Detects cost spikes, traffic surges, latency degradation and runaway agents — alerts via Slack or email before damage is done.</div><div class="feat-tag">→ cron-based · Z-score · Slack alerts</div></div>
-    <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(245,158,11,.1)">🛡️</div><div class="feat-title">Security & data governance</div><div class="feat-desc">API keys hashed with SHA-256, role-based access control (owner/admin/member/viewer), team-scoped data isolation, and AES-256 encryption at rest on Cloudflare's global edge.</div><div class="feat-tag">→ RBAC · encryption · data isolation</div></div>
-    <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(0,212,161,.1)">🌐</div><div class="feat-title">Cross-platform OTel collector</div><div class="feat-desc">Auto-track spend across 13+ AI coding tools via OpenTelemetry. Claude Code, GitHub Copilot, Gemini CLI, Codex, Cursor, Cline, Aider, Roo Code — all in one dashboard. Zero code changes.</div><div class="feat-tag">→ OTel telemetry · auto cost estimation · per-developer ROI</div></div>
+    <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(248,113,113,.1)">🚨</div><div class="feat-title">Anomaly detection</div><div class="feat-desc">Continuous intelligent analysis of your spend data. Detects cost spikes, traffic surges, latency degradation and runaway agents — alerts via Slack or email before damage is done.</div><div class="feat-tag">→ continuous monitoring · intelligent detection · Slack alerts</div></div>
+    <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(245,158,11,.1)">🛡️</div><div class="feat-title">Security & data governance</div><div class="feat-desc">API keys hashed with industry-standard encryption, role-based access control (owner/admin/member/viewer), team-scoped data isolation, and AES-256 encryption at rest on global edge infrastructure.</div><div class="feat-tag">→ RBAC · encryption · data isolation</div></div>
+    <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(0,212,161,.1)">🌐</div><div class="feat-title">Cross-platform OTel collector</div><div class="feat-desc">Zero-instrumentation spend tracking across 13+ AI coding tools via OpenTelemetry. Claude Code, GitHub Copilot, Gemini CLI, Codex, Cursor, Cline, Aider, Roo Code — all in one dashboard. Zero code changes.</div><div class="feat-tag">→ zero-instrumentation · auto cost estimation · per-developer ROI</div></div>
     <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(167,139,250,.1)">⌨️</div><div class="feat-title">VantageAI CLI</div><div class="feat-desc">Transparent terminal wrapper for any AI CLI. Optimizes prompts before sending (40% savings), streams output in real-time, tracks costs. Switch between Claude, Gemini, Codex with /slash commands.</div><div class="feat-tag">→ zero latency · /session mode · /compare agents</div></div>
-    <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(0,152,255,.1)">🔒</div><div class="feat-title">Local proxy — zero trust</div><div class="feat-desc">Run the VantageAI proxy on your machine. Your API keys and prompts never leave your environment — only anonymized stats (token counts, costs, latency) are sent to the dashboard.</div><div class="feat-tag">→ strict · standard · relaxed privacy modes</div></div>
+    <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(0,152,255,.1)">🔒</div><div class="feat-title">Local proxy — zero trust</div><div class="feat-desc">Privacy-first cost intelligence: run the VantageAI proxy on your machine. Your API keys and prompts never leave your environment — only anonymized stats (token counts, costs, latency) are sent to the dashboard.</div><div class="feat-tag">→ strict · standard · relaxed privacy modes</div></div>
     <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(245,158,11,.1)">👥</div><div class="feat-title">Developer productivity ROI</div><div class="feat-desc">Track cost per PR, cost per commit, and lines of code per dollar for every developer. Correlate AI spend with actual code output. Enterprise chargeback reporting built in.</div><div class="feat-tag">→ cost/PR · cost/commit · lines/$ · team budgets</div></div>
   </div>
 </section>
@@ -702,7 +702,7 @@ response = client.chat.completions.<span class="c-func">create</span>(
           <div style="font-size:12px;color:var(--accent);margin-bottom:8px">AFTER (23 tokens) — <strong style="color:var(--accent)">41% saved</strong></div>
           <div style="background:rgba(0,212,161,.05);border:1px solid rgba(0,212,161,.15);border-radius:8px;padding:12px;font-size:13px;margin-bottom:16px">Analyze quarterly revenue data. We need year-over-year growth. Consider market trends.</div>
           <div style="font-size:11px;color:var(--muted)">
-            <div style="margin-bottom:6px">5-layer compression engine:</div>
+            <div style="margin-bottom:6px">AI-powered compression engine:</div>
             <div>✂️ Removed: "I would like you to please", "It is important to note that", "Could you please"</div>
             <div>🔄 Rewritten: "take into consideration" → "consider"</div>
             <div>📊 Estimated savings per 1K calls: <span style="color:var(--accent)">-$0.048 on claude-sonnet-4-6</span></div>
@@ -760,7 +760,7 @@ response = client.chat.completions.<span class="c-func">create</span>(
     <a href="/app.html" class="btn-ghost" style="font-size:13px;padding:12px 28px;text-decoration:none">Open full dashboard →</a>
   </div>
   <p style="text-align:center;margin-top:12px;font-size:12px;color:var(--muted)">
-    No credit card required · Free tier includes 10,000 events/month
+    No credit card required · Generous free tier — upgrade when you need
   </p>
 </section>
 
@@ -894,7 +894,7 @@ response = client.chat.completions.<span class="c-func">create</span>(
     <div class="trust-badge"><span>🔒</span> SOC2 Ready</div>
     <div class="trust-badge"><span>🇪🇺</span> GDPR Compliant</div>
     <div class="trust-badge"><span>🏥</span> HIPAA Ready</div>
-    <div class="trust-badge"><span>🔑</span> API Keys SHA-256</div>
+    <div class="trust-badge"><span>🔑</span> Encrypted API Keys</div>
     <div class="trust-badge"><span>📋</span> Full Audit Logs</div>
     <div class="trust-badge"><span>🌐</span> Self-Hostable</div>
     <div class="trust-badge"><span>⚡</span> 99.9% Uptime</div>
@@ -908,7 +908,7 @@ response = client.chat.completions.<span class="c-func">create</span>(
   <div class="faq-list reveal">
     <div class="faq-item">
       <div class="faq-q" onclick="toggleFaq(this)">Does Vantage store my prompts and responses? <span class="faq-arrow">+</span></div>
-      <div class="faq-a"><div class="faq-a-inner">Vantage stores a short preview of your request and response (first 500 chars) to help you debug expensive or low-quality calls. You can disable this entirely in your SDK config. We never train models on your data, and you can request deletion at any time under GDPR.</div></div>
+      <div class="faq-a"><div class="faq-a-inner">Vantage stores a configurable preview of your request and response to help you debug expensive or low-quality calls. You can disable this entirely in your SDK config. We never train models on your data, and you can request deletion at any time under GDPR.</div></div>
     </div>
     <div class="faq-item">
       <div class="faq-q" onclick="toggleFaq(this)">Does adding the Vantage SDK add latency to my calls? <span class="faq-arrow">+</span></div>
@@ -928,7 +928,7 @@ response = client.chat.completions.<span class="c-func">create</span>(
     </div>
     <div class="faq-item">
       <div class="faq-q" onclick="toggleFaq(this)">How does the free tier compare to paid plans? <span class="faq-arrow">+</span></div>
-      <div class="faq-a"><div class="faq-a-inner">The free tier gives you 10,000 requests/month, the core cost dashboard, 7-day log retention, and 1 user seat — no credit card required, forever. The Team plan ($99/mo) adds unlimited requests, cross-model pricing intelligence, efficiency scoring, budget alerts, team attribution, and up to 10 seats.</div></div>
+      <div class="faq-a"><div class="faq-a-inner">The free tier gives you generous request limits, the core cost dashboard, 7-day log retention, and 1 user seat — no credit card required, forever. The Team plan ($99/mo) adds unlimited requests, cross-model pricing intelligence, efficiency scoring, budget alerts, team attribution, and up to 10 seats.</div></div>
     </div>
     <div class="faq-item">
       <div class="faq-q" onclick="toggleFaq(this)">What is the VantageAI CLI and how does it work? <span class="faq-arrow">+</span></div>

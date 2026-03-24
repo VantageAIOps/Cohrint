@@ -28,7 +28,18 @@ superadmin.use('*', async (c, next) => {
   }
   const auth = c.req.header('Authorization') ?? '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
-  if (token !== secret) {
+  // Constant-time comparison to prevent timing attacks
+  // Hash both values to ensure equal length, then compare hashes
+  const enc = new TextEncoder();
+  const [hashA, hashB] = await Promise.all([
+    crypto.subtle.digest('SHA-256', enc.encode(token)),
+    crypto.subtle.digest('SHA-256', enc.encode(secret)),
+  ]);
+  const arrA = new Uint8Array(hashA);
+  const arrB = new Uint8Array(hashB);
+  let diff = 0;
+  for (let i = 0; i < arrA.length; i++) diff |= arrA[i] ^ arrB[i];
+  if (diff !== 0) {
     return c.json({ error: 'Forbidden' }, 403);
   }
   return next();
