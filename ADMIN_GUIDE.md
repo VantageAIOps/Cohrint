@@ -2386,6 +2386,48 @@ The dashboard (`app.html`) has been restructured to use **only real API data**. 
 - AI Intelligence Layer — removed from sidebar (smart router not yet implemented)
 - Performance percentiles (p50/p95/p99) — requires per-request latency tracking
 
+### 25. VantageAI CLI — AI Agent Wrapper
+
+The `vantage-cli` package (`vantage-cli/`) is a transparent terminal wrapper for AI coding tools (Claude Code, Codex, Gemini CLI, Aider). It adds zero-latency prompt optimization and cost tracking to any AI agent without changing the user's workflow.
+
+**How it works:**
+1. User types a prompt
+2. CLI optimizes it (5-layer compression, <1ms, local)
+3. Forwards optimized prompt to the user's AI tool (Claude Code, Codex, Gemini CLI, Aider)
+4. Streams stdout/stderr in real-time (zero added latency)
+5. Calculates cost + token savings after response
+6. Sends tracking data to dashboard asynchronously (fire-and-forget)
+
+**3 Modes:**
+- **REPL**: `vantage` — interactive mode with agent switching
+- **One-shot**: `vantage "prompt"` — run and exit
+- **Pipe**: `echo "prompt" | vantage` — scriptable
+
+**Agent switching:**
+- `/claude <prompt>` — run with Claude Code
+- `/gemini <prompt>` — run with Gemini CLI
+- `/codex <prompt>` — run with OpenAI Codex
+- `/compare <prompt>` — run on all agents, show cost comparison
+- `/cost` — show session totals
+- `/help` — show all commands
+
+**Setup wizard:** First run auto-detects installed AI tools and creates `~/.vantage/config.json`. The wizard validates binary paths and sets the default agent.
+
+**Security:**
+- 50 deny rules strip secrets, credentials, and PII before prompts leave the terminal
+- HTTPS-only tracking — all dashboard reporting uses TLS; no plaintext telemetry
+- Privacy anonymization — prompt content is never stored; only token counts and cost metadata are sent
+
+**Key files:**
+- `src/optimizer.ts` — 5-layer prompt compression (filler phrases, verbose rewrites, dedup)
+- `src/pricing.ts` — 15+ model pricing table with cost calculation
+- `src/event-bus.ts` — Typed EventEmitter for async processing
+- `src/agents/` — Adapter plugins for each AI CLI tool
+- `src/tracker.ts` — Async batch queue for dashboard reporting
+- `src/security.ts` — 50 deny-rule engine for prompt sanitization
+
+**Test coverage:** `tests/suites/21_vantage_cli/` (suite 21) — 33+ checks (optimizer, pricing, pipe mode, config, security deny rules)
+
 ### Test Coverage
 
 - `tests/suites/17_otel/test_otel_collector.py` — 41 checks (auth, ingestion, API queries)
@@ -2393,8 +2435,9 @@ The dashboard (`app.html`) has been restructured to use **only real API data**. 
 - `tests/suites/18_sdk_privacy/test_sdk_privacy.py` — 50+ checks (privacy modes, pricing engine, date format, dual-write)
 - `tests/suites/19_local_proxy/test_local_proxy.py` — 42+ checks (privacy engine, pricing accuracy, proxy integration, scanner coverage)
 - `tests/suites/20_dashboard_real_data/test_dashboard_real_data.py` — 42+ checks (enterprise reporting, cost intelligence, no fake data, cross-platform integration)
-- Total: **250+ checks** covering OTel + cross-platform + privacy + pricing + dashboard features
+- `tests/suites/21_vantage_cli/test_vantage_cli.py` — 33+ checks (optimizer engine, pricing engine, CLI pipe mode, config & file structure)
+- Total: **286+ checks** across 21 suites covering OTel + cross-platform + privacy + pricing + dashboard + CLI features
 
 ---
 
-*Last updated: 24 March 2026 — v2.1 all fake data removed, enterprise reporting wired to real APIs, sidebar simplified, 250+ test checks.*
+*Last updated: 24 March 2026 — v2.1 vantage-cli security docs updated, 286+ test checks across 21 suites.*

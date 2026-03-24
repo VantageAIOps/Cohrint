@@ -1467,6 +1467,11 @@ curl -X POST https://api.vantageaiops.com/v1/events \
               </div>
               <label class="muted" style="font-size:12px;display:block;margin:8px 0 4px">Compressed output:</label>
               <div id="opt-output" style="background:var(--s1);border:1px solid var(--s2);border-radius:8px;padding:10px;font-size:13px;white-space:pre-wrap;max-height:200px;overflow-y:auto"></div>
+              <div id="opt-cost-estimate" style="margin-top:10px"></div>
+              <div style="margin-top:12px">
+                <label class="muted" style="font-size:12px;display:block;margin-bottom:6px">Optimization tips:</label>
+                <div id="opt-tips-list"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -3684,62 +3689,155 @@ document.addEventListener('keydown', e => {
 <!-- Token Optimizer functions -->
 <script>
 const OPT_PRICING = {
-  'gpt-4o':          { input: 0.0025, output: 0.01 },
-  'gpt-4':           { input: 0.03,   output: 0.06 },
-  'gpt-3.5-turbo':   { input: 0.0015, output: 0.002 },
-  'claude-3-sonnet':  { input: 0.003,  output: 0.015 },
-  'claude-3-haiku':   { input: 0.00025,output: 0.00125 },
-  'gemini-pro':       { input: 0.0005, output: 0.0015 },
+  'claude-opus-4-6':    { input: 0.015,   output: 0.075 },
+  'claude-sonnet-4-6':  { input: 0.003,   output: 0.015 },
+  'claude-haiku-4-5':   { input: 0.0008,  output: 0.004 },
+  'gpt-4o':             { input: 0.0025,  output: 0.01 },
+  'gpt-4o-mini':        { input: 0.00015, output: 0.0006 },
+  'o1':                 { input: 0.015,   output: 0.06 },
+  'o3-mini':            { input: 0.0011,  output: 0.0044 },
+  'gemini-2.0-flash':   { input: 0.0001,  output: 0.0004 },
+  'gemini-1.5-pro':     { input: 0.00125, output: 0.005 },
+  'deepseek-v3':        { input: 0.00027, output: 0.0011 },
 };
 
+// Filler phrases to strip
 const OPT_FILLERS = [
-  /\bplease\b/gi, /\bcould you\b/gi, /\bcan you\b/gi, /\bwould you mind\b/gi,
   /\bi'd like you to\b/gi, /\bi want you to\b/gi, /\bi need you to\b/gi,
-  /\bkindly\b/gi, /\bjust\b/gi, /\bbasically\b/gi, /\bactually\b/gi,
-  /\bsimply\b/gi, /\bin order to\b/gi, /\bthe fact that\b/gi,
-  /\bit is important to note that\b/gi, /\bit should be noted that\b/gi,
-  /\bas a matter of fact\b/gi, /\bin my opinion\b/gi,
+  /\bwould you mind\b/gi, /\bcould you please\b/gi, /\bcan you please\b/gi,
+  /\bplease note that\b/gi, /\bit is important to note that\b/gi,
+  /\bit should be noted that\b/gi, /\bit is worth mentioning that\b/gi,
+  /\bi was wondering if you could\b/gi, /\bit goes without saying\b/gi,
+  /\bneedless to say\b/gi, /\bas previously mentioned\b/gi,
+  /\bfor your information\b/gi, /\bi would appreciate it if you could\b/gi,
+  /\bplease be advised that\b/gi, /\bat the end of the day\b/gi,
+  /\bin today's world\b/gi, /\bin this day and age\b/gi,
+  /\beach and every\b/gi, /\bfirst and foremost\b/gi,
+  /\bdue to the fact that\b/gi, /\bin light of the fact that\b/gi,
+  /\bwhether or not\b/gi, /\bas a matter of fact\b/gi,
+];
+// Filler words
+const OPT_FILLER_WORDS = /\b(please|kindly|basically|essentially|actually|literally|obviously|clearly|simply|just|very|really|quite|rather|somewhat|pretty|fairly)\b/gi;
+// Verbose → concise rewrites
+const OPT_REWRITES = [
+  [/\bin order to\b/gi, 'to'], [/\bfor the purpose of\b/gi, 'for'],
+  [/\bwith regard to\b/gi, 'regarding'], [/\bwith respect to\b/gi, 'regarding'],
+  [/\bin the event that\b/gi, 'if'], [/\bat this point in time\b/gi, 'now'],
+  [/\bprior to\b/gi, 'before'], [/\bsubsequent to\b/gi, 'after'],
+  [/\ba large number of\b/gi, 'many'], [/\ba small number of\b/gi, 'few'],
+  [/\bthe majority of\b/gi, 'most'], [/\bon a daily basis\b/gi, 'daily'],
+  [/\bon a regular basis\b/gi, 'regularly'], [/\bis able to\b/gi, 'can'],
+  [/\bare able to\b/gi, 'can'], [/\bhas the ability to\b/gi, 'can'],
+  [/\bmake a decision\b/gi, 'decide'], [/\btake into consideration\b/gi, 'consider'],
+  [/\bthe fact that\b/gi, 'that'], [/\bin spite of\b/gi, 'despite'],
+  [/\bdue to the fact that\b/gi, 'because'], [/\bon account of\b/gi, 'because'],
+  [/\bfor the reason that\b/gi, 'because'], [/\bwith the exception of\b/gi, 'except'],
+  [/\bin the near future\b/gi, 'soon'], [/\bin regard to\b/gi, 'about'],
+  [/\bpertaining to\b/gi, 'about'], [/\bby means of\b/gi, 'by'],
+  [/\bin conjunction with\b/gi, 'with'], [/\bin an effort to\b/gi, 'to'],
+  [/\bas a consequence of\b/gi, 'because of'], [/\bin the process of\b/gi, 'while'],
 ];
 
 function countTokensLocal(text) {
-  return Math.ceil(text.trim().split(/\s+/).filter(Boolean).length * 1.3);
+  if (!text) return 0;
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  let count = 0;
+  for (const w of words) {
+    if (w.length <= 4) count += 1;
+    else if (w.length <= 8) count += 1.3;
+    else if (w.length <= 12) count += 1.8;
+    else count += Math.ceil(w.length / 4);
+  }
+  return Math.ceil(count);
 }
 
 function compressLocal(text) {
   let out = text;
+  // 1. Remove filler phrases
   OPT_FILLERS.forEach(r => out = out.replace(r, ''));
-  out = out.replace(/\s{2,}/g, ' ').trim();
-  return out;
+  // 2. Verbose → concise rewrites
+  OPT_REWRITES.forEach(([pat, rep]) => out = out.replace(pat, rep));
+  // 3. Remove filler words
+  out = out.replace(OPT_FILLER_WORDS, '');
+  // 4. Deduplicate sentences
+  const sents = out.split(/(?<=[.!?])\s+/);
+  const seen = new Set(); const unique = [];
+  for (const s of sents) {
+    const n = s.toLowerCase().trim().replace(/\s+/g,' ');
+    if (n.length > 2 && !seen.has(n)) { seen.add(n); unique.push(s); }
+  }
+  out = unique.join(' ');
+  // 5. Collapse whitespace
+  out = out.replace(/\n{3,}/g, '\n\n').replace(/[ \t]{2,}/g, ' ').replace(/\s+([.!?,;:])/g, '$1');
+  return out.trim();
+}
+
+function getLocalOptTips(text, origTok, compTok) {
+  const tips = [];
+  const saved = origTok - compTok;
+  const pct = origTok > 0 ? Math.round(saved / origTok * 100) : 0;
+  if (saved > 5) tips.push({icon:'✂️', text:`Compression removes ~${saved} tokens (${pct}%) — filler phrases + verbose rewrites`, tag:`-${saved} tokens`});
+  if (/```[\s\S]{500,}```/.test(text)) tips.push({icon:'📄', text:'Large code block inlined — reference the file path instead of pasting code', tag:'HIGH IMPACT'});
+  if ((text.match(/\n/g)||[]).length > 50) tips.push({icon:'📋', text:'Many lines — use bullet points instead of prose to reduce ~30%', tag:'~30%'});
+  if (origTok > 8000) tips.push({icon:'💾', text:'8K+ tokens — enable prompt caching (system prompt prefix) to save 90% on repeated calls', tag:'CACHE'});
+  if (origTok > 4000) tips.push({icon:'🔄', text:'4K+ tokens — try gemini-2.0-flash ($0.10/1M) or deepseek-v3 ($0.27/1M)', tag:'MODEL'});
+  if (/\{[\s\S]{200,}\}/.test(text)) tips.push({icon:'📦', text:'Large JSON payload — send as a parameter or file reference instead of inline', tag:'JSON'});
+  if (/you are|your role|act as/i.test(text) && origTok > 500) tips.push({icon:'🔒', text:'System prompt (500+ tokens) — make it static and enable caching', tag:'CACHE'});
+  // Duplicate sentences
+  const sentences = text.split(/(?<=[.!?])\s+/);
+  const set = new Set(); let dupes = 0;
+  for (const s of sentences) { const n=s.toLowerCase().trim(); if (n.length>20 && set.has(n)) dupes++; set.add(n); }
+  if (dupes > 0) tips.push({icon:'🔁', text:`${dupes} duplicate sentence(s) — remove repeats`, tag:`-${dupes} dupes`});
+  if (tips.length === 0) tips.push({icon:'✅', text:'Prompt is already concise — no major optimizations found', tag:''});
+  return tips;
 }
 
 async function compressPrompt() {
   const input = document.getElementById('opt-input').value.trim();
   if (!input) return;
-  const rate = parseFloat(document.getElementById('opt-rate').value);
 
-  // Try API first, fall back to local
-  let origTok, compTok, compressed;
-  try {
-    const resp = await fetch(API + '/v1/optimizer/compress', {
-      method: 'POST', headers: authHeaders(),
-      body: JSON.stringify({ prompt: input, compression_rate: rate }),
-    });
-    if (resp.ok) {
-      const d = await resp.json();
-      origTok = d.original_tokens;
-      compTok = d.compressed_tokens;
-      compressed = d.compressed_prompt;
-    } else throw new Error('api');
-  } catch {
-    compressed = compressLocal(input);
-    origTok = countTokensLocal(input);
-    compTok = countTokensLocal(compressed);
-  }
+  // Compress locally (works offline, instant)
+  const compressed = compressLocal(input);
+  const origTok = countTokensLocal(input);
+  const compTok = countTokensLocal(compressed);
+  const saved = origTok - compTok;
+  const pct = origTok > 0 ? Math.round(saved / origTok * 100) : 0;
 
   document.getElementById('opt-orig-tok').textContent = origTok;
   document.getElementById('opt-comp-tok').textContent = compTok;
-  document.getElementById('opt-saved-tok').textContent = origTok - compTok;
-  document.getElementById('opt-output').textContent = compressed;
+  document.getElementById('opt-saved-tok').textContent = saved + ' (' + pct + '%)';
+
+  // Show compressed output with diff highlighting
+  if (saved > 0) {
+    document.getElementById('opt-output').textContent = compressed;
+  } else {
+    document.getElementById('opt-output').innerHTML = '<span style="color:var(--ac)">Prompt is already concise — no filler or verbose patterns detected.</span>';
+  }
+
+  // Show optimization tips
+  const tips = getLocalOptTips(input, origTok, compTok);
+  const tipsEl = document.getElementById('opt-tips-list');
+  if (tipsEl) {
+    tipsEl.innerHTML = tips.map(t => `<div style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--b1);font-size:12px">
+      <span style="font-size:14px">${t.icon}</span>
+      <span style="flex:1">${t.text}</span>
+      ${t.tag ? '<span class="tag tag-amber" style="font-size:9px">'+t.tag+'</span>' : ''}
+    </div>`).join('');
+  }
+
+  // Show cost savings estimate
+  const costEl = document.getElementById('opt-cost-estimate');
+  if (costEl && saved > 0) {
+    const models = [
+      {name:'claude-opus-4-6', rate:15}, {name:'claude-sonnet-4-6', rate:3}, {name:'gpt-4o', rate:2.5}, {name:'gemini-2.0-flash', rate:0.1}
+    ];
+    costEl.innerHTML = '<div style="font-size:11px;color:var(--mu);margin-bottom:4px">Estimated savings per 1K calls:</div>' +
+      models.map(m => {
+        const saveDollar = (saved / 1e6 * m.rate * 1000).toFixed(4);
+        return `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:11px"><span class="mono">${m.name}</span><span class="mono" style="color:var(--ac)">-$${saveDollar}</span></div>`;
+      }).join('');
+  }
+
   document.getElementById('opt-result').style.display = '';
 }
 
