@@ -47,6 +47,30 @@ jobs:
         working-directory: vantage-worker
         run: npx tsc --noEmit
 
+  # ── 1b. CLI Build & type check ──────────────────────────────────────────────
+  cli-build:
+    name: CLI Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        working-directory: vantage-cli
+        run: npm ci
+
+      - name: Run TypeScript check
+        working-directory: vantage-cli
+        run: npx tsc --noEmit
+
+      - name: Build CLI bundle
+        working-directory: vantage-cli
+        run: npx tsup src/index.ts --format esm --dts --clean
+
   # ── 2. API + core test suites (no browser) ──────────────────────────────────
   api-tests:
     name: API Test Suites
@@ -393,7 +417,7 @@ jobs:
   pr-summary:
     name: PR Gate Summary
     runs-on: ubuntu-latest
-    needs: [typecheck, api-tests, env-tests, cross-browser, mcp-tests, connector-tests, preview-deploy]
+    needs: [typecheck, cli-build, api-tests, env-tests, cross-browser, mcp-tests, connector-tests, preview-deploy]
     if: always()
     steps:
       - name: Write summary
@@ -403,6 +427,7 @@ jobs:
           echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| TypeScript Check | ${{ needs.typecheck.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| CLI Build | ${{ needs.cli-build.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| API Test Suites | ${{ needs.api-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Environment & Health | ${{ needs.env-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Cross-Browser Tests | ${{ needs.cross-browser.result }} |" >> $GITHUB_STEP_SUMMARY
@@ -417,6 +442,7 @@ jobs:
       - name: Fail if critical checks failed
         if: |
           needs.typecheck.result == 'failure' ||
+          needs.cli-build.result == 'failure' ||
           needs.api-tests.result == 'failure' ||
           needs.mcp-tests.result == 'failure' ||
           needs.connector-tests.result == 'failure'

@@ -7,7 +7,7 @@ export interface VantageConfig {
   agents: Record<string, { model?: string; args?: string[] }>;
   vantageApiKey: string;
   vantageApiBase: string;
-  privacy: "full" | "anonymized" | "local-only";
+  privacy: "full" | "strict" | "anonymized" | "local-only";
   optimization: {
     enabled: boolean;
   };
@@ -65,7 +65,8 @@ export function loadConfig(): VantageConfig {
         ...(parsed.tracking ?? {}),
       },
     };
-  } catch {
+  } catch (err) {
+    console.warn(`[vantage] Config corrupted, using defaults: ${err instanceof Error ? err.message : String(err)}`);
     return { ...DEFAULT_CONFIG };
   }
 }

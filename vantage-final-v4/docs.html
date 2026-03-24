@@ -215,6 +215,9 @@ pre{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;pad
     <a class="docs-nav-item" onclick="show('local-proxy',this)">Local Proxy (zero-trust)</a>
     <a class="docs-nav-item" onclick="show('privacy-modes',this)">SDK privacy modes</a>
 
+    <div class="docs-nav-sec">CLI</div>
+    <a class="docs-nav-item" onclick="show('vantage-cli',this)">VantageAI CLI</a>
+
     <div class="docs-nav-sec">Features</div>
     <a class="docs-nav-item" onclick="show('tagging',this)">Cost attribution tags</a>
     <a class="docs-nav-item" onclick="show('alerts',this)">Budget alerts</a>
@@ -1656,6 +1659,36 @@ export CLINE_OTEL_EXPORTER_OTLP_PROTOCOL=http/json</pre>
 
 <h2>POST /v1/otel/v1/logs</h2>
 <p>OTLP logs/events ingestion. Accepts api_request, tool_result, user_prompt events.</p>
+`,
+
+'vantage-cli': `
+<h1>VantageAI CLI — AI Agent Wrapper</h1>
+<p>A terminal tool that wraps any AI CLI (Claude Code, Codex, Gemini, Aider) with <strong>zero-latency prompt optimization</strong> and <strong>cost tracking</strong>.</p>
+
+<h2>Install & Run</h2>
+<pre>npx vantageai-cli</pre>
+
+<h2>3 Modes</h2>
+<div class="step-row"><div class="step-num">1</div><div class="step-body"><strong>REPL</strong> — <code>vantage</code> — interactive mode, type prompts, switch agents</div></div>
+<div class="step-row"><div class="step-num">2</div><div class="step-body"><strong>One-shot</strong> — <code>vantage "explain kubernetes"</code> — run and exit</div></div>
+<div class="step-row"><div class="step-num">3</div><div class="step-body"><strong>Pipe</strong> — <code>echo "prompt" | vantage</code> — scriptable</div></div>
+
+<h2>Agent Switching</h2>
+<table class="api-table">
+<thead><tr><th>Command</th><th>Action</th></tr></thead>
+<tbody>
+<tr><td><code>/claude prompt</code></td><td>Run with Claude Code</td></tr>
+<tr><td><code>/gemini prompt</code></td><td>Run with Gemini CLI</td></tr>
+<tr><td><code>/codex prompt</code></td><td>Run with OpenAI Codex</td></tr>
+<tr><td><code>/compare prompt</code></td><td>Run on all agents, show cost comparison</td></tr>
+<tr><td><code>/cost</code></td><td>Show session totals</td></tr>
+<tr><td><code>/help</code></td><td>Show all commands</td></tr>
+</tbody></table>
+
+<h2>How It Works</h2>
+<p>1. You type a prompt → 2. CLI optimizes it (<1ms, local) → 3. Forwards to your AI tool → 4. Streams output in real-time → 5. Calculates cost + savings</p>
+
+<div class="info-box">Zero added latency: optimization is synchronous, tracking is async fire-and-forget.</div>
 `
 
 };

@@ -28,6 +28,8 @@ import {
   type CompareResult,
 } from "./ui.js";
 
+const COST_TIMEOUT_MS = 2000;
+
 // ---------------------------------------------------------------------------
 // Arg parser
 // ---------------------------------------------------------------------------
@@ -132,7 +134,7 @@ async function runCompare(
       const result = await runAgentBuffered(spawnArgs, agent.name);
       const model = agent.defaultModel;
       const outputTokens = countTokens(result.stdout);
-      const inputTokens = Math.ceil(outputTokens * 0.1);
+      const inputTokens = countTokens(prompt);
       const costUsd = calculateCost(model, inputTokens, outputTokens);
 
       results.push({
@@ -218,13 +220,11 @@ async function startRepl(config: VantageConfig): Promise<void> {
         return;
       }
 
-      // Agent prefix commands: /claude, /gemini, /codex, /aider, /chatgpt
-      const agentPrefixMatch = line.match(
-        /^\/(claude|gemini|codex|aider|chatgpt)\s+([\s\S]+)$/
-      );
+      // Agent prefix commands: /claude, /gemini, /codex, /aider, /chatgpt, etc.
+      const agentPrefixMatch = line.match(/^\/(\w+)\s+([\s\S]+)$/);
       if (agentPrefixMatch) {
-        const agentName = agentPrefixMatch[1];
-        const agentPrompt = agentPrefixMatch[2].trim();
+        const [, agentName, rawAgentPrompt] = agentPrefixMatch;
+        const agentPrompt = rawAgentPrompt.trim();
         const agent = getAgent(agentName);
         if (agent && agentPrompt) {
           const costPromise = waitForCost();
@@ -232,7 +232,7 @@ async function startRepl(config: VantageConfig): Promise<void> {
           try {
             const cost = await Promise.race([
               costPromise,
-              new Promise<null>((resolve) => setTimeout(() => resolve(null), 1000)),
+              new Promise<null>((resolve) => setTimeout(() => resolve(null), COST_TIMEOUT_MS)),
             ]);
             if (cost) {
               printCostSummary(cost, getSession());
@@ -248,9 +248,7 @@ async function startRepl(config: VantageConfig): Promise<void> {
       }
 
       // Switch agent without prompt (just /claude, /gemini, etc.)
-      const switchMatch = line.match(
-        /^\/(claude|gemini|codex|aider|chatgpt)$/
-      );
+      const switchMatch = line.match(/^\/(\w+)$/);
       if (switchMatch) {
         const agent = getAgent(switchMatch[1]);
         if (agent) {
@@ -267,7 +265,7 @@ async function startRepl(config: VantageConfig): Promise<void> {
       try {
         const cost = await Promise.race([
           costPromise,
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), 1000)),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), COST_TIMEOUT_MS)),
         ]);
         if (cost) {
           printCostSummary(cost, getSession());
@@ -287,9 +285,9 @@ async function startRepl(config: VantageConfig): Promise<void> {
     process.exit(0);
   };
 
-  // Handle Ctrl+C
+  // Handle Ctrl+C — async-safe shutdown
   rl.on("SIGINT", () => {
-    shutdown();
+    shutdown().then(() => process.exit(0));
   });
 
   prompt();
@@ -375,7 +373,7 @@ async function main(): Promise<void> {
     try {
       const cost = await Promise.race([
         costPromise,
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), COST_TIMEOUT_MS)),
       ]);
       if (cost) {
         printCostSummary(cost, getSession());
@@ -390,13 +388,17 @@ async function main(): Promise<void> {
   // Mode 2: Pipe mode
   if (!process.stdin.isTTY) {
     const stdinPrompt = await readStdin();
+    if (!stdinPrompt) {
+      console.error(dim("  No prompt provided. Usage: echo 'prompt' | vantage"));
+      process.exit(1);
+    }
     if (stdinPrompt) {
       const costPromise = waitForCost();
       await executePrompt(stdinPrompt, agent, config);
       try {
         const cost = await Promise.race([
           costPromise,
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), COST_TIMEOUT_MS)),
         ]);
         if (cost) {
           printCostSummary(cost, getSession());

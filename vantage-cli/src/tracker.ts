@@ -8,7 +8,7 @@ export interface TrackerConfig {
   apiBase: string;
   batchSize: number;
   flushInterval: number;
-  privacy: "full" | "anonymized" | "local-only";
+  privacy: "full" | "strict" | "anonymized" | "local-only";
   debug: boolean;
 }
 
@@ -28,6 +28,8 @@ export class Tracker {
   private queue: TrackerEvent[] = [];
   private timer: ReturnType<typeof setInterval> | null = null;
   private config: TrackerConfig;
+  private sentIds = new Set<string>();
+  private exitRegistered = false;
 
   constructor(config: TrackerConfig) {
     this.config = config;
@@ -69,10 +71,16 @@ export class Tracker {
   enqueue(event: TrackerEvent): void {
     if (this.config.privacy === "local-only") return;
 
-    if (this.config.privacy === "anonymized") {
-      // Strip any potentially identifying info — only keep metrics
-      event = { ...event };
+    if (this.config.privacy === "strict" || this.config.privacy === "anonymized") {
+      // Strip identifying info — keep only numeric metrics
+      delete (event as unknown as Record<string, unknown>).prompt;
+      delete (event as unknown as Record<string, unknown>).output;
     }
+
+    // Deduplication guard
+    const eventKey = `${event.type}:${event.agent}:${event.timestamp}`;
+    if (this.sentIds.has(eventKey)) return;
+    this.sentIds.add(eventKey);
 
     this.queue.push(event);
 
@@ -84,6 +92,11 @@ export class Tracker {
   async flush(): Promise<void> {
     if (this.queue.length === 0) return;
     if (!this.config.apiKey) return;
+
+    if (this.config.apiBase && !this.config.apiBase.startsWith("https://")) {
+      if (this.config.debug) console.warn("[vantage] Skipping tracking: API base is not HTTPS");
+      return;
+    }
 
     const batch = this.queue.splice(0, this.queue.length);
     const url = `${this.config.apiBase}/v1/events`;
@@ -108,8 +121,12 @@ export class Tracker {
       if (this.config.debug) {
         console.error("[vantage] Failed to send events:", err);
       }
-      // Re-queue failed events
-      this.queue.unshift(...batch);
+      // Re-queue failed events (skip any already confirmed sent)
+      const unsent = batch.filter((e) => {
+        const key = `${e.type}:${e.agent}:${e.timestamp}`;
+        return !this.sentIds.has(key);
+      });
+      this.queue.unshift(...unsent);
     }
   }
 
@@ -119,10 +136,13 @@ export class Tracker {
       this.flush().catch(() => {});
     }, this.config.flushInterval);
 
-    // Ensure final flush on exit
-    process.on("beforeExit", () => {
-      this.flush().catch(() => {});
-    });
+    // Ensure final flush on exit — register only once
+    if (!this.exitRegistered) {
+      this.exitRegistered = true;
+      process.on("beforeExit", () => this.flush().catch(() => {}));
+      process.on("SIGTERM", () => { this.flush().catch(() => {}); process.exit(0); });
+      process.on("SIGINT", () => { this.flush().catch(() => {}); process.exit(0); });
+    }
   }
 
   stop(): void {

@@ -33,9 +33,16 @@ export function calculateCost(
   completionTokens: number,
   cachedTokens: number = 0
 ): number {
-  const price = PRICES[model];
+  let price = PRICES[model];
   if (!price) {
-    return 0;
+    const lower = model.toLowerCase();
+    const key = Object.keys(PRICES).find(k => lower.includes(k) || k.includes(lower));
+    if (key) {
+      price = PRICES[key];
+    } else {
+      // Unknown model — warn but don't crash
+      return 0;
+    }
   }
   const billableInput = Math.max(0, promptTokens - cachedTokens);
   const inputCost = (billableInput * price.input) / 1_000_000;

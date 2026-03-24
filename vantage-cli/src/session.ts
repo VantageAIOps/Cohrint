@@ -1,10 +1,10 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import { bus } from "./event-bus.js";
 
 export interface PromptRecord {
   agent: string;
   model: string;
-  prompt: string;
+  promptPreview: string;
   inputTokens: number;
   outputTokens: number;
   costUsd: number;
@@ -30,6 +30,7 @@ class Session {
   private state: SessionState;
   private currentPrompt: string = "";
   private currentSavedTokens: number = 0;
+  private currentDurationMs: number = 0;
 
   constructor() {
     this.state = {
@@ -51,6 +52,10 @@ class Session {
       this.currentPrompt = data.prompt;
     });
 
+    bus.on("agent:completed", (data) => {
+      this.currentDurationMs = data.durationMs;
+    });
+
     bus.on("prompt:optimized", (data) => {
       this.currentSavedTokens = data.savedTokens;
       this.state.totalSavedTokens += data.savedTokens;
@@ -63,21 +68,25 @@ class Session {
       this.state.totalCostUsd += data.costUsd;
       this.state.totalSavedUsd += data.savedUsd;
 
+      const promptHash = createHash("sha256").update(this.currentPrompt).digest("hex").slice(0, 12);
+      const promptPreview = this.currentPrompt.slice(0, 50) + (this.currentPrompt.length > 50 ? "..." : "") + ` [${promptHash}]`;
+
       const record: PromptRecord = {
         agent: data.agent,
         model: data.model,
-        prompt: this.currentPrompt,
+        promptPreview,
         inputTokens: data.inputTokens,
         outputTokens: data.outputTokens,
         costUsd: data.costUsd,
         savedTokens: this.currentSavedTokens,
         savedUsd: data.savedUsd,
-        durationMs: 0,
+        durationMs: this.currentDurationMs,
         timestamp: Date.now(),
       };
 
       this.state.history.push(record);
       this.currentSavedTokens = 0;
+      this.currentDurationMs = 0;
 
       bus.emit("session:updated", {
         totalCost: this.state.totalCostUsd,
