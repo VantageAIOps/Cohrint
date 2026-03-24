@@ -150,6 +150,10 @@ if (cmd === "optimize") {
   console.log(JSON.stringify(r));
 } else if (cmd === "cheapest") {
   const r = findCheapest(arg1, parseInt(arg2), parseInt(arg3));
+  if (r) {
+    const { totalCostUsd: currentCost } = calculateCost(arg1, parseInt(arg2), parseInt(arg3));
+    r.savingsUsd = currentCost - r.costUsd;
+  }
   console.log(JSON.stringify(r));
 } else if (cmd === "models") {
   console.log(JSON.stringify({ count: Object.keys(PRICES).length, models: Object.keys(PRICES) }));

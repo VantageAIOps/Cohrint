@@ -22,7 +22,7 @@ export const DEFAULT_CONFIG: VantageConfig = {
   defaultAgent: "claude",
   agents: {},
   vantageApiKey: "",
-  vantageApiBase: "https://vantageai.dev",
+  vantageApiBase: "https://api.vantageaiops.com",
   privacy: "anonymized",
   optimization: {
     enabled: true,
@@ -72,10 +72,16 @@ export function loadConfig(): VantageConfig {
 }
 
 export function saveConfig(config: VantageConfig): void {
-  const dir = getConfigDir();
-  mkdirSync(dir, { recursive: true });
-  const configPath = getConfigPath();
-  const tmpPath = configPath + ".tmp";
-  writeFileSync(tmpPath, JSON.stringify(config, null, 2), "utf-8");
-  renameSync(tmpPath, configPath);
+  try {
+    const dir = getConfigDir();
+    mkdirSync(dir, { recursive: true });
+    const configPath = getConfigPath();
+    const tmpPath = configPath + ".tmp";
+    writeFileSync(tmpPath, JSON.stringify(config, null, 2), "utf-8");
+    renameSync(tmpPath, configPath);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[vantage] Failed to save config: ${msg}`);
+    throw err;
+  }
 }

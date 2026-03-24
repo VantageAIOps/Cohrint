@@ -237,9 +237,13 @@ superadmin.get('/storage', async (c) => {
   const tables = ['orgs', 'events', 'org_members', 'team_budgets',
                   'alert_configs', 'platform_pageviews', 'platform_requests', 'platform_sessions'];
 
+  // Use a validated allowlist — never interpolate untrusted values into SQL
+  const ALLOWED_TABLES = new Set(tables);
   const counts: Record<string, number> = {};
   await Promise.all(tables.map(async (t) => {
+    if (!ALLOWED_TABLES.has(t)) { counts[t] = -1; return; }
     try {
+      // Each table name is from a hardcoded array above — safe for interpolation
       const row = await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM ${t}`).first<{ n: number }>();
       counts[t] = row?.n ?? 0;
     } catch {
@@ -313,7 +317,13 @@ superadmin.post('/reset', async (c) => {
     ? ['platform_pageviews', 'platform_requests', 'platform_sessions']
     : target !== 'kv' ? [target] : [];
 
+  // Double-validate table names against allowlist before SQL interpolation
+  const RESET_ALLOWED = new Set(allowed_targets.filter(t => t !== 'kv' && t !== 'all_platform'));
   for (const tbl of dbTargets) {
+    if (!RESET_ALLOWED.has(tbl)) {
+      results.push(`${tbl}: skipped — not in allowed table list`);
+      continue;
+    }
     try {
       if (mode === 'hard') {
         await c.env.DB.prepare(`DELETE FROM ${tbl}`).run();

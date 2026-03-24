@@ -59,7 +59,11 @@ export function runAgent(
       if (totalBytes <= MAX_OUTPUT_BYTES) {
         chunks.push(chunk);
       }
-      process.stdout.write(chunk);
+      const ok = process.stdout.write(chunk);
+      if (!ok) {
+        child.stdout?.pause();
+        process.stdout.once("drain", () => child.stdout?.resume());
+      }
     });
 
     child.stderr?.on("data", (chunk: Buffer) => {

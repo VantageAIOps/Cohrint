@@ -36,11 +36,15 @@ export function calculateCost(
   let price = PRICES[model];
   if (!price) {
     const lower = model.toLowerCase();
-    const key = Object.keys(PRICES).find(k => lower.includes(k) || k.includes(lower));
+    // Try exact prefix match first (e.g. "claude-sonnet-4-6-20250514" matches "claude-sonnet-4-6")
+    const key = Object.keys(PRICES).find(k => lower.startsWith(k) || k.startsWith(lower));
     if (key) {
       price = PRICES[key];
     } else {
-      // Unknown model — warn but don't crash
+      // Unknown model — log warning and return 0
+      if (typeof process !== "undefined" && process.stderr) {
+        process.stderr.write(`  [vantage] Unknown model "${model}" — cost set to $0\n`);
+      }
       return 0;
     }
   }

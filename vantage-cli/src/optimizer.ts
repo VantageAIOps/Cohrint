@@ -85,13 +85,18 @@ export const FILLER_WORDS_RE =
   /\b(just|really|very|quite|basically|actually|simply|honestly|literally|definitely|certainly|absolutely|obviously|clearly|essentially|practically|virtually|merely|somewhat|rather|fairly|pretty much)\b/gi;
 
 /**
- * Approximate token count using word-based heuristic.
- * ~1 token per 0.75 words for English text.
+ * Approximate token count using character-based heuristic.
+ * ~1 token per 4 characters for English text, ~1 per 3 for code.
+ * More accurate than word-based counting for mixed content.
  */
 export function countTokens(text: string): number {
   if (!text || text.trim().length === 0) return 0;
-  const words = text.trim().split(/\s+/).length;
-  return Math.ceil(words / 0.75);
+  const trimmed = text.trim();
+  // Detect code-heavy content (higher token density)
+  const codeChars = (trimmed.match(/[{}()\[\];=<>|&!~^%]/g) || []).length;
+  const isCodeHeavy = codeChars > trimmed.length * 0.05;
+  const charsPerToken = isCodeHeavy ? 3 : 4;
+  return Math.ceil(trimmed.length / charsPerToken);
 }
 
 /**

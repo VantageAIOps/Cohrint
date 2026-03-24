@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { createInterface } from "node:readline";
-import { loadConfig, configExists, type VantageConfig } from "./config.js";
+import { loadConfig, configExists, saveConfig, type VantageConfig } from "./config.js";
 import { runSetup } from "./setup.js";
 import { getAgent, detectAll, ALL_AGENTS } from "./agents/registry.js";
 import type { AgentAdapter } from "./agents/types.js";
@@ -29,7 +29,7 @@ import {
   type CompareResult,
 } from "./ui.js";
 
-const COST_TIMEOUT_MS = 2000;
+const COST_TIMEOUT_MS = 5000;
 
 // ---------------------------------------------------------------------------
 // Dashboard helpers
@@ -118,7 +118,11 @@ async function showDashboardSummary(config: VantageConfig): Promise<void> {
     console.log("");
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(red(`  Failed to fetch dashboard: ${msg}`));
+    if (msg.includes("timeout") || msg.includes("abort")) {
+      console.error(red("  Dashboard request timed out. Check your network or API endpoint."));
+    } else {
+      console.error(red(`  Failed to fetch dashboard: ${msg}`));
+    }
   }
 }
 
@@ -162,7 +166,11 @@ async function showBudgetStatus(config: VantageConfig): Promise<void> {
     console.log("");
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(red(`  Failed to fetch budget: ${msg}`));
+    if (msg.includes("timeout") || msg.includes("abort")) {
+      console.error(red("  Budget request timed out. Check your network or API endpoint."));
+    } else {
+      console.error(red(`  Failed to fetch budget: ${msg}`));
+    }
   }
 }
 
@@ -355,6 +363,37 @@ async function startRepl(config: VantageConfig): Promise<void> {
           return;
         }
 
+        if (line === "/setup") {
+          // Close REPL readline to avoid stdin conflict with setup's readline
+          rl.close();
+          try {
+            const newConfig = await runSetup();
+            // Update config in-place so all references see new values
+            Object.assign(config, newConfig);
+            // Reinitialize tracker with new config
+            if (tracker) tracker.stop();
+            tracker = new Tracker({
+              apiKey: config.vantageApiKey,
+              apiBase: config.vantageApiBase,
+              batchSize: config.tracking.batchSize,
+              flushInterval: config.tracking.flushInterval,
+              privacy: config.privacy,
+              debug: false,
+            });
+            if (config.tracking.enabled) tracker.start();
+            // Update current agent if changed
+            const newAgent = getAgent(config.defaultAgent);
+            if (newAgent) currentAgent = newAgent;
+            console.log(green("  Config reloaded. REPL restarting...\n"));
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error(red(`  Setup failed: ${msg}`));
+          }
+          // Restart REPL with fresh readline
+          await startRepl(config);
+          return;
+        }
+
         if (line === "/session" || line.startsWith("/session ")) {
           const sessionAgent = line.includes(" ")
             ? getAgent(line.split(" ")[1]) ?? currentAgent
@@ -397,7 +436,7 @@ async function startRepl(config: VantageConfig): Promise<void> {
                 }
 
                 if (activeSession?.isActive()) {
-                  const processed = activeSession.sendLine(sLine);
+                  const processed = await activeSession.sendLine(sLine);
                   if (processed?.type === "vantage-command") {
                     // Handle vantage commands internally
                     const cmd = sLine.trim().toLowerCase();
@@ -409,8 +448,8 @@ async function startRepl(config: VantageConfig): Promise<void> {
                       printSessionHelp();
                     }
                   }
-                  // Wait for output to stream before re-prompting
-                  setTimeout(sessionPrompt, 200);
+                  // Use setImmediate to let stdout drain before re-prompting
+                  setImmediate(sessionPrompt);
                 } else {
                   sessionExiting = true;
                   activeSession = null;
@@ -572,6 +611,7 @@ function printHelp(): void {
   console.log(`  ${cyan("/session [agent]")}   Start interactive session (supports /compact, /clear, @file, !shell)`);
   console.log(`  ${cyan("/exit-session")}      Return to VantageAI REPL from session`);
   console.log(`  ${cyan("/default <agent>")}    Set default agent`);
+  console.log(`  ${cyan("/setup")}              Run setup wizard (API key, agent, privacy)`);
   console.log(`  ${cyan("/help")}               Show this help`);
   console.log(`  ${cyan("/quit")}               Exit VantageAI CLI`);
   console.log("");
