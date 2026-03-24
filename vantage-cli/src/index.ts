@@ -56,6 +56,16 @@ function parseArgs() {
 // Core execution logic
 // ---------------------------------------------------------------------------
 
+function looksLikeStructuredData(text: string): boolean {
+  // Skip optimization for JSON, code blocks, URLs-heavy content
+  const trimmed = text.trim();
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) return true; // JSON
+  if (trimmed.startsWith("```")) return true; // code block
+  if ((text.match(/https?:\/\//g) || []).length > 2) return true; // URL-heavy
+  if ((text.match(/[{}()\[\];=<>]/g) || []).length > text.length * 0.1) return true; // code-like
+  return false;
+}
+
 async function executePrompt(
   prompt: string,
   agent: AgentAdapter,
@@ -68,9 +78,9 @@ async function executePrompt(
     timestamp: Date.now(),
   });
 
-  // Optimize prompt
+  // Optimize prompt (skip for structured data like JSON, code, URL-heavy content)
   let finalPrompt = prompt;
-  if (config.optimization.enabled) {
+  if (config.optimization.enabled && !looksLikeStructuredData(prompt)) {
     const result = optimizePrompt(prompt);
     if (result.savedTokens > 0) {
       finalPrompt = result.optimized;
@@ -176,105 +186,111 @@ async function startRepl(config: VantageConfig): Promise<void> {
         return;
       }
 
-      // Special commands
-      if (line === "/quit" || line === "/exit" || line === "/q") {
-        await shutdown();
-        return;
-      }
-
-      if (line === "/help") {
-        printHelp();
-        prompt();
-        return;
-      }
-
-      if (line === "/cost") {
-        const session = getSession();
-        printSessionSummary(session);
-        prompt();
-        return;
-      }
-
-      if (line.startsWith("/default ")) {
-        const name = line.slice(9).trim();
-        const agent = getAgent(name);
-        if (agent) {
-          currentAgent = agent;
-          console.log(green(`  Default agent set to ${agent.displayName}`));
-        } else {
-          console.log(red(`  Unknown agent: ${name}`));
-          console.log(dim(`  Available: ${ALL_AGENTS.map((a) => a.name).join(", ")}`));
-        }
-        prompt();
-        return;
-      }
-
-      if (line.startsWith("/compare ")) {
-        const comparePrompt = line.slice(9).trim();
-        if (comparePrompt) {
-          await runCompare(comparePrompt, config);
-        } else {
-          console.log(yellow("  Usage: /compare <prompt>"));
-        }
-        prompt();
-        return;
-      }
-
-      // Agent prefix commands: /claude, /gemini, /codex, /aider, /chatgpt, etc.
-      const agentPrefixMatch = line.match(/^\/(\w+)\s+([\s\S]+)$/);
-      if (agentPrefixMatch) {
-        const [, agentName, rawAgentPrompt] = agentPrefixMatch;
-        const agentPrompt = rawAgentPrompt.trim();
-        const agent = getAgent(agentName);
-        if (agent && agentPrompt) {
-          const costPromise = waitForCost();
-          await executePrompt(agentPrompt, agent, config);
-          try {
-            const cost = await Promise.race([
-              costPromise,
-              new Promise<null>((resolve) => setTimeout(() => resolve(null), COST_TIMEOUT_MS)),
-            ]);
-            if (cost) {
-              printCostSummary(cost, getSession());
-            }
-          } catch {
-            // Cost calculation may not fire for all agents
-          }
-        } else if (!agent) {
-          console.log(red(`  Unknown agent: ${agentName}`));
-        }
-        prompt();
-        return;
-      }
-
-      // Switch agent without prompt (just /claude, /gemini, etc.)
-      const switchMatch = line.match(/^\/(\w+)$/);
-      if (switchMatch) {
-        const agent = getAgent(switchMatch[1]);
-        if (agent) {
-          currentAgent = agent;
-          console.log(green(`  Switched to ${agent.displayName}`));
-        }
-        prompt();
-        return;
-      }
-
-      // Normal prompt — use current default agent
-      const costPromise = waitForCost();
-      await executePrompt(line, currentAgent, config);
       try {
-        const cost = await Promise.race([
-          costPromise,
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), COST_TIMEOUT_MS)),
-        ]);
-        if (cost) {
-          printCostSummary(cost, getSession());
+        // Special commands
+        if (line === "/quit" || line === "/exit" || line === "/q") {
+          await shutdown();
+          return;
         }
-      } catch {
-        // Cost calculation may not fire for all agents
-      }
 
-      prompt();
+        if (line === "/help") {
+          printHelp();
+          prompt();
+          return;
+        }
+
+        if (line === "/cost") {
+          const session = getSession();
+          printSessionSummary(session);
+          prompt();
+          return;
+        }
+
+        if (line.startsWith("/default ")) {
+          const name = line.slice(9).trim();
+          const agent = getAgent(name);
+          if (agent) {
+            currentAgent = agent;
+            console.log(green(`  Default agent set to ${agent.displayName}`));
+          } else {
+            console.log(red(`  Unknown agent: ${name}`));
+            console.log(dim(`  Available: ${ALL_AGENTS.map((a) => a.name).join(", ")}`));
+          }
+          prompt();
+          return;
+        }
+
+        if (line.startsWith("/compare ")) {
+          const comparePrompt = line.slice(9).trim();
+          if (comparePrompt) {
+            await runCompare(comparePrompt, config);
+          } else {
+            console.log(yellow("  Usage: /compare <prompt>"));
+          }
+          prompt();
+          return;
+        }
+
+        // Agent prefix commands: /claude, /gemini, /codex, /aider, /chatgpt, etc.
+        const agentPrefixMatch = line.match(/^\/(\w+)\s+([\s\S]+)$/);
+        if (agentPrefixMatch) {
+          const [, agentName, rawAgentPrompt] = agentPrefixMatch;
+          const agentPrompt = rawAgentPrompt.trim();
+          const agent = getAgent(agentName);
+          if (agent && agentPrompt) {
+            const costPromise = waitForCost();
+            await executePrompt(agentPrompt, agent, config);
+            try {
+              const cost = await Promise.race([
+                costPromise,
+                new Promise<null>((resolve) => setTimeout(() => resolve(null), COST_TIMEOUT_MS)),
+              ]);
+              if (cost) {
+                printCostSummary(cost, getSession());
+              }
+            } catch {
+              // Cost calculation may not fire for all agents
+            }
+          } else if (!agent) {
+            console.log(red(`  Unknown agent: ${agentName}`));
+          }
+          prompt();
+          return;
+        }
+
+        // Switch agent without prompt (just /claude, /gemini, etc.)
+        const switchMatch = line.match(/^\/(\w+)$/);
+        if (switchMatch) {
+          const agent = getAgent(switchMatch[1]);
+          if (agent) {
+            currentAgent = agent;
+            console.log(green(`  Switched to ${agent.displayName}`));
+          }
+          prompt();
+          return;
+        }
+
+        // Normal prompt — use current default agent
+        const costPromise = waitForCost();
+        await executePrompt(line, currentAgent, config);
+        try {
+          const cost = await Promise.race([
+            costPromise,
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), COST_TIMEOUT_MS)),
+          ]);
+          if (cost) {
+            printCostSummary(cost, getSession());
+          }
+        } catch {
+          // Cost calculation may not fire for all agents
+        }
+
+        prompt();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(red(`  Error: ${msg}`));
+        prompt();
+      }
     });
   };
 
@@ -317,10 +333,32 @@ function printHelp(): void {
 // ---------------------------------------------------------------------------
 
 async function readStdin(): Promise<string> {
+  const MAX_STDIN_BYTES = 1024 * 1024; // 1MB max prompt from pipe
   const chunks: Buffer[] = [];
-  for await (const chunk of process.stdin) {
-    chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+  let totalBytes = 0;
+
+  // Timeout: if nothing comes in 10 seconds, bail
+  const timeout = setTimeout(() => {
+    process.stdin.destroy();
+  }, 10_000);
+
+  try {
+    for await (const chunk of process.stdin) {
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      totalBytes += buf.length;
+      if (totalBytes > MAX_STDIN_BYTES) {
+        clearTimeout(timeout);
+        console.error(dim("  Warning: prompt truncated at 1MB"));
+        break;
+      }
+      chunks.push(buf);
+    }
+  } catch {
+    // stdin destroyed by timeout or encoding error
   }
+  clearTimeout(timeout);
+
+  if (chunks.length === 0) return "";
   return Buffer.concat(chunks).toString("utf-8").trim();
 }
 
@@ -418,4 +456,10 @@ async function main(): Promise<void> {
 main().catch((err) => {
   console.error(red(`Fatal error: ${err instanceof Error ? err.message : String(err)}`));
   process.exit(1);
+});
+
+process.on("unhandledRejection", (reason) => {
+  const msg = reason instanceof Error ? reason.message : String(reason);
+  console.error(red(`  Unhandled error: ${msg}`));
+  // Don't exit — let the REPL continue
 });
