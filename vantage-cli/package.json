@@ -1,0 +1,24 @@
+{
+  "name": "vantageai-cli",
+  "version": "1.0.0",
+  "description": "Transparent AI agent wrapper — optimize prompts, stream output, track costs",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "vantage": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0"
+  },
+  "engines": { "node": ">=18.0.0" },
+  "license": "MIT"
+}
