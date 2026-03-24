@@ -108,6 +108,10 @@ _KNOWN_NOISE = (
     "401 ()",
     # Browser extension interference (seen in some CI environments)
     "extension://",
+    # Google Fonts download failures in CI (Firefox can't reach fonts.gstatic.com)
+    "downloadable font",
+    "fonts.gstatic.com",
+    "fonts.googleapis.com",
 )
 
 
