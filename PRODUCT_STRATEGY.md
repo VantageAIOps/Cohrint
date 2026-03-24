@@ -196,6 +196,7 @@ Why existing tools fail:
 | **P2** | Dashboard | "All AI Spend" view + developer profiles | Days 7–8 |
 | **P2** | Budget | Policy engine + alert cron | Day 9 |
 | **P2** | MCP + Landing | Update MCP tools + landing page messaging | Day 10 |
+| **P2** | VantageAI CLI | Terminal wrapper for AI agents — prompt optimization, cost tracking, dashboard push, anomaly detection. Distribution channel that puts VantageAI in front of every developer using Claude Code, Codex, Gemini CLI, or Aider. | Days 10–11 |
 | **P3** | L2: Local Scanner | CLI agent for local file scanning (post-sprint) | Post-sprint |
 | **P3** | L4: Browser Ext | Chrome extension for ChatGPT/Claude/Gemini web | Post-sprint |
 

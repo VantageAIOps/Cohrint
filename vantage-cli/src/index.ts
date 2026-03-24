@@ -31,6 +31,137 @@ import {
 const COST_TIMEOUT_MS = 2000;
 
 // ---------------------------------------------------------------------------
+// Dashboard helpers
+// ---------------------------------------------------------------------------
+
+function checkAnomaly(cost: import("./event-bus.js").VantageEvents["cost:calculated"]): void {
+  const sess = getSession();
+  if (sess.promptCount > 2) {
+    const avgCost = sess.totalCostUsd / sess.promptCount;
+    if (cost.costUsd > avgCost * 3) {
+      console.log(yellow(`  ⚠ Anomaly: this prompt cost $${cost.costUsd.toFixed(4)} — ${(cost.costUsd / avgCost).toFixed(1)}x your session average`));
+    }
+  }
+}
+
+async function showDashboardSummary(config: VantageConfig): Promise<void> {
+  if (!config.vantageApiKey) {
+    console.log(yellow("  No API key configured. Run setup or set VANTAGE_API_KEY."));
+    return;
+  }
+  try {
+    const base = config.vantageApiBase || "https://api.vantageaiops.com";
+    const headers = {
+      "Authorization": `Bearer ${config.vantageApiKey}`,
+      "Content-Type": "application/json",
+    };
+
+    // Fetch summary + kpis in parallel
+    const [summaryRes, kpisRes] = await Promise.all([
+      fetch(`${base}/v1/analytics/summary`, { headers, signal: AbortSignal.timeout(10000) }),
+      fetch(`${base}/v1/analytics/kpis?period=30`, { headers, signal: AbortSignal.timeout(10000) }),
+    ]);
+
+    const summary = summaryRes.ok ? await summaryRes.json() as Record<string, unknown> : null;
+    const kpis = kpisRes.ok ? await kpisRes.json() as Record<string, unknown> : null;
+
+    console.log("");
+    console.log(bold(cyan("  Dashboard Summary")));
+    console.log(dim("  " + "-".repeat(45)));
+
+    if (summary) {
+      const todayCost = Number(summary.today_cost_usd ?? 0);
+      const mtdCost = Number(summary.mtd_cost_usd ?? 0);
+      const todayReqs = Number(summary.today_requests ?? 0);
+      const budgetPct = Number(summary.budget_pct ?? 0);
+      const budgetUsd = Number(summary.budget_usd ?? 0);
+
+      console.log(`  ${dim("Today spend:")}    ${green("$" + todayCost.toFixed(4))}`);
+      console.log(`  ${dim("MTD spend:")}      $${mtdCost.toFixed(4)}`);
+      console.log(`  ${dim("Today requests:")} ${todayReqs}`);
+      if (budgetUsd > 0) {
+        const color = budgetPct > 85 ? red : budgetPct > 60 ? yellow : green;
+        console.log(`  ${dim("Budget:")}         ${color(budgetPct + "%")} of $${budgetUsd}`);
+      }
+    }
+
+    if (kpis) {
+      const totalCost = Number(kpis.total_cost_usd ?? 0);
+      const totalTokens = Number(kpis.total_tokens ?? 0);
+      const totalReqs = Number(kpis.total_requests ?? 0);
+      const avgLatency = Number(kpis.avg_latency_ms ?? 0);
+      const effScore = Number(kpis.efficiency_score ?? 0);
+
+      console.log(`  ${dim("30d spend:")}      $${totalCost.toFixed(4)}`);
+      console.log(`  ${dim("30d tokens:")}     ${totalTokens.toLocaleString()}`);
+      console.log(`  ${dim("30d requests:")}   ${totalReqs.toLocaleString()}`);
+      console.log(`  ${dim("Avg latency:")}    ${avgLatency.toFixed(0)}ms`);
+      console.log(`  ${dim("Efficiency:")}     ${effScore}/100`);
+    }
+
+    // Local session stats
+    const session = getSession();
+    if (session.promptCount > 0) {
+      console.log(dim("  " + "-".repeat(45)));
+      console.log(`  ${dim("Local session:")}  ${session.promptCount} prompts, $${session.totalCostUsd.toFixed(4)}`);
+      if (session.totalSavedTokens > 0) {
+        console.log(`  ${dim("Tokens saved:")}   ${green(session.totalSavedTokens.toLocaleString())}`);
+      }
+    }
+
+    console.log(dim("  " + "-".repeat(45)));
+    console.log("");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(red(`  Failed to fetch dashboard: ${msg}`));
+  }
+}
+
+async function showBudgetStatus(config: VantageConfig): Promise<void> {
+  if (!config.vantageApiKey) {
+    console.log(yellow("  No API key configured."));
+    return;
+  }
+  try {
+    const base = config.vantageApiBase || "https://api.vantageaiops.com";
+    const res = await fetch(`${base}/v1/analytics/summary`, {
+      headers: { "Authorization": `Bearer ${config.vantageApiKey}` },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json() as Record<string, unknown>;
+
+    const budgetUsd = Number(data.budget_usd ?? 0);
+    const budgetPct = Number(data.budget_pct ?? 0);
+    const mtdCost = Number(data.mtd_cost_usd ?? 0);
+
+    console.log("");
+    if (budgetUsd <= 0) {
+      console.log(yellow("  No budget set. Configure in dashboard → Settings."));
+    } else {
+      const remaining = budgetUsd - mtdCost;
+      const color = budgetPct > 85 ? red : budgetPct > 60 ? yellow : green;
+      console.log(bold("  Budget Status"));
+      console.log(`  ${dim("Monthly budget:")} $${budgetUsd.toFixed(2)}`);
+      console.log(`  ${dim("MTD spend:")}      $${mtdCost.toFixed(4)}`);
+      console.log(`  ${dim("Used:")}           ${color(budgetPct.toFixed(1) + "%")}`);
+      console.log(`  ${dim("Remaining:")}      ${remaining > 0 ? green("$" + remaining.toFixed(2)) : red("OVER BUDGET")}`);
+
+      // Budget alerts
+      if (budgetPct >= 100) {
+        console.log(red("\n  ⚠ OVER BUDGET — spending exceeds monthly limit!"));
+      } else if (budgetPct >= 80) {
+        console.log(yellow("\n  ⚠ Budget warning — 80% threshold exceeded"));
+      }
+    }
+    console.log("");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(red(`  Failed to fetch budget: ${msg}`));
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Arg parser
 // ---------------------------------------------------------------------------
 
@@ -206,6 +337,18 @@ async function startRepl(config: VantageConfig): Promise<void> {
           return;
         }
 
+        if (line === "/summary" || line === "/stats") {
+          await showDashboardSummary(config);
+          prompt();
+          return;
+        }
+
+        if (line === "/budget") {
+          await showBudgetStatus(config);
+          prompt();
+          return;
+        }
+
         if (line.startsWith("/default ")) {
           const name = line.slice(9).trim();
           const agent = getAgent(name);
@@ -247,6 +390,7 @@ async function startRepl(config: VantageConfig): Promise<void> {
               ]);
               if (cost) {
                 printCostSummary(cost, getSession());
+                checkAnomaly(cost);
               }
             } catch {
               // Cost calculation may not fire for all agents
@@ -280,6 +424,7 @@ async function startRepl(config: VantageConfig): Promise<void> {
           ]);
           if (cost) {
             printCostSummary(cost, getSession());
+            checkAnomaly(cost);
           }
         } catch {
           // Cost calculation may not fire for all agents
@@ -320,6 +465,8 @@ function printHelp(): void {
   console.log(`  ${cyan("/chatgpt <prompt>")}   Run prompt with ChatGPT CLI`);
   console.log(`  ${cyan("/compare <prompt>")}   Compare all agents side by side`);
   console.log(`  ${cyan("/cost")}               Show session cost summary`);
+  console.log(`  ${cyan("/summary")}              Dashboard summary (spend, tokens, budget)`);
+  console.log(`  ${cyan("/budget")}               Check budget status and alerts`);
   console.log(`  ${cyan("/default <agent>")}    Set default agent`);
   console.log(`  ${cyan("/help")}               Show this help`);
   console.log(`  ${cyan("/quit")}               Exit VantageAI CLI`);
@@ -415,6 +562,7 @@ async function main(): Promise<void> {
       ]);
       if (cost) {
         printCostSummary(cost, getSession());
+        checkAnomaly(cost);
       }
     } catch {
       // Cost may not be available
@@ -440,6 +588,7 @@ async function main(): Promise<void> {
         ]);
         if (cost) {
           printCostSummary(cost, getSession());
+          checkAnomaly(cost);
         }
       } catch {
         // Cost may not be available
