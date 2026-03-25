@@ -42,7 +42,7 @@ const AGENT_TIPS: Recommendation[] = [
     title: "Switch to Sonnet for this session",
     action: "Run: /model sonnet — Opus costs 5x more. Use Opus only for complex multi-file architecture.",
     savingsEstimate: "~60% cost reduction",
-    condition: (m) => m.agent === "claude" && (m.model ?? "").includes("opus") && m.avgCostPerPrompt < 0.50,
+    condition: (m) => m.agent === "claude" && (m.model ?? "").includes("opus") && (m.avgCostPerPrompt ?? 0) < 0.10,
   },
   {
     id: "claude-use-haiku",

@@ -67,16 +67,13 @@ const PRICES = {
 };
 
 function countTokens(text) {
-  if (!text) return 0;
-  const words = text.split(/\s+/).filter(w => w.length > 0);
-  let count = 0;
-  for (const w of words) {
-    if (w.length <= 4) count += 1;
-    else if (w.length <= 8) count += 1.3;
-    else if (w.length <= 12) count += 1.8;
-    else count += Math.ceil(w.length / 4);
-  }
-  return Math.ceil(count);
+  if (!text || text.trim().length === 0) return 0;
+  const trimmed = text.trim();
+  // Match production optimizer.ts: char-based heuristic (~4 chars/token, ~3 for code)
+  const codeChars = (trimmed.match(/[{}()\[\];=<>|&!~^%]/g) || []).length;
+  const isCodeHeavy = codeChars > trimmed.length * 0.05;
+  const charsPerToken = isCodeHeavy ? 3 : 4;
+  return Math.ceil(trimmed.length / charsPerToken);
 }
 
 function compressPrompt(prompt) {
@@ -104,7 +101,8 @@ function calculateCost(model, promptTokens, completionTokens, cachedTokens = 0) 
   let price = PRICES[model];
   if (!price) {
     const lower = model.toLowerCase();
-    const key = Object.keys(PRICES).find(k => lower.includes(k) || k.includes(lower));
+    // Match production pricing.ts: prefix-based matching (not substring)
+    const key = Object.keys(PRICES).find(k => lower.startsWith(k) || k.startsWith(lower));
     price = key ? PRICES[key] : { provider: "unknown", input: 0, output: 0, cache: 0 };
   }
   const uncached = Math.max(0, promptTokens - cachedTokens);
