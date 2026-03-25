@@ -493,6 +493,32 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         required: ['input_tokens', 'output_tokens'],
       },
     },
+    {
+      name: 'get_recommendations',
+      description: 'Get agent-specific cost optimization recommendations based on your current usage patterns. Provides actionable tips for Claude Code, Gemini CLI, Codex, Cursor, Aider, and Copilot. Works offline — no API key needed.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          agent: {
+            type: 'string',
+            description: 'The AI coding agent being used (claude, gemini, codex, cursor, aider, copilot)',
+          },
+          model: {
+            type: 'string',
+            description: 'Current model being used (e.g. claude-sonnet-4-6, gpt-4o, gemini-2.0-flash)',
+          },
+          session_cost_usd: {
+            type: 'number',
+            description: 'Current session total cost in USD',
+          },
+          prompt_count: {
+            type: 'number',
+            description: 'Number of prompts in this session',
+          },
+        },
+        required: ['agent'],
+      },
+    },
   ],
 }));
 
@@ -868,6 +894,153 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           ``,
           `**Recommendation:** Use **${top3[0].model}** (${top3[0].provider}) at $${top3[0].totalCost.toFixed(6)} per call`,
         ];
+        return { content: [{ type: 'text', text: lines.join('\n') }] };
+      }
+
+      case 'get_recommendations': {
+        const agent = String(args.agent ?? '').toLowerCase().trim();
+        if (!agent) throw new Error('agent is required (claude, gemini, codex, cursor, aider, copilot)');
+        const recModel = typeof args.model === 'string' ? args.model.toLowerCase().trim() : '';
+        const sessionCost = safeNum(args.session_cost_usd, 0);
+        const promptCount = safeNum(args.prompt_count, 0);
+
+        // ── Tip database per agent ────────────────────────────────────────
+        interface Tip { title: string; action: string; savings: string; priority: 'high' | 'medium' | 'low' }
+
+        const AGENT_TIPS: Record<string, Tip[]> = {
+          claude: [
+            { title: 'Use /compact to shrink context', action: 'Type /compact in Claude Code to compress conversation history', savings: '30-50% token reduction per session', priority: 'high' },
+            { title: 'Use CLAUDE.md for persistent instructions', action: 'Add rules to CLAUDE.md instead of repeating them in every prompt', savings: '~200-500 tokens per prompt', priority: 'high' },
+            { title: 'Prefer Haiku for simple tasks', action: 'Set model to claude-haiku-3.5 for refactors, renames, and formatting', savings: 'Up to 90% cost reduction vs Opus', priority: 'medium' },
+            { title: 'Use /clear between unrelated tasks', action: 'Type /clear to reset context when switching tasks', savings: '20-40% by avoiding stale context', priority: 'medium' },
+            { title: 'Batch file edits in one prompt', action: 'Describe all related changes in a single message instead of one-at-a-time', savings: '~$0.02-0.10 per avoided round-trip', priority: 'low' },
+          ],
+          gemini: [
+            { title: 'Use Gemini Flash for most tasks', action: 'gemini -m gemini-2.0-flash (10x cheaper than Pro)', savings: 'Up to 90% vs gemini-1.5-pro', priority: 'high' },
+            { title: 'Leverage 1M token context wisely', action: 'Pass entire files instead of snippets to reduce follow-up prompts', savings: '~30% fewer round-trips', priority: 'medium' },
+            { title: 'Use grounding for factual queries', action: 'Enable Google Search grounding for docs/API questions', savings: 'Fewer hallucination retries, ~20% savings', priority: 'medium' },
+            { title: 'Stream responses for long outputs', action: 'Use --stream flag for code generation tasks', savings: 'Faster perceived latency, same cost', priority: 'low' },
+          ],
+          codex: [
+            { title: 'Use o3-mini for routine coding', action: 'codex --model o3-mini (4x cheaper than o3)', savings: 'Up to 75% cost reduction', priority: 'high' },
+            { title: 'Sandbox tasks to avoid retries', action: 'Use codex in full-auto mode with sandboxed execution to catch errors early', savings: '~$0.05-0.20 per avoided retry cycle', priority: 'high' },
+            { title: 'Keep prompts specific and scoped', action: 'Ask for one function at a time, not entire modules', savings: '~40% token reduction per prompt', priority: 'medium' },
+            { title: 'Use --quiet for simple completions', action: 'Skip verbose explanations with concise output flags', savings: '~30% output token savings', priority: 'low' },
+          ],
+          cursor: [
+            { title: 'Use Cursor Tab for completions', action: 'Rely on Tab autocomplete instead of Chat for small edits', savings: 'Tab is free/included, Chat costs tokens', priority: 'high' },
+            { title: 'Apply to specific files only', action: 'Use @file references instead of letting Cursor scan entire codebase', savings: '~50% context token reduction', priority: 'high' },
+            { title: 'Switch to claude-haiku-3.5 for refactors', action: 'Settings > Models > select claude-haiku-3.5 for bulk operations', savings: 'Up to 85% vs default Sonnet', priority: 'medium' },
+            { title: 'Use .cursorignore to exclude files', action: 'Add build/, dist/, node_modules/ to .cursorignore', savings: '~20% faster indexing, fewer wasted tokens', priority: 'medium' },
+            { title: 'Compose mode for multi-file edits', action: 'Use Composer instead of Chat for coordinated multi-file changes', savings: '~30% fewer round-trips', priority: 'low' },
+          ],
+          aider: [
+            { title: 'Use --model for cheaper alternatives', action: 'aider --model deepseek-v3 or --model gemini-2.0-flash', savings: 'Up to 95% vs GPT-4 / Opus', priority: 'high' },
+            { title: 'Add only relevant files to chat', action: 'Use /add and /drop to manage context — never add the whole repo', savings: '~60% context reduction', priority: 'high' },
+            { title: 'Use /tokens to monitor usage', action: 'Type /tokens periodically to track session spend', savings: 'Awareness prevents overspend', priority: 'medium' },
+            { title: 'Use map-tokens wisely', action: 'Set --map-tokens 1024 to limit repo map size', savings: '~500-2000 tokens per prompt', priority: 'medium' },
+            { title: 'Enable caching with Anthropic', action: 'aider --cache-prompts with Claude models for repeated context', savings: 'Up to 90% on cached prefixes', priority: 'low' },
+          ],
+          copilot: [
+            { title: 'Use inline completions over Chat', action: 'Rely on ghost text suggestions — they use smaller, cheaper models', savings: 'Chat costs 5-10x more per interaction', priority: 'high' },
+            { title: 'Write clear function signatures', action: 'Add JSDoc/docstrings before the function for better completions', savings: 'Fewer rejected suggestions = fewer retries', priority: 'medium' },
+            { title: 'Scope Chat to workspace', action: 'Use @workspace only when needed — prefer @file for targeted questions', savings: '~40% context reduction in Chat', priority: 'medium' },
+            { title: 'Disable for non-code files', action: 'Settings > Copilot > disable for markdown, JSON, YAML', savings: '~15% fewer wasted completions', priority: 'low' },
+          ],
+        };
+
+        // Resolve tips for the agent (fall back to generic)
+        const agentKey = Object.keys(AGENT_TIPS).find(k => agent.includes(k)) ?? '';
+        let tips: Tip[] = agentKey ? [...AGENT_TIPS[agentKey]] : [
+          { title: 'Track your costs', action: 'Use VantageAI SDK or MCP to monitor every LLM call', savings: 'Visibility enables 20-40% optimization', priority: 'high' },
+          { title: 'Use the cheapest viable model', action: 'Run estimate_costs tool to compare models for your workload', savings: 'Up to 95% by switching models', priority: 'high' },
+          { title: 'Compress prompts', action: 'Run optimize_prompt tool to remove filler and reduce tokens', savings: '10-30% token savings', priority: 'medium' },
+        ];
+
+        // ── Contextual tips based on model/cost/prompt count ──────────────
+        const expensiveModels = ['opus', 'gpt-4', 'pro', 'o1', 'o3'];
+        const isExpensiveModel = recModel && expensiveModels.some(m => recModel.includes(m));
+
+        if (isExpensiveModel) {
+          tips.unshift({
+            title: 'Switch to a cheaper model for this task',
+            action: recModel.includes('opus') ? 'Switch to claude-sonnet-4 (5x cheaper) or claude-haiku-3.5 (60x cheaper)'
+              : recModel.includes('gpt-4') && !recModel.includes('mini') ? 'Switch to gpt-4o-mini (20x cheaper) or deepseek-v3 (100x cheaper)'
+              : recModel.includes('pro') ? 'Switch to gemini-2.0-flash (12x cheaper)'
+              : recModel.includes('o1') ? 'Switch to o3-mini (5x cheaper) for reasoning tasks'
+              : 'Switch to o3-mini (2.5x cheaper) for reasoning tasks',
+            savings: 'Estimated 60-95% cost reduction',
+            priority: 'high',
+          });
+        }
+
+        if (sessionCost > 1.0) {
+          tips.unshift({
+            title: 'High session cost detected ($' + sessionCost.toFixed(2) + ')',
+            action: 'Consider starting a fresh session. Use /compact or /clear to reset context. Review if recent prompts could be batched.',
+            savings: 'New session avoids compounding context costs',
+            priority: 'high',
+          });
+        } else if (sessionCost > 0.25) {
+          tips.unshift({
+            title: 'Session cost rising ($' + sessionCost.toFixed(2) + ')',
+            action: 'Run /compact to compress context, or switch to a cheaper model for remaining tasks.',
+            savings: '30-50% savings on remaining prompts',
+            priority: 'medium',
+          });
+        }
+
+        if (promptCount > 20) {
+          tips.unshift({
+            title: 'Many prompts in session (' + promptCount + ')',
+            action: 'Start a new session to reset context. Long sessions accumulate tokens — each prompt re-sends the full history.',
+            savings: 'Up to 70% reduction by resetting context',
+            priority: 'high',
+          });
+        } else if (promptCount > 10) {
+          tips.push({
+            title: 'Consider session hygiene (' + promptCount + ' prompts)',
+            action: 'Use /compact to compress older messages, or /clear if switching tasks.',
+            savings: '20-40% context savings',
+            priority: 'medium',
+          });
+        }
+
+        // ── Format output ────────────────────────────────────────────────
+        const priorityOrder = { high: 0, medium: 1, low: 2 };
+        tips.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+
+        // Deduplicate by title
+        const seenTitles = new Set<string>();
+        tips = tips.filter(t => {
+          if (seenTitles.has(t.title)) return false;
+          seenTitles.add(t.title);
+          return true;
+        });
+
+        const priorityEmoji = { high: '🔴', medium: '🟡', low: '🟢' };
+        const agentLabel = agentKey ? agentKey.charAt(0).toUpperCase() + agentKey.slice(1) : agent;
+
+        const lines = [
+          `**Cost Optimization Recommendations** — ${agentLabel}${recModel ? ` (${recModel})` : ''}`,
+          ``,
+          ...(sessionCost > 0 ? [`Session spend: **$${sessionCost.toFixed(4)}**${promptCount > 0 ? ` | ${promptCount} prompts | ~$${(sessionCost / promptCount).toFixed(4)}/prompt` : ''}`, ``] : []),
+        ];
+
+        for (const tip of tips.slice(0, 7)) {
+          lines.push(
+            `${priorityEmoji[tip.priority]} **${tip.title}**`,
+            `   Action: ${tip.action}`,
+            `   Savings: ${tip.savings}`,
+            ``,
+          );
+        }
+
+        lines.push(
+          `---`,
+          `Track all your AI costs at https://vantageaiops.com/app.html`,
+        );
+
         return { content: [{ type: 'text', text: lines.join('\n') }] };
       }
 

@@ -127,6 +127,10 @@ export function printSessionSummary(session: SessionState): void {
   console.log("");
 }
 
+export function printTip(tip: string): void {
+  console.log(dim(`  💡 ${tip}`));
+}
+
 export function promptLine(agentName: string): string {
   return isTTY ? `${cyan("vantage")} ${dim(`[${agentName}]`)} ${dim(">")} ` : "> ";
 }
