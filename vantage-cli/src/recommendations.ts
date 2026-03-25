@@ -52,7 +52,7 @@ const AGENT_TIPS: Recommendation[] = [
     title: "Use Haiku for simple edits",
     action: "Run: /model haiku — Best for formatting, linting, docstrings, and simple fixes.",
     savingsEstimate: "~80% cost reduction vs Sonnet",
-    condition: (m) => m.agent === "claude" && m.lastPromptTokens < 500 && m.promptCount > 3,
+    condition: (m) => m.agent === "claude" && (m.lastPromptTokens ?? 0) < 500 && m.promptCount > 3,
   },
   {
     id: "claude-compact",
@@ -72,7 +72,7 @@ const AGENT_TIPS: Recommendation[] = [
     title: "Start fresh with /clear",
     action: "Run: /clear — Mixing unrelated tasks wastes context. Start a clean session for the new topic.",
     savingsEstimate: "~30-50% per session",
-    condition: (m) => m.agent === "claude" && m.sessionDurationMin > 30 && m.promptCount > 15,
+    condition: (m) => m.agent === "claude" && (m.sessionDurationMin ?? 0) > 30 && m.promptCount > 15,
   },
   {
     id: "claude-use-bang",
@@ -156,7 +156,7 @@ const AGENT_TIPS: Recommendation[] = [
     title: "Be selective with file context",
     action: "Don't send entire files. Specify function names or line ranges. Each file adds thousands of tokens.",
     savingsEstimate: "~40-60% on large repos",
-    condition: (m) => m.agent === "codex" && m.lastPromptTokens > 8000,
+    condition: (m) => m.agent === "codex" && (m.lastPromptTokens ?? 0) > 8000,
   },
   {
     id: "codex-prompt-cache",
@@ -188,7 +188,7 @@ const AGENT_TIPS: Recommendation[] = [
     title: "Try DeepSeek for budget tasks",
     action: "DeepSeek V3 ($1.27/1M) achieves 55% benchmark accuracy vs Sonnet's 60%. Great for routine edits.",
     savingsEstimate: "~75% cost reduction vs Sonnet",
-    condition: (m) => m.agent === "aider" && (m.model ?? "").includes("claude") && m.avgCostPerPrompt > 0.02,
+    condition: (m) => m.agent === "aider" && (m.model ?? "").includes("claude") && (m.avgCostPerPrompt ?? 0) > 0.02,
   },
   {
     id: "aider-selective-add",
@@ -230,7 +230,7 @@ const AGENT_TIPS: Recommendation[] = [
     title: "Use Cmd+K instead of Composer",
     action: "Cmd+K is lean and fast. Composer reads multiple files and burns 5-10x more tokens per operation.",
     savingsEstimate: "~80% per edit operation",
-    condition: (m) => m.agent === "chatgpt" && m.avgCostPerPrompt > 0.05,
+    condition: (m) => m.agent === "chatgpt" && (m.avgCostPerPrompt ?? 0) > 0.05,
   },
   {
     id: "cursor-at-refs",
@@ -240,7 +240,7 @@ const AGENT_TIPS: Recommendation[] = [
     title: "Use @ references instead of pasting code",
     action: "Type @filename to reference code. Don't paste blocks into chat — @ saves tokens and is more precise.",
     savingsEstimate: "~30-50% token reduction",
-    condition: (m) => m.agent === "chatgpt" && m.lastPromptTokens > 3000,
+    condition: (m) => m.agent === "chatgpt" && (m.lastPromptTokens ?? 0) > 3000,
   },
 
   // ── Universal Tips (all agents) ──
@@ -262,7 +262,7 @@ const AGENT_TIPS: Recommendation[] = [
     title: "Average cost per prompt is high",
     action: "At ${avg}/prompt, consider a cheaper model. Run /compare to find the best price/quality ratio.",
     savingsEstimate: "Varies by model switch",
-    condition: (m) => m.avgCostPerPrompt > 0.20 && m.promptCount > 3,
+    condition: (m) => (m.avgCostPerPrompt ?? 0) > 0.20 && m.promptCount > 3,
   },
   {
     id: "all-large-prompt",
@@ -272,7 +272,7 @@ const AGENT_TIPS: Recommendation[] = [
     title: "Last prompt was very large",
     action: "Your last prompt used ${tokens} tokens. Break large requests into smaller, focused prompts.",
     savingsEstimate: "~20-40% by reducing context",
-    condition: (m) => m.lastPromptTokens > 10000,
+    condition: (m) => (m.lastPromptTokens ?? 0) > 10000,
   },
   {
     id: "all-low-cache",
