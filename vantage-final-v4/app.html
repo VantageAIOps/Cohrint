@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <!-- CSP managed via _headers for Cloudflare Pages -->
 <title>VantageAI — LLM Cost Analytics Dashboard</title>
@@ -1673,6 +1674,11 @@ curl -X POST https://api.vantageaiops.com/v1/events \
 <script src="vantage-models.js"></script>
 <script>
 /* ════════════════════════════════════════════════════════════════════════════
+   XSS SAFETY — HTML escaper for user-provided data in innerHTML
+═══════════════════════════════════════════════════════════════════════════ */
+function esc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;');}
+
+/* ════════════════════════════════════════════════════════════════════════════
    DATA LAYER — Synthetic but realistic demo data
 ═══════════════════════════════════════════════════════════════════════════ */
 /* Dead demo constants removed — all views now use real API data */
@@ -1780,14 +1786,14 @@ async function loadMembersView() {
       ? `<tr><td colspan="6" style="color:var(--mu);text-align:center;padding:20px">No members yet. Click "+ Invite" to add your first team member.</td></tr>`
       : members.map(m => `
         <tr>
-          <td>${m.email}</td>
-          <td style="color:var(--mu)">${m.name||"—"}</td>
-          <td><span class="tag ${roleColors[m.role]||"tag-gray"}">${m.role}</span></td>
-          <td style="font-family:var(--mono);font-size:11px">${m.scope_team||'<span style="color:var(--mu)">all teams</span>'}</td>
-          <td style="font-family:var(--mono);font-size:10px;color:var(--mu)">${m.api_key_hint||"—"}</td>
+          <td>${esc(m.email)}</td>
+          <td style="color:var(--mu)">${esc(m.name)||"—"}</td>
+          <td><span class="tag ${roleColors[m.role]||"tag-gray"}">${esc(m.role)}</span></td>
+          <td style="font-family:var(--mono);font-size:11px">${m.scope_team?esc(m.scope_team):'<span style="color:var(--mu)">all teams</span>'}</td>
+          <td style="font-family:var(--mono);font-size:10px;color:var(--mu)">${esc(m.api_key_hint)||"—"}</td>
           <td style="display:flex;gap:4px">
-            <button onclick="rotateMemberKey('${m.id}','${m.email}')" class="btn btn-ghost" style="font-size:10px;padding:3px 8px" title="Generate a new key (old one revoked)">Rotate</button>
-            <button onclick="revokeMember('${m.id}','${m.email}')" class="btn btn-danger" style="font-size:10px;padding:3px 8px">Revoke</button>
+            <button onclick="rotateMemberKey('${esc(m.id)}','${esc(m.email)}')" class="btn btn-ghost" style="font-size:10px;padding:3px 8px" title="Generate a new key (old one revoked)">Rotate</button>
+            <button onclick="revokeMember('${esc(m.id)}','${esc(m.email)}')" class="btn btn-danger" style="font-size:10px;padding:3px 8px">Revoke</button>
           </td>
         </tr>`).join("");
 
@@ -1799,7 +1805,7 @@ async function loadMembersView() {
           const pct = t.budget_pct;
           const barColor = pct >= 100 ? "var(--re)" : pct >= 80 ? "var(--am)" : "var(--ac)";
           return `<tr>
-            <td style="font-family:var(--mono);font-size:12px">${t.team}</td>
+            <td style="font-family:var(--mono);font-size:12px">${esc(t.team)}</td>
             <td style="font-family:var(--mono);font-size:12px">$${Number(t.cost_usd).toFixed(4)}</td>
             <td style="font-family:var(--mono);font-size:12px">${t.budget_usd ? "$"+t.budget_usd.toFixed(2) : "—"}</td>
             <td>
@@ -1808,7 +1814,7 @@ async function loadMembersView() {
                 <span style="font-family:var(--mono);font-size:10px;color:${barColor}">${pct?.toFixed(1)}%</span>
               </div>` : "—"}
             </td>
-            <td><button onclick="deleteTeamBudget('${t.team}')" class="btn btn-ghost" style="font-size:10px;padding:3px 8px">Remove</button></td>
+            <td><button onclick="deleteTeamBudget('${esc(t.team)}')" class="btn btn-ghost" style="font-size:10px;padding:3px 8px">Remove</button></td>
           </tr>`;
         }).join("");
 
@@ -1969,7 +1975,7 @@ async function init_cost(){
       const color = PROV_COLORS[m.provider] || "#6b7b8a";
       return `<div class="model-row">
         <div class="model-dot" style="background:${color}"></div>
-        <div style="flex:1;font-size:12px">${m.model}</div>
+        <div style="flex:1;font-size:12px">${esc(m.model)}</div>
         <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${color}40;border-right:2px solid ${color}"></div></div>
         <div class="mono" style="font-size:11px;min-width:54px;text-align:right">${fmt(m.cost_usd||0)}</div>
         <div class="mono muted" style="font-size:10px;min-width:30px;text-align:right">${pct}%</div>
@@ -2069,7 +2075,9 @@ async function init_allspend(){
 
     if (budgetLimit > 0) {
       const budgetColor = budgetPct > 85 ? "var(--re)" : budgetPct > 60 ? "var(--am)" : "var(--ac)";
-      document.getElementById("xp-budget-pct").innerHTML = `<span style="color:${budgetColor}">${budgetPct}%</span>`;
+      const budgetEl = document.getElementById("xp-budget-pct");
+      budgetEl.textContent = budgetPct + "%";
+      budgetEl.style.color = budgetColor;
       document.getElementById("xp-budget-sub").textContent = `$${summary.budget.month_spend_usd.toFixed(2)} / $${budgetLimit}`;
     } else {
       document.getElementById("xp-budget-pct").textContent = "—";
@@ -2096,7 +2104,7 @@ async function init_allspend(){
         const name = XP_PROVIDER_NAMES[p.provider] || p.provider;
         return `<div class="model-row">
           <div class="model-dot" style="background:${color}"></div>
-          <div style="flex:1;font-size:12px">${name}</div>
+          <div style="flex:1;font-size:12px">${esc(name)}</div>
           <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${color}40;border-right:2px solid ${color}"></div></div>
           <div class="mono" style="font-size:11px;min-width:60px;text-align:right">$${(p.cost||0).toFixed(4)}</div>
           <div class="mono muted" style="font-size:10px;min-width:55px;text-align:right">${fmtNum(p.tokens||0)} tok</div>
@@ -2113,11 +2121,11 @@ async function init_allspend(){
   if (devList.length > 0) {
     document.getElementById("xp-dev-body").innerHTML = devList.map(d => {
       const providerTags = (d.providers||[]).map(p =>
-        `<span class="tag tag-gray" style="font-size:9px;margin:1px">${(XP_PROVIDER_NAMES[p]||p).split(" ")[0]}</span>`
+        `<span class="tag tag-gray" style="font-size:9px;margin:1px">${esc((XP_PROVIDER_NAMES[p]||p).split(" ")[0])}</span>`
       ).join("");
       const totalTokens = (d.input_tokens||0) + (d.output_tokens||0);
       return `<tr>
-        <td><strong>${d.developer_email||"unknown"}</strong></td>
+        <td><strong>${esc(d.developer_email)||"unknown"}</strong></td>
         <td>${providerTags}</td>
         <td class="mono">${fmtNum(totalTokens)}</td>
         <td class="mono"><strong>$${(d.total_cost||0).toFixed(4)}</strong></td>
@@ -2140,7 +2148,7 @@ async function init_allspend(){
       const color = XP_PROVIDER_COLORS[m.provider] || "#6b7b8a";
       return `<div class="model-row">
         <div class="model-dot" style="background:${color}"></div>
-        <div style="flex:1;font-size:12px">${m.model||"unknown"} <span class="muted" style="font-size:10px">${XP_PROVIDER_NAMES[m.provider]||m.provider}</span></div>
+        <div style="flex:1;font-size:12px">${esc(m.model)||"unknown"} <span class="muted" style="font-size:10px">${esc(XP_PROVIDER_NAMES[m.provider]||m.provider)}</span></div>
         <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${color}40;border-right:2px solid ${color}"></div></div>
         <div class="mono" style="font-size:11px;min-width:60px;text-align:right">$${(m.cost||0).toFixed(4)}</div>
       </div>`;
@@ -2160,9 +2168,9 @@ async function init_allspend(){
       const tokens = (e.tokens_in||0) + (e.tokens_out||0);
       return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--b1);font-size:12px">
         <div class="model-dot" style="background:${color}"></div>
-        <span class="mono muted" style="font-size:10px;min-width:60px">${time}</span>
-        <span style="min-width:80px">${name}</span>
-        <span class="mono muted" style="font-size:10px">${e.model||""}</span>
+        <span class="mono muted" style="font-size:10px;min-width:60px">${esc(time)}</span>
+        <span style="min-width:80px">${esc(name)}</span>
+        <span class="mono muted" style="font-size:10px">${esc(e.model)||""}</span>
         <span style="flex:1"></span>
         <span class="mono" style="min-width:50px;text-align:right">${tokens?fmtNum(tokens)+' tok':''}</span>
         <span class="mono" style="min-width:55px;text-align:right;color:var(--ac)">${cost}</span>
@@ -2189,11 +2197,11 @@ async function init_allspend(){
     connHTML += `<div style="flex:1;min-width:200px;background:var(--bg3);border-radius:8px;padding:12px;border:1px solid var(--b1)">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
         <div class="model-dot" style="background:${color}"></div>
-        <strong style="font-size:12px">${name}</strong>
+        <strong style="font-size:12px">${esc(name)}</strong>
         <span class="tag tag-green" style="font-size:9px">OTel</span>
       </div>
       <div class="mono muted" style="font-size:10px">${src.record_count} records</div>
-      <div class="mono muted" style="font-size:10px">Last: ${lastAt}</div>
+      <div class="mono muted" style="font-size:10px">Last: ${esc(lastAt)}</div>
     </div>`;
   }
   // Billing API connections
@@ -2204,11 +2212,11 @@ async function init_allspend(){
                       '<span class="tag tag-amber" style="font-size:9px">Pending</span>';
     connHTML += `<div style="flex:1;min-width:200px;background:var(--bg3);border-radius:8px;padding:12px;border:1px solid var(--b1)">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-        <strong style="font-size:12px">${name}</strong>
+        <strong style="font-size:12px">${esc(name)}</strong>
         ${statusTag}
         <span class="tag tag-gray" style="font-size:9px">API</span>
       </div>
-      <div class="mono muted" style="font-size:10px">Last sync: ${conn.last_sync_at || 'Never'}</div>
+      <div class="mono muted" style="font-size:10px">Last sync: ${esc(conn.last_sync_at) || 'Never'}</div>
     </div>`;
   }
   if (otelSources.length === 0 && billingConns.length === 0) {
@@ -2236,9 +2244,9 @@ async function init_allspend(){
             const tokens = (e.tokens_in||0) + (e.tokens_out||0);
             return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--b1);font-size:12px">
               <div class="model-dot" style="background:${color}"></div>
-              <span class="mono muted" style="font-size:10px;min-width:60px">${time}</span>
-              <span style="min-width:80px">${name}</span>
-              <span class="mono muted" style="font-size:10px">${e.model||""}</span>
+              <span class="mono muted" style="font-size:10px;min-width:60px">${esc(time)}</span>
+              <span style="min-width:80px">${esc(name)}</span>
+              <span class="mono muted" style="font-size:10px">${esc(e.model)||""}</span>
               <span style="flex:1"></span>
               <span class="mono" style="min-width:50px;text-align:right">${tokens?fmtNum(tokens)+' tok':''}</span>
               <span class="mono" style="min-width:55px;text-align:right;color:var(--ac)">${cost}</span>
@@ -2287,7 +2295,7 @@ async function init_allspend(){
       const totalCost = summary.total_cost_usd || 0;
       if (modelList.length > 0) {
         const topModel = modelList[0];
-        if (topModel.cost > totalCost * 0.6) tips.push({ icon: '🔄', text: topModel.model + ' accounts for ' + Math.round((topModel.cost/totalCost)*100) + '% of spend. Consider a cheaper model for non-critical tasks.', save: 'up to 50%' });
+        if (topModel.cost > totalCost * 0.6) tips.push({ icon: '🔄', text: esc(topModel.model) + ' accounts for ' + Math.round((topModel.cost/totalCost)*100) + '% of spend. Consider a cheaper model for non-critical tasks.', save: 'up to 50%' });
       }
       if (typeof effScore === 'number' && effScore < 60) tips.push({ icon: '✂️', text: 'Efficiency score is ' + effScore + '/100. Use prompt compression to reduce input tokens by 10-30%.', save: '10-30%' });
     }
@@ -2335,15 +2343,15 @@ function updateComparison(){
       <div class="grid-stat-card"><div class="grid-stat-val">${fmt(gpt4o.monthly)}</div><div class="grid-stat-lbl">GPT-4o equiv/mo</div></div>
       <div class="grid-stat-card"><div class="grid-stat-val" style="color:var(--am)">${fmt(saving)}</div><div class="grid-stat-lbl">Max saving/mo</div></div>
     </div>
-    <div class="info-box"><strong style="color:var(--tx)">Best value:</strong> ${cheapest.label} (${cheapest.provider}) at ${fmt(cheapest.perCall)}/call<br>Switching from GPT-4o saves <strong style="color:var(--ac)">${fmt(saving)}/month</strong></div>`;
+    <div class="info-box"><strong style="color:var(--tx)">Best value:</strong> ${esc(cheapest.label)} (${esc(cheapest.provider)}) at ${fmt(cheapest.perCall)}/call<br>Switching from GPT-4o saves <strong style="color:var(--ac)">${fmt(saving)}/month</strong></div>`;
 
   document.getElementById("model-cmp-body").innerHTML=results.map((m,i)=>{
     const vs=m.monthly-cheapest.monthly;
     const pr=PROVIDER_META?PROVIDER_META[m.provider]:{color:"#888",bg:"rgba(128,128,128,.15)"};
     return`<tr style="${i===0?'background:rgba(0,212,161,.04)':''}">
-      <td style="font-weight:${i===0?'500':'400'}">${i===0?'★ ':''}${m.label}</td>
-      <td><span class="prov prov-${m.provider}">${m.provider}</span></td>
-      <td><span class="tag ${m.tier==='frontier'?'tag-purple':m.tier==='mid'?'tag-blue':'tag-green'}">${m.tier}</span></td>
+      <td style="font-weight:${i===0?'500':'400'}">${i===0?'★ ':''}${esc(m.label)}</td>
+      <td><span class="prov prov-${esc(m.provider)}">${esc(m.provider)}</span></td>
+      <td><span class="tag ${m.tier==='frontier'?'tag-purple':m.tier==='mid'?'tag-blue':'tag-green'}">${esc(m.tier)}</span></td>
       <td class="mono">$${m.input}</td><td class="mono">$${m.output}</td>
       <td class="mono muted">${m.cacheRead>0?'$'+m.cacheRead:'—'}</td>
       <td class="mono">${fmt(m.perCall)}</td>
@@ -2391,7 +2399,7 @@ window.init_perf=async function(){
     document.getElementById("sla-body").innerHTML=realModels.map(m=>{
       const lat = Math.round(m.avg_latency_ms||0);
       return `<tr>
-        <td><span class="prov prov-${m.provider}">${m.model}</span></td>
+        <td><span class="prov prov-${esc(m.provider)}">${esc(m.model)}</span></td>
         <td class="mono">${lat}ms</td><td class="mono">\u2014</td><td class="mono">\u2014</td>
         <td class="mono">\u2014</td>
         <td class="mono">${fmtNum(m.requests||0)}</td>
@@ -2586,7 +2594,7 @@ window.init_reports = async function() {
         const budgetPct = t.budget_pct || (budget > 0 ? Math.round(spend / budget * 100) : 0);
         const budgetColor = budgetPct > 85 ? 'var(--re)' : budgetPct > 60 ? 'var(--am)' : 'var(--ac)';
         return `<tr>
-          <td style="font-weight:500">${t.team || 'unassigned'}</td>
+          <td style="font-weight:500">${esc(t.team) || 'unassigned'}</td>
           <td class="mono">$${spend.toFixed(2)}</td>
           <td class="mono">${fmtNum(reqs)}</td>
           <td class="mono">${fmtNum(tokens)}</td>
@@ -2606,10 +2614,10 @@ window.init_reports = async function() {
     if (devList.length > 0) {
       document.getElementById('rpt-dev-body').innerHTML = devList.slice(0, 20).map(d => {
         const providerTags = (d.providers || []).map(p =>
-          `<span class="tag tag-gray" style="font-size:9px;margin:1px">${(XP_PROVIDER_NAMES[p]||p).split(' ')[0]}</span>`
+          `<span class="tag tag-gray" style="font-size:9px;margin:1px">${esc((XP_PROVIDER_NAMES[p]||p).split(' ')[0])}</span>`
         ).join('');
         return `<tr>
-          <td><strong>${d.developer_email || 'unknown'}</strong></td>
+          <td><strong>${esc(d.developer_email) || 'unknown'}</strong></td>
           <td class="mono"><strong>$${(d.total_cost||0).toFixed(4)}</strong></td>
           <td>${providerTags || '—'}</td>
           <td class="mono">${d.commits || 0}</td>
@@ -2644,7 +2652,7 @@ window.init_reports = async function() {
         const color = XP_PROVIDER_COLORS[m.provider] || '#6b7b8a';
         return `<div class="model-row">
           <div class="model-dot" style="background:${color}"></div>
-          <div style="flex:1;font-size:12px">${m.model||'unknown'} <span class="muted" style="font-size:10px">${XP_PROVIDER_NAMES[m.provider]||m.provider}</span></div>
+          <div style="flex:1;font-size:12px">${esc(m.model)||'unknown'} <span class="muted" style="font-size:10px">${esc(XP_PROVIDER_NAMES[m.provider]||m.provider)}</span></div>
           <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${color}40;border-right:2px solid ${color}"></div></div>
           <div class="mono" style="font-size:11px;min-width:60px;text-align:right">$${(m.cost||0).toFixed(4)}</div>
         </div>`;
@@ -2713,9 +2721,9 @@ window.init_security=async function(){
     // ── API Keys — show actual member key hints ──
     document.getElementById("keys-body").innerHTML = members.length > 0
       ? members.map(m => `<tr>
-          <td class="mono" style="font-size:11px">${m.api_key_hint || '\u2014'}</td>
-          <td>${m.name || '\u2014'}</td><td class="muted small">${m.email || '\u2014'}</td>
-          <td class="mono muted small">${m.created_at || '\u2014'}</td>
+          <td class="mono" style="font-size:11px">${esc(m.api_key_hint) || '\u2014'}</td>
+          <td>${esc(m.name) || '\u2014'}</td><td class="muted small">${esc(m.email) || '\u2014'}</td>
+          <td class="mono muted small">${esc(m.created_at) || '\u2014'}</td>
           <td class="mono muted small">\u2014</td>
           <td><span class="tag tag-green">active</span></td>
           <td>\u2014</td>
@@ -2725,8 +2733,8 @@ window.init_security=async function(){
     // ── RBAC — show real members with roles ──
     document.getElementById("rbac-body").innerHTML = members.length > 0
       ? members.map(m => `<tr>
-          <td class="mono" style="font-size:11px">${m.email || '\u2014'}</td>
-          <td><span class="tag ${m.role==='owner'?'tag-purple':m.role==='admin'?'tag-blue':'tag-gray'}">${m.role}</span></td>
+          <td class="mono" style="font-size:11px">${esc(m.email) || '\u2014'}</td>
+          <td><span class="tag ${m.role==='owner'?'tag-purple':m.role==='admin'?'tag-blue':'tag-gray'}">${esc(m.role)}</span></td>
           <td><span class="tag tag-green">\u2713</span></td>
           <td><span class="tag ${m.role==='viewer'?'tag-red':'tag-green'}">${m.role==='viewer'?'\u2717':'\u2713'}</span></td>
           <td><span class="tag ${m.role==='owner'||m.role==='admin'?'tag-green':'tag-red'}">${m.role==='owner'||m.role==='admin'?'\u2713':'\u2717'}</span></td>
@@ -2742,12 +2750,12 @@ window.init_security=async function(){
     document.getElementById("audit-body").innerHTML = auditEvents.map(e => {
       const time = new Date(e.created_at * 1000).toLocaleString();
       return `<tr>
-        <td class="mono muted small">${time}</td>
-        <td>${e.action}</td>
-        <td>${e.actor_email || '\u2014'}</td>
-        <td>${e.actor_role || '\u2014'}</td>
-        <td class="muted small">${e.resource || '\u2014'}</td>
-        <td class="muted small">${e.detail || '\u2014'}</td>
+        <td class="mono muted small">${esc(time)}</td>
+        <td>${esc(e.action)}</td>
+        <td>${esc(e.actor_email) || '\u2014'}</td>
+        <td>${esc(e.actor_role) || '\u2014'}</td>
+        <td class="muted small">${esc(e.resource) || '\u2014'}</td>
+        <td class="muted small">${esc(e.detail) || '\u2014'}</td>
       </tr>`;
     }).join("");
   } else {
@@ -2772,10 +2780,10 @@ window.init_security=async function(){
   // ── Compliance — real security features from API or static product truth ──
   const features = secData?.security_features || {};
   document.getElementById("compliance-status").innerHTML = [
-    {name:"Data Encryption",status:features.data_encryption || "AES-256 at rest (Cloudflare D1)",icon:"\u{1F512}",color:"var(--ac)"},
-    {name:"Session Security",status:features.session_security || "HTTP-only, SameSite=Lax, Secure",icon:"\u{1F30D}",color:"var(--ac)"},
-    {name:"Access Control",status:features.access_control || "RBAC (owner/admin/member/viewer)",icon:"\u{1F511}",color:"var(--ac)"},
-    {name:"API Security",status:features.api_key_hashing ? `${features.api_key_hashing} hashed keys` : "SHA-256 hashed keys",icon:"\u{1F6E1}",color:"var(--ac)"},
+    {name:"Data Encryption",status:esc(features.data_encryption) || "AES-256 at rest (Cloudflare D1)",icon:"\u{1F512}",color:"var(--ac)"},
+    {name:"Session Security",status:esc(features.session_security) || "HTTP-only, SameSite=Lax, Secure",icon:"\u{1F30D}",color:"var(--ac)"},
+    {name:"Access Control",status:esc(features.access_control) || "RBAC (owner/admin/member/viewer)",icon:"\u{1F511}",color:"var(--ac)"},
+    {name:"API Security",status:features.api_key_hashing ? `${esc(features.api_key_hashing)} hashed keys` : "SHA-256 hashed keys",icon:"\u{1F6E1}",color:"var(--ac)"},
   ].map(r => `
     <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--b1)">
       <span>${r.icon}</span>
@@ -3265,7 +3273,7 @@ async function loadNotifications() {
         desc:`MTD spend is ${org.budget_pct}% of your $${org.budget_usd} budget`, time:'now' });
     }
     teams.filter(t => t.budget_usd > 0 && t.budget_pct >= 90).forEach(t => {
-      items.push({ ico:'🔴', bg:'var(--re2)', name:`Team "${t.team}" budget`,
+      items.push({ ico:'🔴', bg:'var(--re2)', name:`Team "${esc(t.team)}" budget`,
         desc:`${Number(t.budget_pct).toFixed(0)}% of $${t.budget_usd} budget`, time:'today' });
     });
 
@@ -3276,7 +3284,7 @@ async function loadNotifications() {
       ? '<div class="nd-empty">✓ No alerts — all budgets healthy</div>'
       : items.map(n => `<div class="nd-item">
           <div class="nd-ico" style="background:${n.bg}">${n.ico}</div>
-          <div class="nd-body"><div class="nd-name">${n.name}</div><div class="nd-desc">${n.desc}</div></div>
+          <div class="nd-body"><div class="nd-name">${esc(n.name)}</div><div class="nd-desc">${esc(n.desc)}</div></div>
           <span class="nd-time">${n.time}</span>
         </div>`).join('');
   } catch {
@@ -3493,7 +3501,7 @@ function connectSSE() {
         const ts = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
         const cost = d.cost_total_usd != null ? ` · $${Number(d.cost_total_usd).toFixed(6)}` : '';
         const tok  = d.total_tokens  != null ? ` · ${d.total_tokens} tok` : '';
-        line.innerHTML = `<span style="color:var(--di)">${ts}</span> <span style="color:var(--ac)">${d.provider||'?'}/${d.model||'?'}</span>${tok}${cost}`;
+        line.innerHTML = `<span style="color:var(--di)">${esc(ts)}</span> <span style="color:var(--ac)">${esc(d.provider)||'?'}/${esc(d.model)||'?'}</span>${tok}${cost}`;
         streamEl.appendChild(line);
         if (streamEl.children.length > 200) streamEl.removeChild(streamEl.firstChild);
         streamEl.scrollTop = streamEl.scrollHeight;
@@ -3594,7 +3602,7 @@ function renderTraceList(traces) {
     <div onclick="showTraceDetail(${i})" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--b1);cursor:pointer;transition:background .1s" onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background='transparent'">
       <span style="width:7px;height:7px;border-radius:50%;background:var(--ac);flex-shrink:0"></span>
       <div style="flex:1;min-width:0">
-        <div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name || traceId || 'Unnamed trace'}</div>
+        <div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.name) || esc(traceId) || 'Unnamed trace'}</div>
         <div style="font-size:10px;color:var(--mu);font-family:var(--mono)">${t.spans || 0} spans \u00b7 ${Math.round(t.latency || 0)}ms \u00b7 $${Number(t.cost || 0).toFixed(4)}</div>
       </div>
       <span style="font-family:var(--mono);font-size:10px;color:var(--di)">${ts}</span>
@@ -3613,14 +3621,14 @@ function showTraceDetail(idx) {
   el.innerHTML = `
     <div style="margin-bottom:10px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-        <span style="font-size:11px;font-weight:500">${t.name || 'Root'}</span>
+        <span style="font-size:11px;font-weight:500">${esc(t.name) || 'Root'}</span>
         <span style="margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--mu)">${Math.round(t.latency || 0)}ms \u00b7 $${Number(t.cost || 0).toFixed(4)}</span>
       </div>
       <div style="height:6px;background:var(--bg3);border-radius:3px;overflow:hidden">
         <div style="height:100%;width:100%;background:var(--ac);border-radius:3px"></div>
       </div>
       <div style="margin-top:8px;font-size:11px;color:var(--mu)">
-        ${t.spans || 0} spans \u00b7 Trace ID: <code style="font-size:10px">${traceId}</code>
+        ${t.spans || 0} spans \u00b7 Trace ID: <code style="font-size:10px">${esc(traceId)}</code>
       </div>
     </div>`;
 }
@@ -3852,9 +3860,9 @@ async function compressPrompt() {
   const tipsEl = document.getElementById('opt-tips-list');
   if (tipsEl) {
     tipsEl.innerHTML = tips.map(t => `<div style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--b1);font-size:12px">
-      <span style="font-size:14px">${t.icon}</span>
-      <span style="flex:1">${t.text}</span>
-      ${t.tag ? '<span class="tag tag-amber" style="font-size:9px">'+t.tag+'</span>' : ''}
+      <span style="font-size:14px">${esc(t.icon)}</span>
+      <span style="flex:1">${esc(t.text)}</span>
+      ${t.tag ? '<span class="tag tag-amber" style="font-size:9px">'+esc(t.tag)+'</span>' : ''}
     </div>`).join('');
   }
 
@@ -3867,7 +3875,7 @@ async function compressPrompt() {
     costEl.innerHTML = '<div style="font-size:11px;color:var(--mu);margin-bottom:4px">Estimated savings per 1K calls:</div>' +
       models.map(m => {
         const saveDollar = (saved / 1e6 * m.rate * 1000).toFixed(4);
-        return `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:11px"><span class="mono">${m.name}</span><span class="mono" style="color:var(--ac)">-$${saveDollar}</span></div>`;
+        return `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:11px"><span class="mono">${esc(m.name)}</span><span class="mono" style="color:var(--ac)">-$${saveDollar}</span></div>`;
       }).join('');
   }
 
@@ -3887,7 +3895,7 @@ async function estimateCosts() {
     const oc = (outTokens / 1000 * p.output).toFixed(6);
     const tc = (parseFloat(ic) + parseFloat(oc)).toFixed(6);
     const row = document.createElement('tr');
-    row.innerHTML = `<td>${model}</td><td>$${ic}</td><td>$${oc}</td><td>$${tc}</td>`;
+    row.innerHTML = `<td>${esc(model)}</td><td>$${ic}</td><td>$${oc}</td><td>$${tc}</td>`;
     tbody.appendChild(row);
   }
   document.getElementById('est-result').style.display = '';

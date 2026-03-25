@@ -391,6 +391,170 @@ All claims in this document are backed by verified sources:
 
 ---
 
-*Last updated: 23 March 2026 (v3.0 — 4-layer architecture, new competitor analysis, all sources linked)*
+---
+
+## 9. Semantic Cache — Next Major Feature (v3.1)
+
+### Why Semantic Caching
+
+- 80% of companies miss AI cost forecasts by >25%
+- Developers ask similar questions repeatedly across teams (error explanations, code patterns, boilerplate)
+- LLM round-trips add 1-30 seconds; cache hits return in <100ms
+- AI cost optimization market: **$5.03B (2025) → $13.52B (2029)**, CAGR 28%
+- VentureBeat: semantic caching cuts LLM bills by up to 73% in ideal conditions; 40% median in production
+
+### Competitive Position — Cache
+
+| Platform | Semantic Cache | Local-First | CLI Wrapping | Our Advantage |
+|----------|:---:|:---:|:---:|---|
+| **VantageAI** | Planned | Yes | Yes (5+ agents) | Only local-first + multi-agent |
+| Helicone | Yes | No | No | Cloud-only proxy |
+| Portkey | Yes | No | No | Cloud-only gateway |
+| LiteLLM | Yes | No | Proxy only | No CLI agent support |
+| Braintrust | Limited | No | No | Eval-focused, not caching |
+
+**Key differentiator:** VantageAI is the only platform offering **local-first semantic caching** for CLI AI tools. All competitors operate cloud-only proxies.
+
+### How It Works
+
+1. User prompt arrives at vantage-cli
+2. Generate embedding vector (384-1536 dims) via Cloudflare Workers AI `bge-m3`
+3. Query local cache (SQLite + cosine similarity) for nearest neighbors
+4. If similarity ≥ threshold (default 0.95) → return cached response (cache hit)
+5. If no match → forward to LLM, cache prompt embedding + response on return
+
+### Architecture
+
+```
+Developer Machine                    VantageAI Cloud
++------------------+                +-------------------+
+| vantage-cli      |                | CF Worker         |
+|   ↓               |                |   ↓               |
+| Local Cache       |  (optional)   | Shared Cache      |
+| (SQLite + cosine) | ───────────→ | (Vectorize)       |
+|   ↓               |   sync        |   ↓               |
+| Cache HIT?        |                | Team-level cache  |
+| Yes → return      |                | hit analytics     |
+| No  → forward     |                +-------------------+
+|   to LLM API      |
++------------------+
+```
+
+### Phased Rollout
+
+| Phase | Scope | Timeline | Expected Hit Rate |
+|-------|-------|----------|-------------------|
+| **Phase 1: Exact Match (MVP)** | SHA-256 prompt hashing, local SQLite, zero new deps | 1-2 weeks | 5-15% |
+| **Phase 2: Semantic Match** | Workers AI `bge-m3` embeddings, brute-force cosine, threshold tuning | 2-3 weeks | 15-30% |
+| **Phase 3: Team Shared Cache** | Cloudflare Vectorize, new API endpoints, dashboard analytics | 3-4 weeks | 25-40% |
+| **Phase 4: Advanced Tuning** | Per-category thresholds, model-version invalidation, cache warming | 4-6 weeks | 30-50% |
+
+### Similarity Thresholds
+
+| Threshold | Hit Rate | Risk | Use Case |
+|-----------|----------|------|----------|
+| 0.98 | 5-10% | Very low | Safety-critical |
+| **0.95** | **15-25%** | **Low (default)** | **Code generation** |
+| 0.90 | 25-40% | Medium | Customer support |
+| 0.85 | 35-55% | High | Highly repetitive only |
+
+### Privacy Design
+
+| Mode | Local Cache | Server Cache |
+|------|------------|-------------|
+| `full` | Prompt + embedding + response | Embedding + metadata only |
+| `anonymized` | Prompt + embedding + response | Embedding + metadata only |
+| `strict` | Embedding + response only (no prompt stored) | Nothing sent |
+| `local-only` | Embedding + response only | Nothing sent |
+
+Embeddings are one-way transforms — prompts cannot be reconstructed from vectors. Server-side storage is privacy-safe.
+
+### Storage Strategy
+
+| Layer | Storage | Why |
+|-------|---------|-----|
+| **Local (vantage-cli)** | SQLite + BLOB vectors + JS cosine | Zero native deps; O(n) fine for <10K entries |
+| **Server (shared)** | Cloudflare Vectorize + D1 metadata | ~$2/mo for 50K embeddings; native vector search |
+| **Embedding model** | `bge-m3` via Workers AI | $0.012/M tokens — cheapest, multilingual |
+
+### D1 Schema Addition
+
+```sql
+CREATE TABLE cache_analytics (
+  id TEXT PRIMARY KEY,
+  org_id TEXT NOT NULL,
+  team TEXT DEFAULT '',
+  developer TEXT DEFAULT '',
+  cache_hits INTEGER DEFAULT 0,
+  cache_misses INTEGER DEFAULT 0,
+  cost_saved_usd REAL DEFAULT 0,
+  latency_saved_ms INTEGER DEFAULT 0,
+  period TEXT NOT NULL,
+  created_at TEXT DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now'))
+);
+```
+
+### Config Schema Addition
+
+```typescript
+cache: {
+  enabled: boolean;              // default false (opt-in for v1)
+  similarityThreshold: number;   // 0.85-0.99, default 0.95
+  ttlSeconds: number;            // default 86400 (24h)
+  maxEntries: number;            // default 10000
+  strategy: "local" | "hybrid";  // default "local"
+}
+```
+
+### New API Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/v1/cache/query` | POST | Send embedding, get cached response if match |
+| `/v1/cache/store` | POST | Store new embedding + response metadata |
+| `/v1/cache/stats` | GET | Cache hit rate, cost savings, per-team breakdown |
+
+### Dashboard Metrics
+
+| Metric | Value to User |
+|--------|--------------|
+| Cache hit rate (%) | "32% of your LLM calls served from cache" |
+| Cost savings ($) | "$47.20 saved this month via caching" |
+| Latency saved (s) | "14.2 hours of wait time saved" |
+| Top cached queries | Your team's most repeated prompt patterns |
+| Cache efficiency by model | "Opus cache saves 50x more than Flash" |
+
+### ROI Estimate (10-dev team, 100 calls/dev/day)
+
+| Metric | Value |
+|--------|-------|
+| Monthly LLM calls | 90,000 |
+| Cache hit rate (25%) | 22,500 cached |
+| Avg cost per call | $0.02 |
+| **Monthly savings** | **$450** |
+| Embedding cost | $0.54/mo |
+| Vectorize cost | ~$2/mo |
+| **Net ROI** | **99.6%** |
+
+### Key Open-Source References
+
+| Library | Notes |
+|---------|-------|
+| [GPTCache](https://github.com/zilliztech/GPTCache) | Most mature; LangChain integration |
+| [LiteLLM Cache](https://docs.litellm.ai/docs/proxy/caching) | Redis/Qdrant semantic; production-ready |
+| [LangChain Cache](https://python.langchain.com/docs/integrations/caches/) | RedisSemanticCache, GPTCache adapters |
+
+### Embedding Model Comparison
+
+| Model | Dims | Cost (Workers AI) | Best For |
+|-------|------|-------------------|----------|
+| `bge-small-en-v1.5` | 384 | $0.020/M tokens | High-volume, lower accuracy |
+| `bge-base-en-v1.5` | 768 | $0.067/M tokens | Good balance |
+| **`bge-m3`** | **1024** | **$0.012/M tokens** | **Cheapest, multilingual (recommended)** |
+| `bge-large-en-v1.5` | 1536 | $0.204/M tokens | Highest accuracy |
+
+---
+
+*Last updated: 24 March 2026 (v3.1 — added semantic cache strategy, market analysis, phased rollout)*
 *Sprint: March 24 – April 6, 2026*
 *Next review: April 7, 2026 (post-sprint retro)*

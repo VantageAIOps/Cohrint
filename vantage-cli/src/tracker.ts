@@ -34,6 +34,7 @@ export class Tracker {
   private sentIds = new Set<string>();
   private exitRegistered = false;
   private lastSavedTokens = 0;
+  private lastPromptText = "";
 
   constructor(config: TrackerConfig) {
     this.config = config;
@@ -56,12 +57,19 @@ export class Tracker {
       this.lastSavedTokens = data.savedTokens;
     });
 
+    bus.on("prompt:submitted", (data) => {
+      this.lastPromptText = data.prompt;
+    });
+
     bus.on("agent:completed", (data) => {
       const agent = getAgent(data.agent);
       const model = agent?.defaultModel ?? "unknown";
       const outputTokens = countTokens(data.outputText);
-      // Estimate input tokens as ~10% of output for CLI wrappers
-      const inputTokens = Math.ceil(outputTokens * 0.1);
+      // Use actual prompt text for input tokens when available
+      const inputTokens = this.lastPromptText
+        ? countTokens(this.lastPromptText)
+        : Math.ceil(outputTokens * 0.25); // Fallback: ~25% of output (more realistic)
+      this.lastPromptText = "";
       const costUsd = calculateCost(model, inputTokens, outputTokens);
 
       // Calculate saved cost from optimization
@@ -132,7 +140,8 @@ export class Tracker {
     }
 
     const batch = this.queue.splice(0, this.queue.length);
-    const url = `${this.config.apiBase}/v1/events/batch`;
+    const base = this.config.apiBase || "https://api.vantageaiops.com";
+    const url = `${base}/v1/events/batch`;
 
     try {
       const response = await fetch(url, {

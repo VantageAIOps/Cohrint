@@ -1,6 +1,11 @@
 import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
 
+async function sha256hex(data: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(data));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 const stream = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 /**
@@ -35,7 +40,18 @@ stream.get('/:orgId', async (c) => {
     }
     await c.env.KV.delete(`sse:${orgId}:${sseToken}`);
   } else if (token.startsWith('vnt_')) {
-    // Legacy bearer token — SDK compatibility, accept as-is
+    // Validate API key against DB (same pattern as authMiddleware)
+    const hash = await sha256hex(token);
+    const org = await c.env.DB.prepare(
+      'SELECT id FROM orgs WHERE api_key_hash = ?'
+    ).bind(hash).first<{ id: string }>();
+    const member = org ? null : await c.env.DB.prepare(
+      'SELECT org_id FROM org_members WHERE api_key_hash = ?'
+    ).bind(hash).first<{ org_id: string }>();
+    const resolvedOrg = org?.id ?? member?.org_id;
+    if (!resolvedOrg || resolvedOrg !== orgId) {
+      return c.json({ error: 'Invalid API key or org mismatch' }, 401);
+    }
   } else {
     return c.json({ error: 'Missing token query param' }, 401);
   }
@@ -88,7 +104,7 @@ stream.get('/:orgId', async (c) => {
       'Content-Type':                'text/event-stream',
       'Cache-Control':               'no-cache',
       'Connection':                  'keep-alive',
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': c.req.header('Origin') || 'https://vantageaiops.com',
       'X-Accel-Buffering':           'no',
     },
   });

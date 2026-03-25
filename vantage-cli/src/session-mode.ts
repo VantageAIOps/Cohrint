@@ -64,7 +64,11 @@ export class AgentSession {
     }
 
     this.child.stdout?.on("data", (chunk: Buffer) => {
-      process.stdout.write(chunk);
+      const ok = process.stdout.write(chunk);
+      if (!ok) {
+        this.child?.stdout?.pause();
+        process.stdout.once("drain", () => this.child?.stdout?.resume());
+      }
       this.totalOutputTokens += Math.ceil(chunk.length / 4);
     });
 
@@ -88,7 +92,7 @@ export class AgentSession {
   }
 
   /** Process and send a line to the agent's stdin */
-  sendLine(line: string): ProcessedInput | null {
+  async sendLine(line: string): Promise<ProcessedInput | null> {
     if (!this.child?.stdin?.writable) {
       console.error(red("  Session not active."));
       return null;
@@ -130,10 +134,12 @@ export class AgentSession {
     this.totalInputTokens += result.forwarded.split(/\s+/).length;
     this.totalSavedTokens += result.savedTokens;
 
-    // Forward to agent
+    // Forward to agent with backpressure handling
     const ok = this.child.stdin.write(result.forwarded + "\n");
     if (!ok) {
-      this.child.stdin.once("drain", () => {});
+      await new Promise<void>((resolve) => {
+        this.child?.stdin?.once("drain", resolve) ?? resolve();
+      });
     }
 
     return result;

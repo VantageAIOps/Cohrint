@@ -102,18 +102,7 @@ export async function authMiddleware(
     ).bind(hash).first<{ id: string; org_id: string; role: string; scope_team: string | null }>();
 
     if (!member) {
-      const isDevKey = c.env.ENVIRONMENT !== 'production';
-      if (isDevKey) {
-        await c.env.DB.prepare(
-          'INSERT OR IGNORE INTO orgs (id, api_key_hash, name, plan) VALUES (?, ?, ?, ?)'
-        ).bind(orgId, hash, orgId, 'free').run();
-        c.set('orgId',     orgId);
-        c.set('role',      'owner');
-        c.set('scopeTeam', null);
-        c.set('memberId',  null);
-      } else {
-        return c.json({ error: 'API key not found. Sign up at vantageaiops.com' }, 401);
-      }
+      return c.json({ error: 'API key not found. Sign up at vantageaiops.com' }, 401);
     } else {
       c.set('orgId',     member.org_id);
       c.set('role',      member.role);

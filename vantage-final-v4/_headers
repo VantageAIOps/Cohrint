@@ -1,3 +1,7 @@
+# NOTE: External CDN scripts (cdnjs.cloudflare.com, cdn.jsdelivr.net) should use
+# Subresource Integrity (SRI) hashes in their <script> tags in the HTML files.
+# SRI cannot be enforced via _headers — it must be set on each <script> element.
+
 /*
   X-Frame-Options: DENY
   X-Content-Type-Options: nosniff
@@ -6,25 +10,49 @@
 
 /app.html
   Cache-Control: no-cache, no-store, must-revalidate
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
   Content-Security-Policy: default-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://static.cloudflareinsights.com; connect-src 'self' https://api.vantageaiops.com wss://api.vantageaiops.com https://cloudflareinsights.com https://*.workers.dev; img-src 'self' data:; worker-src 'self';
 
 /app
   Cache-Control: no-cache, no-store, must-revalidate
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
   Content-Security-Policy: default-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://static.cloudflareinsights.com; connect-src 'self' https://api.vantageaiops.com wss://api.vantageaiops.com https://cloudflareinsights.com https://*.workers.dev; img-src 'self' data:; worker-src 'self';
 
 /superadmin.html
   Cache-Control: no-cache, no-store, must-revalidate
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
   Content-Security-Policy: default-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; connect-src 'self' https://api.vantageaiops.com; img-src 'self' data:;
   X-Robots-Tag: noindex, nofollow
 
 /index.html
   Cache-Control: no-cache, no-store, must-revalidate
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
 
 /calculator.html
   Cache-Control: public, max-age=3600
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
 
 /docs.html
   Cache-Control: public, max-age=3600
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
 
 /sw.js
   Cache-Control: no-cache, no-store, must-revalidate
