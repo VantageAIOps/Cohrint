@@ -233,7 +233,8 @@ async function executePrompt(
   prompt: string,
   agent: AgentAdapter,
   config: VantageConfig,
-  stream: boolean = true
+  stream: boolean = true,
+  continueConversation: boolean = false
 ): Promise<void> {
   bus.emit("prompt:submitted", {
     prompt,
@@ -257,8 +258,11 @@ async function executePrompt(
     }
   }
 
-  // Build and run command
-  const spawnArgs = agent.buildCommand(finalPrompt);
+  // Build command — use continue if this is a follow-up prompt
+  const useContinue = continueConversation && agent.supportsContinue && agent.buildContinueCommand;
+  const spawnArgs = useContinue
+    ? agent.buildContinueCommand!(finalPrompt)
+    : agent.buildCommand(finalPrompt);
 
   try {
     if (stream) {
@@ -335,6 +339,9 @@ async function startRepl(config: VantageConfig): Promise<void> {
 
   let currentAgent = getAgent(config.defaultAgent) ?? ALL_AGENTS[0];
   let activeSession: AgentSession | null = null;
+
+  // Track per-agent prompt count for --continue support
+  const agentPromptCount = new Map<string, number>();
 
   const rl = createInterface({
     input: process.stdin,
@@ -538,7 +545,9 @@ async function startRepl(config: VantageConfig): Promise<void> {
           const agent = getAgent(agentName);
           if (agent && agentPrompt) {
             const costPromise = waitForCost();
-            await executePrompt(agentPrompt, agent, config);
+            const count = agentPromptCount.get(agent.name) ?? 0;
+            agentPromptCount.set(agent.name, count + 1);
+            await executePrompt(agentPrompt, agent, config, true, count > 0);
             try {
               const cost = await Promise.race([
                 costPromise,
@@ -584,7 +593,9 @@ async function startRepl(config: VantageConfig): Promise<void> {
 
         // Normal prompt — use current default agent
         const costPromise = waitForCost();
-        await executePrompt(line, currentAgent, config);
+        const count = agentPromptCount.get(currentAgent.name) ?? 0;
+        agentPromptCount.set(currentAgent.name, count + 1);
+        await executePrompt(line, currentAgent, config, true, count > 0);
         try {
           const cost = await Promise.race([
             costPromise,
