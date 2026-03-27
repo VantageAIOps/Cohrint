@@ -9,6 +9,7 @@ export const geminiAdapter: AgentAdapter = {
   provider: "google",
   interactiveArgs: [],
   exitCommand: "/quit",
+  supportsContinue: true,
 
   async detect(): Promise<boolean> {
     try {
@@ -25,6 +26,14 @@ export const geminiAdapter: AgentAdapter = {
     return {
       command: cmd,
       args: [...baseArgs, prompt],
+    };
+  },
+
+  buildContinueCommand(prompt: string, config?: AgentConfig): SpawnArgs {
+    const cmd = config?.command || "gemini";
+    return {
+      command: cmd,
+      args: ["--continue", "-p", prompt],
     };
   },
 };
