@@ -461,14 +461,14 @@ class TestNoFakeData:
         chk("DR.30 no mult() function", not has_mult)
         assert not has_mult
 
-    def test_dr31_enterprise_gate_elements(self):
-        """DR.31: Enterprise Reporting has 'rpt-gate' and 'rpt-content' elements (plan gating)."""
+    def test_dr31_no_enterprise_reporting_remnants(self):
+        """DR.31: Enterprise Reporting removed — no rpt-gate/rpt-content remnants."""
         html = self._fetch_html()
-        has_gate = "rpt-gate" in html
-        has_content = "rpt-content" in html
-        chk("DR.31a rpt-gate element exists", has_gate)
-        chk("DR.31b rpt-content element exists", has_content)
-        assert has_gate or has_content  # At least one must be present
+        no_gate = "rpt-gate" not in html
+        no_content = "rpt-content" not in html
+        chk("DR.31a no rpt-gate remnant", no_gate)
+        chk("DR.31b no rpt-content remnant", no_content)
+        assert no_gate and no_content
 
     def test_dr32_no_ai_intelligence_layer(self):
         """DR.32: Sidebar has no 'AI Intelligence Layer' nav button."""
@@ -486,14 +486,14 @@ class TestNoFakeData:
         chk("DR.33 no standalone 'Token Analytics' link", not has_standalone)
         assert not has_standalone
 
-    def test_dr34_demo_button_noop(self):
-        """DR.34: 'Demo data' button exists but toggleSeedData is a no-op."""
+    def test_dr34_no_demo_toggle(self):
+        """DR.34: Demo data toggle fully removed."""
         html = self._fetch_html()
-        has_toggle = "toggleSeedData" in html
-        # The function should exist but should be a no-op (empty body or console log only)
-        chk("DR.34 toggleSeedData reference exists", has_toggle,
-            "toggleSeedData not found in HTML")
-        # Not a hard failure if it doesn't exist at all (may have been fully removed)
+        no_toggle = "toggleSeedData" not in html
+        no_seed = "seed-toggle" not in html
+        chk("DR.34a no toggleSeedData function", no_toggle)
+        chk("DR.34b no seed-toggle button", no_seed)
+        assert no_toggle
 
     def test_dr35_no_fake_sse_events(self):
         """DR.35: No fake SSE events generated (no addEvent with random provider selection)."""

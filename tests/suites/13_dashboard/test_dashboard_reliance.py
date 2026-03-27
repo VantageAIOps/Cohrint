@@ -23,14 +23,12 @@ MODELS = ["gpt-4o", "gpt-3.5-turbo", "claude-3-sonnet", "gemini-pro",
           "gpt-4-turbo", "claude-instant"]
 
 SIDEBAR_SELECTORS = [
-    ("button.sb-item:has-text('Cost')",        "Cost"),
-    ("button.sb-item:has-text('Token')",       "Tokens"),
-    ("button.sb-item:has-text('Model')",       "Models"),
-    ("button.sb-item:has-text('Performance')", "Performance"),
-    ("button.sb-item:has-text('Quality')",     "Quality"),
-    ("button.sb-item:has-text('Traces')",      "Traces"),
-    ("button.sb-item:has-text('Security')",    "Security"),
-    ("button.sb-item:has-text('Developer')",   "DevX"),
+    ("button.sb-item:has-text('Spend')",    "Spend Analysis"),
+    ("button.sb-item:has-text('Model')",    "Model Pricing"),
+    ("button.sb-item:has-text('Members')",  "Members"),
+    ("button.sb-item:has-text('Budget')",   "Budgets"),
+    ("button.sb-item:has-text('Settings')", "Settings"),
+    ("button.sb-item:has-text('Account')",  "Account"),
 ]
 
 
@@ -141,14 +139,14 @@ def test_full_dashboard_flow(api_key, email):
                 except PWTimeout:
                     warn(f"DR.8  {label} sidebar selector ({selector}) not found")
 
-            chk("DR.8  All 8 sidebar views reachable", views_loaded >= 6,
-                f"only {views_loaded}/8 views loaded")
+            chk("DR.8  All sidebar views reachable", views_loaded >= 5,
+                f"only {views_loaded}/6 views loaded")
 
             # DR.9 KPI cards show real data (not dashes)
             try:
-                page.click('button.sb-item:has-text("Cost")', timeout=3000)
+                page.click('button.sb-item:has-text("Overview")', timeout=3000)
             except Exception:
-                pass  # Already on cost view from sidebar iteration
+                pass  # Already on Overview from default
             time.sleep(1)
             body = page.inner_text("body")
 
@@ -179,13 +177,13 @@ def test_full_dashboard_flow(api_key, email):
             except PWTimeout:
                 warn('DR.11 button.sb-item:has-text("Model") not found')
 
-            # DR.12 Performance view loads
+            # DR.12 Spend Analysis view loads
             try:
-                page.click('button.sb-item:has-text("Performance")', timeout=3000)
+                page.click('button.sb-item:has-text("Spend")', timeout=3000)
                 time.sleep(0.8)
-                chk("DR.12 Performance view loads", True)
+                chk("DR.12 Spend Analysis view loads", True)
             except PWTimeout:
-                warn('DR.12 button.sb-item:has-text("Performance") not found')
+                warn('DR.12 button.sb-item:has-text("Spend") not found')
 
             # DR.13 Settings shows org info
             try:
@@ -222,7 +220,7 @@ def test_full_dashboard_flow(api_key, email):
 
             # DR.16 Logout → session cleared
             try:
-                page.click("#btn-logout, [data-action='logout'], .logout-btn",
+                page.click("#btn-signout, #btn-logout, [data-action='logout'], .logout-btn",
                            timeout=5000)
                 time.sleep(1)
                 chk("DR.16 Logout → navigates away from /app",

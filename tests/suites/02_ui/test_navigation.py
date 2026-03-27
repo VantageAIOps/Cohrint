@@ -19,14 +19,12 @@ from helpers.output import ok, fail, warn, info, section, chk, get_results
 
 
 SIDEBAR_VIEWS = [
-    ("#nav-cost",        "/app",         "Cost view"),
-    ("#nav-tokens",      "/app",         "Tokens view"),
-    ("#nav-models",      "/app",         "Models view"),
-    ("#nav-perf",        "/app",         "Performance view"),
-    ("#nav-settings",    "/app",         "Settings view"),
-    ("#nav-account",     "/app",         "Account view"),
-    ("#nav-devx",        "/app",         "DevX view"),
-    ("#nav-traces",      "/app",         "Traces view"),
+    ("button.sb-item:has-text('Spend')",    "/app", "Spend Analysis"),
+    ("button.sb-item:has-text('Model')",    "/app", "Model Pricing"),
+    ("button.sb-item:has-text('Members')",  "/app", "Members"),
+    ("button.sb-item:has-text('Budget')",   "/app", "Budgets"),
+    ("button.sb-item:has-text('Settings')", "/app", "Settings"),
+    ("button.sb-item:has-text('Account')",  "/app", "Account"),
 ]
 
 PAGES_TO_CHECK = [

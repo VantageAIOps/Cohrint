@@ -19,14 +19,12 @@ from helpers.output import ok, fail, warn, info, section, chk, get_results
 
 
 SIDEBAR_VIEWS = [
-    ("#nav-cost",     "Cost"),
-    ("#nav-tokens",   "Tokens"),
-    ("#nav-models",   "Models"),
-    ("#nav-perf",     "Performance"),
-    ("#nav-settings", "Settings"),
-    ("#nav-account",  "Account"),
-    ("#nav-devx",     "DevX"),
-    ("#nav-traces",   "Traces"),
+    ("button.sb-item:has-text('Spend')",    "Spend Analysis"),
+    ("button.sb-item:has-text('Model')",    "Model Pricing"),
+    ("button.sb-item:has-text('Members')",  "Members"),
+    ("button.sb-item:has-text('Budget')",   "Budgets"),
+    ("button.sb-item:has-text('Settings')", "Settings"),
+    ("button.sb-item:has-text('Account')",  "Account"),
 ]
 
 
@@ -68,48 +66,39 @@ def test_sidebar_views(page, errors_list):
         f"errors: {list(errors_list)[:3]}")
 
 
-def test_modals(page):
-    section("D. Dashboard — Modals")
+def test_views_load(page):
+    section("D. Dashboard — View Navigation")
 
     from playwright.sync_api import TimeoutError as PWTimeout
 
-    # Settings modal
+    # Settings view
     try:
-        page.click("#nav-settings, [data-action='settings'], .btn-settings", timeout=5000)
+        page.click("button.sb-item:has-text('Settings')", timeout=5000)
         time.sleep(0.5)
-        page.wait_for_selector(".modal, dialog, [role='dialog'], .settings-modal",
-                               timeout=5000)
-        chk("D.13 Settings modal opens", True)
-        # Close it
-        page.press("Escape")
-        time.sleep(0.3)
+        chk("D.13 Settings view loads", True)
     except PWTimeout:
-        warn("D.13 Settings modal selector not found")
+        warn("D.13 Settings view selector not found")
     except Exception as e:
-        warn(f"D.13 Settings modal: {e}")
+        warn(f"D.13 Settings view: {e}")
 
-    # Account modal
+    # Account view
     try:
-        page.click("#nav-account, [data-action='account'], .btn-account", timeout=5000)
+        page.click("button.sb-item:has-text('Account')", timeout=5000)
         time.sleep(0.5)
-        page.wait_for_selector(".modal, dialog, [role='dialog'], .account-modal",
-                               timeout=5000)
-        chk("D.14 Account modal opens", True)
-        page.press("Escape")
-        time.sleep(0.3)
+        chk("D.14 Account view loads", True)
     except PWTimeout:
-        warn("D.14 Account modal selector not found")
+        warn("D.14 Account view selector not found")
     except Exception as e:
-        warn(f"D.14 Account modal: {e}")
+        warn(f"D.14 Account view: {e}")
 
 
 def test_charts(page):
     section("D. Dashboard — Charts")
 
-    # Navigate to cost view first
+    # Navigate to Overview view (default, has charts)
     try:
         from playwright.sync_api import TimeoutError as PWTimeout
-        page.click("#nav-cost", timeout=3000)
+        page.click("button.sb-item:has-text('Overview')", timeout=3000)
         time.sleep(1)
     except Exception:
         pass
@@ -165,7 +154,7 @@ def main():
 
             test_dashboard_loads(page, errors)
             test_sidebar_views(page, errors)
-            test_modals(page)
+            test_views_load(page)
             test_charts(page)
 
         except Exception as e:
