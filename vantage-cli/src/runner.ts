@@ -45,9 +45,10 @@ export function runAgent(
       return;
     }
 
+    const spinner = createSpinner("Thinking");
+
     // Timeout guard — kill process if it hangs (grace = 10% of timeout, max 10s)
     const grace = Math.min(Math.ceil(timeoutMs * 0.1), 10000);
-    const spinner = createSpinner("Thinking");
     const timer = setTimeout(() => {
       timedOut = true;
       spinner.stop();
