@@ -9,6 +9,7 @@ export const claudeAdapter: AgentAdapter = {
   provider: "anthropic",
   interactiveArgs: [],
   exitCommand: "/quit",
+  supportsContinue: true,
 
   async detect(): Promise<boolean> {
     try {
@@ -25,6 +26,14 @@ export const claudeAdapter: AgentAdapter = {
     return {
       command: cmd,
       args: [...baseArgs, prompt],
+    };
+  },
+
+  buildContinueCommand(prompt: string, config?: AgentConfig): SpawnArgs {
+    const cmd = config?.command || "claude";
+    return {
+      command: cmd,
+      args: ["--continue", "-p", prompt],
     };
   },
 };
