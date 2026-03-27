@@ -635,7 +635,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
 
     <div class="sidebar-section">
       <div class="sidebar-label">System</div>
-      <button class="sb-item" onclick="nav('settings', this)">
+      <button class="sb-item" id="sb-settings" onclick="nav('settings', this)">
         <span class="icon">&#9881;</span> Settings
       </button>
       <button class="sb-item" onclick="nav('account', this)">
@@ -1195,12 +1195,15 @@ function esc(s) {
 }
 
 function fmt(n) {
-  if (n == null || isNaN(n)) return '$0.00';
+  if (n == null || isNaN(n)) return '\u2014';
+  if (n === 0) return '$0.00';
+  if (n >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M';
+  if (n >= 1000) return '$' + (n / 1000).toFixed(1) + 'K';
   return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function fmtNum(n) {
-  if (n == null || isNaN(n)) return '0';
+  if (n == null || isNaN(n)) return '\u2014';
   return Number(n).toLocaleString('en-US');
 }
 
@@ -2610,7 +2613,7 @@ function loadConnectedTools() {
     addItem.style.cursor = 'pointer';
     addItem.style.color = 'var(--text-muted)';
     addItem.style.marginTop = '4px';
-    addItem.onclick = function() { nav('settings', document.querySelectorAll('button.sb-item')[5]); };
+    addItem.onclick = function() { nav('settings', document.getElementById('sb-settings')); };
     var addDot = document.createElement('div');
     addDot.className = 'connection-dot off';
     addItem.appendChild(addDot);
