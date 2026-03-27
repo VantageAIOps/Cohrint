@@ -546,8 +546,8 @@ async function startRepl(config: VantageConfig): Promise<void> {
           if (agent && agentPrompt) {
             const costPromise = waitForCost();
             const count = agentPromptCount.get(agent.name) ?? 0;
-            agentPromptCount.set(agent.name, count + 1);
             await executePrompt(agentPrompt, agent, config, true, count > 0);
+            agentPromptCount.set(agent.name, count + 1);
             try {
               const cost = await Promise.race([
                 costPromise,
@@ -594,8 +594,8 @@ async function startRepl(config: VantageConfig): Promise<void> {
         // Normal prompt — use current default agent
         const costPromise = waitForCost();
         const count = agentPromptCount.get(currentAgent.name) ?? 0;
-        agentPromptCount.set(currentAgent.name, count + 1);
         await executePrompt(line, currentAgent, config, true, count > 0);
+        agentPromptCount.set(currentAgent.name, count + 1);
         try {
           const cost = await Promise.race([
             costPromise,

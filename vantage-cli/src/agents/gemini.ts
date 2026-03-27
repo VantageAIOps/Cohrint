@@ -31,9 +31,10 @@ export const geminiAdapter: AgentAdapter = {
 
   buildContinueCommand(prompt: string, config?: AgentConfig): SpawnArgs {
     const cmd = config?.command || "gemini";
+    const extraArgs = config?.args?.filter(a => a !== "-p") ?? [];
     return {
       command: cmd,
-      args: ["--continue", "-p", prompt],
+      args: ["--continue", ...extraArgs, "-p", prompt],
     };
   },
 };
