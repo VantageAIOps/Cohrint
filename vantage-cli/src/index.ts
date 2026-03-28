@@ -348,8 +348,27 @@ async function startRepl(config: VantageConfig): Promise<void> {
     output: process.stdout,
   });
 
+  // Multi-line paste detection: buffer lines that arrive rapidly (< 80ms apart),
+  // then join them into a single prompt when a pause is detected.
+  const PASTE_DELAY_MS = 80;
+  let pasteBuffer: string[] = [];
+  let pasteTimer: ReturnType<typeof setTimeout> | null = null;
+  let handleLine: ((combined: string) => void) | null = null;
+
+  function onLineReceived(raw: string) {
+    pasteBuffer.push(raw);
+    if (pasteTimer) clearTimeout(pasteTimer);
+    pasteTimer = setTimeout(() => {
+      const combined = pasteBuffer.join("\n").trim();
+      pasteBuffer = [];
+      pasteTimer = null;
+      if (handleLine) handleLine(combined);
+    }, PASTE_DELAY_MS);
+  }
+
   const prompt = () => {
-    rl.question(promptLine(currentAgent.name), async (input) => {
+    process.stdout.write(promptLine(currentAgent.name));
+    handleLine = async (input: string) => {
       const line = input.trim();
 
       if (!line) {
@@ -459,7 +478,8 @@ async function startRepl(config: VantageConfig): Promise<void> {
               prompt();
               return;
             }
-            rl.question(cyan(`  ${sessionAgent.name}> `), async (sessionInput) => {
+            process.stdout.write(cyan(`  ${sessionAgent.name}> `));
+            handleLine = async (sessionInput: string) => {
               try {
                 const sLine = sessionInput.trim();
                 if (!sLine) { sessionPrompt(); return; }
@@ -505,7 +525,7 @@ async function startRepl(config: VantageConfig): Promise<void> {
                   prompt();
                 }
               }
-            });
+            };
           };
 
           sessionPrompt();
@@ -616,7 +636,7 @@ async function startRepl(config: VantageConfig): Promise<void> {
         console.error(red(`  Error: ${msg}`));
         prompt();
       }
-    });
+    };
   };
 
   const shutdown = async () => {
@@ -630,6 +650,9 @@ async function startRepl(config: VantageConfig): Promise<void> {
     printSessionSummary(getSession());
     process.exit(0);
   };
+
+  // Wire readline 'line' events through paste-detection buffer
+  rl.on("line", onLineReceived);
 
   // Handle Ctrl+C — clean up session + tracker before exit
   rl.on("SIGINT", () => {
