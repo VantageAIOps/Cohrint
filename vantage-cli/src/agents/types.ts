@@ -10,8 +10,8 @@ export interface AgentAdapter {
   exitCommand?: string;
   /** Whether this agent supports --continue for conversation context */
   supportsContinue?: boolean;
-  /** Build command that continues a previous conversation. */
-  buildContinueCommand?(prompt: string, config?: AgentConfig): SpawnArgs;
+  /** Build command that continues a previous conversation. sessionId enables --resume. */
+  buildContinueCommand?(prompt: string, config?: AgentConfig, sessionId?: string): SpawnArgs;
   detect(): Promise<boolean>;
   buildCommand(prompt: string, config?: AgentConfig): SpawnArgs;
 }

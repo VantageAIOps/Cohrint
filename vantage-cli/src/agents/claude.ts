@@ -29,12 +29,16 @@ export const claudeAdapter: AgentAdapter = {
     };
   },
 
-  buildContinueCommand(prompt: string, config?: AgentConfig): SpawnArgs {
+  buildContinueCommand(prompt: string, config?: AgentConfig, sessionId?: string): SpawnArgs {
     const cmd = config?.command || "claude";
     const extraArgs = config?.args?.filter(a => a !== "-p") ?? [];
+    // Use --resume with session ID for reliable context (--continue picks up wrong conversation)
+    const resumeArgs = sessionId
+      ? ["--resume", sessionId, ...extraArgs, "-p", prompt]
+      : ["--continue", ...extraArgs, "-p", prompt];
     return {
       command: cmd,
-      args: ["--continue", ...extraArgs, "-p", prompt],
+      args: resumeArgs,
     };
   },
 };
