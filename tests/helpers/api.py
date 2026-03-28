@@ -28,10 +28,17 @@ def signup_api(email=None, name=None, org=None, timeout=15) -> dict:
     hdrs = {"Content-Type": "application/json"}
     if CI_SECRET:
         hdrs["X-Vantage-CI"] = CI_SECRET
-    r = requests.post(f"{API_URL}/v1/auth/signup", json=payload, headers=hdrs, timeout=timeout)
-    if r.status_code != 201:
+    last_err = None
+    for attempt in range(4):
+        r = requests.post(f"{API_URL}/v1/auth/signup", json=payload, headers=hdrs, timeout=timeout)
+        if r.status_code == 201:
+            return r.json()
+        if r.status_code == 429 and attempt < 3:
+            time.sleep(2 ** attempt)
+            last_err = f"signup_api failed {r.status_code}: {r.text[:200]}"
+            continue
         raise RuntimeError(f"signup_api failed {r.status_code}: {r.text[:200]}")
-    return r.json()
+    raise RuntimeError(last_err or "signup_api failed after retries")
 
 
 def get_headers(api_key: str) -> dict:
