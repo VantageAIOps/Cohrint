@@ -127,6 +127,37 @@ export function printSessionSummary(session: SessionState): void {
   console.log("");
 }
 
+export function printTip(tip: string): void {
+  console.log(dim(`  💡 ${tip}`));
+}
+
 export function promptLine(agentName: string): string {
   return isTTY ? `${cyan("vantage")} ${dim(`[${agentName}]`)} ${dim(">")} ` : "> ";
+}
+
+export interface Spinner {
+  stop(): void;
+}
+
+export function createSpinner(message: string = "Thinking"): Spinner {
+  if (!isTTY) return { stop() {} }; // No spinner in non-TTY (pipe mode)
+
+  const frames = ["\u28CB", "\u28D9", "\u28F9", "\u28F8", "\u28FC", "\u28F4", "\u28E6", "\u28E7", "\u28C7", "\u28CF"];
+  let i = 0;
+  let stopped = false;
+
+  const interval = setInterval(() => {
+    const frame = frames[i % frames.length];
+    process.stderr.write(`\r${dim(`  ${frame} ${message}...`)}`);
+    i++;
+  }, 80);
+
+  return {
+    stop() {
+      if (stopped) return;
+      stopped = true;
+      clearInterval(interval);
+      process.stderr.write("\r\x1b[K"); // Clear the spinner line
+    },
+  };
 }

@@ -10,7 +10,7 @@ import time
 import requests
 from typing import Optional, Tuple
 
-from config.settings import API_URL, SITE_URL
+from config.settings import API_URL, SITE_URL, CI_API_KEY, CI_ORG_ID
 from helpers.data import rand_email, rand_name, rand_org
 
 
@@ -18,17 +18,26 @@ def signup_api(email=None, name=None, org=None, timeout=15) -> dict:
     """
     POST /v1/auth/signup — create a fresh test account.
     Returns the full response dict including api_key and org_id.
-    Raises on non-201 status.
+    Retries on 429 (rate limit) with exponential backoff.
+    Raises on non-201 status after retries exhausted.
     """
     payload = {
         "email": email or rand_email(),
         "name":  name  or rand_name(),
         "org":   org   or rand_org(),
     }
-    r = requests.post(f"{API_URL}/v1/auth/signup", json=payload, timeout=timeout)
-    if r.status_code != 201:
+    last_err = None
+    for attempt in range(4):
+        r = requests.post(f"{API_URL}/v1/auth/signup", json=payload, timeout=timeout)
+        if r.status_code == 201:
+            return r.json()
+        if r.status_code == 429 and attempt < 3:
+            delay = 2 ** attempt  # 1s, 2s, 4s
+            time.sleep(delay)
+            last_err = f"signup_api failed {r.status_code}: {r.text[:200]}"
+            continue
         raise RuntimeError(f"signup_api failed {r.status_code}: {r.text[:200]}")
-    return r.json()
+    raise RuntimeError(last_err or "signup_api failed after retries")
 
 
 def get_headers(api_key: str) -> dict:
@@ -73,7 +82,13 @@ def fresh_account(prefix="t") -> Tuple[str, str, dict]:
     """
     Create a brand-new test account and sign in.
     Returns (api_key, org_id, cookies).
+
+    When VANTAGE_CI_API_KEY is set, reuses the pre-seeded CI account
+    instead of signing up — avoids hitting the signup rate limit in CI.
     """
+    if CI_API_KEY and CI_ORG_ID:
+        cookies = get_session_cookie(CI_API_KEY)
+        return CI_API_KEY, CI_ORG_ID, cookies
     d = signup_api(email=rand_email(prefix))
     api_key = d["api_key"]
     org_id  = d["org_id"]

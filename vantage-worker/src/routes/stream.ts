@@ -104,7 +104,11 @@ stream.get('/:orgId', async (c) => {
       'Content-Type':                'text/event-stream',
       'Cache-Control':               'no-cache',
       'Connection':                  'keep-alive',
-      'Access-Control-Allow-Origin': c.req.header('Origin') || 'https://vantageaiops.com',
+      'Access-Control-Allow-Origin': (() => {
+        const origin = c.req.header('Origin') ?? '';
+        const allowed = ['https://vantageaiops.com', 'https://www.vantageaiops.com', 'https://vantageai.pages.dev'];
+        return allowed.includes(origin) ? origin : 'https://vantageaiops.com';
+      })(),
       'X-Accel-Buffering':           'no',
     },
   });

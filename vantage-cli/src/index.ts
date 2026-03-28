@@ -19,6 +19,7 @@ import {
   printCostSummary,
   printCompareTable,
   printSessionSummary,
+  printTip,
   promptLine,
   bold,
   cyan,
@@ -28,6 +29,7 @@ import {
   red,
   type CompareResult,
 } from "./ui.js";
+import { getInlineTip, getRecommendations, formatRecommendations, type SessionMetrics } from "./recommendations.js";
 
 const COST_TIMEOUT_MS = 5000;
 
@@ -47,6 +49,23 @@ function checkAnomaly(cost: import("./event-bus.js").VantageEvents["cost:calcula
   if (avgCost > 0 && Number.isFinite(avgCost) && cost.costUsd > avgCost * 3) {
     console.log(yellow(`  ⚠ Anomaly: this prompt cost $${cost.costUsd.toFixed(4)} — ${(cost.costUsd / avgCost).toFixed(1)}x your session average`));
   }
+}
+
+function buildSessionMetrics(): SessionMetrics {
+  const sess = getSession();
+  return {
+    totalInputTokens: sess.totalInputTokens,
+    totalOutputTokens: sess.totalOutputTokens,
+    totalCachedTokens: sess.totalSavedTokens,
+    promptCount: sess.promptCount,
+    totalCostUsd: sess.totalCostUsd,
+    sessionStartTime: sess.startedAt,
+  };
+}
+
+function showInlineTip(): void {
+  const tip = getInlineTip(buildSessionMetrics());
+  if (tip) printTip(tip);
 }
 
 async function showDashboardSummary(config: VantageConfig): Promise<void> {
@@ -214,7 +233,8 @@ async function executePrompt(
   prompt: string,
   agent: AgentAdapter,
   config: VantageConfig,
-  stream: boolean = true
+  stream: boolean = true,
+  continueConversation: boolean = false
 ): Promise<void> {
   bus.emit("prompt:submitted", {
     prompt,
@@ -238,8 +258,11 @@ async function executePrompt(
     }
   }
 
-  // Build and run command
-  const spawnArgs = agent.buildCommand(finalPrompt);
+  // Build command — use continue if this is a follow-up prompt
+  const useContinue = continueConversation && agent.supportsContinue && agent.buildContinueCommand;
+  const spawnArgs = useContinue
+    ? agent.buildContinueCommand!(finalPrompt)
+    : agent.buildCommand(finalPrompt);
 
   try {
     if (stream) {
@@ -317,6 +340,9 @@ async function startRepl(config: VantageConfig): Promise<void> {
   let currentAgent = getAgent(config.defaultAgent) ?? ALL_AGENTS[0];
   let activeSession: AgentSession | null = null;
 
+  // Track per-agent prompt count for --continue support
+  const agentPromptCount = new Map<string, number>();
+
   const rl = createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -359,6 +385,18 @@ async function startRepl(config: VantageConfig): Promise<void> {
 
         if (line === "/budget") {
           await showBudgetStatus(config);
+          prompt();
+          return;
+        }
+
+        if (line === "/tips") {
+          const metrics = buildSessionMetrics();
+          const tips = getRecommendations(metrics);
+          if (tips.length > 0) {
+            console.log(formatRecommendations(tips));
+          } else {
+            console.log(dim("  No recommendations yet — keep prompting!"));
+          }
           prompt();
           return;
         }
@@ -507,7 +545,9 @@ async function startRepl(config: VantageConfig): Promise<void> {
           const agent = getAgent(agentName);
           if (agent && agentPrompt) {
             const costPromise = waitForCost();
-            await executePrompt(agentPrompt, agent, config);
+            const count = agentPromptCount.get(agent.name) ?? 0;
+            await executePrompt(agentPrompt, agent, config, true, count > 0);
+            agentPromptCount.set(agent.name, count + 1);
             try {
               const cost = await Promise.race([
                 costPromise,
@@ -516,6 +556,7 @@ async function startRepl(config: VantageConfig): Promise<void> {
               if (cost) {
                 printCostSummary(cost, getSession());
                 checkAnomaly(cost);
+                showInlineTip();
               }
             } catch {
               // Cost calculation may not fire for all agents
@@ -552,7 +593,9 @@ async function startRepl(config: VantageConfig): Promise<void> {
 
         // Normal prompt — use current default agent
         const costPromise = waitForCost();
-        await executePrompt(line, currentAgent, config);
+        const count = agentPromptCount.get(currentAgent.name) ?? 0;
+        await executePrompt(line, currentAgent, config, true, count > 0);
+        agentPromptCount.set(currentAgent.name, count + 1);
         try {
           const cost = await Promise.race([
             costPromise,
@@ -561,6 +604,7 @@ async function startRepl(config: VantageConfig): Promise<void> {
           if (cost) {
             printCostSummary(cost, getSession());
             checkAnomaly(cost);
+            showInlineTip();
           }
         } catch {
           // Cost calculation may not fire for all agents
@@ -608,6 +652,7 @@ function printHelp(): void {
   console.log(`  ${cyan("/cost")}               Show session cost summary`);
   console.log(`  ${cyan("/summary")}              Dashboard summary (spend, tokens, budget)`);
   console.log(`  ${cyan("/budget")}               Check budget status and alerts`);
+  console.log(`  ${cyan("/tips")}                Show cost-saving recommendations`);
   console.log(`  ${cyan("/session [agent]")}   Start interactive session (supports /compact, /clear, @file, !shell)`);
   console.log(`  ${cyan("/exit-session")}      Return to VantageAI REPL from session`);
   console.log(`  ${cyan("/default <agent>")}    Set default agent`);
@@ -732,6 +777,7 @@ async function main(): Promise<void> {
       if (cost) {
         printCostSummary(cost, getSession());
         checkAnomaly(cost);
+        showInlineTip();
       }
     } catch {
       // Cost may not be available
@@ -758,6 +804,7 @@ async function main(): Promise<void> {
         if (cost) {
           printCostSummary(cost, getSession());
           checkAnomaly(cost);
+          showInlineTip();
         }
       } catch {
         // Cost may not be available

@@ -121,6 +121,8 @@ jobs:
           VANTAGE_SITE_URL: "https://vantageaiops.com"
           VANTAGE_API_URL: "https://api.vantageaiops.com"
           SUPERADMIN_SECRET: ${{ secrets.SUPERADMIN_SECRET }}
+          VANTAGE_CI_API_KEY: ${{ secrets.VANTAGE_CI_API_KEY }}
+          VANTAGE_CI_ORG_ID: ${{ secrets.VANTAGE_CI_ORG_ID }}
         run: |
           python tests/run_suite.py --no-browser --superadmin --clean --no-report 2>&1 | tee /tmp/api-tests.txt
           EXIT=${PIPESTATUS[0]}
@@ -167,6 +169,8 @@ jobs:
           CB_ALL_DEVICES: '1'
           VANTAGE_SITE_URL: "https://vantageaiops.com"
           VANTAGE_API_URL: "https://api.vantageaiops.com"
+          VANTAGE_CI_API_KEY: ${{ secrets.VANTAGE_CI_API_KEY }}
+          VANTAGE_CI_ORG_ID: ${{ secrets.VANTAGE_CI_ORG_ID }}
         run: |
           if [ "${{ inputs.extended }}" = "true" ] || [ "${{ github.event_name }}" = "push" ]; then
             python tests/run_suite.py \

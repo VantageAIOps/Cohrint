@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import type { SpawnArgs } from "./agents/types.js";
 import { bus } from "./event-bus.js";
+import { createSpinner } from "./ui.js";
 
 export interface RunResult {
   exitCode: number;
@@ -44,10 +45,13 @@ export function runAgent(
       return;
     }
 
+    const spinner = createSpinner("Thinking");
+
     // Timeout guard — kill process if it hangs (grace = 10% of timeout, max 10s)
     const grace = Math.min(Math.ceil(timeoutMs * 0.1), 10000);
     const timer = setTimeout(() => {
       timedOut = true;
+      spinner.stop();
       child.kill("SIGTERM");
       setTimeout(() => { if (!child.killed) child.kill("SIGKILL"); }, grace);
     }, timeoutMs);
@@ -60,7 +64,13 @@ export function runAgent(
       });
     }
 
+    let firstChunk = true;
+
     child.stdout?.on("data", (chunk: Buffer) => {
+      if (firstChunk) {
+        spinner.stop();
+        firstChunk = false;
+      }
       totalBytes += chunk.length;
       if (totalBytes <= MAX_OUTPUT_BYTES) {
         chunks.push(chunk);
@@ -78,6 +88,7 @@ export function runAgent(
 
     child.on("error", (err) => {
       clearTimeout(timer);
+      spinner.stop();
       if ((err as NodeJS.ErrnoException).code === "ENOENT") {
         reject(new Error(`'${spawnArgs.command}' not found. Install it or check your PATH.`));
       } else {
@@ -87,6 +98,7 @@ export function runAgent(
 
     child.on("close", (code) => {
       clearTimeout(timer);
+      spinner.stop();
       const durationMs = Date.now() - start;
       const stdout = Buffer.concat(chunks).toString("utf-8");
       const exitCode = code ?? 1;

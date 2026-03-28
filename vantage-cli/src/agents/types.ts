@@ -8,6 +8,10 @@ export interface AgentAdapter {
   interactiveArgs?: string[];
   /** Command to exit the agent's interactive session */
   exitCommand?: string;
+  /** Whether this agent supports --continue for conversation context */
+  supportsContinue?: boolean;
+  /** Build command that continues a previous conversation. */
+  buildContinueCommand?(prompt: string, config?: AgentConfig): SpawnArgs;
   detect(): Promise<boolean>;
   buildCommand(prompt: string, config?: AgentConfig): SpawnArgs;
 }
