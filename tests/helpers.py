@@ -94,26 +94,21 @@ def signup_api(email=None, name=None, org=None, timeout=15) -> dict:
     """
     POST /v1/auth/signup — create a fresh test account.
     Returns the full response dict including api_key and org_id.
-    Retries on 429 (rate limit) with exponential backoff.
-    Raises on non-201 status after retries exhausted.
+    Raises on non-201 status.
     """
     payload = {
         "email": email or rand_email(),
         "name":  name  or rand_name(),
         "org":   org   or rand_org(),
     }
-    last_err = None
-    for attempt in range(4):
-        r = requests.post(f"{API_URL}/v1/auth/signup", json=payload, timeout=timeout)
-        if r.status_code == 201:
-            return r.json()
-        if r.status_code == 429 and attempt < 3:
-            delay = 2 ** attempt  # 1s, 2s, 4s
-            time.sleep(delay)
-            last_err = f"signup_api failed {r.status_code}: {r.text[:200]}"
-            continue
+    hdrs = {"Content-Type": "application/json"}
+    _ci_secret = os.environ.get("VANTAGE_CI_SECRET", "")
+    if _ci_secret:
+        hdrs["X-Vantage-CI"] = _ci_secret
+    r = requests.post(f"{API_URL}/v1/auth/signup", json=payload, headers=hdrs, timeout=timeout)
+    if r.status_code != 201:
         raise RuntimeError(f"signup_api failed {r.status_code}: {r.text[:200]}")
-    raise RuntimeError(last_err or "signup_api failed after retries")
+    return r.json()
 
 def get_headers(api_key: str) -> dict:
     """Bearer auth headers for a given API key."""
@@ -150,20 +145,11 @@ def session_get(api_key: str, timeout=15) -> Optional[dict]:
         return None
     return r.json()
 
-_CI_API_KEY = os.environ.get("VANTAGE_CI_API_KEY", "")
-_CI_ORG_ID  = os.environ.get("VANTAGE_CI_ORG_ID", "")
-
 def fresh_account(prefix="t") -> Tuple[str, str, dict]:
     """
     Create a brand-new test account and sign in.
     Returns (api_key, org_id, cookies).
-
-    When VANTAGE_CI_API_KEY is set, reuses the pre-seeded CI account
-    instead of signing up — avoids hitting the signup rate limit in CI.
     """
-    if _CI_API_KEY and _CI_ORG_ID:
-        cookies = get_session_cookie(_CI_API_KEY)
-        return _CI_API_KEY, _CI_ORG_ID, cookies
     d = signup_api(email=rand_email(prefix))
     api_key = d["api_key"]
     org_id  = d["org_id"]

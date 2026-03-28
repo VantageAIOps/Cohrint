@@ -21,3 +21,6 @@ CI_ORG_ID  = os.environ.get("VANTAGE_CI_ORG_ID", "")
 SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
 TEAMS_WEBHOOK_URL = os.environ.get("TEAMS_WEBHOOK_URL", "")
 ALERT_EMAIL       = os.environ.get("VANTAGE_ALERT_EMAIL", "")
+
+# CI bypass secret — skips signup rate limiting when header matches
+CI_SECRET  = os.environ.get("VANTAGE_CI_SECRET", "")

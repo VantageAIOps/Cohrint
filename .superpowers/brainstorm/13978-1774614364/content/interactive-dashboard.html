@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VantageAI — AI Coding Tool Cost Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-deep: #06080d;
+    --bg-panel: #0c1017;
+    --bg-card: #111823;
+    --bg-hover: #1a2332;
+    --border: #1e2a3a;
+    --border-active: #2d3f54;
+    --text-primary: #e8ecf1;
+    --text-secondary: #7a8ba0;
+    --text-muted: #4a5568;
+    --accent-green: #34d399;
+    --accent-green-dim: #065f46;
+    --accent-blue: #60a5fa;
+    --accent-pink: #f472b6;
+    --accent-amber: #fbbf24;
+    --accent-purple: #a78bfa;
+    --accent-orange: #fb923c;
+    --accent-red: #ef4444;
+    --accent-cyan: #22d3ee;
+    --glow-green: 0 0 20px rgba(52, 211, 153, 0.15);
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-display: 'DM Sans', sans-serif;
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: var(--font-display);
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    overflow-x: hidden;
+    min-height: 100vh;
+  }
+
+  /* ── Noise texture overlay ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    opacity: 0.025;
+    background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ── Layout ── */
+  .app { display: flex; height: 100vh; }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 220px;
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    flex-shrink: 0;
+  }
+
+  .sidebar-logo {
+    padding: 20px 18px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-icon {
+    width: 28px;
+    height: 28px;
+    background: linear-gradient(135deg, var(--accent-green), #059669);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 14px;
+    color: #000;
+    box-shadow: var(--glow-green);
+  }
+
+  .logo-text {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--text-primary);
+    letter-spacing: -0.5px;
+  }
+
+  .logo-badge {
+    font-size: 8px;
+    color: var(--accent-green);
+    background: var(--accent-green-dim);
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+
+  .sidebar-section {
+    padding: 16px 12px 8px;
+  }
+
+  .sidebar-label {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    padding: 0 8px;
+    margin-bottom: 6px;
+  }
+
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-size: 13px;
+    color: var(--text-secondary);
+    position: relative;
+  }
+
+  .sidebar-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+  .sidebar-item.active {
+    background: linear-gradient(90deg, rgba(52, 211, 153, 0.1), transparent);
+    color: var(--accent-green);
+    border-left: 2px solid var(--accent-green);
+    margin-left: -1px;
+  }
+
+  .sidebar-item .icon { font-size: 16px; width: 20px; text-align: center; }
+
+  .sidebar-connections {
+    margin-top: auto;
+    padding: 12px;
+    border-top: 1px solid var(--border);
+  }
+
+  .connection-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  .connection-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .connection-dot.live { background: var(--accent-green); box-shadow: 0 0 6px var(--accent-green); }
+  .connection-dot.pending { background: var(--accent-amber); }
+  .connection-dot.off { background: var(--text-muted); }
+
+  /* ── Main content ── */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Top bar ── */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-panel);
+  }
+
+  .topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .topbar-title {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+
+  .period-selector {
+    display: flex;
+    gap: 2px;
+    background: var(--bg-deep);
+    padding: 3px;
+    border-radius: 6px;
+  }
+
+  .period-btn {
+    padding: 4px 12px;
+    border: none;
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    cursor: pointer;
+    background: transparent;
+    color: var(--text-muted);
+    transition: all 0.15s;
+  }
+
+  .period-btn:hover { color: var(--text-secondary); }
+  .period-btn.active { background: var(--bg-card); color: var(--accent-green); }
+
+  .topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .live-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--accent-green);
+    background: var(--accent-green-dim);
+    padding: 4px 10px;
+    border-radius: 12px;
+  }
+
+  .live-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 4px var(--accent-green); }
+    50% { opacity: 0.4; box-shadow: none; }
+  }
+
+  /* ── Tool Tabs ── */
+  .tool-tabs {
+    display: flex;
+    gap: 3px;
+    padding: 12px 24px;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+
+  .tool-tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 18px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    font-weight: 500;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+    white-space: nowrap;
+    position: relative;
+  }
+
+  .tool-tab:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-active);
+  }
+
+  .tool-tab.active {
+    background: var(--bg-card);
+    border-color: var(--accent-green);
+    color: var(--text-primary);
+    box-shadow: 0 0 12px rgba(52, 211, 153, 0.08);
+  }
+
+  .tool-tab .tab-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .tool-tab .tab-cost {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+
+  .tool-tab.active .tab-cost { color: var(--accent-green); }
+
+  /* ── Dashboard Grid ── */
+  .dashboard {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .dashboard::-webkit-scrollbar { width: 6px; }
+  .dashboard::-webkit-scrollbar-track { background: transparent; }
+  .dashboard::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ── KPI Cards ── */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+
+  .kpi-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px 18px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.2s;
+  }
+
+  .kpi-card:hover {
+    border-color: var(--border-active);
+    transform: translateY(-1px);
+  }
+
+  .kpi-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent-green), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .kpi-card:hover::after { opacity: 1; }
+
+  .kpi-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .kpi-value {
+    font-family: var(--font-mono);
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+
+  .kpi-sub {
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+
+  .kpi-sub.up { color: var(--accent-red); }
+  .kpi-sub.down { color: var(--accent-green); }
+  .kpi-sub.neutral { color: var(--text-muted); }
+
+  /* ── Chart cards ── */
+  .chart-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 12px;
+  }
+
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 18px;
+    transition: border-color 0.2s;
+  }
+
+  .card:hover { border-color: var(--border-active); }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+
+  .card-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .card-badge {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+  }
+
+  /* ── Stacked bar chart ── */
+  .stacked-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 140px;
+    padding: 0 4px;
+  }
+
+  .stacked-bar {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: 1px;
+    border-radius: 3px 3px 0 0;
+    overflow: hidden;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+
+  .stacked-bar:hover { opacity: 0.85; }
+
+  .bar-segment {
+    width: 100%;
+    border-radius: 1px;
+    min-height: 2px;
+    transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .chart-legend {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 12px;
+    font-size: 10px;
+    font-family: var(--font-mono);
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+
+  .legend-item:hover { opacity: 0.7; }
+
+  .legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  /* ── Developer bars ── */
+  .dev-list { display: flex; flex-direction: column; gap: 12px; }
+
+  .dev-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .dev-info {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+  }
+
+  .dev-name { color: var(--text-primary); font-weight: 500; }
+
+  .dev-cost {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .dev-bar {
+    height: 8px;
+    background: var(--bg-deep);
+    border-radius: 4px;
+    overflow: hidden;
+    display: flex;
+  }
+
+  .dev-bar-seg {
+    height: 100%;
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* ── Tool comparison table ── */
+  .tool-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 12px;
+  }
+
+  .tool-table th {
+    text-align: left;
+    padding: 8px 12px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tool-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+
+  .tool-table tr {
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .tool-table tbody tr:hover { background: var(--bg-hover); }
+
+  .tool-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 12px;
+  }
+
+  .tool-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .trend-up { color: var(--accent-red); }
+  .trend-down { color: var(--accent-green); }
+  .trend-flat { color: var(--text-muted); }
+
+  .cost-highlight {
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 12px;
+  }
+
+  /* ── Budget bar ── */
+  .budget-track {
+    height: 10px;
+    background: var(--bg-deep);
+    border-radius: 5px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .budget-fill {
+    height: 100%;
+    border-radius: 5px;
+    background: linear-gradient(90deg, var(--accent-green), var(--accent-amber));
+    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+  }
+
+  .budget-fill::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 20px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15));
+  }
+
+  /* ── Animations ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-in {
+    animation: fadeUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
+  }
+
+  .delay-1 { animation-delay: 0.05s; }
+  .delay-2 { animation-delay: 0.1s; }
+  .delay-3 { animation-delay: 0.15s; }
+  .delay-4 { animation-delay: 0.2s; }
+  .delay-5 { animation-delay: 0.25s; }
+  .delay-6 { animation-delay: 0.3s; }
+
+  /* ── Active tool tab content transitions ── */
+  .tab-content { display: none; }
+  .tab-content.active { display: flex; flex-direction: column; gap: 16px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">V</div>
+      <div>
+        <div class="logo-text">VantageAI</div>
+      </div>
+      <div class="logo-badge">BETA</div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Dashboard</div>
+      <div class="sidebar-item active" onclick="switchView('overview')">
+        <span class="icon">◎</span> Overview
+      </div>
+      <div class="sidebar-item" onclick="switchView('spend')">
+        <span class="icon">◈</span> Spend Analysis
+      </div>
+      <div class="sidebar-item" onclick="switchView('models')">
+        <span class="icon">⬡</span> Model Pricing
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Team</div>
+      <div class="sidebar-item" onclick="switchView('members')">
+        <span class="icon">◉</span> Members
+      </div>
+      <div class="sidebar-item" onclick="switchView('budgets')">
+        <span class="icon">◐</span> Budgets & Alerts
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Account</div>
+      <div class="sidebar-item" onclick="switchView('settings')">
+        <span class="icon">⚙</span> Settings
+      </div>
+      <div class="sidebar-item" onclick="switchView('keys')">
+        <span class="icon">⚿</span> API Keys
+      </div>
+    </div>
+
+    <div class="sidebar-connections">
+      <div class="sidebar-label" style="padding:0 0 8px;">Connected Tools</div>
+      <div class="connection-item">
+        <div class="connection-dot live"></div> Claude Code
+      </div>
+      <div class="connection-item">
+        <div class="connection-dot live"></div> GitHub Copilot
+      </div>
+      <div class="connection-item">
+        <div class="connection-dot live"></div> Gemini CLI
+      </div>
+      <div class="connection-item">
+        <div class="connection-dot pending"></div> Cursor
+        <span style="font-size:9px; color:var(--accent-amber);">setup</span>
+      </div>
+      <div class="connection-item" style="cursor:pointer; color:var(--text-muted);">
+        <div class="connection-dot off"></div> + Connect tool
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <div class="main">
+    <!-- Top bar -->
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="topbar-title">AI Coding Tool Intelligence</div>
+        <div class="period-selector">
+          <button class="period-btn" onclick="setPeriod(this, 7)">7D</button>
+          <button class="period-btn active" onclick="setPeriod(this, 30)">30D</button>
+          <button class="period-btn" onclick="setPeriod(this, 90)">90D</button>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div class="live-indicator">
+          <div class="live-dot"></div>
+          LIVE
+        </div>
+      </div>
+    </div>
+
+    <!-- Tool Tabs -->
+    <div class="tool-tabs" id="toolTabs">
+      <div class="tool-tab active" onclick="switchTool(this, 'all')" data-tool="all">
+        <div class="tab-dot" style="background:var(--accent-green);"></div>
+        All Tools
+        <span class="tab-cost">$4,060</span>
+      </div>
+      <div class="tool-tab" onclick="switchTool(this, 'claude')" data-tool="claude">
+        <div class="tab-dot" style="background:var(--accent-green);"></div>
+        Claude Code
+        <span class="tab-cost">$1,920</span>
+      </div>
+      <div class="tool-tab" onclick="switchTool(this, 'copilot')" data-tool="copilot">
+        <div class="tab-dot" style="background:var(--accent-blue);"></div>
+        Copilot
+        <span class="tab-cost">$1,070</span>
+      </div>
+      <div class="tool-tab" onclick="switchTool(this, 'cursor')" data-tool="cursor">
+        <div class="tab-dot" style="background:var(--accent-pink);"></div>
+        Cursor
+        <span class="tab-cost">$640</span>
+      </div>
+      <div class="tool-tab" onclick="switchTool(this, 'gemini')" data-tool="gemini">
+        <div class="tab-dot" style="background:var(--accent-amber);"></div>
+        Gemini CLI
+        <span class="tab-cost">$430</span>
+      </div>
+    </div>
+
+    <!-- Dashboard Content -->
+    <div class="dashboard" id="dashboardContent">
+
+      <!-- ALL TOOLS VIEW -->
+      <div class="tab-content active" id="view-all">
+        <!-- KPIs -->
+        <div class="kpi-grid">
+          <div class="kpi-card animate-in delay-1">
+            <div class="kpi-label">Total AI Tool Spend</div>
+            <div class="kpi-value" style="color:var(--text-primary);">$4,060</div>
+            <div class="kpi-sub up">↑ 8.2% vs prev month</div>
+          </div>
+          <div class="kpi-card animate-in delay-2">
+            <div class="kpi-label">Costliest Tool</div>
+            <div class="kpi-value" style="color:var(--accent-green); font-size:22px;">Claude Code</div>
+            <div class="kpi-sub neutral">$1,920 · 47% of total</div>
+          </div>
+          <div class="kpi-card animate-in delay-3">
+            <div class="kpi-label">Active Developers</div>
+            <div class="kpi-value">12</div>
+            <div class="kpi-sub neutral">avg $338/dev/month</div>
+          </div>
+          <div class="kpi-card animate-in delay-4">
+            <div class="kpi-label">Budget Status</div>
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+              <div class="budget-track" style="flex:1;">
+                <div class="budget-fill" style="width:67%;"></div>
+              </div>
+              <span class="kpi-value" style="font-size:22px; color:var(--accent-amber);">67%</span>
+            </div>
+            <div class="kpi-sub neutral">$2,940 remaining</div>
+          </div>
+        </div>
+
+        <!-- Charts row -->
+        <div class="chart-row animate-in delay-5">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Daily Spend by Tool</div>
+              <div class="card-badge" style="background:var(--accent-green-dim); color:var(--accent-green);">30 DAYS</div>
+            </div>
+            <div class="stacked-chart" id="spendChart"></div>
+            <div class="chart-legend">
+              <div class="legend-item"><div class="legend-dot" style="background:var(--accent-green);"></div>Claude</div>
+              <div class="legend-item"><div class="legend-dot" style="background:var(--accent-blue);"></div>Copilot</div>
+              <div class="legend-item"><div class="legend-dot" style="background:var(--accent-pink);"></div>Cursor</div>
+              <div class="legend-item"><div class="legend-dot" style="background:var(--accent-amber);"></div>Gemini</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Cost per Developer</div>
+            </div>
+            <div class="dev-list">
+              <div class="dev-row">
+                <div class="dev-info"><span class="dev-name">Alice Chen</span><span class="dev-cost">$820</span></div>
+                <div class="dev-bar">
+                  <div class="dev-bar-seg" style="width:55%; background:var(--accent-green);"></div>
+                  <div class="dev-bar-seg" style="width:30%; background:var(--accent-blue);"></div>
+                  <div class="dev-bar-seg" style="width:15%; background:var(--accent-amber);"></div>
+                </div>
+              </div>
+              <div class="dev-row">
+                <div class="dev-info"><span class="dev-name">Bob Taylor</span><span class="dev-cost">$650</span></div>
+                <div class="dev-bar">
+                  <div class="dev-bar-seg" style="width:85%; background:var(--accent-green);"></div>
+                  <div class="dev-bar-seg" style="width:15%; background:var(--accent-pink);"></div>
+                </div>
+              </div>
+              <div class="dev-row">
+                <div class="dev-info"><span class="dev-name">Carol Kim</span><span class="dev-cost">$480</span></div>
+                <div class="dev-bar">
+                  <div class="dev-bar-seg" style="width:35%; background:var(--accent-blue);"></div>
+                  <div class="dev-bar-seg" style="width:35%; background:var(--accent-amber);"></div>
+                  <div class="dev-bar-seg" style="width:30%; background:var(--accent-pink);"></div>
+                </div>
+              </div>
+              <div class="dev-row">
+                <div class="dev-info"><span class="dev-name">Dave Patel</span><span class="dev-cost">$340</span></div>
+                <div class="dev-bar">
+                  <div class="dev-bar-seg" style="width:70%; background:var(--accent-pink);"></div>
+                  <div class="dev-bar-seg" style="width:30%; background:var(--accent-green);"></div>
+                </div>
+              </div>
+              <div class="dev-row">
+                <div class="dev-info"><span class="dev-name">Eve Jones</span><span class="dev-cost">$280</span></div>
+                <div class="dev-bar">
+                  <div class="dev-bar-seg" style="width:45%; background:var(--accent-green);"></div>
+                  <div class="dev-bar-seg" style="width:55%; background:var(--accent-blue);"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tool comparison table -->
+        <div class="card animate-in delay-6">
+          <div class="card-header">
+            <div class="card-title">Tool Comparison</div>
+            <div class="card-badge" style="background:rgba(96,165,250,0.15); color:var(--accent-blue);">CLICK TO DRILL DOWN</div>
+          </div>
+          <table class="tool-table">
+            <thead>
+              <tr>
+                <th>Tool</th>
+                <th>Monthly Cost</th>
+                <th>Requests</th>
+                <th>Top Model</th>
+                <th>Avg $/Req</th>
+                <th>Developers</th>
+                <th>30d Trend</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr onclick="switchTool(document.querySelector('[data-tool=claude]'), 'claude')">
+                <td>
+                  <div class="tool-name">
+                    <div class="tool-icon" style="background:rgba(52,211,153,0.15); color:var(--accent-green);">C</div>
+                    Claude Code
+                  </div>
+                </td>
+                <td class="cost-highlight">$1,920</td>
+                <td>4,200</td>
+                <td>Sonnet 4.6</td>
+                <td>$0.46</td>
+                <td>8</td>
+                <td class="trend-up">↑ 12%</td>
+              </tr>
+              <tr onclick="switchTool(document.querySelector('[data-tool=copilot]'), 'copilot')">
+                <td>
+                  <div class="tool-name">
+                    <div class="tool-icon" style="background:rgba(96,165,250,0.15); color:var(--accent-blue);">G</div>
+                    GitHub Copilot
+                  </div>
+                </td>
+                <td class="cost-highlight">$1,070</td>
+                <td>12,400</td>
+                <td>GPT-4o</td>
+                <td>$0.09</td>
+                <td>10</td>
+                <td class="trend-down">↓ 5%</td>
+              </tr>
+              <tr onclick="switchTool(document.querySelector('[data-tool=cursor]'), 'cursor')">
+                <td>
+                  <div class="tool-name">
+                    <div class="tool-icon" style="background:rgba(244,114,182,0.15); color:var(--accent-pink);">Cu</div>
+                    Cursor
+                  </div>
+                </td>
+                <td class="cost-highlight">$640</td>
+                <td>3,100</td>
+                <td>Claude Sonnet</td>
+                <td>$0.21</td>
+                <td>5</td>
+                <td class="trend-flat">→ 0%</td>
+              </tr>
+              <tr onclick="switchTool(document.querySelector('[data-tool=gemini]'), 'gemini')">
+                <td>
+                  <div class="tool-name">
+                    <div class="tool-icon" style="background:rgba(251,191,36,0.15); color:var(--accent-amber);">G</div>
+                    Gemini CLI
+                  </div>
+                </td>
+                <td class="cost-highlight">$430</td>
+                <td>1,900</td>
+                <td>Flash 2.0</td>
+                <td>$0.23</td>
+                <td>4</td>
+                <td class="trend-down">↓ 18%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- CLAUDE-SPECIFIC VIEW -->
+      <div class="tab-content" id="view-claude">
+        <div class="kpi-grid">
+          <div class="kpi-card animate-in delay-1">
+            <div class="kpi-label">Claude Code Spend</div>
+            <div class="kpi-value" style="color:var(--accent-green);">$1,920</div>
+            <div class="kpi-sub up">↑ 12% vs prev month</div>
+          </div>
+          <div class="kpi-card animate-in delay-2">
+            <div class="kpi-label">Requests</div>
+            <div class="kpi-value">4,200</div>
+            <div class="kpi-sub neutral">avg 140/day</div>
+          </div>
+          <div class="kpi-card animate-in delay-3">
+            <div class="kpi-label">Tokens Used</div>
+            <div class="kpi-value" style="font-size:22px;">86.4M</div>
+            <div class="kpi-sub neutral">in: 24M · out: 62M</div>
+          </div>
+          <div class="kpi-card animate-in delay-4">
+            <div class="kpi-label">Developers Using</div>
+            <div class="kpi-value">8</div>
+            <div class="kpi-sub neutral">avg $240/dev</div>
+          </div>
+        </div>
+
+        <div class="card animate-in delay-5">
+          <div class="card-header">
+            <div class="card-title">Claude Models Breakdown</div>
+          </div>
+          <table class="tool-table">
+            <thead>
+              <tr><th>Model</th><th>Requests</th><th>Input Tokens</th><th>Output Tokens</th><th>Cost</th><th>% of Claude</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><div class="tool-name"><div class="tool-icon" style="background:rgba(52,211,153,0.15); color:var(--accent-green);">S</div>Sonnet 4.6</div></td>
+                <td>2,800</td><td>16M</td><td>42M</td><td class="cost-highlight">$1,140</td><td>59%</td>
+              </tr>
+              <tr>
+                <td><div class="tool-name"><div class="tool-icon" style="background:rgba(167,139,250,0.15); color:var(--accent-purple);">O</div>Opus 4.6</div></td>
+                <td>620</td><td>5.2M</td><td>14M</td><td class="cost-highlight">$580</td><td>30%</td>
+              </tr>
+              <tr>
+                <td><div class="tool-name"><div class="tool-icon" style="background:rgba(34,211,238,0.15); color:var(--accent-cyan);">H</div>Haiku 4.5</div></td>
+                <td>780</td><td>2.8M</td><td>6M</td><td class="cost-highlight">$200</td><td>11%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card animate-in delay-6">
+          <div class="card-header">
+            <div class="card-title">Top Claude Users</div>
+          </div>
+          <div class="dev-list">
+            <div class="dev-row">
+              <div class="dev-info"><span class="dev-name">Alice Chen</span><span class="dev-cost">$480 <span style="color:var(--text-muted); font-size:10px;">· Opus heavy</span></span></div>
+              <div class="dev-bar">
+                <div class="dev-bar-seg" style="width:35%; background:var(--accent-green);" title="Sonnet"></div>
+                <div class="dev-bar-seg" style="width:55%; background:var(--accent-purple);" title="Opus"></div>
+                <div class="dev-bar-seg" style="width:10%; background:var(--accent-cyan);" title="Haiku"></div>
+              </div>
+            </div>
+            <div class="dev-row">
+              <div class="dev-info"><span class="dev-name">Bob Taylor</span><span class="dev-cost">$390 <span style="color:var(--text-muted); font-size:10px;">· Sonnet only</span></span></div>
+              <div class="dev-bar">
+                <div class="dev-bar-seg" style="width:95%; background:var(--accent-green);"></div>
+                <div class="dev-bar-seg" style="width:5%; background:var(--accent-cyan);"></div>
+              </div>
+            </div>
+            <div class="dev-row">
+              <div class="dev-info"><span class="dev-name">Eve Jones</span><span class="dev-cost">$210 <span style="color:var(--text-muted); font-size:10px;">· mixed</span></span></div>
+              <div class="dev-bar">
+                <div class="dev-bar-seg" style="width:50%; background:var(--accent-green);"></div>
+                <div class="dev-bar-seg" style="width:30%; background:var(--accent-purple);"></div>
+                <div class="dev-bar-seg" style="width:20%; background:var(--accent-cyan);"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- COPILOT VIEW -->
+      <div class="tab-content" id="view-copilot">
+        <div class="kpi-grid">
+          <div class="kpi-card animate-in delay-1">
+            <div class="kpi-label">Copilot Spend</div>
+            <div class="kpi-value" style="color:var(--accent-blue);">$1,070</div>
+            <div class="kpi-sub down">↓ 5% vs prev month</div>
+          </div>
+          <div class="kpi-card animate-in delay-2">
+            <div class="kpi-label">Completions</div>
+            <div class="kpi-value">12,400</div>
+            <div class="kpi-sub neutral">avg 413/day</div>
+          </div>
+          <div class="kpi-card animate-in delay-3">
+            <div class="kpi-label">Acceptance Rate</div>
+            <div class="kpi-value" style="color:var(--accent-green);">34%</div>
+            <div class="kpi-sub up">↑ 3% improving</div>
+          </div>
+          <div class="kpi-card animate-in delay-4">
+            <div class="kpi-label">Seats Licensed</div>
+            <div class="kpi-value">10</div>
+            <div class="kpi-sub neutral">$19/seat/mo</div>
+          </div>
+        </div>
+        <div class="card animate-in delay-5" style="display:flex; align-items:center; justify-content:center; min-height:200px;">
+          <div style="text-align:center; color:var(--text-muted);">
+            <div style="font-size:32px; margin-bottom:8px;">📊</div>
+            <div style="font-size:14px; color:var(--text-secondary);">Copilot usage data syncs from GitHub API</div>
+            <div style="font-size:12px; margin-top:4px;">Connect your GitHub org in Settings → Integrations</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CURSOR VIEW -->
+      <div class="tab-content" id="view-cursor">
+        <div class="kpi-grid">
+          <div class="kpi-card animate-in delay-1">
+            <div class="kpi-label">Cursor Spend</div>
+            <div class="kpi-value" style="color:var(--accent-pink);">$640</div>
+            <div class="kpi-sub neutral">→ flat vs prev month</div>
+          </div>
+          <div class="kpi-card animate-in delay-2">
+            <div class="kpi-label">Requests</div>
+            <div class="kpi-value">3,100</div>
+            <div class="kpi-sub neutral">avg 103/day</div>
+          </div>
+          <div class="kpi-card animate-in delay-3">
+            <div class="kpi-label">Pro Seats</div>
+            <div class="kpi-value">5</div>
+            <div class="kpi-sub neutral">$20/seat/mo</div>
+          </div>
+          <div class="kpi-card animate-in delay-4">
+            <div class="kpi-label">Top Model</div>
+            <div class="kpi-value" style="font-size:18px; color:var(--accent-green);">Claude Sonnet</div>
+            <div class="kpi-sub neutral">via Cursor proxy</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GEMINI VIEW -->
+      <div class="tab-content" id="view-gemini">
+        <div class="kpi-grid">
+          <div class="kpi-card animate-in delay-1">
+            <div class="kpi-label">Gemini CLI Spend</div>
+            <div class="kpi-value" style="color:var(--accent-amber);">$430</div>
+            <div class="kpi-sub down">↓ 18% vs prev month</div>
+          </div>
+          <div class="kpi-card animate-in delay-2">
+            <div class="kpi-label">Requests</div>
+            <div class="kpi-value">1,900</div>
+            <div class="kpi-sub neutral">avg 63/day</div>
+          </div>
+          <div class="kpi-card animate-in delay-3">
+            <div class="kpi-label">Tokens</div>
+            <div class="kpi-value" style="font-size:22px;">12.8M</div>
+            <div class="kpi-sub neutral">in: 4M · out: 8.8M</div>
+          </div>
+          <div class="kpi-card animate-in delay-4">
+            <div class="kpi-label">Developers</div>
+            <div class="kpi-value">4</div>
+            <div class="kpi-sub neutral">avg $108/dev</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  // Generate stacked bar chart
+  const chart = document.getElementById('spendChart');
+  const colors = ['var(--accent-green)', 'var(--accent-blue)', 'var(--accent-pink)', 'var(--accent-amber)'];
+
+  for (let i = 0; i < 30; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'stacked-bar';
+    const heights = [
+      20 + Math.random() * 40,
+      10 + Math.random() * 25,
+      5 + Math.random() * 20,
+      3 + Math.random() * 15
+    ];
+    heights.forEach((h, j) => {
+      const seg = document.createElement('div');
+      seg.className = 'bar-segment';
+      seg.style.height = h + 'px';
+      seg.style.background = colors[j];
+      seg.style.animationDelay = (i * 20 + j * 50) + 'ms';
+      bar.appendChild(seg);
+    });
+    chart.appendChild(bar);
+  }
+
+  // Tool tab switching
+  function switchTool(el, tool) {
+    document.querySelectorAll('.tool-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    const view = document.getElementById('view-' + tool);
+    if (view) {
+      view.classList.add('active');
+      // Re-trigger animations
+      view.querySelectorAll('.animate-in').forEach(el => {
+        el.style.animation = 'none';
+        el.offsetHeight;
+        el.style.animation = '';
+      });
+    }
+  }
+
+  // Period selector
+  function setPeriod(el, days) {
+    document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  // Sidebar view switching
+  function switchView(view) {
+    document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+  }
+</script>
+
+</body>
+</html>
