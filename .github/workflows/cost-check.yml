@@ -68,30 +68,31 @@ jobs:
                   f.write("status=skipped\n")
               sys.exit(0)
 
-          # Fetch PR-specific cost
+          # Fetch org-wide cost summary
           pr_cost = daily_cost = 0.0
-          url = f"{api_base}/v1/analytics/cost?org=ci&tag_branch={branch}&period=7d"
+          url = f"{api_base}/v1/analytics/summary"
           req = urllib.request.Request(url, headers={"Authorization": f"Bearer {api_key}"})
           try:
               with urllib.request.urlopen(req, timeout=10) as resp:
                   data = json.loads(resp.read())
-                  pr_cost    = float(data.get('total_cost_usd', 0))
+                  pr_cost    = float(data.get('mtd_cost_usd', 0))
                   daily_cost = float(data.get('today_cost_usd', 0))
           except Exception as e:
-              print(f"::warning ::Could not fetch PR cost data: {e}")
+              print(f"::warning ::Could not fetch cost data: {e}")
 
-          # Fetch cross-platform org spend (v2 feature)
+          # Fetch cross-platform org spend
           cross_cost = 0.0
           budget_pct = 0
           try:
-              xp_url = f"{api_base}/v1/cross-platform/summary/ci"
+              xp_url = f"{api_base}/v1/cross-platform/summary?days=1"
               xp_req = urllib.request.Request(xp_url, headers={"Authorization": f"Bearer {api_key}"})
               with urllib.request.urlopen(xp_req, timeout=10) as resp:
                   xp_data = json.loads(resp.read())
                   cross_cost = float(xp_data.get('total_cost_usd', 0))
-                  budget_pct = int(xp_data.get('budget_pct', 0))
+                  budget = xp_data.get('budget', {})
+                  budget_pct = int(budget.get('budget_pct', 0))
           except Exception:
-              pass  # Cross-platform endpoints may not exist yet
+              pass  # Cross-platform data may be empty for new accounts
 
           exceeded = pr_cost > pr_limit
           status = "exceeded" if exceeded else "ok"
