@@ -2396,7 +2396,7 @@ The `vantage-cli` package (`vantage-cli/`) is a transparent terminal wrapper for
 1. User types a prompt
 2. CLI optimizes it (5-layer compression, <1ms, local)
 3. Forwards optimized prompt to the user's AI tool (Claude Code, Codex, Gemini CLI, Aider)
-4. Streams stdout/stderr in real-time (zero added latency)
+4. Streams output in real-time (zero added latency); for Claude Code, parses `stream-json` output to extract text and capture session ID
 5. Calculates cost + token savings after response
 6. Sends tracking data to dashboard asynchronously (fire-and-forget)
 
@@ -2423,12 +2423,19 @@ The `vantage-cli` package (`vantage-cli/`) is a transparent terminal wrapper for
 **Anomaly detection:**
 - The CLI warns when a prompt's cost exceeds 3x the session average, helping catch runaway token usage early
 
+**Context continuation (Claude Code):**
+- CLI invokes Claude with `--output-format stream-json`, parses each newline-delimited JSON line to extract text for display and capture `session_id` from the result line
+- On follow-up prompts, uses `--resume <sessionId>` instead of `--continue` — deterministic context regardless of Claude usage outside vantage between prompts
+- Falls back to `--continue` if no session ID was captured (e.g. first prompt, or non-Claude agents)
+- Session IDs are tracked per-agent in the REPL (`agentSessionIds` map in `src/index.ts`)
+
 **Stability:**
 - 5-minute timeout per agent invocation (prevents hung processes)
 - ENOENT handling for missing agent binaries (graceful error instead of crash)
 - 5 MB output cap (prevents memory exhaustion on large responses)
 - REPL crash recovery (catches unhandled rejections, keeps session alive)
 - Structured data detection (identifies JSON/code blocks in output for better cost attribution)
+- Non-Claude agents: stream-json parsing gracefully falls back — non-JSON lines are displayed as-is
 
 **Setup wizard:** First run auto-detects installed AI tools and creates `~/.vantage/config.json`. The wizard validates binary paths and sets the default agent.
 

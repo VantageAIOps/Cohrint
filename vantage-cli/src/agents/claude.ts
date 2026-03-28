@@ -25,7 +25,7 @@ export const claudeAdapter: AgentAdapter = {
     const baseArgs = config?.args ?? ["-p"];
     return {
       command: cmd,
-      args: [...baseArgs, prompt],
+      args: [...baseArgs, "--output-format", "stream-json", prompt],
     };
   },
 
@@ -34,8 +34,8 @@ export const claudeAdapter: AgentAdapter = {
     const extraArgs = config?.args?.filter(a => a !== "-p") ?? [];
     // Use --resume with session ID for reliable context (--continue picks up wrong conversation)
     const resumeArgs = sessionId
-      ? ["--resume", sessionId, ...extraArgs, "-p", prompt]
-      : ["--continue", ...extraArgs, "-p", prompt];
+      ? ["--resume", sessionId, ...extraArgs, "--output-format", "stream-json", "-p", prompt]
+      : ["--continue", ...extraArgs, "--output-format", "stream-json", "-p", prompt];
     return {
       command: cmd,
       args: resumeArgs,

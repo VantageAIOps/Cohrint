@@ -95,6 +95,8 @@ jobs:
           VANTAGE_SITE_URL: "https://vantageaiops.com"
           VANTAGE_API_URL: "https://api.vantageaiops.com"
           VANTAGE_CI_SECRET: ${{ secrets.VANTAGE_CI_SECRET }}
+          EMAIL: ${{ secrets.EMAIL }}
+          PASSWORD: ${{ secrets.PASSWORD }}
         run: |
           python tests/run_suite.py --no-browser --clean 2>&1 | tee /tmp/api-test-output.txt
           EXIT=${PIPESTATUS[0]}
@@ -198,6 +200,8 @@ jobs:
           VANTAGE_SITE_URL: "https://vantageaiops.com"
           VANTAGE_API_URL: "https://api.vantageaiops.com"
           VANTAGE_CI_SECRET: ${{ secrets.VANTAGE_CI_SECRET }}
+          EMAIL: ${{ secrets.EMAIL }}
+          PASSWORD: ${{ secrets.PASSWORD }}
           CB_ALL_DEVICES: "0"
         run: |
           python tests/run_suite.py --category 15_cross_browser --clean 2>&1 | tee /tmp/cross-browser-output.txt

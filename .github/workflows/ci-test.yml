@@ -108,6 +108,8 @@ jobs:
           VANTAGE_SITE_URL: "https://vantageaiops.com"
           VANTAGE_API_URL: "https://api.vantageaiops.com"
           VANTAGE_CI_SECRET: ${{ secrets.VANTAGE_CI_SECRET }}
+          EMAIL: ${{ secrets.EMAIL }}
+          PASSWORD: ${{ secrets.PASSWORD }}
         run: |
           EXTRA_FLAGS=""
           if [ "${{ inputs.category }}" != "" ]; then
@@ -184,6 +186,8 @@ jobs:
           VANTAGE_SITE_URL: "https://vantageaiops.com"
           VANTAGE_API_URL: "https://api.vantageaiops.com"
           VANTAGE_CI_SECRET: ${{ secrets.VANTAGE_CI_SECRET }}
+          EMAIL: ${{ secrets.EMAIL }}
+          PASSWORD: ${{ secrets.PASSWORD }}
         run: |
           if [ -n "${{ inputs.category }}" ]; then
             python tests/run_suite.py --category ${{ inputs.category }} 2>&1 | tee /tmp/browser-test-output.txt
@@ -250,6 +254,8 @@ jobs:
           VANTAGE_SITE_URL: "https://vantageaiops.com"
           VANTAGE_API_URL: "https://api.vantageaiops.com"
           VANTAGE_CI_SECRET: ${{ secrets.VANTAGE_CI_SECRET }}
+          EMAIL: ${{ secrets.EMAIL }}
+          PASSWORD: ${{ secrets.PASSWORD }}
         run: |
           python tests/run_suite.py \
             --category 06_stress \
@@ -289,6 +295,8 @@ jobs:
           VANTAGE_SITE_URL: "https://vantageaiops.com"
           VANTAGE_API_URL: "https://api.vantageaiops.com"
           VANTAGE_CI_SECRET: ${{ secrets.VANTAGE_CI_SECRET }}
+          EMAIL: ${{ secrets.EMAIL }}
+          PASSWORD: ${{ secrets.PASSWORD }}
         run: |
           python tests/run_suite.py --security --no-report 2>&1 | tee /tmp/security-output.txt || true
           cat /tmp/security-output.txt

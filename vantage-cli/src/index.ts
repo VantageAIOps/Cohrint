@@ -234,8 +234,9 @@ async function executePrompt(
   agent: AgentAdapter,
   config: VantageConfig,
   stream: boolean = true,
-  continueConversation: boolean = false
-): Promise<void> {
+  continueConversation: boolean = false,
+  sessionId?: string
+): Promise<string | undefined> {
   bus.emit("prompt:submitted", {
     prompt,
     agent: agent.name,
@@ -261,19 +262,19 @@ async function executePrompt(
   // Build command — use continue if this is a follow-up prompt
   const useContinue = continueConversation && agent.supportsContinue && agent.buildContinueCommand;
   const spawnArgs = useContinue
-    ? agent.buildContinueCommand!(finalPrompt)
+    ? agent.buildContinueCommand!(finalPrompt, undefined, sessionId)
     : agent.buildCommand(finalPrompt);
 
   try {
-    if (stream) {
-      await runAgent(spawnArgs, agent.name);
-    } else {
-      await runAgentBuffered(spawnArgs, agent.name);
-    }
+    const result = stream
+      ? await runAgent(spawnArgs, agent.name)
+      : await runAgentBuffered(spawnArgs, agent.name);
+    return result.sessionId;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(red(`  Error running ${agent.displayName}: ${message}`));
     console.error(dim(`  Make sure '${agent.binary}' is installed and in your PATH.`));
+    return undefined;
   }
 }
 
@@ -340,8 +341,9 @@ async function startRepl(config: VantageConfig): Promise<void> {
   let currentAgent = getAgent(config.defaultAgent) ?? ALL_AGENTS[0];
   let activeSession: AgentSession | null = null;
 
-  // Track per-agent prompt count for --continue support
+  // Track per-agent prompt count and session ID for --resume support
   const agentPromptCount = new Map<string, number>();
+  const agentSessionIds = new Map<string, string>();
 
   const rl = createInterface({
     input: process.stdin,
@@ -566,8 +568,9 @@ async function startRepl(config: VantageConfig): Promise<void> {
           if (agent && agentPrompt) {
             const costPromise = waitForCost();
             const count = agentPromptCount.get(agent.name) ?? 0;
-            await executePrompt(agentPrompt, agent, config, true, count > 0);
+            const sid = await executePrompt(agentPrompt, agent, config, true, count > 0, agentSessionIds.get(agent.name));
             agentPromptCount.set(agent.name, count + 1);
+            if (sid) agentSessionIds.set(agent.name, sid);
             try {
               const cost = await Promise.race([
                 costPromise,
@@ -614,8 +617,9 @@ async function startRepl(config: VantageConfig): Promise<void> {
         // Normal prompt — use current default agent
         const costPromise = waitForCost();
         const count = agentPromptCount.get(currentAgent.name) ?? 0;
-        await executePrompt(line, currentAgent, config, true, count > 0);
+        const sid = await executePrompt(line, currentAgent, config, true, count > 0, agentSessionIds.get(currentAgent.name));
         agentPromptCount.set(currentAgent.name, count + 1);
+        if (sid) agentSessionIds.set(currentAgent.name, sid);
         try {
           const cost = await Promise.race([
             costPromise,
