@@ -40,6 +40,22 @@ auth.post('/signup', async (c) => {
   try { body = await c.req.json(); }
   catch { return c.json({ error: 'Invalid JSON body' }, 400); }
 
+  // Rate limit signup: 30 per IP per hour (degrade gracefully if KV unavailable)
+  // CI bypass: X-Vantage-CI header with matching secret skips rate limiting
+  try {
+    const ciBypass = c.req.header('X-Vantage-CI');
+    const ciSecret = c.env.VANTAGE_CI_SECRET;
+    if (!(ciBypass && ciSecret && ciBypass === ciSecret)) {
+      const ip = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For') ?? 'unknown';
+      const rlKey = `rl:signup:${ip}`;
+      const count = parseInt(await c.env.KV.get(rlKey) ?? '0', 10);
+      if (count >= 30) {
+        return c.json({ error: 'Too many signup attempts. Try again later.' }, 429);
+      }
+      await c.env.KV.put(rlKey, String(count + 1), { expirationTtl: 3600 });
+    }
+  } catch { /* KV unavailable — allow signup to proceed */ }
+
   const email    = (body.email ?? '').trim().toLowerCase();
   const name     = (body.name  ?? '').trim();
   const orgInput = (body.org   ?? name ?? email).trim();

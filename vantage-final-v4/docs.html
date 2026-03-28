@@ -2,20 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
-<title>Docs — VantageAI LLM Cost Tracking SDK & API Reference</title>
-<meta name="description" content="Integration guides, SDK reference and REST API docs for VantageAI. Add LLM cost tracking to Python or JavaScript in under 2 minutes. Supports OpenAI, Anthropic, Google, Mistral and more.">
-<meta name="keywords" content="LLM cost tracking SDK, AI API monitoring docs, OpenAI cost tracking Python, Anthropic cost tracker, LLM observability SDK, token tracking API">
+<title>Docs — VantageAI AI Coding Tool Cost Intelligence SDK & API</title>
+<meta name="description" content="Integration guides, SDK reference and API docs for VantageAI. Track AI coding tool costs across Claude Code, Copilot, Cursor, Gemini CLI and 13+ tools. Python, TypeScript, OTel and CLI setup in 2 minutes.">
+<meta name="keywords" content="AI coding tool cost SDK, Claude Code cost tracking, Copilot spend monitoring, Cursor cost API, VantageAI SDK, AI developer tools FinOps, OTel AI tools, coding assistant cost tracking">
 <meta name="robots" content="index, follow">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="VantageAI">
-<meta property="og:title" content="VantageAI Docs — LLM Cost Tracking SDK & API Reference">
-<meta property="og:description" content="Add LLM cost tracking to your app in 2 minutes. Python and JavaScript SDKs with full OpenAI, Anthropic, Google and Mistral support.">
+<meta property="og:title" content="VantageAI Docs — AI Coding Tool Cost Intelligence SDK & API">
+<meta property="og:description" content="Track AI coding tool costs across Claude Code, Copilot, Cursor, Gemini CLI and 13+ tools. Python, TypeScript, OTel and CLI setup in 2 minutes.">
 <meta property="og:url" content="https://vantageaiops.com/docs.html">
 <meta property="og:image" content="https://vantageaiops.com/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="VantageAI Docs — LLM Cost Tracking SDK & API Reference">
-<meta name="twitter:description" content="Add LLM cost tracking to your app in 2 minutes. Python and JavaScript SDKs.">
+<meta name="twitter:title" content="VantageAI Docs — AI Coding Tool Cost Intelligence SDK & API">
+<meta name="twitter:description" content="Track AI coding tool costs across Claude Code, Copilot, Cursor, Gemini CLI and 13+ tools.">
 <meta name="twitter:image" content="https://vantageaiops.com/og-image.png">
 <link rel="canonical" href="https://vantageaiops.com/docs.html">
 <link rel="manifest" href="/manifest.json">
@@ -128,13 +127,6 @@ footer a:hover{color:var(--text)}
 [data-theme="light"] .tab-content{background:var(--bg3);border-color:rgba(0,0,0,.12)}
 [data-theme="light"] .api-table th{border-bottom-color:rgba(0,0,0,.08)}
 [data-theme="light"] .api-table td{border-bottom-color:rgba(0,0,0,.05)}
-/* Light theme: syntax highlighting colors with proper contrast */
-[data-theme="light"] .c-string{color:#1a7a2e}
-[data-theme="light"] .c-keyword{color:#7c3aed}
-[data-theme="light"] .c-var{color:#1d4ed8}
-[data-theme="light"] .c-func{color:#047857}
-[data-theme="light"] .c-num{color:#b45309}
-[data-theme="light"] .c-comment{color:#6b7b8a}
 </style>
 <style>
 .docs-layout{display:grid;grid-template-columns:240px 1fr;gap:0;min-height:calc(100vh - 53px)}
@@ -176,14 +168,7 @@ pre{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;pad
 .api-table td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top}
 .api-table tr:last-child td{border-bottom:none}
 .api-table code{font-size:11px}
-.docs-mobile-toggle{display:none;position:fixed;bottom:20px;right:20px;z-index:200;width:48px;height:48px;border-radius:50%;background:var(--accent);color:#000;border:none;font-size:20px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.3);align-items:center;justify-content:center}
-@media(max-width:768px){
-  .docs-layout{grid-template-columns:1fr}
-  .docs-sidebar{display:none;position:fixed;top:53px;left:0;right:0;bottom:0;z-index:150;height:auto;padding-bottom:80px}
-  .docs-sidebar.mobile-open{display:block}
-  .docs-content{padding:32px 24px}
-  .docs-mobile-toggle{display:flex}
-}
+@media(max-width:768px){.docs-layout{grid-template-columns:1fr}.docs-sidebar{display:none}.docs-content{padding:32px 24px}}
 </style>
 </head>
 <body>
@@ -228,7 +213,7 @@ pre{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;pad
     </div>
 
     <div class="docs-nav-group">
-      <div class="docs-nav-sec" style="color:var(--accent)" onclick="toggleNavGroup(this)">Cross-Platform (NEW)</div>
+      <div class="docs-nav-sec" style="color:var(--ac)" onclick="toggleNavGroup(this)">Cross-Platform (NEW)</div>
       <a class="docs-nav-item" onclick="show('otel-setup',this)">OTel Setup (all tools)</a>
       <a class="docs-nav-item" onclick="show('otel-claude',this)">Claude Code</a>
       <a class="docs-nav-item" onclick="show('otel-copilot',this)">GitHub Copilot</a>
@@ -269,7 +254,6 @@ pre{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;pad
   <div class="docs-content" id="docs-content"></div>
 
 </div>
-<button class="docs-mobile-toggle" onclick="toggleMobileSidebar()" aria-label="Toggle docs menu">☰</button>
 </div>
 
 <footer>
@@ -410,7 +394,7 @@ concepts: `
 
 <h2>Key Concepts</h2>
 
-<h3>Prompt Optimization (AI-powered prompt optimizer)</h3>
+<h3>Prompt Optimization (5-layer engine)</h3>
 <p>Every prompt can be compressed before sending to the LLM:</p>
 <ol>
 <li><strong>Filler phrases</strong> — removes "could you please", "it is important to note that" (32 patterns)</li>
@@ -427,7 +411,7 @@ concepts: `
 <tbody>
 <tr><td><code>full</code></td><td>Everything (tokens, cost, prompt preview)</td><td>Internal teams, debugging</td></tr>
 <tr><td><code>stats-only</code></td><td>Only numbers (tokens, cost, latency)</td><td>Enterprise, compliance</td></tr>
-<tr><td><code>hashed</code></td><td>Numbers + cryptographic hash</td><td>Dedup detection without text</td></tr>
+<tr><td><code>hashed</code></td><td>Numbers + SHA-256 prompt hash</td><td>Dedup detection without text</td></tr>
 </tbody>
 </table>
 
@@ -977,7 +961,7 @@ api: `
 <h2>Anomaly detection (automatic)</h2>
 <p>Anomaly detection is <strong>not an MCP tool</strong> — it runs automatically as a Cloudflare Cron Trigger every 10 minutes. No manual invocation needed.</p>
 <div class="info-box">
-<strong>How it works:</strong> Intelligent anomaly detection on rolling cost patterns. If recent spend deviates significantly from the norm, an alert fires to your configured Slack webhook. Alerts are throttled to 1 per org per hour.
+<strong>How it works:</strong> Z-score analysis on rolling 7-day hourly cost. If the last 10 minutes of spend is more than 3 standard deviations above the mean, an alert fires to your configured Slack webhook. Alerts are throttled to 1 per org per hour.
 </div>
 <p>To enable: configure a Slack webhook in <strong>Settings → Slack Integration</strong> and enable anomaly alerts. The system will automatically detect cost spikes, traffic surges, and runaway agents.</p>
 
@@ -1216,8 +1200,8 @@ curl http://localhost:<span class="c-num">4891</span>/health</pre></div>
 <h2>Privacy levels</h2>
 <table class="api-table"><thead><tr><th>Level</th><th>Text sent?</th><th>Prompt hash?</th><th>Best for</th></tr></thead><tbody>
 <tr><td><code>strict</code> (default)</td><td>❌ None</td><td>❌ No</td><td>Compliance, regulated industries, maximum security</td></tr>
-<tr><td><code>standard</code></td><td>❌ None</td><td>✅ Cryptographic hash (non-reversible)</td><td>Dedup detection without exposing content</td></tr>
-<tr><td><code>relaxed</code></td><td>⚠️ Configurable preview length</td><td>✅ Yes</td><td>Internal debugging only — <strong>NOT for production</strong></td></tr>
+<tr><td><code>standard</code></td><td>❌ None</td><td>✅ SHA-256 (non-reversible)</td><td>Dedup detection without exposing content</td></tr>
+<tr><td><code>relaxed</code></td><td>⚠️ First 100 chars</td><td>✅ Yes</td><td>Internal debugging only — <strong>NOT for production</strong></td></tr>
 </tbody></table>
 
 <h2>CLI options</h2>
@@ -1235,7 +1219,7 @@ curl http://localhost:<span class="c-num">4891</span>/health</pre></div>
 <div class="info-box">
 <strong>1.</strong> API keys are never forwarded — they route directly from proxy to LLM API<br>
 <strong>2.</strong> Text is stripped immediately in memory — never queued or persisted<br>
-<strong>3.</strong> The proxy self-validates — automated checks for leaked key patterns<br>
+<strong>3.</strong> The proxy self-validates — <code>assertNoSensitiveData()</code> checks for leaked key patterns<br>
 <strong>4.</strong> No external dependencies for privacy — sanitization runs entirely in-process<br>
 <strong>5.</strong> Fully open source — audit <code>privacy.ts</code> yourself
 </div>
@@ -1249,7 +1233,7 @@ curl http://localhost:<span class="c-num">4891</span>/health</pre></div>
 
 <h2>Three modes</h2>
 <table class="api-table"><thead><tr><th>Mode</th><th>Prompt text</th><th>Response text</th><th>Prompt hash</th><th>Best for</th></tr></thead><tbody>
-<tr><td><code>full</code> (default)</td><td>✅ Configurable preview length</td><td>✅ Configurable preview length</td><td>✅ One-way hash</td><td>Full observability, internal tools</td></tr>
+<tr><td><code>full</code> (default)</td><td>✅ First 600 chars</td><td>✅ First 600 chars</td><td>✅ MD5</td><td>Full observability, internal tools</td></tr>
 <tr><td><code>stats-only</code></td><td>❌ Stripped</td><td>❌ Stripped</td><td>❌ Stripped</td><td>Maximum privacy, compliance</td></tr>
 <tr><td><code>hashed</code></td><td>❌ Stripped</td><td>❌ Stripped</td><td>✅ Kept</td><td>Privacy + dedup detection</td></tr>
 </tbody></table>
@@ -1574,7 +1558,24 @@ export OTEL_RESOURCE_ATTRIBUTES="team.id=backend,cost_center=eng-100"</pre>
 }</pre>
 
 <h2>Metrics Received</h2>
-<p>VantageAI automatically parses 40+ metrics from each tool. No configuration needed beyond pointing the OTel endpoint at your VantageAI instance.</p>
+<table class="doc-table">
+<tr><th>Metric</th><th>Type</th><th>Data</th></tr>
+<tr><td><code>claude_code.token.usage</code></td><td>Counter</td><td>Input, output, cache read, cache creation tokens per model</td></tr>
+<tr><td><code>claude_code.cost.usage</code></td><td>Counter</td><td>Cost in USD per model</td></tr>
+<tr><td><code>claude_code.commit.count</code></td><td>Counter</td><td>Git commits created</td></tr>
+<tr><td><code>claude_code.pull_request.count</code></td><td>Counter</td><td>PRs created</td></tr>
+<tr><td><code>claude_code.lines_of_code.count</code></td><td>Counter</td><td>Lines added/removed</td></tr>
+<tr><td><code>claude_code.active_time.total</code></td><td>Counter</td><td>Active time in seconds</td></tr>
+<tr><td><code>claude_code.session.count</code></td><td>Counter</td><td>Sessions started</td></tr>
+</table>
+
+<h2>Events Received</h2>
+<table class="doc-table">
+<tr><th>Event</th><th>Data</th></tr>
+<tr><td><code>api_request</code></td><td>Model, cost, tokens, duration, cache tokens</td></tr>
+<tr><td><code>tool_result</code></td><td>Tool name, success/fail, duration</td></tr>
+<tr><td><code>user_prompt</code></td><td>Prompt length (content opt-in)</td></tr>
+</table>
 
 <div class="callout callout-blue">
 <strong>Privacy:</strong> User prompt content is NOT sent by default — only prompt length. Enable with <code>OTEL_LOG_USER_PROMPTS=1</code>.
@@ -1600,7 +1601,14 @@ export COPILOT_OTEL_ENDPOINT=https://api.vantageaiops.com/v1/otel
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer vnt_your_key"</pre>
 
 <h2>Metrics Received</h2>
-<p>VantageAI automatically parses 40+ metrics from each tool. No configuration needed beyond pointing the OTel endpoint at your VantageAI instance.</p>
+<table class="doc-table">
+<tr><th>Metric</th><th>Data</th></tr>
+<tr><td><code>gen_ai.client.token.usage</code></td><td>Input/output tokens per model (histogram)</td></tr>
+<tr><td><code>gen_ai.client.operation.duration</code></td><td>API call latency in seconds</td></tr>
+<tr><td><code>copilot_chat.time_to_first_token</code></td><td>TTFT in seconds</td></tr>
+<tr><td><code>copilot_chat.tool.call.count</code></td><td>Tool invocations by name</td></tr>
+<tr><td><code>copilot_chat.session.count</code></td><td>Sessions started</td></tr>
+</table>
 
 <div class="callout callout-amber">
 <strong>Note:</strong> Copilot does not emit cost in USD. VantageAI calculates cost from token counts + our pricing database.
@@ -1624,7 +1632,14 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer vnt_your_key"</pre>
 <pre>export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer vnt_your_key"</pre>
 
 <h2>Metrics Received</h2>
-<p>VantageAI automatically parses 40+ metrics from each tool. No configuration needed beyond pointing the OTel endpoint at your VantageAI instance.</p>
+<table class="doc-table">
+<tr><th>Metric</th><th>Data</th></tr>
+<tr><td><code>gemini_cli.token.usage</code></td><td>Input, output, thought, cache, tool tokens</td></tr>
+<tr><td><code>gemini_cli.api.request.count</code></td><td>API calls by model and status</td></tr>
+<tr><td><code>gemini_cli.tool.call.count</code></td><td>Tool invocations</td></tr>
+<tr><td><code>gemini_cli.file.operation.count</code></td><td>File creates/reads/updates</td></tr>
+<tr><td><code>gemini_cli.session.count</code></td><td>Sessions started</td></tr>
+</table>
 `,
 
 "otel-codex": `
@@ -1639,7 +1654,13 @@ otlp_endpoint = "https://api.vantageaiops.com/v1/otel"</pre>
 <pre>export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer vnt_your_key"</pre>
 
 <h2>Metrics Received</h2>
-<p>VantageAI automatically parses 40+ metrics from each tool. No configuration needed beyond pointing the OTel endpoint at your VantageAI instance.</p>
+<p>Codex uses GenAI semantic conventions plus custom metrics for productivity:</p>
+<ul>
+<li><code>gen_ai.client.token.usage</code> — Input/output tokens</li>
+<li><code>codex.cost.usage</code> — Cost in USD</li>
+<li><code>codex.commit.count</code> — Git commits</li>
+<li><code>codex.lines_of_code.count</code> — Lines added/removed</li>
+</ul>
 `,
 
 "otel-cline": `
@@ -1655,13 +1676,40 @@ export CLINE_OTEL_EXPORTER_OTLP_PROTOCOL=http/json</pre>
 `,
 
 "otel-pricing": `
-<h1>Auto-Cost Calculation</h1>
-<p>VantageAI automatically calculates USD costs for tools that only report token counts (like Copilot and Gemini CLI). Our pricing engine covers 24+ models across all major providers and updates within 24 hours of provider price changes.</p>
+<h1>OTel Pricing Engine — Auto Cost Estimation</h1>
+<p>When AI tools send only token counts via OTel (no explicit cost metric), VantageAI <strong>automatically calculates cost in USD</strong> using its internal pricing table. This is critical for tools like GitHub Copilot and Gemini CLI that emit token counts but not dollar costs.</p>
 
-<div class="info-box">No configuration needed — costs are calculated server-side based on the model name in your OTel data.</div>
+<h2>How It Works</h2>
+<div class="step-row"><div class="step-num">1</div><div class="step-body">Tool sends OTel metrics with token counts (e.g., <code>copilot_chat.token.usage</code>)</div></div>
+<div class="step-row"><div class="step-num">2</div><div class="step-body">VantageAI checks if <code>cost_usd == 0</code> for the record</div></div>
+<div class="step-row"><div class="step-num">3</div><div class="step-body">Looks up model in the pricing table (exact match, then fuzzy substring match)</div></div>
+<div class="step-row"><div class="step-num">4</div><div class="step-body">Calculates: <code>cost = (uncached_input / 1M) × input_price + (cached / 1M) × cache_price + (output / 1M) × output_price</code></div></div>
+
+<h2>Supported Models &amp; Pricing</h2>
+<table class="api-table">
+<thead><tr><th>Model</th><th>Provider</th><th>Input ($/1M)</th><th>Output ($/1M)</th><th>Cache ($/1M)</th></tr></thead>
+<tbody>
+<tr><td><code>claude-opus-4-6</code></td><td>Anthropic</td><td>$15.00</td><td>$75.00</td><td>$1.50</td></tr>
+<tr><td><code>claude-sonnet-4-6</code></td><td>Anthropic</td><td>$3.00</td><td>$15.00</td><td>$0.30</td></tr>
+<tr><td><code>claude-haiku-4-5</code></td><td>Anthropic</td><td>$0.80</td><td>$4.00</td><td>$0.08</td></tr>
+<tr><td><code>gpt-4o</code></td><td>OpenAI</td><td>$2.50</td><td>$10.00</td><td>$1.25</td></tr>
+<tr><td><code>gpt-4o-mini</code></td><td>OpenAI</td><td>$0.15</td><td>$0.60</td><td>$0.075</td></tr>
+<tr><td><code>o1</code></td><td>OpenAI</td><td>$15.00</td><td>$60.00</td><td>$7.50</td></tr>
+<tr><td><code>o3-mini</code></td><td>OpenAI</td><td>$1.10</td><td>$4.40</td><td>$0.55</td></tr>
+<tr><td><code>gemini-2.0-flash</code></td><td>Google</td><td>$0.10</td><td>$0.40</td><td>$0.025</td></tr>
+<tr><td><code>gemini-1.5-pro</code></td><td>Google</td><td>$1.25</td><td>$5.00</td><td>$0.31</td></tr>
+<tr><td><code>gemini-1.5-flash</code></td><td>Google</td><td>$0.075</td><td>$0.30</td><td>$0.018</td></tr>
+</tbody>
+</table>
+
+<h2>Fuzzy Model Matching</h2>
+<p>If the exact model name isn't in the table, the engine tries substring matching. For example, <code>claude-sonnet-4-6-20260301</code> matches <code>claude-sonnet-4-6</code>. Unknown models return <code>cost_usd = 0</code>.</p>
 
 <h2>Precedence Rules</h2>
-<div class="info-box">💡 If a tool sends both token counts AND an explicit cost metric, the <strong>explicit cost takes precedence</strong>. Auto-estimation only fills in when no cost is provided.</div>
+<div class="info-box">💡 If a tool sends both token counts AND an explicit cost metric (e.g., <code>claude_code.cost.usage</code>), the <strong>explicit cost takes precedence</strong>. Auto-estimation only fills in when <code>cost_usd == 0</code>.</div>
+
+<h2>Dual-Write to Live Feed</h2>
+<p>OTel metrics with token/cost data are also inserted into the <code>otel_events</code> table, powering the <strong>/live</strong> feed in the dashboard. This ensures real-time visibility for metrics-only sources (Copilot, Gemini CLI) — not just tools that send log events.</p>
 `,
 
 "xp-api": `
@@ -1767,38 +1815,13 @@ function toggleNavGroup(sec) {
   group.classList.toggle('collapsed');
 }
 
-function toggleMobileSidebar() {
-  const sidebar = document.querySelector('.docs-sidebar');
-  const btn = document.querySelector('.docs-mobile-toggle');
-  sidebar.classList.toggle('mobile-open');
-  btn.textContent = sidebar.classList.contains('mobile-open') ? '✕' : '☰';
-}
-
 function show(id, el) {
   document.querySelectorAll(".docs-nav-item").forEach(n => n.classList.remove("active"));
   el.classList.add("active");
   const content = DOCS[id] || "<p>Coming soon.</p>";
   document.getElementById("docs-content").innerHTML = content;
   window.scrollTo(0, 0);
-  // Close mobile sidebar after selection
-  const sidebar = document.querySelector('.docs-sidebar');
-  if (sidebar.classList.contains('mobile-open')) toggleMobileSidebar();
 }
-
-// Keyboard accessibility for sidebar sections
-document.querySelectorAll('.docs-nav-sec').forEach(sec => {
-  sec.setAttribute('role', 'button');
-  sec.setAttribute('tabindex', '0');
-  sec.addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleNavGroup(sec); }
-  });
-});
-document.querySelectorAll('.docs-nav-item').forEach(item => {
-  item.setAttribute('tabindex', '0');
-  item.addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.click(); }
-  });
-});
 
 // Init with quickstart
 document.getElementById("docs-content").innerHTML = DOCS.quickstart;

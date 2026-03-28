@@ -15,6 +15,8 @@ export type Bindings = {
   FROM_EMAIL?:         string;   // defaults to noreply@vantageaiops.com
   // Superadmin — set via: wrangler secret put SUPERADMIN_SECRET
   SUPERADMIN_SECRET?:  string;
+  // CI bypass for signup rate limiting — set via: wrangler secret put VANTAGE_CI_SECRET
+  VANTAGE_CI_SECRET?:  string;
 };
 
 export type Variables = {

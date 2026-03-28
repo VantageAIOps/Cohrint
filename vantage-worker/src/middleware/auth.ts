@@ -7,13 +7,17 @@ export async function sha256hex(text: string): Promise<string> {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// ── Rate limiter (token bucket via KV) ───────────────────────────────────────
+// ── Rate limiter (token bucket via KV, with graceful degradation) ────────────
 async function checkRateLimit(kv: KVNamespace, orgId: string, limitRpm: number): Promise<boolean> {
-  const key   = `rl:${orgId}:${Math.floor(Date.now() / 60_000)}`;
-  const raw   = await kv.get(key);
-  const count = raw ? parseInt(raw, 10) : 0;
-  if (count >= limitRpm) return false;
-  kv.put(key, String(count + 1), { expirationTtl: 70 });
+  try {
+    const key   = `rl:${orgId}:${Math.floor(Date.now() / 60_000)}`;
+    const raw   = await kv.get(key);
+    const count = raw ? parseInt(raw, 10) : 0;
+    if (count >= limitRpm) return false;
+    kv.put(key, String(count + 1), { expirationTtl: 70 });
+  } catch {
+    // KV unavailable or quota exceeded — allow request through
+  }
   return true;
 }
 

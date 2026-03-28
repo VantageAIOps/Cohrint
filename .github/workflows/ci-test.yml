@@ -107,8 +107,7 @@ jobs:
           HEADLESS: "1"
           VANTAGE_SITE_URL: "https://vantageaiops.com"
           VANTAGE_API_URL: "https://api.vantageaiops.com"
-          VANTAGE_CI_API_KEY: ${{ secrets.VANTAGE_CI_API_KEY }}
-          VANTAGE_CI_ORG_ID: ${{ secrets.VANTAGE_CI_ORG_ID }}
+          VANTAGE_CI_SECRET: ${{ secrets.VANTAGE_CI_SECRET }}
         run: |
           EXTRA_FLAGS=""
           if [ "${{ inputs.category }}" != "" ]; then
@@ -184,8 +183,7 @@ jobs:
           HEADLESS: "1"
           VANTAGE_SITE_URL: "https://vantageaiops.com"
           VANTAGE_API_URL: "https://api.vantageaiops.com"
-          VANTAGE_CI_API_KEY: ${{ secrets.VANTAGE_CI_API_KEY }}
-          VANTAGE_CI_ORG_ID: ${{ secrets.VANTAGE_CI_ORG_ID }}
+          VANTAGE_CI_SECRET: ${{ secrets.VANTAGE_CI_SECRET }}
         run: |
           if [ -n "${{ inputs.category }}" ]; then
             python tests/run_suite.py --category ${{ inputs.category }} 2>&1 | tee /tmp/browser-test-output.txt
@@ -251,8 +249,7 @@ jobs:
           HEADLESS: "1"
           VANTAGE_SITE_URL: "https://vantageaiops.com"
           VANTAGE_API_URL: "https://api.vantageaiops.com"
-          VANTAGE_CI_API_KEY: ${{ secrets.VANTAGE_CI_API_KEY }}
-          VANTAGE_CI_ORG_ID: ${{ secrets.VANTAGE_CI_ORG_ID }}
+          VANTAGE_CI_SECRET: ${{ secrets.VANTAGE_CI_SECRET }}
         run: |
           python tests/run_suite.py \
             --category 06_stress \
@@ -291,8 +288,7 @@ jobs:
           HEADLESS: "1"
           VANTAGE_SITE_URL: "https://vantageaiops.com"
           VANTAGE_API_URL: "https://api.vantageaiops.com"
-          VANTAGE_CI_API_KEY: ${{ secrets.VANTAGE_CI_API_KEY }}
-          VANTAGE_CI_ORG_ID: ${{ secrets.VANTAGE_CI_ORG_ID }}
+          VANTAGE_CI_SECRET: ${{ secrets.VANTAGE_CI_SECRET }}
         run: |
           python tests/run_suite.py --security --no-report 2>&1 | tee /tmp/security-output.txt || true
           cat /tmp/security-output.txt
