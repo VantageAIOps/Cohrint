@@ -1,7 +1,7 @@
 {
   "name": "vantageai-cli",
-  "version": "2.1.0",
-  "description": "Transparent AI agent wrapper — optimize prompts, stream output, track costs across Claude Code, Codex, Gemini, Aider",
+  "version": "2.2.0",
+  "description": "AI coding tool cost intelligence CLI — optimize prompts, track costs, multi-line input, conversation context across Claude Code, Copilot, Gemini, Codex, Cursor",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

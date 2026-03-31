@@ -1784,9 +1784,15 @@ export CLINE_OTEL_EXPORTER_OTLP_PROTOCOL=http/json</pre>
 </tbody></table>
 
 <h2>How It Works</h2>
-<p>1. You type a prompt → 2. CLI optimizes it (<1ms, local) → 3. Forwards to your AI tool → 4. Streams output in real-time → 5. Calculates cost + savings</p>
+<p>1. You type a prompt → 2. CLI optimizes it (&lt;1ms, local) → 3. Forwards to your AI tool → 4. Streams output in real-time → 5. Calculates cost + savings</p>
 
 <div class="info-box">Zero added latency: optimization is synchronous, tracking is async fire-and-forget.</div>
+
+<h2>Context Continuation (Claude Code)</h2>
+<p>The CLI maintains reliable conversation context across prompts in the same REPL session:</p>
+<div class="step-row"><div class="step-num">1</div><div class="step-body">Claude is invoked with <code>--output-format stream-json</code>. The CLI parses each JSON line, displays response text, and captures the <code>session_id</code> from the result.</div></div>
+<div class="step-row"><div class="step-num">2</div><div class="step-body">On the next prompt, uses <code>--resume &lt;sessionId&gt;</code> instead of <code>--continue</code> — pins to the exact conversation even if Claude was used outside vantage between prompts.</div></div>
+<div class="step-row"><div class="step-num">3</div><div class="step-body">Falls back to <code>--continue</code> automatically when no session ID is available (first prompt or non-Claude agents).</div></div>
 
 <h2>Dashboard Integration</h2>
 <p>When configured with a VantageAI API key, the CLI automatically pushes cost data to your dashboard. Events include: model, provider, tokens, cost, latency, and agent name.</p>

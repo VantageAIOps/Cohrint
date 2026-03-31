@@ -7,9 +7,39 @@ export interface RunResult {
   exitCode: number;
   stdout: string;
   durationMs: number;
+  sessionId?: string;
 }
 
 const MAX_OUTPUT_BYTES = 5 * 1024 * 1024; // 5MB output cap
+
+/**
+ * Parse a single stream-json line from Claude Code.
+ * Returns the displayable text and/or session ID extracted from it.
+ * Falls back to returning the raw line as text if it's not valid JSON.
+ */
+function parseStreamLine(line: string): { text?: string; sessionId?: string } {
+  if (!line.trim()) return {};
+  try {
+    const obj = JSON.parse(line) as Record<string, unknown>;
+    if (obj["type"] === "assistant") {
+      const msg = obj["message"] as Record<string, unknown> | undefined;
+      const content = msg?.["content"] as Array<Record<string, unknown>> | undefined;
+      const text = content
+        ?.filter((c) => c["type"] === "text")
+        .map((c) => c["text"] as string)
+        .join("") ?? "";
+      return text ? { text } : {};
+    }
+    if (obj["type"] === "result") {
+      return { sessionId: obj["session_id"] as string | undefined };
+    }
+    // system/init/tool lines — suppress from display
+    return {};
+  } catch {
+    // Not JSON — display as-is (non-Claude agents or plain text output)
+    return { text: line + "\n" };
+  }
+}
 const DEFAULT_TIMEOUT_MS = 300_000; // 5 minute timeout
 
 /** Env vars that could be used to inject code into child processes */
@@ -32,6 +62,8 @@ export function runAgent(
     const chunks: Buffer[] = [];
     let totalBytes = 0;
     let timedOut = false;
+    let capturedSessionId: string | undefined;
+    let lineBuffer = "";
 
     let child: ReturnType<typeof spawn>;
     try {
@@ -66,20 +98,29 @@ export function runAgent(
 
     let firstChunk = true;
 
-    child.stdout?.on("data", (chunk: Buffer) => {
+    function flushLine(line: string) {
+      const { text, sessionId } = parseStreamLine(line);
+      if (sessionId) capturedSessionId = sessionId;
+      if (!text) return;
       if (firstChunk) {
         spinner.stop();
         firstChunk = false;
       }
-      totalBytes += chunk.length;
-      if (totalBytes <= MAX_OUTPUT_BYTES) {
-        chunks.push(chunk);
-      }
-      const ok = process.stdout.write(chunk);
+      const buf = Buffer.from(text);
+      totalBytes += buf.length;
+      if (totalBytes <= MAX_OUTPUT_BYTES) chunks.push(buf);
+      const ok = process.stdout.write(buf);
       if (!ok) {
         child.stdout?.pause();
         process.stdout.once("drain", () => child.stdout?.resume());
       }
+    }
+
+    child.stdout?.on("data", (chunk: Buffer) => {
+      lineBuffer += chunk.toString("utf-8");
+      const lines = lineBuffer.split("\n");
+      lineBuffer = lines.pop() ?? "";
+      for (const line of lines) flushLine(line);
     });
 
     child.stderr?.on("data", (chunk: Buffer) => {
@@ -99,6 +140,8 @@ export function runAgent(
     child.on("close", (code) => {
       clearTimeout(timer);
       spinner.stop();
+      // Flush any remaining buffered content
+      if (lineBuffer.trim()) flushLine(lineBuffer);
       const durationMs = Date.now() - start;
       const stdout = Buffer.concat(chunks).toString("utf-8");
       const exitCode = code ?? 1;
@@ -113,7 +156,7 @@ export function runAgent(
       if (timedOut) {
         reject(new Error(`Agent timed out after ${Math.round(timeoutMs / 1000)}s`));
       } else {
-        resolve({ exitCode, stdout, durationMs });
+        resolve({ exitCode, stdout, durationMs, sessionId: capturedSessionId });
       }
     });
   });
@@ -130,10 +173,11 @@ export function runAgentBuffered(
 ): Promise<RunResult> {
   return new Promise((resolve, reject) => {
     const start = Date.now();
-    const stdoutChunks: Buffer[] = [];
-    const stderrChunks: Buffer[] = [];
-    let stdoutBytes = 0;
+    const textChunks: Buffer[] = [];
+    let textBytes = 0;
     let timedOut = false;
+    let capturedSessionId: string | undefined;
+    let lineBuffer = "";
 
     let child: ReturnType<typeof spawn>;
     try {
@@ -163,15 +207,24 @@ export function runAgentBuffered(
       });
     }
 
+    function flushLine(line: string) {
+      const { text, sessionId } = parseStreamLine(line);
+      if (sessionId) capturedSessionId = sessionId;
+      if (!text) return;
+      const buf = Buffer.from(text);
+      textBytes += buf.length;
+      if (textBytes <= MAX_OUTPUT_BYTES) textChunks.push(buf);
+    }
+
     child.stdout?.on("data", (chunk: Buffer) => {
-      stdoutBytes += chunk.length;
-      if (stdoutBytes <= MAX_OUTPUT_BYTES) {
-        stdoutChunks.push(chunk);
-      }
+      lineBuffer += chunk.toString("utf-8");
+      const lines = lineBuffer.split("\n");
+      lineBuffer = lines.pop() ?? "";
+      for (const line of lines) flushLine(line);
     });
 
     child.stderr?.on("data", (chunk: Buffer) => {
-      stderrChunks.push(chunk);
+      // Discard stderr in buffered mode (callers only use stdout)
     });
 
     child.on("error", (err) => {
@@ -185,8 +238,10 @@ export function runAgentBuffered(
 
     child.on("close", (code) => {
       clearTimeout(timer);
+      // Flush any remaining buffered content
+      if (lineBuffer.trim()) flushLine(lineBuffer);
       const durationMs = Date.now() - start;
-      const stdout = Buffer.concat(stdoutChunks).toString("utf-8");
+      const stdout = Buffer.concat(textChunks).toString("utf-8");
       const exitCode = code ?? 1;
 
       bus.emit("agent:completed", {
@@ -199,7 +254,7 @@ export function runAgentBuffered(
       if (timedOut) {
         reject(new Error(`Agent timed out after ${Math.round(timeoutMs / 1000)}s`));
       } else {
-        resolve({ exitCode, stdout, durationMs });
+        resolve({ exitCode, stdout, durationMs, sessionId: capturedSessionId });
       }
     });
   });
