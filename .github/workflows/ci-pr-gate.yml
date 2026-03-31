@@ -1,15 +1,16 @@
 name: PR Gate
 
-# Runs on every PR to main. All required checks must pass before merge.
+# Runs on every PR to main. Fast checks only to stay within GitHub Actions
+# free tier (2,000 min/month). Heavy jobs (api-tests, cross-browser, mcp-tests)
+# run via ci-test.yml on manual dispatch or post-deploy — not on every PR.
 #
 # Jobs:
-#   1. TypeScript Check          — compile check on worker code
-#   2. API Test Suites           — core API tests against live environment
-#   3. Environment & Health Tests — verify API + frontend are reachable
-#   4. Cross-Browser Tests       — Chrome, Firefox, Safari via Playwright
-#   5. MCP Server Tests          — MCP transport, stress, resilience (84 checks)
-#   6. Preview Deploy            — deploy frontend preview, post URL as PR comment
-#   7. PR Gate Summary           — fail if any critical job failed
+#   1. TypeScript Check          — compile check on worker code (~3 min)
+#   2. CLI Build                 — type check + bundle vantage-cli (~3 min)
+#   3. Environment & Health Tests — verify API + frontend reachable (~2 min)
+#   4. Connector Tests           — skipped unless connector files changed (~1 min)
+#   5. Preview Deploy            — deploy preview, post URL as PR comment (~5 min)
+#   6. PR Gate Summary           — fail if any critical job failed
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -71,69 +72,7 @@ jobs:
         working-directory: vantage-cli
         run: npx tsup src/index.ts --format esm --dts --clean
 
-  # ── 2. API + core test suites (no browser) ──────────────────────────────────
-  api-tests:
-    name: API Test Suites
-    runs-on: ubuntu-latest
-    needs: [typecheck]
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: "pip"
-
-      - name: Install dependencies
-        run: pip install -r tests/requirements.txt
-
-      - name: Run API + core suites (no browser)
-        env:
-          HEADLESS: "1"
-          VANTAGE_SITE_URL: "https://vantageaiops.com"
-          VANTAGE_API_URL: "https://api.vantageaiops.com"
-          VANTAGE_CI_SECRET: ${{ secrets.VANTAGE_CI_SECRET }}
-          EMAIL: ${{ secrets.EMAIL }}
-          PASSWORD: ${{ secrets.PASSWORD }}
-        run: |
-          python tests/run_suite.py --no-browser --clean 2>&1 | tee /tmp/api-test-output.txt
-          EXIT=${PIPESTATUS[0]}
-          exit $EXIT
-
-      - name: Generate failure summary
-        if: always()
-        run: |
-          echo "## API Test Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if grep -q "passed.*failed" /tmp/api-test-output.txt 2>/dev/null; then
-            grep -E "(passed|failed|skipped)" /tmp/api-test-output.txt | tail -5 | while read line; do
-              echo "$line" >> $GITHUB_STEP_SUMMARY
-            done
-          fi
-          echo "" >> $GITHUB_STEP_SUMMARY
-          FAILURES=$(grep -E "^  ✗|^       └─" /tmp/api-test-output.txt 2>/dev/null || true)
-          if [ -n "$FAILURES" ]; then
-            echo "### Failures" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            echo "$FAILURES" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          else
-            echo "✅ All tests passed" >> $GITHUB_STEP_SUMMARY
-          fi
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pr-api-tests-${{ github.run_number }}
-          path: |
-            /tmp/api-test-output.txt
-            tests/artifacts/
-            tests/test-results/
-
-  # ── 3. Environment & Health Tests ────────────────────────────────────────────
+  # ── 2. Environment & Health Tests ────────────────────────────────────────────
   env-tests:
     name: Environment & Health Tests
     runs-on: ubuntu-latest
@@ -173,116 +112,7 @@ jobs:
           echo "Auth page: $STATUS"
           [ "$STATUS" = "200" ] || { echo "⚠️ Auth page returned $STATUS"; }
 
-  # ── 4. Cross-Browser Tests (desktop only for speed) ─────────────────────────
-  cross-browser:
-    name: Cross-Browser Tests
-    runs-on: ubuntu-latest
-    needs: typecheck
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: "pip"
-
-      - name: Install dependencies
-        run: pip install -r tests/requirements.txt
-
-      - name: Install browsers
-        run: python -m playwright install chromium firefox webkit --with-deps
-
-      - name: Run cross-browser desktop tests
-        env:
-          HEADLESS: "1"
-          VANTAGE_SITE_URL: "https://vantageaiops.com"
-          VANTAGE_API_URL: "https://api.vantageaiops.com"
-          VANTAGE_CI_SECRET: ${{ secrets.VANTAGE_CI_SECRET }}
-          EMAIL: ${{ secrets.EMAIL }}
-          PASSWORD: ${{ secrets.PASSWORD }}
-          CB_ALL_DEVICES: "0"
-        run: |
-          python tests/run_suite.py --category 15_cross_browser --clean 2>&1 | tee /tmp/cross-browser-output.txt
-          EXIT=${PIPESTATUS[0]}
-          exit $EXIT
-
-      - name: Generate failure summary
-        if: always()
-        run: |
-          echo "## Cross-Browser Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          FAILURES=$(grep -E "^  ✗|^       └─" /tmp/cross-browser-output.txt 2>/dev/null || true)
-          if [ -n "$FAILURES" ]; then
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            echo "$FAILURES" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          else
-            echo "✅ All cross-browser tests passed" >> $GITHUB_STEP_SUMMARY
-          fi
-
-      - name: Upload results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pr-cross-browser-${{ github.run_number }}
-          path: /tmp/cross-browser-output.txt
-
-  # ── 5. MCP Server Tests (transport, stress, resilience) ──────────────────────
-  mcp-tests:
-    name: MCP Server Tests
-    runs-on: ubuntu-latest
-    needs: typecheck
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: "pip"
-
-      - name: Install dependencies
-        run: pip install -r tests/requirements.txt
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-
-      - name: Run MCP server transport tests
-        run: python tests/suites/12_mcp/test_mcp_server.py 2>&1 | tee /tmp/mcp-server.txt
-
-      - name: Run MCP stress & resilience tests
-        run: python tests/suites/12_mcp/test_mcp_stress.py 2>&1 | tee /tmp/mcp-stress.txt
-
-      - name: Generate failure summary
-        if: always()
-        run: |
-          echo "## MCP Server Test Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          for f in /tmp/mcp-server.txt /tmp/mcp-stress.txt; do
-            if [ -f "$f" ]; then
-              FAILURES=$(grep -E "^  ✗|^       └─" "$f" 2>/dev/null || true)
-              SUMMARY=$(grep -E "Results:" "$f" | tail -1 || true)
-              echo "**$(basename $f .txt):** $SUMMARY" >> $GITHUB_STEP_SUMMARY
-              if [ -n "$FAILURES" ]; then
-                echo '```' >> $GITHUB_STEP_SUMMARY
-                echo "$FAILURES" >> $GITHUB_STEP_SUMMARY
-                echo '```' >> $GITHUB_STEP_SUMMARY
-              fi
-            fi
-          done
-
-      - name: Upload results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pr-mcp-tests-${{ github.run_number }}
-          path: /tmp/mcp-*.txt
-
-  # ── 6. Connector Tests (if connector code changed) ──────────────────────────
+  # ── 3. Connector Tests (if connector code changed) ──────────────────────────
   connector-tests:
     name: Connector Tests
     runs-on: ubuntu-latest
@@ -348,7 +178,7 @@ jobs:
           name: pr-connector-tests-${{ github.run_number }}
           path: /tmp/connector-tests.txt
 
-  # ── 7. Preview Deploy ────────────────────────────────────────────────────────
+  # ── 4. Preview Deploy ────────────────────────────────────────────────────────
   preview-deploy:
     name: Preview Deploy
     runs-on: ubuntu-latest
@@ -419,11 +249,11 @@ jobs:
               });
             }
 
-  # ── 8. PR Gate Summary (required check — blocks merge on failure) ───────────
+  # ── 5. PR Gate Summary (required check — blocks merge on failure) ───────────
   pr-summary:
     name: PR Gate Summary
     runs-on: ubuntu-latest
-    needs: [typecheck, cli-build, api-tests, env-tests, cross-browser, mcp-tests, connector-tests, preview-deploy]
+    needs: [typecheck, cli-build, env-tests, connector-tests, preview-deploy]
     if: always()
     steps:
       - name: Write summary
@@ -434,12 +264,11 @@ jobs:
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| TypeScript Check | ${{ needs.typecheck.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| CLI Build | ${{ needs.cli-build.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| API Test Suites | ${{ needs.api-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Environment & Health | ${{ needs.env-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Cross-Browser Tests | ${{ needs.cross-browser.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| MCP Server Tests | ${{ needs.mcp-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Connector Tests | ${{ needs.connector-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Preview Deploy | ${{ needs.preview-deploy.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> API, cross-browser, and MCP tests run via ci-test.yml (post-deploy / manual dispatch)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**PR:** #${{ github.event.number }}" >> $GITHUB_STEP_SUMMARY
           echo "**Branch:** \`${{ github.head_ref }}\`" >> $GITHUB_STEP_SUMMARY
@@ -449,8 +278,6 @@ jobs:
         if: |
           needs.typecheck.result == 'failure' ||
           needs.cli-build.result == 'failure' ||
-          needs.api-tests.result == 'failure' ||
-          needs.mcp-tests.result == 'failure' ||
           needs.connector-tests.result == 'failure'
         run: |
           echo "❌ PR gate failed — fix the issues above before merging"
