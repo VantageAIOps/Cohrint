@@ -25,9 +25,9 @@ on:
 
   # PRs are now handled by ci-pr-gate.yml
 
-  # Nightly regression on main
+  # Weekly regression on main (Sunday 02:00 UTC) — saves ~6x CI minutes vs nightly
   schedule:
-    - cron: "0 2 * * *"
+    - cron: "0 2 * * 0"
 
   # Manual: pick category, enable security/integrations/browser
   workflow_dispatch:
