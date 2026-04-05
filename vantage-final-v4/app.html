@@ -638,6 +638,12 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
       <button class="sb-item" id="sb-settings" onclick="nav('settings', this)">
         <span class="icon">&#9881;</span> Settings
       </button>
+      <button class="sb-item" onclick="nav('security', this)">
+        <span class="icon">&#128274;</span> Security
+      </button>
+      <button class="sb-item" onclick="nav('integrations', this)">
+        <span class="icon">&#128279;</span> Integrations
+      </button>
       <button class="sb-item" onclick="nav('account', this)">
         <span class="icon">&#9683;</span> Account
       </button>
@@ -1040,6 +1046,46 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
         </div>
       </div>
 
+      <!-- ─── Security (Audit Log) ─── -->
+      <div id="view-security" class="view">
+        <div class="card">
+          <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+            <div class="card-title">Audit Log</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <select id="auditTypeFilter" onchange="loadAuditLog()" style="font-size:11px;padding:4px 8px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);border-radius:4px;">
+                <option value="">All events</option>
+                <option value="auth">Auth</option>
+                <option value="data_access">Data Access</option>
+                <option value="admin_action">Admin Actions</option>
+              </select>
+              <input type="date" id="auditDateFrom" onchange="loadAuditLog()" style="font-size:11px;padding:4px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);border-radius:4px;">
+              <input type="date" id="auditDateTo"   onchange="loadAuditLog()" style="font-size:11px;padding:4px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);border-radius:4px;">
+              <button class="btn btn-sm" onclick="exportAuditCsv()">Export CSV</button>
+            </div>
+          </div>
+          <div id="auditLogTable" style="margin-top:8px;font-size:11px;overflow-x:auto;">
+            <div style="color:var(--text-muted);padding:16px 0;">Loading audit log...</div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px;align-items:center;">
+            <button class="btn btn-sm" id="auditPrevBtn" onclick="auditPage(-1)" disabled>Prev</button>
+            <span id="auditPageInfo" style="font-size:11px;color:var(--text-muted);"></span>
+            <button class="btn btn-sm" id="auditNextBtn" onclick="auditPage(1)">Next</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── Integrations ─── -->
+      <div id="view-integrations" class="view">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Integration Status</div></div>
+          <p style="font-size:12px;color:var(--text-secondary);margin-bottom:16px;">
+            Real-time OTel coverage is live across 10+ tools. Billing API connectors and browser extension are on the roadmap.
+            <a href="/roadmap.html" target="_blank" style="color:var(--accent-green);">View full roadmap</a>
+          </p>
+          <div id="integrationsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;"></div>
+        </div>
+      </div>
+
       <!-- ─── Account ─── -->
       <div id="view-account" class="view">
         <div class="card">
@@ -1314,7 +1360,9 @@ function loadViewData(view) {
     case 'models': updateModelCalc(); break;
     case 'members': loadMembers(); break;
     case 'budgets': loadBudgets(); break;
-    case 'settings': loadSettings(); break;
+    case 'settings':      loadSettings(); break;
+    case 'security':      loadAuditLog(); break;
+    case 'integrations':  loadIntegrations(); break;
     case 'account': loadAccount(); break;
   }
 }
@@ -2486,6 +2534,217 @@ function savePrivacy() {
   localStorage.setItem('vantage_privacy', val);
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   Audit Log
+   ═══════════════════════════════════════════════════════════════════ */
+
+var auditOffset = 0;
+var auditLimit  = 50;
+var auditTotal  = 0;
+
+function loadAuditLog()  { auditOffset = 0; fetchAuditPage(); }
+function auditPage(dir)  { auditOffset = Math.max(0, auditOffset + dir * auditLimit); fetchAuditPage(); }
+
+function fetchAuditPage() {
+  var type = document.getElementById('auditTypeFilter').value;
+  var from = document.getElementById('auditDateFrom').value;
+  var to   = document.getElementById('auditDateTo').value;
+  var qs   = '?limit=' + auditLimit + '&offset=' + auditOffset;
+  if (type) qs += '&event_type=' + encodeURIComponent(type);
+  if (from) qs += '&from='       + encodeURIComponent(from);
+  if (to)   qs += '&to='         + encodeURIComponent(to);
+
+  var container = document.getElementById('auditLogTable');
+  container.textContent = '';
+  var loading = document.createElement('div');
+  loading.style.cssText = 'color:var(--text-muted);padding:8px 0;';
+  loading.textContent = 'Loading...';
+  container.appendChild(loading);
+
+  apiFetch('/v1/audit-log' + qs).catch(function() { return null; }).then(function(data) {
+    container.textContent = '';
+    if (!data) {
+      var msg = document.createElement('div');
+      msg.style.color = 'var(--text-muted)';
+      msg.textContent = 'Unable to load audit log. Owner key required.';
+      container.appendChild(msg);
+      return;
+    }
+
+    auditTotal = data.total || 0;
+    var events = data.events || [];
+
+    if (events.length === 0) {
+      var empty = document.createElement('div');
+      empty.style.cssText = 'color:var(--text-muted);padding:16px 0;';
+      empty.textContent = 'No audit events found.';
+      container.appendChild(empty);
+      document.getElementById('auditPageInfo').textContent = '0 events';
+      document.getElementById('auditPrevBtn').disabled = true;
+      document.getElementById('auditNextBtn').disabled = true;
+      return;
+    }
+
+    var BADGE_COLOR = {
+      'auth':              'var(--accent-green)',
+      'auth.failed':       '#e05555',
+      'data_access':       'var(--text-muted)',
+      'admin_action':      'var(--accent-amber)',
+    };
+
+    var table = document.createElement('table');
+    table.className = 'tool-table';
+    table.style.fontSize = '11px';
+    var thead = document.createElement('thead');
+    var hrow  = document.createElement('tr');
+    ['Time','Event','Actor','Resource','IP'].forEach(function(h) {
+      var th = document.createElement('th');
+      th.textContent = h;
+      hrow.appendChild(th);
+    });
+    thead.appendChild(hrow);
+    table.appendChild(thead);
+
+    var tbody = document.createElement('tbody');
+    events.forEach(function(e) {
+      var action   = String(e.action || '');
+      var evType   = String(e.event_type || '');
+      var color    = BADGE_COLOR[action] || BADGE_COLOR[evType] || 'var(--text-muted)';
+      var ts       = String(e.created_at || '').replace('T', ' ').slice(0, 19);
+      var actor    = String(e.actor_email || '');
+      var resource = String(e.resource || '');
+      var ip       = String(e.ip_address || '');
+
+      var tr = document.createElement('tr');
+
+      var tdTime = document.createElement('td');
+      tdTime.style.color = 'var(--text-muted)';
+      tdTime.textContent = ts;
+
+      var tdEvent = document.createElement('td');
+      var badge = document.createElement('span');
+      badge.style.cssText = 'font-size:10px;padding:2px 6px;border-radius:10px;background:' + color + '22;color:' + color + ';';
+      badge.textContent = action;
+      tdEvent.appendChild(badge);
+
+      var tdActor = document.createElement('td');
+      tdActor.style.fontFamily = 'var(--font-mono)';
+      tdActor.textContent = actor;
+
+      var tdResource = document.createElement('td');
+      tdResource.textContent = resource;
+
+      var tdIp = document.createElement('td');
+      tdIp.style.cssText = 'color:var(--text-muted);font-family:var(--font-mono);font-size:10px;';
+      tdIp.textContent = ip;
+
+      [tdTime, tdEvent, tdActor, tdResource, tdIp].forEach(function(td) { tr.appendChild(td); });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    container.appendChild(table);
+
+    var start = auditOffset + 1;
+    var end   = auditOffset + events.length;
+    document.getElementById('auditPageInfo').textContent = start + '\u2013' + end + ' of ' + auditTotal;
+    document.getElementById('auditPrevBtn').disabled = auditOffset === 0;
+    document.getElementById('auditNextBtn').disabled = !data.has_more;
+  });
+}
+
+function exportAuditCsv() {
+  var type    = document.getElementById('auditTypeFilter').value;
+  var from    = document.getElementById('auditDateFrom').value;
+  var to      = document.getElementById('auditDateTo').value;
+  var apiBase = localStorage.getItem('vantage_api_base') || 'https://api.vantageaiops.com';
+  var token   = localStorage.getItem('vantage_api_key') || '';
+  var qs = '?format=csv&limit=500';
+  if (type) qs += '&event_type=' + encodeURIComponent(type);
+  if (from) qs += '&from='       + encodeURIComponent(from);
+  if (to)   qs += '&to='         + encodeURIComponent(to);
+  // Fetch as blob and trigger download — avoids exposing key in URL
+  fetch(apiBase + '/v1/audit-log' + qs, {
+    headers: { 'Authorization': 'Bearer ' + token }
+  }).then(function(res) {
+    return res.blob();
+  }).then(function(blob) {
+    var url = URL.createObjectURL(blob);
+    var a   = document.createElement('a');
+    a.href  = url;
+    a.download = 'audit-log.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }).catch(function() {});
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Integrations Status
+   ═══════════════════════════════════════════════════════════════════ */
+
+var INTEGRATION_STATUS = [
+  { name: 'Claude Code',        method: 'OTel',        status: 'live' },
+  { name: 'Gemini CLI',         method: 'OTel',        status: 'live' },
+  { name: 'GitHub Copilot',     method: 'OTel',        status: 'live' },
+  { name: 'Codex CLI',          method: 'OTel',        status: 'live' },
+  { name: 'Cline',              method: 'OTel',        status: 'live' },
+  { name: 'Windsurf',           method: 'OTel',        status: 'live' },
+  { name: 'Aider',              method: 'OTel',        status: 'live' },
+  { name: 'GitHub Copilot',     method: 'Billing API', status: 'q2' },
+  { name: 'Cursor',             method: 'Billing API', status: 'q2' },
+  { name: 'OpenAI',             method: 'Billing API', status: 'q2' },
+  { name: 'Anthropic',          method: 'Billing API', status: 'q2' },
+  { name: 'Local file scanner', method: 'CLI',         status: 'q3' },
+  { name: 'ChatGPT web',        method: 'Browser ext', status: 'q3' },
+  { name: 'Claude Console',     method: 'Browser ext', status: 'q3' },
+];
+
+var STATUS_CFG = {
+  live: { dot: 'var(--accent-green)', label: 'Live',    glow: true },
+  q2:   { dot: 'var(--accent-amber)', label: 'Q2 2026', glow: false },
+  q3:   { dot: '#5b8dee',             label: 'Q3 2026', glow: false },
+};
+
+function loadIntegrations() {
+  var grid = document.getElementById('integrationsGrid');
+  if (!grid) return;
+  grid.textContent = '';
+
+  INTEGRATION_STATUS.forEach(function(item) {
+    var cfg = STATUS_CFG[item.status] || STATUS_CFG['q3'];
+
+    var card = document.createElement('div');
+    card.style.cssText = 'background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:10px;';
+
+    var dot = document.createElement('div');
+    dot.style.cssText = 'width:8px;height:8px;border-radius:50%;background:' + cfg.dot + ';flex-shrink:0;' +
+      (cfg.glow ? 'box-shadow:0 0 6px ' + cfg.dot + ';' : '');
+
+    var body = document.createElement('div');
+    body.style.cssText = 'flex:1;min-width:0;';
+
+    var nameEl = document.createElement('div');
+    nameEl.style.cssText = 'font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+    nameEl.textContent = item.name;
+
+    var methodEl = document.createElement('div');
+    methodEl.style.cssText = 'font-size:10px;color:var(--text-muted);';
+    methodEl.textContent = item.method;
+
+    body.appendChild(nameEl);
+    body.appendChild(methodEl);
+
+    var badge = document.createElement('span');
+    badge.style.cssText = 'font-size:10px;padding:2px 8px;border-radius:10px;background:' + cfg.dot + '22;color:' + cfg.dot + ';white-space:nowrap;';
+    badge.textContent = cfg.label;
+
+    card.appendChild(dot);
+    card.appendChild(body);
+    card.appendChild(badge);
+    grid.appendChild(card);
+  });
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Account
