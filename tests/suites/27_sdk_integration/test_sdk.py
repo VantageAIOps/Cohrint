@@ -3,9 +3,9 @@ Test Suite 27 --- SDK Integration Tests (vantage-js-sdk)
 =========================================================
 Suite SK: Validates SDK initialization, event tracking (single + batch),
 privacy modes, session management, cost calculation, error handling,
-cross-platform summary, and OTel metric forwarding.
+cross-platform summary, OTel metric forwarding, and SSE live stream.
 
-Labels: SK.1 - SK.35  (35 checks)
+Labels: SK.1 - SK.38  (38 checks)
 """
 
 import sys
@@ -517,6 +517,94 @@ class TestErrorHandling:
         assert r.status_code == 200
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Section G: SSE Live Stream (KV broadcast path)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestSSEStream:
+    """
+    Verify that events ingested via POST /v1/events appear in the SSE live
+    stream (GET /v1/stream/{orgId}).  This tests the KV broadcast path —
+    the gap that was silent in OTel until fix/otel-live-feed-broadcast.
+    """
+
+    def test_sk36_sse_stream_accessible(self, account):
+        section("G --- SSE Live Stream (KV broadcast path)")
+        api_key, org_id, _ = account
+        url = f"{API_URL}/v1/stream/{org_id}?token={api_key}"
+        # Just open the stream and read the first bytes — expect 200
+        try:
+            r = requests.get(url, stream=True, timeout=6)
+            chk("SK.36 SSE stream endpoint returns 200", r.status_code == 200,
+                f"got {r.status_code}")
+            assert r.status_code == 200
+        finally:
+            try:
+                r.close()
+            except Exception:
+                pass
+
+    def test_sk37_sse_stream_after_event_ingest(self, account):
+        """
+        SK.37-38: Ingest a single event via POST /v1/events (which calls
+        broadcastEvent() → KV), then poll the SSE stream and verify the
+        event arrives within 10 seconds.
+
+        This test would have caught the OTel broadcast gap if it had existed
+        for the analogous OTel ingestion path.
+        """
+        api_key, org_id, _ = account
+        hdrs = get_headers(api_key)
+
+        # Unique marker to distinguish this event
+        unique_model = f"gpt-4o-sse-test-{uuid.uuid4().hex[:8]}"
+        ev = make_event(i=0, model=unique_model, cost=0.017)
+
+        r = requests.post(
+            f"{API_URL}/v1/events",
+            json=ev,
+            headers=hdrs,
+            timeout=10,
+        )
+        chk("SK.37 event ingest returns 200/201", r.status_code in (200, 201),
+            f"got {r.status_code}")
+        assert r.status_code in (200, 201)
+
+        # Allow KV write to propagate
+        time.sleep(2)
+
+        # Poll SSE stream for up to 10 seconds
+        stream_url = f"{API_URL}/v1/stream/{org_id}?token={api_key}"
+        received = None
+        try:
+            with requests.get(stream_url, stream=True, timeout=10) as sr:
+                chk("SK.38 SSE stream opens after ingest", sr.status_code == 200,
+                    f"got {sr.status_code}")
+                if sr.status_code != 200:
+                    return
+                for raw in sr.iter_lines():
+                    if not raw:
+                        continue
+                    line = raw.decode("utf-8") if isinstance(raw, bytes) else raw
+                    if line.startswith("data:"):
+                        try:
+                            received = json.loads(line[5:].strip())
+                            break
+                        except json.JSONDecodeError:
+                            continue
+        except requests.exceptions.Timeout:
+            pass  # No event in window — check below
+
+        chk("SK.38 SSE stream delivers an event after ingest",
+            received is not None,
+            "No data: line received within 10s — KV broadcast may be broken")
+        if received:
+            chk("SK.38b SSE event has provider field",
+                "provider" in received, str(received.keys()))
+            chk("SK.38c SSE event has total_tokens",
+                "total_tokens" in received, str(received.keys()))
+
+
 # ── Runner ────────────────────────────────────────────────────────────────────
 
 def run():
@@ -525,12 +613,10 @@ def run():
     api_key, org_id, cookies = fresh_account(prefix="sdk27run")
     hdrs = get_headers(api_key)
 
-    class FakeHeaders:
-        """Simulate pytest fixture for standalone run."""
-        headers = hdrs
-
+    acct = (api_key, org_id, cookies)
     for cls in [TestSDKInit, TestEventTracking, TestPrivacyModes,
-                TestCostAndAnalytics, TestCrossPlatformOTel, TestErrorHandling]:
+                TestCostAndAnalytics, TestCrossPlatformOTel, TestErrorHandling,
+                TestSSEStream]:
         obj = cls()
         for name in sorted(dir(obj)):
             if name.startswith("test_"):
@@ -538,8 +624,12 @@ def run():
                     method = getattr(obj, name)
                     import inspect
                     params = inspect.signature(method).parameters
-                    if "headers" in params:
+                    if "headers" in params and "account" in params:
+                        method(headers=hdrs, account=acct)
+                    elif "headers" in params:
                         method(headers=hdrs)
+                    elif "account" in params:
+                        method(account=acct)
                     else:
                         method()
                 except Exception as e:

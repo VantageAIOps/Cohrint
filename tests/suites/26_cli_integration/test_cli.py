@@ -4,9 +4,9 @@ Test Suite 26 — CLI Integration Tests (vantage-cli)
 Suite CI: Comprehensive integration tests for the VantageAI CLI including
 setup flow, slash commands (/summary, /budget, /cost, /compare),
 session mode, agent detection, prompt optimization, cost calculation,
-config load/save, pipe mode, and error handling.
+config load/save, pipe mode, error handling, and SSE live stream.
 
-Labels: CI.1 - CI.38  (38 checks)
+Labels: CI.1 - CI.41  (41 checks)
 """
 
 import sys
@@ -15,6 +15,9 @@ import shutil
 import subprocess
 import re
 import os
+import time
+import uuid
+import requests
 from pathlib import Path
 
 import pytest
@@ -24,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from config.settings import API_URL
 from helpers.output import section, chk, ok, fail, info, get_results, reset_results
 from helpers.api import fresh_account, get_headers
+from helpers.data import make_event
 
 CLI_DIR = Path(__file__).parent.parent.parent.parent / "vantage-cli"
 HARNESS = CLI_DIR / "test-helpers.mjs"
@@ -348,17 +352,110 @@ class TestConfigAndErrors:
         assert file_exists(CLI_DIR / "dist" / "index.js")
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Section G: SSE Live Stream (KV broadcast path)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestLiveSSEStream:
+    """
+    Verify that events the CLI tracks via POST /v1/events reach the SSE
+    live stream (GET /v1/stream/{orgId}).
+
+    The CLI calls broadcastEvent() → KV after each ingested event.
+    These tests confirm the full pipeline: ingest → KV broadcast → SSE poll.
+    Gap existed for OTel path until fix/otel-live-feed-broadcast.
+    """
+
+    def test_ci39_sse_stream_accessible(self, account):
+        section("G --- SSE Live Stream (KV broadcast path)")
+        api_key, org_id, _ = account
+        url = f"{API_URL}/v1/stream/{org_id}?token={api_key}"
+        try:
+            r = requests.get(url, stream=True, timeout=6)
+            chk("CI.39 SSE stream endpoint returns 200", r.status_code == 200,
+                f"got {r.status_code}")
+            assert r.status_code == 200
+        finally:
+            try:
+                r.close()
+            except Exception:
+                pass
+
+    def test_ci40_sse_stream_after_cli_event_ingest(self, account):
+        """
+        CI.40-41: Simulate the vantage-cli event tracking call (POST /v1/events),
+        which internally calls broadcastEvent() → KV.  Then poll the SSE stream
+        and verify the event is delivered within 10 seconds.
+        """
+        api_key, org_id, _ = account
+        hdrs = get_headers(api_key)
+
+        # Simulate what vantage-cli posts after a Claude Code session
+        unique_model = f"claude-sonnet-4-6-cli-{uuid.uuid4().hex[:8]}"
+        ev = make_event(i=0, model=unique_model, cost=0.023)
+        ev["source"] = "vantage-cli"
+
+        r = requests.post(
+            f"{API_URL}/v1/events",
+            json=ev,
+            headers=hdrs,
+            timeout=10,
+        )
+        chk("CI.40 CLI event ingest returns 200/201", r.status_code in (200, 201),
+            f"got {r.status_code}")
+        assert r.status_code in (200, 201)
+
+        # Allow KV write to propagate
+        time.sleep(2)
+
+        # Poll SSE stream for up to 10 seconds
+        stream_url = f"{API_URL}/v1/stream/{org_id}?token={api_key}"
+        received = None
+        try:
+            with requests.get(stream_url, stream=True, timeout=10) as sr:
+                chk("CI.41 SSE stream opens after CLI ingest", sr.status_code == 200,
+                    f"got {sr.status_code}")
+                if sr.status_code != 200:
+                    return
+                for raw in sr.iter_lines():
+                    if not raw:
+                        continue
+                    line = raw.decode("utf-8") if isinstance(raw, bytes) else raw
+                    if line.startswith("data:"):
+                        try:
+                            received = json.loads(line[5:].strip())
+                            break
+                        except json.JSONDecodeError:
+                            continue
+        except requests.exceptions.Timeout:
+            pass  # No event in window — check below
+
+        chk("CI.41 SSE stream delivers event after CLI ingest",
+            received is not None,
+            "No data: line received within 10s — KV broadcast may be broken")
+
+
 # ── Runner ────────────────────────────────────────────────────────────────────
 
 def run():
     reset_results()
+    api_key, org_id, cookies = fresh_account(prefix="cli26run")
+    acct = (api_key, org_id, cookies)
+
     for cls in [TestSetupFlow, TestSlashCommands, TestSessionMode,
-                TestPromptOptimization, TestAgentDetection, TestConfigAndErrors]:
+                TestPromptOptimization, TestAgentDetection, TestConfigAndErrors,
+                TestLiveSSEStream]:
         obj = cls()
         for name in sorted(dir(obj)):
             if name.startswith("test_"):
                 try:
-                    getattr(obj, name)()
+                    method = getattr(obj, name)
+                    import inspect
+                    params = inspect.signature(method).parameters
+                    if "account" in params:
+                        method(account=acct)
+                    else:
+                        method()
                 except Exception as e:
                     fail(name, str(e))
 
