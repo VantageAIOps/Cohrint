@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
 import { authMiddleware, adminOnly } from '../middleware/auth';
+import { logAudit } from '../lib/audit';
 
 const admin = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -212,6 +213,14 @@ admin.put('/team-budgets/:team', async (c) => {
     VALUES (?, ?, ?, unixepoch())
     ON CONFLICT(org_id, team) DO UPDATE SET budget_usd = excluded.budget_usd, updated_at = unixepoch()
   `).bind(orgId, team, body.budget_usd).run();
+
+  logAudit(c, {
+    event_type:    'admin_action',
+    event_name:    'admin.team_budget.update',
+    resource_type: 'team_budget',
+    resource_id:   team,
+    metadata:      { budget_usd: body.budget_usd },
+  });
 
   return c.json({ ok: true, team, budget_usd: body.budget_usd });
 });
