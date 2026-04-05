@@ -13,6 +13,9 @@
  *   VANTAGE_API_KEY=vnt_... vantage-proxy
  */
 
+import { readFile, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { startProxyServer } from "./proxy-server.js";
 import { scanAll, ALL_SCANNERS } from "./scanners/index.js";
 import type { PrivacyLevel } from "./privacy.js";
@@ -223,28 +226,56 @@ async function pushScanResults(
   apiBase: string,
 ): Promise<void> {
   console.log("  Pushing scan results to VantageAI...");
-  const orgId = apiKey.split("_")[1] ?? "default";
 
-  const events = result.sessions.map((s) => ({
-    provider: s.provider,
-    model: s.model,
-    prompt_tokens: s.totalInputTokens,
-    completion_tokens: s.totalOutputTokens,
-    cached_tokens: s.totalCacheReadTokens,
-    total_tokens: s.totalInputTokens + s.totalOutputTokens,
-    cost_total_usd: s.totalCostUsd,
-    org_id: orgId,
-    source: `local-scanner/${s.tool}`,
-    session_id: s.sessionId,
-    timestamp: s.startedAt,
-    tags: { tool: s.tool, scanner: "local-file" },
-  }));
+  // Load dedup state — skip turns already uploaded
+  const stateFile = join(homedir(), ".claude", "vantage-state.json");
+  let uploadedIds: Set<string> = new Set();
+  try {
+    const raw = await readFile(stateFile, "utf-8");
+    const state = JSON.parse(raw) as { uploadedIds?: string[] };
+    uploadedIds = new Set(state.uploadedIds ?? []);
+  } catch {
+    // First run — state file doesn't exist yet
+  }
 
-  // Send in batches of 50
-  for (let i = 0; i < events.length; i += 50) {
-    const batch = events.slice(i, i + 50);
+  // Build one event per assistant turn (per message, not per session)
+  const events: Record<string, unknown>[] = [];
+  for (const s of result.sessions) {
+    for (let i = 0; i < s.messages.length; i++) {
+      const m = s.messages[i];
+      const eventId = `${s.sessionId}-${m.timestamp}-${i}`;
+      if (uploadedIds.has(eventId)) continue;
+
+      events.push({
+        event_id:          eventId,
+        provider:          s.provider,
+        model:             m.model,
+        prompt_tokens:     m.inputTokens,
+        completion_tokens: m.outputTokens,
+        cache_tokens:      m.cacheReadTokens,
+        total_tokens:      m.inputTokens + m.outputTokens,
+        total_cost_usd:    m.costUsd,
+        environment:       "local",
+        agent_name:        "claude-code",
+        timestamp:         m.timestamp,
+        tags:              { tool: s.tool, scanner: "local-file", session: s.sessionId },
+      });
+    }
+  }
+
+  if (events.length === 0) {
+    console.log("  Nothing new to upload — all sessions already pushed.\n");
+    return;
+  }
+
+  console.log(`  Uploading ${events.length} new turns (${result.sessions.length} sessions)...`);
+
+  // Send in batches of 500 (API max)
+  const newIds: string[] = [];
+  for (let i = 0; i < events.length; i += 500) {
+    const batch = events.slice(i, i + 500);
     try {
-      const res = await fetch(`${apiBase}/v1/events`, {
+      const res = await fetch(`${apiBase}/v1/events/batch`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -256,11 +287,20 @@ async function pushScanResults(
           sdk_language: "local-scanner",
         }),
       });
-      console.log(`  Sent batch ${Math.floor(i / 50) + 1} (${batch.length} events) → ${res.status}`);
+      if (res.ok) {
+        newIds.push(...batch.map((e) => e.event_id as string));
+        console.log(`  Batch ${Math.floor(i / 500) + 1}: ${batch.length} turns → ${res.status}`);
+      } else {
+        const err = await res.text();
+        console.error(`  Batch ${Math.floor(i / 500) + 1} failed: ${res.status} ${err}`);
+      }
     } catch (err) {
-      console.error(`  Failed to send batch: ${err}`);
+      console.error(`  Network error on batch ${Math.floor(i / 500) + 1}: ${err}`);
     }
   }
 
-  console.log(`  Done — pushed ${events.length} sessions to VantageAI.\n`);
+  // Save updated dedup state
+  const updated = [...uploadedIds, ...newIds];
+  await writeFile(stateFile, JSON.stringify({ uploadedIds: updated, lastUploadAt: new Date().toISOString() }, null, 2));
+  console.log(`  Done — uploaded ${newIds.length} turns. State saved to ${stateFile}\n`);
 }
