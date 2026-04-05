@@ -27,10 +27,11 @@
 20. [Research References & Reading List](#20-research-references--reading-list)
 21. [MCP Server — Tools Reference & Examples](#21-mcp-server--tools-reference--examples)
 22. [Local Proxy Gateway — Privacy-First LLM Tracking](#22-local-proxy-gateway--privacy-first-llm-tracking)
-23. [SDK Privacy Modes](#23-sdk-privacy-modes)
-24. [Cross-Platform OTel Collector (v2)](#24-cross-platform-otel-collector-v2)
-25. [VantageAI CLI — AI Agent Wrapper](#25-vantageai-cli--ai-agent-wrapper)
-26. [Security & Governance](#26-security--governance)
+23. [Claude Code Auto-Tracking](#23-claude-code-auto-tracking)
+24. [SDK Privacy Modes](#24-sdk-privacy-modes)
+25. [Cross-Platform OTel Collector (v2)](#25-cross-platform-otel-collector-v2)
+26. [VantageAI CLI — AI Agent Wrapper](#26-vantageai-cli--ai-agent-wrapper)
+27. [Security & Governance](#27-security--governance)
 
 ---
 
@@ -2229,11 +2230,173 @@ curl http://localhost:4891/health
 
 ---
 
-## 23. SDK Privacy Modes
+## 23. Claude Code Auto-Tracking
+
+### 23.1 Overview
+
+Claude Code writes every session to local JSONL files at `~/.claude/projects/{project-slug}/{session-uuid}.jsonl`. Each assistant message in these files contains the full token breakdown (`input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`) and the model used.
+
+The auto-tracking system uses two mechanisms:
+
+1. **Stop hook** — a Node.js script registered in `~/.claude/settings.json` that runs after every Claude Code response, reads new turns from the JSONL file, and uploads them to `POST /v1/events/batch`.
+2. **Backfill scan** — `vantage-proxy scan --tool claude-code --push` reads all historical JSONL sessions and uploads them in bulk.
+
+Both use a shared dedup state file at `~/.claude/vantage-state.json` to prevent double-uploads.
+
+### 23.2 JSONL File Format
+
+**Path:** `~/.claude/projects/{slug}/{uuid}.jsonl`
+
+**Slug algorithm:** Replace all non-alphanumeric characters with `-`. Example:
+```
+/Users/aman/Documents/my project  →  -Users-aman-Documents-my-project
+```
+
+**Assistant message entry (relevant fields):**
+```json
+{
+  "type": "assistant",
+  "uuid": "abc-123",
+  "sessionId": "session-xyz",
+  "timestamp": "2026-04-05T14:00:00.000Z",
+  "message": {
+    "model": "claude-opus-4-6",
+    "usage": {
+      "input_tokens": 3200,
+      "output_tokens": 180,
+      "cache_read_input_tokens": 6400,
+      "cache_creation_input_tokens": 1100
+    }
+  }
+}
+```
+
+### 23.3 Cost Calculation
+
+Costs are calculated locally from the token breakdown:
+
+| Token type | Field | Price basis |
+|-----------|-------|------------|
+| Regular input | `input_tokens` | Input price per 1M |
+| Cache write | `cache_creation_input_tokens` | Cache price per 1M |
+| Cache read | `cache_read_input_tokens` | Cache price per 1M |
+| Output | `output_tokens` | Output price per 1M |
+
+Pricing table (in `~/.claude/hooks/vantage-track.js`):
+```javascript
+'claude-opus-4-6':   { input: 15.00, output: 75.00, cache: 1.50 }
+'claude-sonnet-4-6': { input:  3.00, output: 15.00, cache: 0.30 }
+'claude-haiku-4-5':  { input:  0.80, output:  4.00, cache: 0.08 }
+```
+
+### 23.4 Stop Hook Implementation
+
+**File:** `~/.claude/hooks/vantage-track.js`
+
+**Registered in** `~/.claude/settings.json`:
+```json
+"hooks": {
+  "Stop": [{
+    "matcher": "",
+    "hooks": [{
+      "type": "command",
+      "command": "VANTAGE_API_KEY=vnt_... node ~/.claude/hooks/vantage-track.js"
+    }]
+  }]
+}
+```
+
+**Behavior:**
+- Reads `~/.claude/vantage-state.json` to load already-uploaded event IDs
+- Finds JSONL files in `~/.claude/projects/{cwd-slug}/`
+- For each new assistant turn (not in state), builds an event and POSTs to `/v1/events/batch`
+- 5-second fetch timeout — if API is slow, hook exits gracefully
+- Dedup state is updated only after a successful `res.ok` response
+- State file is trimmed to 50,000 most recent IDs to prevent unbounded growth
+- **Always exits 0** — hook failures never break Claude Code
+
+**Event shape sent to API:**
+```json
+{
+  "event_id": "{sessionId}-{uuid}",
+  "provider": "anthropic",
+  "model": "claude-opus-4-6",
+  "prompt_tokens": 4300,
+  "completion_tokens": 180,
+  "cache_tokens": 6400,
+  "total_tokens": 4480,
+  "total_cost_usd": 0.0842,
+  "environment": "local",
+  "agent_name": "claude-code",
+  "timestamp": "2026-04-05T14:00:00.000Z",
+  "tags": { "tool": "claude-code", "hook": "stop" }
+}
+```
+
+### 23.5 Backfill Command
+
+Upload all historical Claude Code sessions at once:
+
+```bash
+VANTAGE_API_KEY=vnt_your_key \
+  npx vantageai-local-proxy scan --tool claude-code --push
+```
+
+**What it does:**
+1. Scans all JSONL files under `~/.claude/projects/`
+2. Loads `~/.claude/vantage-state.json` and skips already-uploaded event IDs
+3. Sends new turns in batches of 500 to `POST /v1/events/batch`
+4. Updates the state file after each successful batch
+
+Running this command twice is safe — the dedup state ensures no event is uploaded twice.
+
+### 23.6 Dedup State File
+
+**Path:** `~/.claude/vantage-state.json`
+
+**Format:**
+```json
+{
+  "uploadedIds": ["sessionId-uuid", "sessionId-uuid-2", ...],
+  "lastUploadAt": "2026-04-05T14:22:00.000Z"
+}
+```
+
+**Limits:**
+- Capped at 50,000 entries (oldest trimmed first)
+- Shared between the Stop hook and the backfill scan command
+- If file is corrupt or missing, the system starts fresh (may re-upload recent turns)
+
+### 23.7 Data Flow
+
+```
+Claude Code response
+        │
+        ▼
+~/.claude/projects/{slug}/{uuid}.jsonl   ← written by Claude Code
+        │
+        ▼
+vantage-track.js (Stop hook)
+  - reads new assistant turns
+  - calculates cost locally
+  - deduplicates via ~/.claude/vantage-state.json
+        │
+        ▼
+POST /v1/events/batch                    ← only token counts + model + cost
+        │
+        ▼
+D1 events table → /v1/analytics/* endpoints → Dashboard
+```
+
+**Privacy:** Prompt text, response text, and file contents never leave the machine. Only model name, token counts, calculated cost, and timestamp are sent.
+
+---
+
+## 24. SDK Privacy Modes
 
 For teams using the JS/Python SDK directly (not the local proxy), the SDK now supports privacy modes that control what data is sent to VantageAI.
 
-### 23.1 Configuration
+### 24.1 Configuration
 
 ```javascript
 import { VantageClient, createOpenAIProxy } from "vantageaiops";
@@ -2253,7 +2416,7 @@ const response = await openai.chat.completions.create({
 });
 ```
 
-### 23.2 Privacy Modes
+### 24.2 Privacy Modes
 
 | Mode | `requestPreview` | `responsePreview` | `systemPreview` | `promptHash` | Use Case |
 |------|-------------------|-------------------|-----------------|--------------|----------|
@@ -2261,7 +2424,7 @@ const response = await openai.chat.completions.create({
 | `stats-only` | Stripped | Stripped | Stripped | Stripped | Maximum privacy, compliance |
 | `hashed` | Stripped | Stripped | Stripped | SHA hash kept | Privacy + dedup detection |
 
-### 23.3 Comparison: SDK Privacy vs Local Proxy
+### 24.3 Comparison: SDK Privacy vs Local Proxy
 
 | Feature | SDK with `stats-only` | Local Proxy (`strict`) |
 |---|---|---|
@@ -2276,7 +2439,7 @@ const response = await openai.chat.completions.create({
 
 ---
 
-## 24. Cross-Platform OTel Collector (v2)
+## 25. Cross-Platform OTel Collector (v2)
 
 ### Overview
 
@@ -2388,7 +2551,7 @@ The dashboard (`app.html`) has been restructured to use **only real API data**. 
 - AI Intelligence Layer — removed from sidebar (smart router not yet implemented)
 - Performance percentiles (p50/p95/p99) — requires per-request latency tracking
 
-## 25. VantageAI CLI — AI Agent Wrapper
+## 26. VantageAI CLI — AI Agent Wrapper
 
 The `vantage-cli` package (`vantage-cli/`) is a transparent terminal wrapper for AI coding tools (Claude Code, Codex, Gemini CLI, Aider). It adds zero-latency prompt optimization and cost tracking to any AI agent without changing the user's workflow.
 
@@ -2454,7 +2617,7 @@ The `vantage-cli` package (`vantage-cli/`) is a transparent terminal wrapper for
 
 **Test coverage:** `tests/suites/21_vantage_cli/` (suite 21) — 38+ checks (optimizer, pricing, pipe mode, config, security deny rules, dashboard integration, anomaly detection)
 
-## 26. Security & Governance
+## 27. Security & Governance
 
 ### Audit Logging
 All security-critical actions are logged to the `audit_events` table:
