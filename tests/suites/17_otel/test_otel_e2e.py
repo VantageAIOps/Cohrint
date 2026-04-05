@@ -430,8 +430,8 @@ def test_developer_detail(headers, emails):
 
 
 def test_live_feed(headers):
-    """Verify live OTel event feed."""
-    section("XP.F — Live Event Feed")
+    """Verify live OTel event feed via DB (otel_events table)."""
+    section("XP.F — Live Event Feed (DB path)")
 
     r = requests.get(f"{API_URL}/v1/cross-platform/live?limit=50", headers=headers, timeout=15)
     chk("XP.54 Live feed → 200", r.status_code == 200, f"got {r.status_code}")
@@ -453,6 +453,124 @@ def test_live_feed(headers):
     r2 = requests.get(f"{API_URL}/v1/cross-platform/live?limit=3", headers=headers, timeout=15)
     events2 = r2.json().get("events", [])
     chk("XP.61 Limit=3 returns <= 3", len(events2) <= 3, f"count={len(events2)}")
+
+
+def test_sse_stream_after_otel_ingest(headers, api_key, org_id):
+    """
+    XP.F2 — Verify OTel metrics broadcast to the SSE/KV stream.
+
+    This is the test that was MISSING and allowed the broadcast gap to go
+    undetected. /cross-platform/live reads otel_events DB (always worked).
+    /v1/stream/{orgId} reads KV (was never populated from OTel — now fixed).
+
+    Test: ingest OTel metrics → wait for KV TTL → poll SSE stream → verify event.
+    """
+    section("XP.F2 — SSE Stream After OTel Ingest (KV broadcast path)")
+
+    # Unique model so we can identify this specific ingest in the stream
+    unique_model = f"claude-sonnet-4-6-test-{uuid.uuid4().hex[:8]}"
+    expected_tokens = 777
+    expected_cost = 0.042
+
+    # Ingest OTel metrics that should trigger KV broadcast
+    payload = {
+        "resourceMetrics": [{
+            "resource": {
+                "attributes": resource_attrs(
+                    "claude-code", f"sse-test-{uuid.uuid4().hex[:6]}@test.vantage"
+                )
+            },
+            "scopeMetrics": [{
+                "metrics": [
+                    {
+                        "name": "claude_code.token.usage",
+                        "sum": {
+                            "dataPoints": [{
+                                "attributes": [
+                                    {"key": "type", "value": {"stringValue": "input"}},
+                                    {"key": "model", "value": {"stringValue": unique_model}},
+                                ],
+                                "asInt": str(expected_tokens),
+                                "startTimeUnixNano": ts_nano(),
+                                "timeUnixNano": ts_nano(),
+                            }],
+                            "aggregationTemporality": 2, "isMonotonic": True,
+                        }
+                    },
+                    {
+                        "name": "claude_code.cost.usage",
+                        "sum": {
+                            "dataPoints": [{
+                                "attributes": [
+                                    {"key": "model", "value": {"stringValue": unique_model}},
+                                ],
+                                "asDouble": expected_cost,
+                                "startTimeUnixNano": ts_nano(),
+                                "timeUnixNano": ts_nano(),
+                            }],
+                            "aggregationTemporality": 2, "isMonotonic": True,
+                        }
+                    }
+                ]
+            }]
+        }]
+    }
+
+    r_ingest = requests.post(
+        f"{API_URL}/v1/otel/v1/metrics",
+        json=payload,
+        headers=headers,
+        timeout=15,
+    )
+    chk("XP.62a OTel ingest accepted (200)", r_ingest.status_code == 200,
+        f"status={r_ingest.status_code}, body={r_ingest.text[:200]}")
+    if r_ingest.status_code != 200:
+        return
+
+    # Give KV broadcast time to propagate (worker is async, KV TTL is 60s)
+    time.sleep(3)
+
+    # Poll the SSE stream endpoint — this is what the dashboard live feed reads.
+    # Uses ?token=vnt_... auth (legacy bearer in query param, accepted by stream.ts).
+    # The worker polls KV every 2s and closes after 25s; we read with streaming=True
+    # and parse the first 'data:' line.
+    stream_url = f"{API_URL}/v1/stream/{org_id}?token={api_key}"
+    sse_event = None
+    try:
+        with requests.get(stream_url, stream=True, timeout=8) as r_sse:
+            chk("XP.62b SSE stream → 200", r_sse.status_code == 200,
+                f"status={r_sse.status_code}")
+            if r_sse.status_code != 200:
+                return
+            for raw_line in r_sse.iter_lines(chunk_size=64):
+                line = raw_line.decode("utf-8") if isinstance(raw_line, bytes) else raw_line
+                if line.startswith("data:"):
+                    try:
+                        sse_event = json.loads(line[5:].strip())
+                    except json.JSONDecodeError:
+                        pass
+                    break  # got first data event, stop reading
+    except requests.exceptions.Timeout:
+        # Timeout means KV was empty — the broadcast didn't fire
+        pass
+
+    chk("XP.62c SSE stream has data event after OTel ingest",
+        sse_event is not None,
+        "no data: line received — OTel → KV broadcast is broken")
+    if not sse_event:
+        return
+
+    chk("XP.62d SSE event has provider", "provider" in sse_event, str(sse_event.keys()))
+    chk("XP.62e SSE event has model", "model" in sse_event, str(sse_event.keys()))
+    chk("XP.62f SSE event has total_tokens > 0",
+        sse_event.get("total_tokens", 0) > 0,
+        f"total_tokens={sse_event.get('total_tokens')}")
+    chk("XP.62g SSE event has cost_total_usd > 0",
+        sse_event.get("cost_total_usd", 0) > 0,
+        f"cost_total_usd={sse_event.get('cost_total_usd')}")
+    chk("XP.62h SSE event has ts (timestamp)",
+        "ts" in sse_event,
+        str(sse_event.keys()))
 
 
 def test_models_api(headers):
@@ -546,6 +664,9 @@ def run():
     test_developer_data(headers, emails)
     test_developer_detail(headers, emails)
     test_live_feed(headers)
+    # XP.F2: tests the SSE/KV broadcast path — the gap that caused the live feed
+    # to silently drop all OTel events while /cross-platform/live kept passing.
+    test_sse_stream_after_otel_ingest(headers, api_key, org_id)
     test_models_api(headers)
     test_connections_api(headers)
     test_budget_api(headers)
