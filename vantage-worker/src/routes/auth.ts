@@ -2,7 +2,24 @@ import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
 import { authMiddleware, adminOnly, sha256hex } from '../middleware/auth';
 import { sendEmail, memberInviteEmail, keyRecoveryEmail } from '../lib/email';
-import { logAudit } from './admin.js';
+// TODO(Task 5): replace with import { logAudit } from '../lib/audit' and update call sites
+async function logAudit(
+  db: D1Database,
+  orgId: string,
+  action: string,
+  actorEmail: string,
+  actorRole: string,
+  resource: string = '',
+): Promise<void> {
+  try {
+    await db.prepare(`
+      INSERT INTO audit_events (org_id, actor_email, actor_role, action, resource, detail, ip_address)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(orgId, actorEmail, actorRole, action, resource, '', '').run();
+  } catch {
+    // never block main operation
+  }
+}
 
 const auth = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 

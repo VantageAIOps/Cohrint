@@ -69,6 +69,7 @@ import { platform }   from './routes/platform';
 import { optimizer }  from './routes/optimizer';
 import { otel }       from './routes/otel';
 import { crossplatform } from './routes/crossplatform';
+import { auditlog }    from './routes/auditlog';
 import { runAnomalyDetection } from './lib/anomaly';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -99,6 +100,7 @@ app.route('/v1/platform',   platform);
 app.route('/v1/optimizer',  optimizer);
 app.route('/v1/otel',       otel);      // OpenTelemetry collector (Claude Code, Copilot, Gemini CLI)
 app.route('/v1/cross-platform', crossplatform); // Cross-platform cost dashboard API
+app.route('/v1/audit-log',      auditlog);
 
 // ── 404 fallback ──────────────────────────────────────────────────────────────
 app.notFound((c) => c.json({
