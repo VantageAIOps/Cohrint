@@ -2,24 +2,7 @@ import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
 import { authMiddleware, adminOnly, sha256hex } from '../middleware/auth';
 import { sendEmail, memberInviteEmail, keyRecoveryEmail } from '../lib/email';
-// TODO(Task 5): replace with import { logAudit } from '../lib/audit' and update call sites
-async function logAudit(
-  db: D1Database,
-  orgId: string,
-  action: string,
-  actorEmail: string,
-  actorRole: string,
-  resource: string = '',
-): Promise<void> {
-  try {
-    await db.prepare(`
-      INSERT INTO audit_events (org_id, actor_email, actor_role, action, resource, detail, ip_address)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).bind(orgId, actorEmail, actorRole, action, resource, '', '').run();
-  } catch {
-    // never block main operation
-  }
-}
+import { logAudit } from '../lib/audit';
 
 const auth = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -182,9 +165,12 @@ auth.post('/recover', async (c) => {
       }
     }
     // Audit log: recovery attempted
-    c.executionCtx.waitUntil(
-      logAudit(c.env.DB, resolvedOrgId, 'account.recovery_attempted', email, '', '')
-    );
+    logAudit(c, {
+      event_type:    'auth',
+      event_name:    'auth.account_recovery_attempted',
+      resource_type: 'member',
+      resource_id:   email,
+    }, { orgId: resolvedOrgId });
   } catch (err) {
     console.error('[recover] D1/email error — returning 200 to avoid leaking info', err);
     // Still return 200 — don't expose internal errors to caller
@@ -306,17 +292,13 @@ auth.post('/members', authMiddleware, adminOnly, async (c) => {
     sendEmail(c.env.RESEND_API_KEY, { to: email, subject, html })
   );
 
-  // Audit log: member invited — extract actor from session context
-  const inviterId = c.get('memberId');
-  let inviterEmail = 'owner';
-  if (inviterId) {
-    const inviter = await c.env.DB.prepare('SELECT email FROM org_members WHERE id = ?').bind(inviterId).first<{ email: string }>();
-    if (inviter?.email) inviterEmail = inviter.email;
-  }
-  const inviterRole = c.get('role') ?? '';
-  c.executionCtx.waitUntil(
-    logAudit(c.env.DB, orgId, 'member.invited', inviterEmail, inviterRole, email)
-  );
+  logAudit(c, {
+    event_type:    'admin_action',
+    event_name:    'admin_action.member_added',
+    resource_type: 'member',
+    resource_id:   email,
+    metadata:      { role },
+  });
 
   return c.json({
     ok:         true,
@@ -377,17 +359,12 @@ auth.delete('/members/:id', authMiddleware, adminOnly, async (c) => {
     'DELETE FROM org_members WHERE id = ? AND org_id = ?'
   ).bind(memberId, orgId).run();
 
-  // Audit log: member revoked — extract actor from session context
-  const deleterId = c.get('memberId');
-  let deleterEmail = 'owner';
-  if (deleterId) {
-    const deleter = await c.env.DB.prepare('SELECT email FROM org_members WHERE id = ?').bind(deleterId).first<{ email: string }>();
-    if (deleter?.email) deleterEmail = deleter.email;
-  }
-  const deleterRole = c.get('role') ?? '';
-  c.executionCtx.waitUntil(
-    logAudit(c.env.DB, orgId, 'member.revoked', deleterEmail, deleterRole, memberId)
-  );
+  logAudit(c, {
+    event_type:    'admin_action',
+    event_name:    'admin_action.member_removed',
+    resource_type: 'member',
+    resource_id:   memberId,
+  });
 
   return c.json({ ok: true });
 });
@@ -426,17 +403,12 @@ auth.post('/members/:id/rotate', authMiddleware, adminOnly, async (c) => {
     sendEmail(c.env.RESEND_API_KEY, { to: member.email, subject: `[VantageAI] Your API key has been rotated`, html: rotateHtml })
   );
 
-  // Audit log: member key rotated — extract actor from session context
-  const rotatorId = c.get('memberId');
-  let rotatorEmail = 'owner';
-  if (rotatorId) {
-    const rotator = await c.env.DB.prepare('SELECT email FROM org_members WHERE id = ?').bind(rotatorId).first<{ email: string }>();
-    if (rotator?.email) rotatorEmail = rotator.email;
-  }
-  const rotatorRole = c.get('role') ?? '';
-  c.executionCtx.waitUntil(
-    logAudit(c.env.DB, orgId, 'key.rotated', rotatorEmail, rotatorRole, memberId)
-  );
+  logAudit(c, {
+    event_type:    'admin_action',
+    event_name:    'admin_action.key_rotated',
+    resource_type: 'member',
+    resource_id:   memberId,
+  });
 
   return c.json({
     ok:        true,
@@ -623,11 +595,11 @@ auth.post('/rotate', authMiddleware, async (c) => {
     'UPDATE orgs SET api_key_hash = ?, api_key_hint = ? WHERE id = ?'
   ).bind(keyHash, keyHint, orgId).run();
 
-  // Audit log: owner key rotated
-  const ownerEmail = '';
-  c.executionCtx.waitUntil(
-    logAudit(c.env.DB, orgId, 'owner.key.rotated', ownerEmail, role)
-  );
+  logAudit(c, {
+    event_type:    'admin_action',
+    event_name:    'admin_action.owner_key_rotated',
+    resource_type: 'org',
+  });
 
   return c.json({
     ok:      true,
