@@ -253,7 +253,7 @@ async function pushScanResults(
         prompt_tokens:     m.inputTokens,
         completion_tokens: m.outputTokens,
         cache_tokens:      m.cacheReadTokens,
-        total_tokens:      m.inputTokens + m.outputTokens,
+        total_tokens:      m.inputTokens + m.outputTokens + m.cacheCreationTokens,
         total_cost_usd:    m.costUsd,
         environment:       "local",
         agent_name:        "claude-code",
