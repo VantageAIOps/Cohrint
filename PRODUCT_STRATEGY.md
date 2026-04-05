@@ -134,7 +134,8 @@ Why existing tools fail:
 | **Gemini web** | ❌ | ❌ | ✅ | ✅ | **2 sources** |
 | **Custom API code** | ✅ | — | ✅ | — | **2 sources** |
 
-**Result: 100% coverage. Zero gaps.**
+**Current coverage:** OTel real-time tracking across 10+ tools (live).
+**Roadmap:** Billing API connectors (Q2 2026), local file scanner + browser extension (Q3 2026).
 
 ---
 
