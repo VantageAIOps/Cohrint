@@ -511,6 +511,24 @@ otel.post('/v1/metrics', async (c) => {
       console.error('[otel] D1 batch insert error:', err);
       return c.json({ error: 'Failed to store metrics' }, 500);
     }
+
+    // Broadcast the most recent token record to KV so the SSE live feed picks it up
+    const latest = tokenRecords[tokenRecords.length - 1];
+    if (latest) {
+      try {
+        await c.env.KV.put(`stream:${orgId}:latest`, JSON.stringify({
+          provider: latest.provider,
+          model: latest.model,
+          total_tokens: (latest.input_tokens ?? 0) + (latest.output_tokens ?? 0),
+          cost_total_usd: latest.cost_usd,
+          latency_ms: latest.latency_ms ?? 0,
+          team: latest.team,
+          ts: Date.now(),
+        }), { expirationTtl: 60 });
+      } catch {
+        // KV unavailable — event still in D1, SSE broadcast skipped
+      }
+    }
   }
 
   const elapsed = Date.now() - startMs;
@@ -601,6 +619,23 @@ otel.post('/v1/logs', async (c) => {
           eventCount++;
         } catch {
           // otel_events table may not exist yet — non-critical
+        }
+
+        // Broadcast api_request events to KV so the SSE live feed picks them up
+        if (eventName === 'api_request' || eventName === 'claude_code.api_request') {
+          try {
+            await c.env.KV.put(`stream:${orgId}:latest`, JSON.stringify({
+              provider,
+              model,
+              total_tokens: inputTokens + outputTokens,
+              cost_total_usd: costUsd,
+              latency_ms: durationMs,
+              team: getAttr(resAttrs, 'team.id'),
+              ts: Date.now(),
+            }), { expirationTtl: 60 });
+          } catch {
+            // KV unavailable — non-critical
+          }
         }
       }
     }
