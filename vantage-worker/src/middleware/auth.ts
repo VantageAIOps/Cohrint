@@ -1,5 +1,6 @@
 import { Context, Next } from 'hono';
 import { Bindings, Variables } from '../types';
+import { logAudit, logAuditRaw } from '../lib/audit';
 
 // ── SHA-256 helper ────────────────────────────────────────────────────────────
 export async function sha256hex(text: string): Promise<string> {
@@ -67,6 +68,7 @@ export async function authMiddleware(
         c.header('Retry-After', String(retryAt - Math.floor(Date.now() / 1000)));
         return c.json({ error: 'Rate limit exceeded', retry_after: retryAt }, 429);
       }
+      logAudit(c, { event_type: 'auth', event_name: 'auth.login', resource_type: 'session' });
       return await next();
     }
     // Expired / invalid session — fall through to API key check
@@ -77,6 +79,12 @@ export async function authMiddleware(
   const apiKey = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
 
   if (!apiKey || !apiKey.startsWith('vnt_')) {
+    const ip = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For') ?? '';
+    logAuditRaw(c.env.DB, c.executionCtx, ip, 'unknown', 'unknown', 'unknown', {
+      event_type: 'auth',
+      event_name: 'auth.failed',
+      metadata: { reason: 'missing_or_malformed_key', path: c.req.path },
+    });
     return c.json({ error: 'Missing or invalid API key. Expected: Bearer vnt_...' }, 401);
   }
 
@@ -106,6 +114,13 @@ export async function authMiddleware(
     ).bind(hash).first<{ id: string; org_id: string; role: string; scope_team: string | null }>();
 
     if (!member) {
+      const ip = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For') ?? '';
+      logAuditRaw(c.env.DB, c.executionCtx, ip, orgId || 'unknown',
+        `key:${hash.substring(0, 8)}`, 'unknown', {
+          event_type: 'auth',
+          event_name: 'auth.failed',
+          metadata: { reason: 'key_not_found', path: c.req.path },
+        });
       return c.json({ error: 'API key not found. Sign up at vantageaiops.com' }, 401);
     } else {
       c.set('orgId',     member.org_id);
@@ -126,6 +141,7 @@ export async function authMiddleware(
     return c.json({ error: 'Rate limit exceeded', retry_after: retryAt }, 429);
   }
 
+  logAudit(c, { event_type: 'auth', event_name: 'auth.login', resource_type: 'api_key' });
   return await next();
 }
 
