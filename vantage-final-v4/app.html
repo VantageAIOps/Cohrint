@@ -2565,7 +2565,33 @@ function signOut() {
 function loadConnectedTools() {
   apiFetch('/v1/cross-platform/connections').catch(function() { return null; }).then(function(data) {
     var container = document.getElementById('connectedTools');
-    var connections = (data && data.connections) || (data && data.data) || [];
+
+    // API returns { billing_connections: [...], otel_sources: [...] }
+    // Build a unified list: OTel sources (active data feeds) + billing connections
+    var connections = [];
+    var now = Date.now();
+    var STALE_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+    // OTel sources: treat as live if data arrived in the last 24h
+    var otelSources = (data && data.otel_sources) || [];
+    otelSources.forEach(function(s) {
+      var lastMs = s.last_data_at ? new Date(s.last_data_at.replace(' ', 'T') + 'Z').getTime() : 0;
+      connections.push({
+        provider: s.provider,
+        status: (lastMs && (now - lastMs) < STALE_MS) ? 'live' : 'pending',
+        source: 'otel',
+      });
+    });
+
+    // Billing connections: use their own status field
+    var billingConns = (data && data.billing_connections) || [];
+    billingConns.forEach(function(b) {
+      // Avoid duplicate if OTel already listed this provider
+      var already = connections.some(function(c) { return c.provider === b.provider; });
+      if (!already) {
+        connections.push({ provider: b.provider, status: b.status || 'off', source: 'billing' });
+      }
+    });
 
     container.textContent = '';
 
