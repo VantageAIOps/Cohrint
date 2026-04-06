@@ -36,8 +36,14 @@ export class Tracker {
   private sentIds = new Set<string>();   // confirmed-delivered IDs
   private queuedIds = new Set<string>(); // IDs currently in the send queue
   private exitRegistered = false;
-  private lastSavedTokens = 0;
-  private lastPromptText = "";
+  // Queue of submitted prompt texts — consumed FIFO on agent:completed.
+  // Using a queue (not a scalar) handles session mode where N prompts are
+  // submitted before a single agent:completed fires at session end.
+  private promptTexts: string[] = [];
+  // Accumulated optimization savings since the last agent:completed.
+  // Scalar lastSavedTokens only captured the last prompt's savings;
+  // in session mode all intermediate prompts' savings were dropped.
+  private pendingSavedTokens = 0;
 
   constructor(config: TrackerConfig) {
     this.config = config;
@@ -57,11 +63,13 @@ export class Tracker {
 
   private setupListeners(): void {
     bus.on("prompt:optimized", (data) => {
-      this.lastSavedTokens = data.savedTokens;
+      // Accumulate — in session mode multiple prompts optimize before
+      // the single agent:completed fires at session end.
+      this.pendingSavedTokens += data.savedTokens;
     });
 
     bus.on("prompt:submitted", (data) => {
-      this.lastPromptText = data.prompt;
+      this.promptTexts.push(data.prompt);
     });
 
     bus.on("agent:completed", (data) => {
@@ -75,16 +83,18 @@ export class Tracker {
         // Agent failed with no output — don't record $0 cost silently
         return;
       }
-      // Use actual prompt text for input tokens when available
-      const inputTokens = this.lastPromptText
-        ? countTokens(this.lastPromptText)
-        : Math.ceil(outputTokens * 0.25); // Fallback: ~25% of output (more realistic)
-      this.lastPromptText = "";
+      // Sum tokens across all prompts submitted since last agent:completed.
+      // One-shot: 1 entry → same as before.
+      // Session mode: N entries → correct total instead of last-prompt-only.
+      const inputTokens = this.promptTexts.length > 0
+        ? this.promptTexts.reduce((sum, t) => sum + countTokens(t), 0)
+        : Math.ceil(outputTokens * 0.25);
+      this.promptTexts = [];
       const costUsd = calculateCost(model, inputTokens, outputTokens);
 
-      // Calculate saved cost from optimization
-      const savedTokens = this.lastSavedTokens;
-      this.lastSavedTokens = 0; // reset for next prompt
+      // Consume all accumulated optimization savings since last agent:completed.
+      const savedTokens = this.pendingSavedTokens;
+      this.pendingSavedTokens = 0;
       const savedCost = savedTokens > 0 ? calculateCost(model, savedTokens, 0) : 0;
 
       const sessionId = data.sessionId;

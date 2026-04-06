@@ -57,7 +57,10 @@ class Session {
     });
 
     bus.on("prompt:optimized", (data) => {
-      this.currentSavedTokens = data.savedTokens;
+      // Accumulate — in session mode multiple prompts emit prompt:optimized
+      // before the single cost:calculated fires at session end.
+      // Overwriting with = meant history records only showed last prompt's savings.
+      this.currentSavedTokens += data.savedTokens;
       this.state.totalSavedTokens += data.savedTokens;
     });
 

@@ -52,8 +52,13 @@ function checkAnomaly(cost: import("./event-bus.js").VantageEvents["cost:calcula
   checkCostAnomaly(cost.costUsd, priorTotal, priorCount);
 }
 
+// Tracks the active agent so buildSessionMetrics can populate agent/model.
+// Updated whenever the REPL switches agents or main() resolves the active agent.
+let _activeAgentName = "";
+
 function buildSessionMetrics(): SessionMetrics {
   const sess = getSession();
+  const agent = _activeAgentName ? getAgent(_activeAgentName) : undefined;
   return {
     totalInputTokens: sess.totalInputTokens,
     totalOutputTokens: sess.totalOutputTokens,
@@ -61,6 +66,8 @@ function buildSessionMetrics(): SessionMetrics {
     promptCount: sess.promptCount,
     totalCostUsd: sess.totalCostUsd,
     sessionStartTime: sess.startedAt,
+    agent: _activeAgentName || undefined,
+    model: agent?.defaultModel,
   };
 }
 
@@ -378,6 +385,7 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
   printBanner();
 
   let currentAgent = getAgent(config.defaultAgent) ?? ALL_AGENTS[0];
+  _activeAgentName = currentAgent.name;
   let activeSession: AgentSession | null = null;
 
   // Track per-agent prompt count and session ID for --resume support
@@ -588,6 +596,7 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
           const agent = getAgent(name);
           if (agent) {
             currentAgent = agent;
+            _activeAgentName = agent.name;
             console.log(green(`  Default agent set to ${agent.displayName}`));
           } else {
             console.log(red(`  Unknown agent: ${name}`));
@@ -840,6 +849,7 @@ async function main(): Promise<void> {
   // Override agent from flag
   const agentName = flags.agent ?? config.defaultAgent;
   const agent = getAgent(agentName) ?? ALL_AGENTS[0];
+  _activeAgentName = agent.name;
 
   // Build extra flags for the agent from named flags + unknown passthrough flags
   const extraAgentFlags: string[] = [...agentFlags];
