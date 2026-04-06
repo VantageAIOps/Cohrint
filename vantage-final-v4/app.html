@@ -250,6 +250,31 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
   50% { opacity: 0.4; box-shadow: none; }
 }
 
+@keyframes skelshimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+
+.skel {
+  color: transparent !important;
+  background: linear-gradient(90deg, var(--bg-card) 25%, var(--border) 50%, var(--bg-card) 75%);
+  background-size: 400px 100%;
+  animation: skelshimmer 1.4s ease infinite;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+/* ── Offline banner ── */
+#offlineBanner {
+  display: none;
+  position: fixed; top: 0; left: 0; right: 0;
+  background: #92400e; color: #fef3c7;
+  text-align: center; font-size: 13px; font-weight: 500;
+  padding: 8px 16px; z-index: 99999;
+  animation: fadeUp 0.3s ease;
+}
+#offlineBanner.visible { display: block; }
+
 #theme-toggle {
   background: none; border: 1px solid var(--border); border-radius: 6px;
   padding: 4px 10px; cursor: pointer; font-size: 14px;
@@ -598,6 +623,8 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
 </style>
 </head>
 <body>
+
+<div id="offlineBanner">&#9888; You are offline &mdash; showing last cached data. Dashboard will refresh when reconnected.</div>
 
 <div class="app">
   <!-- ══════════ Sidebar ══════════ -->
@@ -1227,6 +1254,8 @@ var period = 30;
 var activeView = 'overview';
 var activeToolFilter = 'all';
 var _sseSource = null;
+var _isOnline = navigator.onLine;
+var _API_CACHE_TTL = 5 * 60 * 1000; // 5 min cache TTL
 
 var TOOL_NAMES = {
   anthropic: 'Claude Code', openai: 'GitHub Copilot', google: 'Gemini CLI',
@@ -1240,6 +1269,43 @@ var TOOL_COLORS = {
   cursor: '#f472b6', windsurf: '#fb923c', aider: '#a78bfa',
   codex: '#22d3ee', default: '#94a3b8'
 };
+
+// ── Offline detection ──
+function _setOnlineBanner(online) {
+  var banner = document.getElementById('offlineBanner');
+  if (!banner) return;
+  if (online) {
+    banner.classList.remove('visible');
+    // Refresh current view when we come back online
+    if (activeView) {
+      var switchEl = document.querySelector('button.sb-item.active');
+      if (switchEl) setTimeout(function() { nav(activeView, switchEl); }, 300);
+    }
+  } else {
+    banner.classList.add('visible');
+  }
+}
+window.addEventListener('online',  function() { _isOnline = true;  _setOnlineBanner(true);  });
+window.addEventListener('offline', function() { _isOnline = false; _setOnlineBanner(false); });
+
+// ── Skeleton helpers ──
+var _KPI_IDS = [
+  'kpiTotalSpend','kpiTotalSpendSub','kpiCostliestTool','kpiCostliestToolSub',
+  'kpiActiveDev','kpiActiveDevSub','kpiTokenUsage','kpiTokenUsageSub','kpiCacheSavings','kpiCacheSavingsSub',
+  'spendTotal','spendTotalSub','spendTopModel','spendTopModelSub','spendTotalReqs','spendTotalReqsSub','spendAvgCost',
+];
+function _skelOn() {
+  _KPI_IDS.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) { el.classList.add('skel'); el._skelText = el.textContent; el.textContent = '\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0'; }
+  });
+}
+function _skelOff() {
+  _KPI_IDS.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.classList.remove('skel');
+  });
+}
 
 // ── XSS-safe HTML escaping ──
 function esc(s) {
@@ -1287,17 +1353,64 @@ function toolInitial(provider) {
    Auth
    ═══════════════════════════════════════════════════════════════════════════ */
 
+// ── API cache (localStorage) ──
+function _cacheKey(path) { return 'vantage_cache:' + path; }
+function _cacheGet(path) {
+  try {
+    var raw = localStorage.getItem(_cacheKey(path));
+    if (!raw) return null;
+    var entry = JSON.parse(raw);
+    if (Date.now() - entry.ts > _API_CACHE_TTL) return null;
+    return entry.data;
+  } catch { return null; }
+}
+function _cacheSet(path, data) {
+  try { localStorage.setItem(_cacheKey(path), JSON.stringify({ ts: Date.now(), data: data })); } catch { /* storage full */ }
+}
+function _cacheGetStale(path) {
+  try {
+    var raw = localStorage.getItem(_cacheKey(path));
+    return raw ? JSON.parse(raw).data : null;
+  } catch { return null; }
+}
+
 function apiFetch(path, opts) {
   opts = opts || {};
+  var isRead = !opts.method || opts.method === 'GET';
   var headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+
+  // Serve from fresh cache first (GET only)
+  if (isRead) {
+    var cached = _cacheGet(path);
+    if (cached) return Promise.resolve(cached);
+  }
+
   return fetch(API_BASE + path, Object.assign({}, opts, { headers: headers, credentials: 'include' }))
     .then(function(res) {
       if (res.status === 401) {
         window.location.replace('/auth.html?next=' + encodeURIComponent(window.location.pathname));
         return;
       }
+      if (res.status === 429) {
+        var retryAfter = parseInt(res.headers.get('Retry-After') || '60', 10);
+        throw new Error('Rate limited. Retry in ' + retryAfter + 's');
+      }
       if (!res.ok) throw new Error('API ' + res.status);
-      return res.json();
+      return res.json().then(function(data) {
+        if (isRead && data) _cacheSet(path, data);
+        return data;
+      });
+    })
+    .catch(function(err) {
+      // Network failure or fetch error — serve stale cache for reads
+      if (isRead) {
+        var stale = _cacheGetStale(path);
+        if (stale) {
+          console.warn('[vantage] offline/error for ' + path + ', serving stale cache');
+          return stale;
+        }
+      }
+      throw err;
     });
 }
 
@@ -1399,20 +1512,27 @@ function selectToolTab(provider) {
 var _dailyChart = null;
 
 function loadOverview() {
+  _skelOn();
   Promise.all([
-    apiFetch('/v1/cross-platform/summary?days=' + period),
-    apiFetch('/v1/cross-platform/developers?days=' + period),
-    apiFetch('/v1/cross-platform/live?limit=30'),
+    apiFetch('/v1/cross-platform/summary?days=' + period).catch(function() { return null; }),
+    apiFetch('/v1/cross-platform/developers?days=' + period).catch(function() { return null; }),
+    apiFetch('/v1/cross-platform/live?limit=30').catch(function() { return null; }),
     apiFetch('/v1/analytics/kpis?period=' + period).catch(function() { return null; }),
     apiFetch('/v1/analytics/timeseries?period=' + period).catch(function() { return null; }),
   ]).then(function(results) {
+    _skelOff();
     var summary = results[0];
     var devs = results[1];
     var live = results[2];
     var kpis = results[3];
     var timeseries = results[4];
 
-    if (!summary) return;
+    if (!summary) {
+      document.getElementById('kpiTotalSpend').textContent = 'Error';
+      document.getElementById('kpiTotalSpendSub').textContent = 'Failed to load \u2014 retrying...';
+      setTimeout(loadOverview, 8000);
+      return;
+    }
 
     buildToolTabs(summary);
 
@@ -1493,7 +1613,12 @@ function loadOverview() {
     startSSE();
 
   }).catch(function(e) {
+    _skelOff();
     console.error('[vantage] overview error:', e);
+    var isRateLimit = e && e.message && e.message.indexOf('Rate limit') !== -1;
+    document.getElementById('kpiTotalSpend').textContent = isRateLimit ? 'Rate limited' : 'Error';
+    document.getElementById('kpiTotalSpendSub').textContent = isRateLimit ? e.message : 'Network error \u2014 retrying in 8s';
+    setTimeout(loadOverview, 8000);
   });
 }
 
@@ -1894,12 +2019,14 @@ var _spendChart = null;
 var _teamPieChart = null;
 
 function loadSpend() {
+  _skelOn();
   Promise.all([
     apiFetch('/v1/analytics/timeseries?period=' + period).catch(function() { return null; }),
     apiFetch('/v1/analytics/models?period=' + period).catch(function() { return null; }),
     apiFetch('/v1/analytics/teams?period=' + period).catch(function() { return null; }),
     apiFetch('/v1/cross-platform/summary?days=' + period).catch(function() { return null; }),
   ]).then(function(results) {
+    _skelOff();
     var timeseries = results[0];
     var models = results[1];
     var teams = results[2];
@@ -2240,7 +2367,7 @@ function loadMembers() {
       var td = document.createElement('td');
       td.colSpan = 6;
       td.className = 'empty-state';
-      td.textContent = 'No members yet';
+      td.textContent = members === null ? 'Failed to load members \u2014 check your connection' : 'No members yet. Invite your team above.';
       tr.appendChild(td);
       tbody.appendChild(tr);
     } else {
@@ -2436,7 +2563,7 @@ function loadBudgets() {
       var td = document.createElement('td');
       td.colSpan = 3;
       td.className = 'empty-state';
-      td.textContent = 'No team budgets configured';
+      td.textContent = budgets === null ? 'Failed to load budgets \u2014 check your connection' : 'No team budgets configured. Add one above.';
       tr.appendChild(td);
       tbody.appendChild(tr);
     } else {
@@ -2553,7 +2680,7 @@ function saveSlackConfig() {
 
 function testSlack() {
   var orgId = _session ? ((_session.user || _session).org_id || '') : '';
-  apiFetch('/v1/alerts/' + orgId + '/test', { method: 'POST' }).then(function() {
+  apiFetch('/v1/alerts/slack/' + orgId + '/test', { method: 'POST' }).then(function() {
     document.getElementById('slackStatus').textContent = 'Test message sent!';
     setTimeout(function() { document.getElementById('slackStatus').textContent = ''; }, 3000);
   }).catch(function(e) {
