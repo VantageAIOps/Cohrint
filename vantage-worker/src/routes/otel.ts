@@ -138,24 +138,43 @@ interface ParsedOTelRecord {
 // ── Pricing table ($ per 1M tokens) ─────────────────────────────────────────
 // Used to calculate cost_usd when tools only send token counts (no cost metric)
 
-const MODEL_PRICES: Record<string, { input: number; output: number; cache: number }> = {
-  'claude-opus-4-6':      { input: 15.00, output: 75.00, cache: 1.50  },
-  'claude-sonnet-4-6':    { input: 3.00,  output: 15.00, cache: 0.30  },
-  'claude-haiku-4-5':     { input: 0.80,  output: 4.00,  cache: 0.08  },
-  'claude-3-5-sonnet':    { input: 3.00,  output: 15.00, cache: 0.30  },
-  'claude-3-haiku':       { input: 0.25,  output: 1.25,  cache: 0.03  },
-  'gpt-4o':               { input: 2.50,  output: 10.00, cache: 1.25  },
-  'gpt-4o-mini':          { input: 0.15,  output: 0.60,  cache: 0.075 },
-  'o1':                   { input: 15.00, output: 60.00, cache: 7.50  },
-  'o3-mini':              { input: 1.10,  output: 4.40,  cache: 0.55  },
-  'gemini-2.0-flash':     { input: 0.10,  output: 0.40,  cache: 0.025 },
-  'gemini-1.5-pro':       { input: 1.25,  output: 5.00,  cache: 0.31  },
-  'gemini-1.5-flash':     { input: 0.075, output: 0.30,  cache: 0.018 },
+const MODEL_PRICES: Record<string, { input: number; output: number; cache: number; cacheWrite: number }> = {
+  // cacheWrite = prompt cache creation rate (25% premium for Claude, same as input for others)
+  // cache      = prompt cache read rate     (Claude: ~90% discount vs input)
+  'claude-opus-4-6':      { input: 15.00, output: 75.00, cache: 1.50,  cacheWrite: 18.75 },
+  'claude-sonnet-4-6':    { input: 3.00,  output: 15.00, cache: 0.30,  cacheWrite: 3.75  },
+  'claude-haiku-4-5':     { input: 0.80,  output: 4.00,  cache: 0.08,  cacheWrite: 1.00  },
+  'claude-3-5-sonnet':    { input: 3.00,  output: 15.00, cache: 0.30,  cacheWrite: 3.75  },
+  'claude-3-haiku':       { input: 0.25,  output: 1.25,  cache: 0.03,  cacheWrite: 0.31  },
+  'gpt-4o':               { input: 2.50,  output: 10.00, cache: 1.25,  cacheWrite: 2.50  },
+  'gpt-4o-mini':          { input: 0.15,  output: 0.60,  cache: 0.075, cacheWrite: 0.15  },
+  'o1':                   { input: 15.00, output: 60.00, cache: 7.50,  cacheWrite: 15.00 },
+  'o3-mini':              { input: 1.10,  output: 4.40,  cache: 0.55,  cacheWrite: 1.10  },
+  'gemini-2.0-flash':     { input: 0.10,  output: 0.40,  cache: 0.025, cacheWrite: 0.10  },
+  'gemini-1.5-pro':       { input: 1.25,  output: 5.00,  cache: 0.31,  cacheWrite: 1.25  },
+  'gemini-1.5-flash':     { input: 0.075, output: 0.30,  cache: 0.018, cacheWrite: 0.075 },
 };
 
-function estimateCostUsd(model: string | null, inputTokens: number, outputTokens: number, cachedTokens: number): number {
+// Infer a best-guess model from the OTel service.name when no model attribute is present.
+// Returns null if the service name gives no useful signal.
+function inferModelFromServiceName(serviceName: string): string | null {
+  const sn = serviceName.toLowerCase();
+  if (sn.includes('claude'))  return 'claude-sonnet-4-6';
+  if (sn.includes('copilot')) return 'gpt-4o';
+  if (sn.includes('gemini'))  return 'gemini-1.5-pro';
+  if (sn.includes('codex') || sn.includes('openai')) return 'gpt-4o';
+  return null;
+}
+
+function estimateCostUsd(
+  model: string | null,
+  inputTokens: number,
+  outputTokens: number,
+  cachedTokens: number,
+  cacheCreationTokens = 0,
+): number {
   if (!model) return 0;
-  // Exact match first, then fuzzy
+  // Exact match first, then fuzzy prefix/suffix match
   let price = MODEL_PRICES[model];
   if (!price) {
     const lower = model.toLowerCase();
@@ -163,10 +182,12 @@ function estimateCostUsd(model: string | null, inputTokens: number, outputTokens
     if (key) price = MODEL_PRICES[key];
   }
   if (!price) return 0;
-  const uncached = Math.max(0, inputTokens - cachedTokens);
-  const inputCost = (uncached / 1e6) * price.input + (cachedTokens / 1e6) * price.cache;
-  const outputCost = (outputTokens / 1e6) * price.output;
-  return inputCost + outputCost;
+  const cacheWriteCost = (cacheCreationTokens / 1e6) * price.cacheWrite;
+  const cacheReadCost  = (cachedTokens / 1e6) * price.cache;
+  const regularInput   = Math.max(0, inputTokens - cachedTokens - cacheCreationTokens);
+  const inputCost      = (regularInput / 1e6) * price.input;
+  const outputCost     = (outputTokens / 1e6) * price.output;
+  return cacheWriteCost + cacheReadCost + inputCost + outputCost;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -288,7 +309,12 @@ otel.post('/v1/metrics', async (c) => {
 
         for (const dp of dataPoints) {
           const metricAttrs = dp.attributes ?? [];
-          const model = getAttr(metricAttrs, 'model') ?? getAttr(metricAttrs, 'gen_ai.request.model');
+          // Model resolution: metric attrs → resource attrs → service.name inference
+          const model = getAttr(metricAttrs, 'model')
+            ?? getAttr(metricAttrs, 'gen_ai.request.model')
+            ?? getAttr(resAttrs, 'gen_ai.request.model')
+            ?? getAttr(resAttrs, 'model')
+            ?? inferModelFromServiceName(serviceName);
           const tokenType = getAttr(metricAttrs, 'type') ?? getAttr(metricAttrs, 'gen_ai.token.type');
           const value = getNumericValue(dp);
           const ts = dp.timeUnixNano ? new Date(parseInt(dp.timeUnixNano) / 1e6).toISOString() : new Date().toISOString();
@@ -483,7 +509,10 @@ otel.post('/v1/metrics', async (c) => {
   // Auto-calculate cost when only tokens are provided (no separate cost metric)
   for (const r of records) {
     if (r.cost_usd === 0 && (r.input_tokens > 0 || r.output_tokens > 0)) {
-      r.cost_usd = estimateCostUsd(r.model, r.input_tokens, r.output_tokens, r.cached_tokens);
+      r.cost_usd = estimateCostUsd(r.model, r.input_tokens, r.output_tokens, r.cached_tokens, r.cache_creation_tokens);
+    }
+    if (!r.model && (r.input_tokens > 0 || r.output_tokens > 0)) {
+      console.warn('[otel] model_missing org=%s provider=%s metric=%s — cost recorded as $0', orgId, r.provider, r.raw_metric_name);
     }
   }
 
@@ -533,19 +562,28 @@ otel.post('/v1/metrics', async (c) => {
       return c.json({ error: 'Failed to store metrics' }, 500);
     }
 
-    // Broadcast the most recent token record to KV so the SSE live feed picks it up
-    const latest = tokenRecords[tokenRecords.length - 1];
-    if (latest) {
+    // Invalidate analytics summary cache for this org
+    try { await c.env.KV.delete(`analytics:summary:${orgId}`); } catch { /* best-effort */ }
+
+    // Broadcast all token records to KV circular buffer for SSE live feed
+    for (const r of tokenRecords) {
       try {
-        await c.env.KV.put(`stream:${orgId}:latest`, JSON.stringify({
-          provider: latest.provider,
-          model: latest.model,
-          total_tokens: (latest.input_tokens ?? 0) + (latest.output_tokens ?? 0),
-          cost_total_usd: latest.cost_usd,
-          latency_ms: latest.latency_ms ?? 0,
-          team: latest.team,
-          ts: Date.now(),
-        }), { expirationTtl: 60 });
+        const seqno = Date.now();
+        const streamEv = {
+          seqno,
+          ts: seqno,
+          provider: r.provider,
+          cost_usd: r.cost_usd,
+          model: r.model,
+          tokens: (r.input_tokens ?? 0) + (r.output_tokens ?? 0),
+        };
+        await c.env.KV.put(`stream:${orgId}:latest`, JSON.stringify(streamEv), { expirationTtl: 60 });
+        const bufKey = `stream:${orgId}:buf`;
+        const rawBuf = await c.env.KV.get(bufKey);
+        const buf: typeof streamEv[] = rawBuf ? JSON.parse(rawBuf) : [];
+        buf.unshift(streamEv);
+        if (buf.length > 25) buf.length = 25;
+        await c.env.KV.put(bufKey, JSON.stringify(buf), { expirationTtl: 300 });
       } catch {
         // KV unavailable — event still in D1, SSE broadcast skipped
       }
@@ -651,18 +689,25 @@ otel.post('/v1/logs', async (c) => {
           // otel_events table may not exist yet — non-critical
         }
 
-        // Broadcast api_request events to KV so the SSE live feed picks them up
+        // Broadcast api_request events to KV circular buffer for SSE live feed
         if (eventName === 'api_request' || eventName === 'claude_code.api_request') {
           try {
-            await c.env.KV.put(`stream:${orgId}:latest`, JSON.stringify({
+            const seqno = Date.now();
+            const streamEv = {
+              seqno,
+              ts: seqno,
               provider,
+              cost_usd: costUsd,
               model,
-              total_tokens: inputTokens + outputTokens,
-              cost_total_usd: costUsd,
-              latency_ms: durationMs,
-              team: getAttr(resAttrs, 'team.id'),
-              ts: Date.now(),
-            }), { expirationTtl: 60 });
+              tokens: inputTokens + outputTokens,
+            };
+            await c.env.KV.put(`stream:${orgId}:latest`, JSON.stringify(streamEv), { expirationTtl: 60 });
+            const bufKey = `stream:${orgId}:buf`;
+            const rawBuf = await c.env.KV.get(bufKey);
+            const buf: typeof streamEv[] = rawBuf ? JSON.parse(rawBuf) : [];
+            buf.unshift(streamEv);
+            if (buf.length > 25) buf.length = 25;
+            await c.env.KV.put(bufKey, JSON.stringify(buf), { expirationTtl: 300 });
           } catch {
             // KV unavailable — non-critical
           }
@@ -675,11 +720,90 @@ otel.post('/v1/logs', async (c) => {
   return c.json({ partialSuccess: {} }, 200);
 });
 
-// ── Traces Endpoint (placeholder for future GenAI tracing) ──────────────────
+// ── Traces Endpoint ──────────────────────────────────────────────────────────
 
 otel.post('/v1/traces', async (c) => {
-  // Accept and acknowledge — we'll implement trace storage in Phase 2
-  return c.json({ partialSuccess: {} }, 200);
+  const apiKey = extractAuth(c);
+  const orgId = await resolveOrg(apiKey, c.env.DB);
+  if (!orgId) {
+    return c.json({ error: 'Invalid or missing API key' }, 401);
+  }
+
+  let body: {
+    resourceSpans?: Array<{
+      resource?: OTLPResource;
+      scopeSpans?: Array<{
+        spans?: Array<{
+          traceId?: string;
+          spanId?: string;
+          parentSpanId?: string;
+          name?: string;
+          startTimeUnixNano?: string;
+          endTimeUnixNano?: string;
+          status?: { code?: number };
+          attributes?: OTLPResourceAttribute[];
+        }>;
+      }>;
+    }>;
+  };
+
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid OTLP JSON body' }, 400);
+  }
+
+  const stmts = [];
+  let spanCount = 0;
+
+  for (const rs of body.resourceSpans ?? []) {
+    for (const ss of rs.scopeSpans ?? []) {
+      for (const span of ss.spans ?? []) {
+        if (spanCount >= 100) break; // max 100 spans per request
+
+        const startMs = span.startTimeUnixNano
+          ? Number(BigInt(span.startTimeUnixNano) / 1_000_000n)
+          : Date.now();
+        const endMs = span.endTimeUnixNano
+          ? Number(BigInt(span.endTimeUnixNano) / 1_000_000n)
+          : startMs;
+
+        stmts.push(c.env.DB.prepare(`
+          INSERT OR IGNORE INTO otel_traces (
+            id, org_id, trace_id, span_id, parent_span_id,
+            operation_name, start_time_ms, end_time_ms, duration_ms,
+            status, attributes, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          crypto.randomUUID(),
+          orgId,
+          span.traceId ?? null,
+          span.spanId ?? null,
+          span.parentSpanId ?? null,
+          span.name ?? 'unknown',
+          startMs,
+          endMs,
+          endMs - startMs,
+          span.status?.code === 2 ? 'error' : 'ok',
+          JSON.stringify(span.attributes ?? []),
+          new Date().toISOString().replace('T', ' ').replace(/\.\d+Z$/, ''),
+        ));
+        spanCount++;
+      }
+    }
+  }
+
+  if (stmts.length > 0) {
+    try {
+      await c.env.DB.batch(stmts);
+    } catch (err) {
+      console.error('[otel/traces] D1 batch insert error:', err);
+      // Non-fatal — traces are diagnostic data
+    }
+  }
+
+  console.log(`[otel/traces] ingested ${spanCount} spans from org=${orgId}`);
+  return c.json({ partialSuccess: { rejectedSpans: 0 } }, 200);
 });
 
 export { otel };

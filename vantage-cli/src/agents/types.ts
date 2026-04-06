@@ -21,6 +21,8 @@ export interface AgentConfig {
   args: string[];
   model: string;
   detected: boolean;
+  /** Extra flags forwarded verbatim to the agent binary (e.g. ["--model", "claude-opus-4-6"]) */
+  extraFlags?: string[];
 }
 
 export interface SpawnArgs {

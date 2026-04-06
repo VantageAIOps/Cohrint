@@ -197,22 +197,38 @@ async function showBudgetStatus(config: VantageConfig): Promise<void> {
 // Arg parser
 // ---------------------------------------------------------------------------
 
+/**
+ * Known vantage flags consumed locally. All other --flags are forwarded to the agent.
+ * Add to this list to prevent a flag from leaking into the agent command.
+ */
+const VANTAGE_FLAGS = new Set([
+  "agent", "no-optimize", "timeout", "model", "system",
+  "debug", "paste-delay",
+]);
+
 function parseArgs() {
   const args = process.argv.slice(2);
   const flags: Record<string, string> = {};
+  const agentFlags: string[] = []; // unknown flags forwarded verbatim to the agent
   const positional: string[] = [];
   for (let i = 0; i < args.length; i++) {
     if (args[i].startsWith("--")) {
       const key = args[i].slice(2);
       const val =
         args[i + 1] && !args[i + 1].startsWith("--") ? args[i + 1] : "true";
-      flags[key] = val;
+      if (VANTAGE_FLAGS.has(key)) {
+        flags[key] = val;
+      } else {
+        // Unknown flag — forward to agent (e.g. --web-search, --memory, --permissions)
+        agentFlags.push(args[i]);
+        if (val !== "true") agentFlags.push(val);
+      }
       if (val !== "true") i++;
     } else {
       positional.push(args[i]);
     }
   }
-  return { flags, positional, prompt: positional.join(" ") };
+  return { flags, agentFlags, positional, prompt: positional.join(" ") };
 }
 
 // ---------------------------------------------------------------------------
@@ -235,7 +251,10 @@ async function executePrompt(
   config: VantageConfig,
   stream: boolean = true,
   continueConversation: boolean = false,
-  sessionId?: string
+  sessionId?: string,
+  noOptimize: boolean = false,
+  extraFlags: string[] = [],
+  timeoutMs?: number,
 ): Promise<string | undefined> {
   bus.emit("prompt:submitted", {
     prompt,
@@ -243,9 +262,9 @@ async function executePrompt(
     timestamp: Date.now(),
   });
 
-  // Optimize prompt (skip for structured data like JSON, code, URL-heavy content)
+  // Optimize prompt (skip for structured data, or when --no-optimize is set)
   let finalPrompt = prompt;
-  if (config.optimization.enabled && !looksLikeStructuredData(prompt)) {
+  if (!noOptimize && config.optimization.enabled && !looksLikeStructuredData(prompt)) {
     const result = optimizePrompt(prompt);
     if (result.savedTokens > 0) {
       finalPrompt = result.optimized;
@@ -260,15 +279,16 @@ async function executePrompt(
   }
 
   // Build command — use continue if this is a follow-up prompt
+  const agentConfig = extraFlags.length > 0 ? { extraFlags } as import("./agents/types.js").AgentConfig : undefined;
   const useContinue = continueConversation && agent.supportsContinue && agent.buildContinueCommand;
   const spawnArgs = useContinue
-    ? agent.buildContinueCommand!(finalPrompt, undefined, sessionId)
-    : agent.buildCommand(finalPrompt);
+    ? agent.buildContinueCommand!(finalPrompt, agentConfig, sessionId)
+    : agent.buildCommand(finalPrompt, agentConfig);
 
   try {
     const result = stream
-      ? await runAgent(spawnArgs, agent.name)
-      : await runAgentBuffered(spawnArgs, agent.name);
+      ? await runAgent(spawnArgs, agent.name, timeoutMs)
+      : await runAgentBuffered(spawnArgs, agent.name, timeoutMs);
     return result.sessionId;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -350,7 +370,7 @@ async function runCompare(
 // REPL mode
 // ---------------------------------------------------------------------------
 
-async function startRepl(config: VantageConfig): Promise<void> {
+async function startRepl(config: VantageConfig, replFlags: Record<string, string> = {}): Promise<void> {
   printBanner();
 
   let currentAgent = getAgent(config.defaultAgent) ?? ALL_AGENTS[0];
@@ -365,9 +385,11 @@ async function startRepl(config: VantageConfig): Promise<void> {
     output: process.stdout,
   });
 
-  // Multi-line paste detection: buffer lines that arrive rapidly (< 80ms apart),
-  // then join them into a single prompt when a pause is detected.
-  const PASTE_DELAY_MS = 80;
+  // Multi-line paste detection: buffer lines that arrive rapidly, then join on pause.
+  // Configurable via --paste-delay <ms> flag or VANTAGE_PASTE_DELAY env var (default 80ms).
+  const PASTE_DELAY_MS = replFlags["paste-delay"]
+    ? Number(replFlags["paste-delay"])
+    : Number(process.env.VANTAGE_PASTE_DELAY) || 80;
   let pasteBuffer: string[] = [];
   let pasteTimer: ReturnType<typeof setTimeout> | null = null;
   let handleLine: ((combined: string) => void) | null = null;
@@ -673,10 +695,10 @@ async function startRepl(config: VantageConfig): Promise<void> {
   // Wire readline 'line' events through paste-detection buffer
   rl.on("line", onLineReceived);
 
-  // Handle Ctrl+C — clean up session + tracker before exit
-  rl.on("SIGINT", () => {
-    shutdown().catch(() => process.exit(1));
-  });
+  // Handle Ctrl+C, SIGTERM, and SIGHUP — clean up session + tracker before exit
+  rl.on("SIGINT", () => { shutdown().catch(() => process.exit(1)); });
+  process.on("SIGTERM", () => { shutdown().catch(() => process.exit(1)); });
+  process.on("SIGHUP", () => { shutdown().catch(() => process.exit(1)); });
 
   prompt();
 }
@@ -740,10 +762,11 @@ async function readStdin(): Promise<string> {
   const chunks: Buffer[] = [];
   let totalBytes = 0;
 
-  // Timeout: if nothing comes in 10 seconds, bail
+  // Timeout: configurable via VANTAGE_STDIN_TIMEOUT (ms), default 30s
+  const stdinTimeoutMs = Number(process.env.VANTAGE_STDIN_TIMEOUT) || 30_000;
   const timeout = setTimeout(() => {
     process.stdin.destroy();
-  }, 10_000);
+  }, stdinTimeoutMs);
 
   try {
     for await (const chunk of process.stdin) {
@@ -772,7 +795,7 @@ async function readStdin(): Promise<string> {
 let tracker: Tracker | null = null;
 
 async function main(): Promise<void> {
-  const { flags, prompt: cliPrompt } = parseArgs();
+  const { flags, agentFlags, prompt: cliPrompt } = parseArgs();
 
   // Load or create config
   let config: VantageConfig;
@@ -790,6 +813,13 @@ async function main(): Promise<void> {
   // Override agent from flag
   const agentName = flags.agent ?? config.defaultAgent;
   const agent = getAgent(agentName) ?? ALL_AGENTS[0];
+
+  // Build extra flags for the agent from named flags + unknown passthrough flags
+  const extraAgentFlags: string[] = [...agentFlags];
+  if (flags.model) extraAgentFlags.push("--model", flags.model);
+  if (flags.system) extraAgentFlags.push("--system", flags.system);
+  const noOptimize = flags["no-optimize"] === "true";
+  const timeoutMs = flags.timeout ? Number(flags.timeout) : undefined;
 
   // Initialize session and tracker
   initSession();
@@ -810,7 +840,7 @@ async function main(): Promise<void> {
   // Mode 1: One-shot with CLI prompt
   if (cliPrompt) {
     const costPromise = waitForCost();
-    await executePrompt(cliPrompt, agent, config);
+    await executePrompt(cliPrompt, agent, config, true, false, undefined, noOptimize, extraAgentFlags, timeoutMs);
     try {
       const cost = await Promise.race([
         costPromise,
@@ -824,7 +854,9 @@ async function main(): Promise<void> {
     } catch {
       // Cost may not be available
     }
-    await tracker.flush();
+    // Wait for tracker to drain before exit to avoid dropped events
+    await tracker.flush().catch(() => {});
+    await new Promise<void>((resolve) => setTimeout(resolve, 200));
     process.exit(0);
   }
 
@@ -837,7 +869,7 @@ async function main(): Promise<void> {
     }
     if (stdinPrompt) {
       const costPromise = waitForCost();
-      await executePrompt(stdinPrompt, agent, config);
+      await executePrompt(stdinPrompt, agent, config, true, false, undefined, noOptimize, extraAgentFlags, timeoutMs);
       try {
         const cost = await Promise.race([
           costPromise,
@@ -852,12 +884,13 @@ async function main(): Promise<void> {
         // Cost may not be available
       }
     }
-    await tracker.flush();
+    await tracker.flush().catch(() => {});
+    await new Promise<void>((resolve) => setTimeout(resolve, 200));
     process.exit(0);
   }
 
   // Mode 3: REPL
-  await startRepl(config);
+  await startRepl(config, flags);
 }
 
 async function checkForUpdate(): Promise<void> {

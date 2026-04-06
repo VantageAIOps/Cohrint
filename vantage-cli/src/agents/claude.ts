@@ -23,19 +23,21 @@ export const claudeAdapter: AgentAdapter = {
   buildCommand(prompt: string, config?: AgentConfig): SpawnArgs {
     const cmd = config?.command || "claude";
     const baseArgs = config?.args ?? ["-p"];
+    const extraFlags = config?.extraFlags ?? [];
     return {
       command: cmd,
-      args: [...baseArgs, "--output-format", "stream-json", prompt],
+      args: [...baseArgs, "--verbose", "--output-format", "stream-json", ...extraFlags, prompt],
     };
   },
 
   buildContinueCommand(prompt: string, config?: AgentConfig, sessionId?: string): SpawnArgs {
     const cmd = config?.command || "claude";
     const extraArgs = config?.args?.filter(a => a !== "-p") ?? [];
+    const extraFlags = config?.extraFlags ?? [];
     // Use --resume with session ID for reliable context (--continue picks up wrong conversation)
     const resumeArgs = sessionId
-      ? ["--resume", sessionId, ...extraArgs, "--output-format", "stream-json", "-p", prompt]
-      : ["--continue", ...extraArgs, "--output-format", "stream-json", "-p", prompt];
+      ? ["--resume", sessionId, ...extraArgs, "--verbose", "--output-format", "stream-json", ...extraFlags, "-p", prompt]
+      : ["--continue", ...extraArgs, "--verbose", "--output-format", "stream-json", ...extraFlags, "-p", prompt];
     return {
       command: cmd,
       args: resumeArgs,

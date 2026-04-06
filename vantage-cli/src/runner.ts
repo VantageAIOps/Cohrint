@@ -31,7 +31,8 @@ function parseStreamLine(line: string): { text?: string; sessionId?: string } {
       return text ? { text } : {};
     }
     if (obj["type"] === "result") {
-      return { sessionId: obj["session_id"] as string | undefined };
+      const sid = obj["session_id"] as string | undefined;
+      return { sessionId: isValidSessionId(sid) ? sid : undefined };
     }
     // system/init/tool lines — suppress from display
     return {};
@@ -40,13 +41,28 @@ function parseStreamLine(line: string): { text?: string; sessionId?: string } {
     return { text: line + "\n" };
   }
 }
-const DEFAULT_TIMEOUT_MS = 300_000; // 5 minute timeout
+// Timeout: VANTAGE_TIMEOUT env var overrides default 5-minute limit
+const DEFAULT_TIMEOUT_MS = Number(process.env.VANTAGE_TIMEOUT) || 300_000;
 
 /** Env vars that could be used to inject code into child processes */
 const BLOCKED_ENV = ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'DYLD_INSERT_LIBRARIES', 'PYTHONPATH', 'NODE_OPTIONS'];
-const safeEnv = Object.fromEntries(
-  Object.entries(process.env).filter(([k]) => !BLOCKED_ENV.includes(k))
-);
+
+/**
+ * Build a safe env by blocking injection vectors.
+ * Callers can whitelist additional vars via VANTAGE_PASS_ENV (comma-separated).
+ */
+function buildSafeEnv(extra?: Record<string, string>): Record<string, string> {
+  const passEnv = (process.env.VANTAGE_PASS_ENV ?? "").split(",").map(s => s.trim()).filter(Boolean);
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(([k]) => !BLOCKED_ENV.includes(k) || passEnv.includes(k))
+  ) as Record<string, string>;
+  return { ...env, ...(extra ?? {}) };
+}
+
+/** Validate that a string looks like a UUID (session IDs from Claude Code) */
+function isValidSessionId(id: string | undefined): id is string {
+  return typeof id === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+}
 
 /**
  * Spawn the agent process, streaming stdout/stderr to the terminal in real time.
@@ -68,9 +84,11 @@ export function runAgent(
     let child: ReturnType<typeof spawn>;
     try {
       child = spawn(spawnArgs.command, spawnArgs.args, {
-        stdio: ["ignore", "pipe", "pipe"],
-        env: { ...safeEnv, ...(spawnArgs.env ?? {}) },
+        stdio: ["pipe", "pipe", "pipe"],
+        env: buildSafeEnv(spawnArgs.env),
       });
+      // Pipe host stdin into agent so @file refs and piped input work
+      process.stdin.pipe(child.stdin!);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       reject(new Error(`Failed to start '${spawnArgs.command}': ${msg}`));
@@ -182,9 +200,11 @@ export function runAgentBuffered(
     let child: ReturnType<typeof spawn>;
     try {
       child = spawn(spawnArgs.command, spawnArgs.args, {
-        stdio: ["ignore", "pipe", "pipe"],
-        env: { ...safeEnv, ...(spawnArgs.env ?? {}) },
+        stdio: ["pipe", "pipe", "pipe"],
+        env: buildSafeEnv(spawnArgs.env),
       });
+      // Pipe host stdin so buffered mode also supports stdin-based workflows
+      process.stdin.pipe(child.stdin!);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       reject(new Error(`Failed to start '${spawnArgs.command}': ${msg}`));

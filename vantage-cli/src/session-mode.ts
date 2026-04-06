@@ -45,11 +45,12 @@ export class AgentSession {
     this._ended = false;
 
     try {
-      // stdin: pipe (we write to it), stdout: pipe (we read from it),
-      // stderr: inherit (agent prompts like "Allow edit? (y/n)" show directly to user)
+      // stdin: pipe (we write to it)
+      // stdout + stderr: inherit — agent gets full TTY, preserving syntax highlighting,
+      // spinners, color output and interactive prompts (file approval, MCP dialogs, etc.)
       this.child = spawn(cmd, interactiveArgs, {
-        stdio: ["pipe", "pipe", "inherit"],
-        env: { ...process.env, TERM: process.env.TERM || "xterm-256color" },
+        stdio: ["pipe", "inherit", "inherit"],
+        env: { ...process.env, TERM: process.env.TERM || "xterm-256color", FORCE_COLOR: "1" },
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -63,17 +64,8 @@ export class AgentSession {
       return false;
     }
 
-    this.child.stdout?.on("data", (chunk: Buffer) => {
-      const ok = process.stdout.write(chunk);
-      if (!ok) {
-        this.child?.stdout?.pause();
-        process.stdout.once("drain", () => this.child?.stdout?.resume());
-      }
-      this.totalOutputTokens += Math.ceil(chunk.length / 4);
-    });
-
-    // stderr is inherited — agent prompts (file approval, etc.) show directly
-    // No need to listen for stderr data
+    // stdout + stderr are inherited — agent writes directly to terminal
+    // No need to pipe data; output token counting is unavailable in full-TTY mode
 
     this.child.on("error", (err) => {
       if ((err as NodeJS.ErrnoException).code === "ENOENT") {

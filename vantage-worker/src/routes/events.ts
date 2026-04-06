@@ -78,6 +78,9 @@ events.post('/', async (c) => {
   // Broadcast to SSE subscribers via KV pub channel
   await broadcastEvent(c.env.KV, orgId, body);
 
+  // Invalidate analytics summary cache for this org
+  try { await c.env.KV.delete(`analytics:summary:${orgId}`); } catch { /* best-effort */ }
+
   return c.json({ ok: true, id: body.event_id }, 201);
 });
 
@@ -124,6 +127,9 @@ events.post('/batch', async (c) => {
   if (body.events.length > 0) {
     await broadcastEvent(c.env.KV, orgId, body.events[body.events.length - 1]);
   }
+
+  // Invalidate analytics summary cache for this org
+  try { await c.env.KV.delete(`analytics:summary:${orgId}`); } catch { /* best-effort */ }
 
   return c.json({
     ok:       true,
@@ -229,22 +235,42 @@ async function insertEvent(db: D1Database, orgId: string, ev: EventIn) {
   return buildInsertStmt(db, orgId, ev).run();
 }
 
+interface StreamEvent {
+  seqno: number;
+  ts: number;
+  provider: string;
+  cost_usd: number;
+  model: string | null;
+  tokens: number;
+}
+
 async function broadcastEvent(kv: KVNamespace, orgId: string, ev: EventIn) {
-  // Store last event per org in KV so SSE stream can serve it
-  // TTL 60s — only recent events matter for live stream
-  const payload = JSON.stringify({
-    provider: ev.provider,
-    model:    ev.model,
-    total_tokens: ev.total_tokens ?? ((ev.prompt_tokens ?? 0) + (ev.completion_tokens ?? 0)),
-    cost_total_usd: ev.total_cost_usd ?? ev.cost_total_usd,
-    latency_ms: ev.latency_ms,
-    team: ev.team,
-    ts: Date.now(),
-  });
   try {
+    const seqno = Date.now();
+    const r = ev as unknown as Record<string, unknown>;
+    const streamEv: StreamEvent = {
+      seqno,
+      ts: seqno,
+      provider: ev.provider ?? 'unknown',
+      cost_usd: ev.total_cost_usd ?? ev.cost_total_usd ?? 0,
+      model: ev.model ?? null,
+      tokens: (Number(r.input_tokens ?? ev.prompt_tokens ?? 0)) +
+              (Number(r.output_tokens ?? ev.completion_tokens ?? 0)),
+    };
+    const payload = JSON.stringify(streamEv);
+
+    // Write latest (backwards compat for SSE reader during transition)
     await kv.put(`stream:${orgId}:latest`, payload, { expirationTtl: 60 });
+
+    // Write circular buffer (max 25 events, newest first)
+    const bufKey = `stream:${orgId}:buf`;
+    const rawBuf = await kv.get(bufKey);
+    const buf: StreamEvent[] = rawBuf ? JSON.parse(rawBuf) : [];
+    buf.unshift(streamEv);
+    if (buf.length > 25) buf.length = 25;
+    await kv.put(bufKey, JSON.stringify(buf), { expirationTtl: 300 });
   } catch {
-    // KV unavailable — event still recorded in D1, SSE broadcast skipped
+    // KV unavailable — event still recorded in D1, live feed skipped
   }
 }
 

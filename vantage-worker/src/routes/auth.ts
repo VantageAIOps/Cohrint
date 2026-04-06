@@ -510,12 +510,12 @@ auth.get('/session', authMiddleware, async (c) => {
   crypto.getRandomValues(sseTokenBytes);
   const sseToken = Array.from(sseTokenBytes).map(b => b.toString(16).padStart(2, '0')).join('');
 
-  // Store in KV with 120-second TTL — one-time use, consumed by stream.ts
+  // Store in KV with 1-hour TTL — reusable across reconnects within the session.
   // If KV write fails (e.g. free tier limit), return null sse_token so the
   // client knows SSE is unavailable instead of getting a phantom token.
   let sseTokenFinal: string | null = sseToken;
   try {
-    await c.env.KV.put(`sse:${orgId}:${sseToken}`, '1', { expirationTtl: 120 });
+    await c.env.KV.put(`sse:${orgId}:${sseToken}`, '1', { expirationTtl: 3600 });
   } catch {
     sseTokenFinal = null; // KV unavailable — SSE disabled for this session
   }
