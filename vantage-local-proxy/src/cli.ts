@@ -234,12 +234,15 @@ async function pushScanResults(
     const raw = await readFile(stateFile, "utf-8");
     const state = JSON.parse(raw) as { uploadedIds?: string[] };
     uploadedIds = new Set(state.uploadedIds ?? []);
-  } catch {
-    // First run — state file doesn't exist yet
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+      console.warn(`  WARN: could not read dedup state (${err}) — starting fresh`);
+    }
   }
 
   // Build one event per assistant turn (per message, not per session)
-  const events: Record<string, unknown>[] = [];
+  interface PendingEvent { event_id: string; [key: string]: unknown; }
+  const events: PendingEvent[] = [];
   for (const s of result.sessions) {
     for (let i = 0; i < s.messages.length; i++) {
       const m = s.messages[i];
@@ -288,7 +291,7 @@ async function pushScanResults(
         }),
       });
       if (res.ok) {
-        newIds.push(...batch.map((e) => e.event_id as string));
+        newIds.push(...batch.map((e) => e.event_id));
         console.log(`  Batch ${Math.floor(i / 500) + 1}: ${batch.length} turns → ${res.status}`);
       } else {
         const err = await res.text();
@@ -301,6 +304,11 @@ async function pushScanResults(
 
   // Save updated dedup state
   const updated = [...uploadedIds, ...newIds];
-  await writeFile(stateFile, JSON.stringify({ uploadedIds: updated, lastUploadAt: new Date().toISOString() }, null, 2));
-  console.log(`  Done — uploaded ${newIds.length} turns. State saved to ${stateFile}\n`);
+  try {
+    await writeFile(stateFile, JSON.stringify({ uploadedIds: updated, lastUploadAt: new Date().toISOString() }, null, 2));
+    console.log(`  Done — uploaded ${newIds.length} turns. State saved to ${stateFile}\n`);
+  } catch (err) {
+    console.error(`  WARN: failed to save dedup state — duplicate uploads may occur on next run: ${err}`);
+    console.log(`  Done — uploaded ${newIds.length} turns (state not saved).\n`);
+  }
 }

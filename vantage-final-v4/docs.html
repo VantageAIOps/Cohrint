@@ -693,9 +693,53 @@ windsurf: `
 
 claudecode: `
 <h1>Claude Code</h1>
-<p>Claude Code supports MCP natively. You can add VantageAI at the project level or globally.</p>
+<p>VantageAI tracks every Claude Code response automatically — tokens, cost, model — with no manual calls required.</p>
 
-<h2>Project-level setup</h2>
+<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
+  <button class="tab active" onclick="switchTab('cc',this,'cc-auto')" style="padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer;font-size:13px">Auto-track (recommended)</button>
+  <button class="tab" onclick="switchTab('cc',this,'cc-mcp')" style="padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer;font-size:13px">MCP server</button>
+</div>
+
+<div id="cc-auto" class="tab-content active">
+<h2>Automatic tracking via Stop hook</h2>
+<p>Reads Claude Code's local session files and uploads token usage after every response. <strong>Zero code changes required.</strong></p>
+
+<div class="step-row"><div class="step-num">1</div><div class="step-body">Create <code>~/.claude/hooks/vantage-track.js</code> — <a href="https://github.com/Amanjain98/VantageAI/blob/main/vantage-local-proxy/src/cli.ts" style="color:var(--accent)">get the script from GitHub</a> or copy from ADMIN_GUIDE §23.4</div></div>
+
+<div class="step-row"><div class="step-num">2</div><div class="step-body">Register it as a Stop hook in <code>~/.claude/settings.json</code></div></div>
+<pre>{
+  <span class="c-string">"hooks"</span>: {
+    <span class="c-string">"Stop"</span>: [{
+      <span class="c-string">"matcher"</span>: <span class="c-string">""</span>,
+      <span class="c-string">"hooks"</span>: [{
+        <span class="c-string">"type"</span>: <span class="c-string">"command"</span>,
+        <span class="c-string">"command"</span>: <span class="c-string">"VANTAGE_API_KEY=vnt_your_key node ~/.claude/hooks/vantage-track.js"</span>
+      }]
+    }]
+  }
+}</pre>
+
+<div class="step-row"><div class="step-num">3</div><div class="step-body">Backfill all historical sessions (one-time)</div></div>
+<pre><span class="c-comment"># Upload all past Claude Code sessions — safe to run multiple times</span>
+VANTAGE_API_KEY=<span class="c-string">vnt_your_key</span> npx vantageai-local-proxy scan --tool claude-code --push</pre>
+
+<div class="info-box">✅ <strong style="color:var(--text)">Privacy.</strong> Claude Code writes sessions to <code>~/.claude/projects/*/uuid.jsonl</code>. The hook reads these files locally and uploads only token counts + model name + calculated cost. Prompt text and responses never leave your machine.</div>
+
+<h2>What gets tracked per turn</h2>
+<table class="api-table"><thead><tr><th>Field</th><th>Source</th></tr></thead><tbody>
+<tr><td>Model</td><td>JSONL <code>message.model</code></td></tr>
+<tr><td>Input + cache-write tokens</td><td><code>input_tokens</code> + <code>cache_creation_input_tokens</code></td></tr>
+<tr><td>Cache-read tokens</td><td><code>cache_read_input_tokens</code></td></tr>
+<tr><td>Output tokens</td><td><code>output_tokens</code></td></tr>
+<tr><td>Cost (USD)</td><td>Calculated locally from pricing table</td></tr>
+</tbody></table>
+</div>
+
+<div id="cc-mcp" class="tab-content">
+<h2>MCP server setup</h2>
+<p>Add VantageAI as an MCP server to query costs and manually track calls from within Claude Code conversations.</p>
+
+<h3>Project-level setup</h3>
 <p>Create <code>.mcp.json</code> in your project root:</p>
 <pre>{
   <span class="c-string">"mcpServers"</span>: {
@@ -708,7 +752,7 @@ claudecode: `
   }
 }</pre>
 
-<h2>Global setup (all projects)</h2>
+<h3>Global setup (all projects)</h3>
 <p>Add to <code>~/.claude/mcp.json</code>:</p>
 <pre>{
   <span class="c-string">"mcpServers"</span>: {
@@ -721,15 +765,15 @@ claudecode: `
   }
 }</pre>
 
-<h2>Verify it works</h2>
-<p>Open Claude Code and type: <code>/mcp</code> — you should see "vantage" listed with 12 tools. Then try:</p>
+<h3>Verify it works</h3>
+<p>Open Claude Code and type: <code>/mcp</code> — you should see "vantage" listed. Then try:</p>
 <pre><span class="c-comment"># Ask Claude Code about your AI costs</span>
 "How much have we spent on LLMs this month?"
-"Which model is the most expensive?"
-"Track this call: gpt-4o, 1000 prompt tokens, 500 completion, $0.01"</pre>
+"Which model is the most expensive?"</pre>
 
 <div class="warn-box">
-<strong>Tip:</strong> If you get "server not found", make sure <code>npx</code> is on your PATH. You can use the full path: <code>/usr/local/bin/npx</code> or <code>/opt/homebrew/bin/npx</code> (run <code>which npx</code> to find it).
+<strong>Tip:</strong> If you get "server not found", make sure <code>npx</code> is on your PATH. Run <code>which npx</code> to find it and use the full path.
+</div>
 </div>`,
 
 vscode: `
