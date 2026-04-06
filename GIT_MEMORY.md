@@ -5,21 +5,20 @@ Fast reference for Claude Code sessions. Auto-refreshed by `/clean`. Replaces `g
 ---
 
 ## Current Branch
-`fix/cli-ux-and-dynamic-versioning` → PR #29 (OPEN)
+`fix/cli-ux-and-dynamic-versioning` → PR #29 (check status: `gh pr view 29`)
 
 ---
 
 ## Open PRs
-
-| # | Title | Branch |
-|---|-------|--------|
-| 29 | feat(cli): live tool rendering + 9 UX/stability fixes + dynamic versioning | fix/cli-ux-and-dynamic-versioning |
+None detected via `gh pr list --state open` (verify with `gh pr view 29`).
 
 ---
 
 ## Latest 15 Commits
 
 ```
+f3feba4  fix(ci): fix YAML syntax error in ci-version.yml (multiline bash string)
+f647f3a  chore(release): bump vantage-cli to 2.2.3; refresh GIT_MEMORY.md
 6245566  feat(cli): render Claude tool use live like Claude terminal
 96afe9f  fix(cli): fix 6 review issues — TS error, sessionId, timeouts, sleep, pkg-lock, structured-data
 2ee4719  fix(cli): fix crash vectors, permission prompts, context loss, and update check
@@ -33,8 +32,6 @@ d9c4328  fix(cli): fix session mode REPL prompt appearing mid-response
 16a2c19  fix(cli): suppress stdin warning when running interactively
 d3a4caf  Merge pull request #28 from Amanjain98/fix/zero-bugs-sweep
 45fd91c  chore(release): bump patch versions for bug-fix release
-dfce416  fix(otel-realtime): fix all critical + high OTel pipeline and live feed gaps
-0757335  fix(sweep5): 4 bugs from cross-component audit
 ```
 
 ---
@@ -55,13 +52,13 @@ dfce416  fix(otel-realtime): fix all critical + high OTel pipeline and live feed
 
 | Package | npm name | Version | Notes |
 |---------|----------|---------|-------|
-| vantage-cli | vantageai-cli | **2.2.3** | CLI wrapper — pending publish on PR merge |
-| vantage-mcp | vantageaiops-mcp | 1.1.1 | MCP server (cost tools + optimizer) |
-| vantage-js-sdk | vantageaiops | 1.0.1 | JS/TS SDK, zero deps |
-| vantage-local-proxy | vantageai-local-proxy | 1.0.2 | Local HTTP proxy + file scanners |
-| vantage-worker | — | 1.0.0 | Cloudflare Worker API (not on npm) |
+| vantage-cli | vantageai-cli | **2.2.3** | Pending publish on PR #29 merge |
+| vantage-mcp | vantageaiops-mcp | 1.1.1 | |
+| vantage-js-sdk | vantageaiops | 1.0.1 | |
+| vantage-local-proxy | vantageai-local-proxy | 1.0.2 | |
+| vantage-worker | — | 1.0.0 | Cloudflare Worker (not on npm) |
 
-Publish is automatic on merge to main via `publish-packages.yml` — compares local vs registry version.
+Publish: automatic on merge to main via `publish-packages.yml`.
 
 ---
 
@@ -69,13 +66,13 @@ Publish is automatic on merge to main via `publish-packages.yml` — compares lo
 
 | File | Change |
 |------|--------|
-| `vantage-cli/src/runner.ts` | `ClaudeStreamRenderer` — renders `⏺ Tool(input)` + `⎿ result` live |
-| `vantage-cli/src/session-mode.ts` | sessionId capture from JSON stream; INITIAL_TIMEOUT 5s→30s |
+| `vantage-cli/src/runner.ts` | `ClaudeStreamRenderer` — `⏺ Tool(input)` + `⎿ result` live rendering |
+| `vantage-cli/src/session-mode.ts` | sessionId capture; INITIAL_TIMEOUT 5s→30s |
 | `vantage-cli/src/index.ts` | Removed 2s flush sleep; Bug 3 checks in `looksLikeStructuredData` |
-| `vantage-cli/src/tracker.ts` | Removed SIGTERM/SIGINT handlers; relies on `beforeExit` |
+| `vantage-cli/src/tracker.ts` | Removed SIGTERM/SIGINT handlers |
 | `vantage-cli/src/anomaly.ts` | Fixed average cost (exclude current prompt) |
-| `vantage-cli/src/optimizer.ts` | Safety fix for empty/null input |
-| All 5 packages | `gen-version` prebuild hook → `src/_version.ts` from `package.json` |
+| All 5 packages | `gen-version` prebuild hook → `src/_version.ts` |
+| `.github/workflows/ci-version.yml` | Fixed YAML syntax error (multiline bash string at col 0) |
 
 ---
 
@@ -89,13 +86,13 @@ Publish is automatic on merge to main via `publish-packages.yml` — compares lo
 | `vantage-cli/src/tracker.ts` | Event → API telemetry flush |
 | `vantage-cli/src/ui.ts` | Terminal UI helpers (Spinner, colors) |
 | `vantage-worker/src/` | Cloudflare Worker routes + D1 queries |
-| `tests/suites/` | pytest suites (17–21, 32–33 active; 34 needed for PR #29) |
+| `tests/suites/` | pytest suites (17–21, 32–33 active) |
 | `GIT_MEMORY.md` | This file — refreshed by `/clean` |
 
 ---
 
 ## Outstanding Items
 
-- [ ] Tests in `tests/suites/34_cli_session/` for PR #29 (sessionId capture, looksLikeStructuredData, flush exit time)
-- [ ] Merge PR #29 → triggers auto-publish of `vantageai-cli@2.2.3`
+- [ ] Tests in `tests/suites/34_cli_session/` for PR #29 changes
+- [ ] Confirm PR #29 merge + `vantageai-cli@2.2.3` published to npm
 - [ ] Update `GIT_MEMORY.md` after merge (run `/clean`)
