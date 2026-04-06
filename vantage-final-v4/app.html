@@ -2884,43 +2884,120 @@ var STATUS_CFG = {
   q3:   { dot: '#5b8dee',             label: 'Q3 2026', glow: false },
 };
 
+// Provider name → INTEGRATION_STATUS key mapping for connection lookups
+var _PROVIDER_KEYS = {
+  'anthropic': 'Claude Code', 'claude-code': 'Claude Code',
+  'openai': 'GitHub Copilot',  'copilot': 'GitHub Copilot',
+  'google': 'Gemini CLI',      'gemini': 'Gemini CLI',
+  'codex': 'Codex CLI',        'openai-codex': 'Codex CLI',
+  'cline': 'Cline',            'windsurf': 'Windsurf', 'aider': 'Aider',
+};
+
 function loadIntegrations() {
   var grid = document.getElementById('integrationsGrid');
   if (!grid) return;
   grid.textContent = '';
 
-  INTEGRATION_STATUS.forEach(function(item) {
-    var cfg = STATUS_CFG[item.status] || STATUS_CFG['q3'];
+  // Fetch real connections to show actual "connected" vs "not yet set up"
+  apiFetch('/v1/cross-platform/connections').catch(function() { return null; }).then(function(data) {
+    var otelSources = (data && data.otel_sources) || [];
+    var billingConns = (data && data.billing_connections) || [];
+    var STALE_DAYS = 7;
+    var now = Date.now();
 
-    var card = document.createElement('div');
-    card.style.cssText = 'background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:10px;';
+    // Build lookup: display name → last_data_at ms
+    var connected = {};
+    otelSources.forEach(function(s) {
+      var key = _PROVIDER_KEYS[(s.provider || '').toLowerCase()] || s.provider;
+      var ts = s.last_data_at ? new Date(s.last_data_at.replace(' ', 'T') + 'Z').getTime() : 0;
+      if (!connected[key] || ts > connected[key]) connected[key] = ts;
+    });
+    billingConns.forEach(function(b) {
+      if (b.status === 'active' || b.status === 'connected') {
+        var key = _PROVIDER_KEYS[(b.provider || '').toLowerCase()] || b.provider;
+        connected[key] = connected[key] || now;
+      }
+    });
 
-    var dot = document.createElement('div');
-    dot.style.cssText = 'width:8px;height:8px;border-radius:50%;background:' + cfg.dot + ';flex-shrink:0;' +
-      (cfg.glow ? 'box-shadow:0 0 6px ' + cfg.dot + ';' : '');
+    INTEGRATION_STATUS.forEach(function(item) {
+      var isLiveInRoadmap = item.status === 'live';
+      var lastSeen = connected[item.name] || 0;
+      var recentlyActive = lastSeen > 0 && (now - lastSeen) < STALE_DAYS * 86400 * 1000;
+      var everSeen = lastSeen > 0;
 
-    var body = document.createElement('div');
-    body.style.cssText = 'flex:1;min-width:0;';
+      var dotColor, badgeLabel, glow, subLabel;
+      if (isLiveInRoadmap) {
+        if (recentlyActive) {
+          var daysAgo = Math.round((now - lastSeen) / 86400000);
+          dotColor = 'var(--accent-green)';
+          badgeLabel = 'Connected';
+          glow = true;
+          subLabel = daysAgo === 0 ? 'Active today' : daysAgo + 'd ago';
+        } else if (everSeen) {
+          dotColor = 'var(--accent-amber)';
+          badgeLabel = 'Inactive';
+          glow = false;
+          subLabel = 'No data in ' + Math.round((now - lastSeen) / 86400000) + 'd';
+        } else {
+          dotColor = '#4a5568';
+          badgeLabel = 'Not connected';
+          glow = false;
+          subLabel = item.method;
+        }
+      } else {
+        var cfg = STATUS_CFG[item.status] || STATUS_CFG['q3'];
+        dotColor = cfg.dot;
+        badgeLabel = cfg.label;
+        glow = false;
+        subLabel = item.method;
+      }
 
-    var nameEl = document.createElement('div');
-    nameEl.style.cssText = 'font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
-    nameEl.textContent = item.name;
+      var card = document.createElement('div');
+      var borderColor = recentlyActive ? 'rgba(52,211,153,.2)' : 'var(--border)';
+      card.style.cssText = 'background:var(--bg-card);border:1px solid ' + borderColor + ';border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:10px;';
 
-    var methodEl = document.createElement('div');
-    methodEl.style.cssText = 'font-size:10px;color:var(--text-muted);';
-    methodEl.textContent = item.method;
+      var dot = document.createElement('div');
+      dot.style.cssText = 'width:8px;height:8px;border-radius:50%;background:' + dotColor + ';flex-shrink:0;' +
+        (glow ? 'box-shadow:0 0 6px ' + dotColor + ';animation:pulse 2s infinite;' : '');
 
-    body.appendChild(nameEl);
-    body.appendChild(methodEl);
+      var body = document.createElement('div');
+      body.style.cssText = 'flex:1;min-width:0;';
 
-    var badge = document.createElement('span');
-    badge.style.cssText = 'font-size:10px;padding:2px 8px;border-radius:10px;background:' + cfg.dot + '22;color:' + cfg.dot + ';white-space:nowrap;';
-    badge.textContent = cfg.label;
+      var nameEl = document.createElement('div');
+      nameEl.style.cssText = 'font-size:12px;font-weight:500;';
+      nameEl.textContent = item.name;
 
-    card.appendChild(dot);
-    card.appendChild(body);
-    card.appendChild(badge);
-    grid.appendChild(card);
+      var methodEl = document.createElement('div');
+      methodEl.style.cssText = 'font-size:10px;color:var(--text-muted);';
+      methodEl.textContent = subLabel;
+
+      body.appendChild(nameEl);
+      body.appendChild(methodEl);
+
+      var badge = document.createElement('span');
+      badge.style.cssText = 'font-size:10px;padding:2px 8px;border-radius:10px;background:' + dotColor + '22;color:' + dotColor + ';white-space:nowrap;';
+      badge.textContent = badgeLabel;
+
+      card.appendChild(dot);
+      card.appendChild(body);
+      card.appendChild(badge);
+      grid.appendChild(card);
+    });
+
+    // If nothing is connected, prepend a setup prompt
+    var anyConnected = Object.keys(connected).length > 0;
+    if (!anyConnected) {
+      var setupBanner = document.createElement('div');
+      setupBanner.style.cssText = 'grid-column:1/-1;padding:16px;background:rgba(52,211,153,.04);border:1px dashed rgba(52,211,153,.2);border-radius:8px;text-align:center;font-size:12px;color:var(--text-muted);';
+      var bannerText = document.createTextNode('No tools connected yet. ');
+      var bannerLink = document.createElement('a');
+      bannerLink.href = '/docs.html#otel';
+      bannerLink.style.color = 'var(--accent-green)';
+      bannerLink.textContent = 'Set up OTel in 2 minutes \u2192';
+      setupBanner.appendChild(bannerText);
+      setupBanner.appendChild(bannerLink);
+      grid.insertBefore(setupBanner, grid.firstChild);
+    }
   });
 }
 
