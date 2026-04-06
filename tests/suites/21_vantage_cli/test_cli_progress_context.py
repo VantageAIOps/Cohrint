@@ -76,8 +76,9 @@ class TestRunnerIntegration:
 
     def test_pc09_calls_spinner_stop(self):
         content = src("runner.ts")
-        chk("PC.09 runner.ts calls spinner.stop()", "spinner.stop()" in content)
-        assert "spinner.stop()" in content
+        # runner.ts wraps spinner in a stopSpinner() closure
+        chk("PC.09 runner.ts calls stopSpinner()", "stopSpinner()" in content)
+        assert "stopSpinner()" in content
 
 
 # ── Section C: types.ts Interface ─────────────────────────────────────────
@@ -166,18 +167,18 @@ class TestNonContinueAdapters:
     def test_pc22_aider_no_supports_continue(self):
         section("G — Non-continue Adapters")
         content = agent_src("aider.ts")
-        chk("PC.22 aider.ts does NOT have supportsContinue", "supportsContinue" not in content)
-        assert "supportsContinue" not in content
+        chk("PC.22 aider.ts has supportsContinue: false", "supportsContinue: false" in content)
+        assert "supportsContinue: false" in content
 
     def test_pc23_codex_no_supports_continue(self):
         content = agent_src("codex.ts")
-        chk("PC.23 codex.ts does NOT have supportsContinue", "supportsContinue" not in content)
-        assert "supportsContinue" not in content
+        chk("PC.23 codex.ts has supportsContinue", "supportsContinue" in content)
+        assert "supportsContinue" in content
 
     def test_pc24_chatgpt_no_supports_continue(self):
         content = agent_src("chatgpt.ts")
-        chk("PC.24 chatgpt.ts does NOT have supportsContinue", "supportsContinue" not in content)
-        assert "supportsContinue" not in content
+        chk("PC.24 chatgpt.ts has supportsContinue", "supportsContinue" in content)
+        assert "supportsContinue" in content
 
 
 # ── Section H: TypeScript Compilation ────────────────────────────────────

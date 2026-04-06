@@ -196,6 +196,10 @@ jobs:
         working-directory: vantage-cli
         run: npm ci
 
+      - name: Build CLI (required for dist/index.js check)
+        working-directory: vantage-cli
+        run: npx tsup src/index.ts --format esm --dts --clean
+
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
