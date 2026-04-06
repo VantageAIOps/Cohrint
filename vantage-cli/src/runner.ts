@@ -227,25 +227,25 @@ export function runAgent(
 
     let child: ReturnType<typeof spawn>;
     try {
+      // stdin: "inherit" in TTY mode passes the real terminal fd to the child.
+      //   This lets the agent show permission prompts and receive the user's
+      //   y/n response directly — exactly like running the agent manually.
+      // stdin: "pipe" in non-TTY (pipe) mode — the prompt is already passed via
+      //   -p flag, so we feed whatever is left in stdin without closing it early.
+      // stdout: always "pipe" so we can parse stream-json and relay formatted output.
+      // stderr: "inherit" so native errors / warnings go straight to the terminal.
+      const stdinMode = process.stdin.isTTY ? "inherit" : "pipe";
       child = spawn(spawnArgs.command, spawnArgs.args, {
-        stdio: ["pipe", "pipe", "inherit"],  // stderr → terminal directly (permission prompts visible)
+        stdio: [stdinMode, "pipe", "inherit"],
         env: buildSafeEnv(spawnArgs.env),
       });
-      // Only pipe stdin when data is actually being piped in (non-TTY).
-      // In interactive TTY mode, closing stdin immediately prevents claude from
-      // printing "Warning: no stdin data received in 3s" while waiting for input
-      // that will never arrive.
       if (!process.stdin.isTTY) {
-        // Pipe available stdin data but don't close child stdin after — agent may need
-        // to read interactive input (e.g. permission prompt responses) from the terminal.
+        // Pipe available stdin data; don't close child stdin after so the agent
+        // can still receive interactive input if it asks for it.
         process.stdin.pipe(child.stdin!, { end: false });
-        process.stdin.once("end", () => {
-          // Only close child stdin when parent stdin truly ends
-          child.stdin?.end();
-        });
-      } else {
-        child.stdin?.end();
+        process.stdin.once("end", () => { child.stdin?.end(); });
       }
+      // TTY mode: stdin is the terminal itself — no piping needed.
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       reject(new Error(`Failed to start '${spawnArgs.command}': ${msg}`));
