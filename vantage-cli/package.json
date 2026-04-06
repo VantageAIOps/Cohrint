@@ -1,6 +1,6 @@
 {
   "name": "vantageai-cli",
-  "version": "2.2.2",
+  "version": "2.2.3",
   "description": "AI coding tool cost intelligence CLI — optimize prompts, track costs, multi-line input, conversation context across Claude Code, Copilot, Gemini, Codex, Cursor",
   "type": "module",
   "main": "./dist/index.js",
