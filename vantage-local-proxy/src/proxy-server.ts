@@ -109,6 +109,8 @@ class StatsQueue {
     const batch = this.queue.splice(0, this.batchSize);
     this._send(batch.map((s) => s.event)).catch((err) => {
       if (this.debug) process.stderr.write(`[vantage-proxy] Flush error: ${err}\n`);
+      // Re-queue on failure so stats aren't permanently lost
+      this.queue.unshift(...batch);
     });
   }
 
@@ -127,11 +129,13 @@ class StatsQueue {
         },
         body,
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       if (this.debug) {
         process.stderr.write(`[vantage-proxy] Sent ${events.length} stats → ${res.status}\n`);
       }
     } catch (err) {
       if (this.debug) process.stderr.write(`[vantage-proxy] Send failed: ${err}\n`);
+      throw err; // re-throw so flush() re-queues the batch
     }
   }
 }
@@ -155,7 +159,7 @@ function extractOpenAIStats(
   return {
     provider: "openai", model, endpoint: "/chat/completions",
     prompt_tokens: promptTokens, completion_tokens: completionTokens,
-    total_tokens: promptTokens + completionTokens, cached_tokens: cachedTokens,
+    total_tokens: promptTokens + completionTokens, cache_tokens: cachedTokens,
     latency_ms: Math.round(latencyMs), status_code: statusCode,
     cost_input_usd: inputCostUsd, cost_output_usd: outputCostUsd, cost_total_usd: totalCostUsd,
     cheapest_model: cheapest?.model ?? "", cheapest_cost_usd: cheapest?.costUsd ?? 0,
@@ -180,7 +184,7 @@ function extractAnthropicStats(
   return {
     provider: "anthropic", model, endpoint: "/messages",
     prompt_tokens: promptTokens, completion_tokens: completionTokens,
-    total_tokens: promptTokens + completionTokens, cached_tokens: cachedTokens,
+    total_tokens: promptTokens + completionTokens, cache_tokens: cachedTokens,
     latency_ms: Math.round(latencyMs), status_code: statusCode,
     cost_input_usd: inputCostUsd, cost_output_usd: outputCostUsd, cost_total_usd: totalCostUsd,
     cheapest_model: cheapest?.model ?? "", cheapest_cost_usd: cheapest?.costUsd ?? 0,
@@ -393,7 +397,7 @@ export function startProxyServer(config: LocalProxyConfig): void {
           provider, model: String(reqBody.model ?? "unknown"), endpoint: targetPath,
           latency_ms: Math.round(latencyMs), status_code: upstreamRes.status,
           prompt_tokens: 0, completion_tokens: 0, total_tokens: 0,
-          cached_tokens: 0, cost_total_usd: 0, cost_input_usd: 0, cost_output_usd: 0,
+          cache_tokens: 0, cost_total_usd: 0, cost_input_usd: 0, cost_output_usd: 0,
           org_id: orgId, team, environment,
         });
 

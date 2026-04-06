@@ -1354,7 +1354,10 @@ function toolInitial(provider) {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 // ── API cache (localStorage) ──
-function _cacheKey(path) { return 'vantage_cache:' + path; }
+function _cacheKey(path) {
+  var orgId = _session ? ((_session.user || _session).org_id || '') : '';
+  return 'vantage_cache:' + orgId + ':' + path;
+}
 function _cacheGet(path) {
   try {
     var raw = localStorage.getItem(_cacheKey(path));
@@ -2963,12 +2966,20 @@ function copyApiKey() {
       var full = el.dataset.full || '';
       if (full) el.textContent = full.substring(0, 7) + '****...' + full.substring(full.length - 4);
     }, 1000);
+  }).catch(function() {
+    el.textContent = 'Copy failed';
+    setTimeout(function() { el.textContent = (el.dataset.full || '').substring(0, 7) + '****...'; }, 2000);
   });
 }
 
 function copyOrgId() {
-  var text = document.getElementById('accountOrgId').textContent;
-  navigator.clipboard.writeText(text);
+  var el = document.getElementById('accountOrgId');
+  var text = el.textContent;
+  navigator.clipboard.writeText(text).then(function() {
+    var orig = el.textContent;
+    el.textContent = 'Copied!';
+    setTimeout(function() { el.textContent = orig; }, 1000);
+  }).catch(function() { /* silent — orgId is visible on screen */ });
 }
 
 function rotateApiKey() {

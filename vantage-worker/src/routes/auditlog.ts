@@ -77,7 +77,7 @@ auditlog.get('/', async (c) => {
 // ── CSV helper ────────────────────────────────────────────────────────────────
 
 function csvResponse(orgId: string, events: Record<string, unknown>[]): Response {
-  const header = 'id,org_id,actor_id,actor_role,event_type,event_name,resource,detail,ip_address,created_at\n';
+  const header = 'id,org_id,actor_email,actor_role,event_type,action,resource,detail,ip_address,created_at\n';
   const rows = events.map(e =>
     [e['id'], orgId, e['actor_email'], e['actor_role'], e['event_type'],
      e['action'], e['resource'], e['detail'], e['ip_address'], e['created_at']]

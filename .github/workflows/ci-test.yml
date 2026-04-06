@@ -261,8 +261,10 @@ jobs:
             --category 06_stress \
             --category 07_load \
             --category 08_latency \
-            --no-report 2>&1 | tee /tmp/stress-output.txt || true
+            --no-report 2>&1 | tee /tmp/stress-output.txt
+          EXIT=${PIPESTATUS[0]}
           cat /tmp/stress-output.txt
+          exit $EXIT
 
       - name: Upload stress test results
         if: always()
@@ -298,8 +300,10 @@ jobs:
           EMAIL: ${{ secrets.EMAIL }}
           PASSWORD: ${{ secrets.PASSWORD }}
         run: |
-          python tests/run_suite.py --security --no-report 2>&1 | tee /tmp/security-output.txt || true
+          python tests/run_suite.py --security --no-report 2>&1 | tee /tmp/security-output.txt
+          EXIT=${PIPESTATUS[0]}
           cat /tmp/security-output.txt
+          exit $EXIT
 
       - name: Upload security test results
         if: always()

@@ -114,7 +114,7 @@ export function flattenEvent(e: VantageEvent): Record<string, unknown> {
     prompt_tokens: e.usage.promptTokens,
     completion_tokens: e.usage.completionTokens,
     total_tokens: e.usage.totalTokens,
-    cached_tokens: e.usage.cachedTokens,
+    cache_tokens: e.usage.cachedTokens,
     system_prompt_tokens: e.usage.systemPromptTokens,
     cost_input_usd: e.cost.inputCostUsd,
     cost_output_usd: e.cost.outputCostUsd,

@@ -47,6 +47,8 @@ export class EventQueue {
     const batch = this.queue.splice(0, this.batchSize);
     this._send(batch).catch((err) => {
       if (this.debug) console.warn("[vantage] Flush error:", err);
+      // Re-queue on failure so events aren't permanently lost
+      this.queue.unshift(...batch);
     });
   }
 
@@ -66,9 +68,11 @@ export class EventQueue {
         },
         body,
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       if (this.debug) console.debug(`[vantage] Sent ${events.length} events → ${res.status}`);
     } catch (err) {
       if (this.debug) console.warn("[vantage] Ingest failed:", err);
+      throw err; // re-throw so flush() re-queues the batch
     }
   }
 }

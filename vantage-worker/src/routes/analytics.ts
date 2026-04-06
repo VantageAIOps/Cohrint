@@ -98,7 +98,7 @@ analytics.get('/kpis', async (c) => {
   const orgId     = c.get('orgId');
   const scopeTeam = c.get('scopeTeam');
   const { clause, args } = teamScope(scopeTeam);
-  const period = Math.min(parseInt(c.req.query('period') ?? '30', 10), 365);
+  const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
   const since  = Math.floor(Date.now() / 1000) - period * 86_400;
 
   const row = await c.env.DB.prepare(`
@@ -120,7 +120,7 @@ analytics.get('/timeseries', async (c) => {
   const orgId     = c.get('orgId');
   const scopeTeam = c.get('scopeTeam');
   const { clause, args } = teamScope(scopeTeam);
-  const period = Math.min(parseInt(c.req.query('period') ?? '30', 10), 365);
+  const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
   const since  = Math.floor(Date.now() / 1000) - period * 86_400;
 
   const { results } = await c.env.DB.prepare(`
@@ -143,7 +143,7 @@ analytics.get('/models', async (c) => {
   const orgId     = c.get('orgId');
   const scopeTeam = c.get('scopeTeam');
   const { clause, args } = teamScope(scopeTeam);
-  const period = Math.min(parseInt(c.req.query('period') ?? '30', 10), 365);
+  const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
   const since  = Math.floor(Date.now() / 1000) - period * 86_400;
 
   const { results } = await c.env.DB.prepare(`
@@ -171,7 +171,7 @@ analytics.get('/teams', async (c) => {
   const orgId     = c.get('orgId');
   const scopeTeam = c.get('scopeTeam');
   const { clause, args } = teamScope(scopeTeam);
-  const period = Math.min(parseInt(c.req.query('period') ?? '30', 10), 365);
+  const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
   const since  = Math.floor(Date.now() / 1000) - period * 86_400;
 
   const { results } = await c.env.DB.prepare(`
@@ -201,7 +201,7 @@ analytics.get('/traces', async (c) => {
   const orgId     = c.get('orgId');
   const scopeTeam = c.get('scopeTeam');
   const { clause, args } = teamScope(scopeTeam);
-  const period = Math.min(parseInt(c.req.query('period') ?? '1', 10), 30);
+  const period = Math.min(parseInt(c.req.query('period') ?? '1', 10) || 1, 30);
   const since  = Math.floor(Date.now() / 1000) - period * 86_400;
 
   const { results } = await c.env.DB.prepare(`
@@ -228,7 +228,7 @@ analytics.get('/cost', async (c) => {
   const orgId     = c.get('orgId');
   const scopeTeam = c.get('scopeTeam');
   const { clause, args } = teamScope(scopeTeam);
-  const period = Math.min(parseInt(c.req.query('period') ?? '7', 10), 30);
+  const period = Math.min(parseInt(c.req.query('period') ?? '7', 10) || 7, 30);
   const since  = Math.floor(Date.now() / 1000) - period * 86_400;
   const today  = Math.floor(Date.now() / 1000) - 86_400;
 
