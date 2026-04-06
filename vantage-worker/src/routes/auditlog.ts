@@ -65,7 +65,7 @@ auditlog.get('/', async (c) => {
   ]);
 
   const events = rows.results as Record<string, unknown>[];
-  const total  = (countRow.results[0] as { total: number }).total;
+  const total  = (countRow.results?.[0] as { total: number } | undefined)?.total ?? 0;
 
   if (format === 'csv') {
     return csvResponse(orgId, events);

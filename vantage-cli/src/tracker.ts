@@ -163,6 +163,9 @@ export class Tracker {
       if (!response.ok) {
         // Never log response body — could contain echoed credentials
         console.error(`  [vantage] Dashboard sync failed: HTTP ${response.status}`);
+        // Re-queue events so they're not lost on server-side errors
+        const unsent = batch.filter((e) => !this.sentIds.has(e.event_id));
+        this.queue.unshift(...unsent);
       }
     } catch (err) {
       bus.emit("cost:reported", { success: false });

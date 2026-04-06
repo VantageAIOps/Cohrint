@@ -250,12 +250,15 @@ async function doSignup() {
     document.getElementById('success-state').style.display = 'block';
 
     // Create a server-side session so the user is auto-logged-in
-    await fetch(`${API}/v1/auth/session`, {
+    const sessRes = await fetch(`${API}/v1/auth/session`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({ api_key: data.api_key }),
     });
+    if (!sessRes.ok) {
+      console.warn('[vantage] Session creation failed — user will need to sign in manually');
+    }
 
   } catch {
     showErr('Network error — please check your connection and try again.');

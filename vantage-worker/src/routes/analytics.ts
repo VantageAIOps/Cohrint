@@ -59,20 +59,22 @@ analytics.get('/summary', async (c) => {
 
   // Budget: per-team when scoped, org-wide otherwise
   let budgetUsd = 0;
+  let orgPlan = 'free';
   if (scopeTeam) {
     const tb = await c.env.DB.prepare(
       'SELECT budget_usd FROM team_budgets WHERE org_id = ? AND team = ?'
     ).bind(orgId, scopeTeam).first<{ budget_usd: number }>();
     budgetUsd = tb?.budget_usd ?? 0;
+    const org = await c.env.DB.prepare('SELECT plan FROM orgs WHERE id = ?')
+      .bind(orgId).first<{ plan: string }>();
+    orgPlan = org?.plan ?? 'free';
   } else {
     const org = await c.env.DB.prepare(
       'SELECT budget_usd, plan FROM orgs WHERE id = ?'
     ).bind(orgId).first<{ budget_usd: number; plan: string }>();
     budgetUsd = org?.budget_usd ?? 0;
+    orgPlan = org?.plan ?? 'free';
   }
-
-  const org = await c.env.DB.prepare('SELECT plan FROM orgs WHERE id = ?')
-    .bind(orgId).first<{ plan: string }>();
 
   const t = totals.results[0] as Record<string, number>;
   const s = (session.results[0] as Record<string, number>) ?? {};
@@ -88,7 +90,7 @@ analytics.get('/summary', async (c) => {
     session_cost_usd: s?.session_cost_usd ?? 0,
     budget_pct:       budgetPct,
     budget_usd:       budgetUsd,
-    plan:             org?.plan ?? 'free',
+    plan:             orgPlan,
     scope_team:       scopeTeam ?? null,
   });
 });

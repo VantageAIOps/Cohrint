@@ -35,7 +35,7 @@ alerts.post('/slack/:orgId', async (c) => {
     body.webhook_url,
     body.trigger_budget  !== false ? 1 : 0,
     body.trigger_anomaly !== false ? 1 : 0,
-    body.trigger_daily   === true  ? 1 : 0,
+    body.trigger_daily   !== false ? 1 : 0,
   ).run();
 
   // Cache in KV for fast lookup during event ingest (best-effort — D1 is the source of truth)

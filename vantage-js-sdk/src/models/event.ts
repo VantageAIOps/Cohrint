@@ -81,7 +81,7 @@ export function makeEventId(): string {
 }
 
 export function hashPrompt(text: string): string {
-  return createHash("md5").update(text).digest("hex").slice(0, 12);
+  return createHash("sha256").update(text).digest("hex").slice(0, 12);
 }
 
 export function efficiencyScore(usage: TokenUsage): number {

@@ -151,7 +151,7 @@ function _checkExistingSession() {
     .then(res => {
       if (res.ok) {
         const raw  = new URLSearchParams(window.location.search).get('next') || '/app.html';
-        const dest = raw.startsWith('/auth') ? '/app.html' : raw;
+        const dest = (raw.startsWith('/') && !raw.startsWith('//') && !raw.startsWith('/auth')) ? raw : '/app.html';
         window.location.replace(dest);
       }
     })
@@ -201,7 +201,7 @@ async function doSignIn() {
     }
     if (!res.ok) throw new Error('server');
     const raw = new URLSearchParams(window.location.search).get('next') || '/app.html';
-    const next = raw.startsWith('/auth') ? '/app.html' : raw;
+    const next = (raw.startsWith('/') && !raw.startsWith('//') && !raw.startsWith('/auth')) ? raw : '/app.html';
     window.location.replace(next);
   } catch(e) {
     btn.disabled = false;

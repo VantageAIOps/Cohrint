@@ -161,12 +161,12 @@ function buildInsertStmt(
   const r = ev as unknown as Record<string, unknown>;
 
   const eventId        = ev.event_id ?? r.id as string | undefined;
-  const promptTokens   = ev.prompt_tokens   ?? r.usage_prompt_tokens   as number ?? 0;
-  const completionTok  = ev.completion_tokens ?? r.usage_completion_tokens as number ?? 0;
-  const cacheTok       = ev.cache_tokens    ?? r.usage_cached_tokens   as number ?? r.cache_tokens as number ?? 0;
-  const totalTokens    = ev.total_tokens    ?? r.usage_total_tokens    as number ?? (promptTokens + completionTok);
-  const costUsd        = ev.total_cost_usd  ?? ev.cost_total_usd       ??
-                         r.cost_total_cost_usd as number ?? r.cost_usd as number ?? 0;
+  const promptTokens   = Number(ev.prompt_tokens   ?? r.usage_prompt_tokens   ?? 0);
+  const completionTok  = Number(ev.completion_tokens ?? r.usage_completion_tokens ?? 0);
+  const cacheTok       = Number(ev.cache_tokens    ?? r.usage_cached_tokens   ?? r.cache_tokens   ?? 0);
+  const totalTokens    = Number(ev.total_tokens    ?? r.usage_total_tokens    ?? (promptTokens + completionTok));
+  const costUsd        = Number(ev.total_cost_usd  ?? ev.cost_total_usd       ??
+                         r.cost_total_cost_usd ?? r.cost_usd ?? 0);
   const latencyMs      = ev.latency_ms      ?? r.latency_ms            as number ?? 0;
   const tagsValue      = ev.tags ?? (r.tags as Record<string, string> | undefined);
 

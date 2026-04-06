@@ -719,9 +719,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const compressedTokens = countTokens(compressed);
         const saved = originalTokens - compressedTokens;
         const tips = getOptimizationTips(prompt);
-        const costBefore = calcCost(model, originalTokens, originalTokens);
-        const costAfter = calcCost(model, compressedTokens, compressedTokens);
-        const cheapest = findCheapest(compressedTokens, compressedTokens);
+        // Use a fixed output estimate (half of original input) so cost comparison is fair
+        const estimatedOutputTokens = Math.round(originalTokens / 2);
+        const costBefore = calcCost(model, originalTokens, estimatedOutputTokens);
+        const costAfter = calcCost(model, compressedTokens, estimatedOutputTokens);
+        const cheapest = findCheapest(compressedTokens, estimatedOutputTokens);
 
         const lines = [
           `🔧 **Prompt Optimizer** (${model})`,

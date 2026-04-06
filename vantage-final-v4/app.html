@@ -1702,7 +1702,7 @@ function renderDailyChart(summary, timeseries) {
         datasets.push({
           label: toolName(prov),
           data: daily.map(function(d) {
-            var found = d.by_provider.find(function(bp) { return bp.provider === prov; });
+            var found = (d.by_provider || []).find(function(bp) { return bp.provider === prov; });
             return found ? (found.cost || found.total_cost || 0) : 0;
           }),
           backgroundColor: toolColor(prov),
