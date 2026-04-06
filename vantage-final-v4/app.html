@@ -711,6 +711,16 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
             </div>
             <div class="kpi-sub neutral" id="kpiBudgetSub">&nbsp;</div>
           </div>
+          <div class="kpi-card animate-in delay-5">
+            <div class="kpi-label">Token Usage</div>
+            <div class="kpi-value" id="kpiTokenUsage">&mdash;</div>
+            <div class="kpi-sub neutral" id="kpiTokenUsageSub">&nbsp;</div>
+          </div>
+          <div class="kpi-card animate-in delay-6">
+            <div class="kpi-label">Cache Savings</div>
+            <div class="kpi-value" id="kpiCacheSavings" style="color:var(--accent-green);">&mdash;</div>
+            <div class="kpi-sub neutral" id="kpiCacheSavingsSub">&nbsp;</div>
+          </div>
         </div>
 
         <div class="chart-row animate-in delay-5">
@@ -1253,6 +1263,14 @@ function fmtNum(n) {
   return Number(n).toLocaleString('en-US');
 }
 
+function fmtTok(n) {
+  if (n == null || isNaN(n)) return '\u2014';
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return String(n);
+}
+
 function toolName(provider) {
   return TOOL_NAMES[provider] || provider || 'Unknown';
 }
@@ -1441,6 +1459,30 @@ function loadOverview() {
     } else {
       document.getElementById('kpiBudgetPct').textContent = 'N/A';
       document.getElementById('kpiBudgetSub').textContent = 'No budget set';
+    }
+
+    // Token usage
+    var inputTok = summary.total_input_tokens || 0;
+    var outputTok = summary.total_output_tokens || 0;
+    var totalTok = inputTok + outputTok;
+    if (totalTok > 0) {
+      document.getElementById('kpiTokenUsage').textContent = fmtTok(totalTok);
+      document.getElementById('kpiTokenUsageSub').textContent =
+        fmtTok(inputTok) + ' in \u00b7 ' + fmtTok(outputTok) + ' out';
+    }
+
+    // Cache savings — cached tokens cost ~10% vs full price; savings ≈ 90% of what they would have cost
+    var cachedTok = summary.total_cached_tokens || 0;
+    if (cachedTok > 0 && totalCost > 0) {
+      // Estimate: cached tokens saved ~$2.70/MTok (Claude rate: $3 input - $0.30 cache)
+      var cacheSavingsUsd = (cachedTok / 1e6) * 2.70;
+      document.getElementById('kpiCacheSavings').textContent = fmt(cacheSavingsUsd);
+      var cacheHitPct = totalTok > 0 ? ((cachedTok / (totalTok + cachedTok)) * 100).toFixed(0) : 0;
+      document.getElementById('kpiCacheSavingsSub').textContent =
+        fmtTok(cachedTok) + ' cached \u00b7 ' + cacheHitPct + '% hit rate';
+    } else {
+      document.getElementById('kpiCacheSavings').textContent = '$0.00';
+      document.getElementById('kpiCacheSavingsSub').textContent = 'No cache hits yet';
     }
 
     renderDailyChart(summary, timeseries);
