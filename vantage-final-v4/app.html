@@ -750,12 +750,11 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
           <table class="tool-table">
             <thead>
               <tr>
-                <th>Tool</th><th>Monthly Cost</th><th>Requests</th>
-                <th>Top Model</th><th>Avg $/Req</th><th>Developers</th><th>30d Trend</th>
+                <th>Tool</th><th>Cost</th><th>Requests</th><th>Avg $/Req</th>
               </tr>
             </thead>
             <tbody id="toolComparisonBody">
-              <tr><td colspan="7" class="empty-state">Loading...</td></tr>
+              <tr><td colspan="4" class="empty-state">Loading...</td></tr>
             </tbody>
           </table>
         </div>
@@ -1419,10 +1418,8 @@ function loadOverview() {
     var byProvider = summary.by_provider || [];
     var filtered = activeToolFilter === 'all' ? byProvider : byProvider.filter(function(p) { return p.provider === activeToolFilter; });
     var totalCost = filtered.reduce(function(s, p) { return s + (p.total_cost || p.cost || 0); }, 0);
-    var totalReqs = filtered.reduce(function(s, p) { return s + (p.request_count || 0); }, 0);
-    var totalDevs = activeToolFilter === 'all'
-      ? (summary.total_developers || (devs && devs.developers ? devs.developers.length : 0))
-      : filtered.reduce(function(s, p) { return s + (p.developer_count || 0); }, 0);
+    var totalReqs = filtered.reduce(function(s, p) { return s + (p.records || p.request_count || 0); }, 0);
+    var totalDevs = (devs && devs.developers ? devs.developers.length : 0) || summary.total_developers || 0;
 
     // KPIs
     document.getElementById('kpiTotalSpend').textContent = fmt(totalCost);
@@ -1450,13 +1447,15 @@ function loadOverview() {
       document.getElementById('kpiActiveDevSub').textContent = 'avg ' + fmt(totalCost / totalDevs) + '/dev/' + (period <= 7 ? 'week' : 'month');
     }
 
-    // Budget status
-    var budget = summary.budget || (kpis ? kpis.budget : null) || null;
-    if (budget && budget.limit > 0) {
-      var budgetPct = Math.min(100, ((budget.used || totalCost) / budget.limit * 100)).toFixed(0);
+    // Budget status — summary.budget uses monthly_limit_usd / month_spend_usd
+    var budget = summary.budget || null;
+    var budgetLimit = budget && (budget.monthly_limit_usd || budget.limit) || 0;
+    var budgetSpend = budget && (budget.month_spend_usd || budget.used) || totalCost;
+    if (budgetLimit > 0) {
+      var budgetPct = Math.min(100, (budgetSpend / budgetLimit * 100)).toFixed(0);
       document.getElementById('kpiBudgetPct').textContent = budgetPct + '%';
       document.getElementById('kpiBudgetFill').style.width = budgetPct + '%';
-      document.getElementById('kpiBudgetSub').textContent = fmt(budget.limit - (budget.used || totalCost)) + ' remaining';
+      document.getElementById('kpiBudgetSub').textContent = fmt(budgetLimit - budgetSpend) + ' remaining';
     } else {
       document.getElementById('kpiBudgetPct').textContent = 'N/A';
       document.getElementById('kpiBudgetSub').textContent = 'No budget set';
@@ -1654,7 +1653,7 @@ function renderDevCosts(devs, byProvider) {
   // Build DOM safely
   container.textContent = '';
   sorted.forEach(function(dev) {
-    var name = dev.developer || dev.name || dev.email || 'Unknown';
+    var name = dev.developer_email || dev.developer || dev.name || dev.email || 'Unknown';
     var cost = dev.total_cost || 0;
 
     var row = document.createElement('div');
@@ -1675,7 +1674,7 @@ function renderDevCosts(devs, byProvider) {
     var bar = document.createElement('div');
     bar.className = 'dev-bar';
 
-    var providers = dev.by_provider || [];
+    var providers = dev.providers || dev.by_provider || [];
     if (providers.length > 0) {
       providers.forEach(function(p) {
         var w = cost > 0 ? ((p.total_cost || p.cost || 0) / cost * 100) : 0;
@@ -1707,7 +1706,7 @@ function renderToolComparison(byProvider) {
     tbody.textContent = '';
     var tr = document.createElement('tr');
     var td = document.createElement('td');
-    td.colSpan = 7;
+    td.colSpan = 4;
     td.className = 'empty-state';
     td.textContent = 'No tool data yet';
     tr.appendChild(td);
@@ -1720,12 +1719,9 @@ function renderToolComparison(byProvider) {
 
   sorted.forEach(function(p) {
     var cost = p.total_cost || p.cost || 0;
-    var reqs = p.request_count || 0;
+    var reqs = p.records || p.request_count || 0;
     var avgPerReq = reqs > 0 ? (cost / reqs) : 0;
     var color = toolColor(p.provider);
-    var trend = p.trend || 0;
-    var trendClass = trend > 0 ? 'trend-up' : trend < 0 ? 'trend-down' : 'trend-flat';
-    var trendArrow = trend > 0 ? '\u2191' : trend < 0 ? '\u2193' : '\u2192';
 
     var tr = document.createElement('tr');
     tr.onclick = function() { selectToolTab(p.provider); };
@@ -1755,26 +1751,10 @@ function renderToolComparison(byProvider) {
     td3.textContent = fmtNum(reqs);
     tr.appendChild(td3);
 
-    // Top model
-    var td4 = document.createElement('td');
-    td4.textContent = p.top_model || '-';
-    tr.appendChild(td4);
-
     // Avg per req
-    var td5 = document.createElement('td');
-    td5.textContent = fmt(avgPerReq);
-    tr.appendChild(td5);
-
-    // Developers
-    var td6 = document.createElement('td');
-    td6.textContent = fmtNum(p.developer_count || 0);
-    tr.appendChild(td6);
-
-    // Trend
-    var td7 = document.createElement('td');
-    td7.className = trendClass;
-    td7.textContent = trendArrow + ' ' + Math.abs(trend).toFixed(0) + '%';
-    tr.appendChild(td7);
+    var td4 = document.createElement('td');
+    td4.textContent = fmt(avgPerReq);
+    tr.appendChild(td4);
 
     tbody.appendChild(tr);
   });
@@ -2029,7 +2009,7 @@ function renderSpendModels(modelList) {
     tr.appendChild(td4);
 
     var td5 = document.createElement('td');
-    td5.textContent = fmtNum(m.request_count || m.requests || 0);
+    td5.textContent = fmtNum(m.requests || m.request_count || 0);
     tr.appendChild(td5);
 
     tbody.appendChild(tr);
@@ -2352,7 +2332,7 @@ function renderTeamBudgets(overview) {
 
     var td3 = document.createElement('td');
     td3.className = 'cost-highlight';
-    td3.textContent = fmt(t.mtd_spend || t.total_cost || 0);
+    td3.textContent = fmt(t.cost_usd || t.mtd_spend || t.total_cost || 0);
     tr.appendChild(td3);
 
     var td4 = document.createElement('td');
