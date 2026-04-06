@@ -80,7 +80,10 @@ export class Tracker {
       const model = agent?.defaultModel ?? "unknown";
       const outputTokens = countTokens(data.outputText);
       if (outputTokens === 0 && data.exitCode !== 0) {
-        // Agent failed with no output — don't record $0 cost silently
+        // Agent failed with no output — don't record $0 cost silently.
+        // Reset accumulated state so it doesn't bleed into the next invocation.
+        this.promptTexts = [];
+        this.pendingSavedTokens = 0;
         return;
       }
       // Sum tokens across all prompts submitted since last agent:completed.

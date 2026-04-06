@@ -54,6 +54,12 @@ class Session {
 
     bus.on("agent:completed", (data) => {
       this.currentDurationMs = data.durationMs;
+      if (data.exitCode !== 0 && !data.outputText?.trim()) {
+        // Agent failed with no output — cost:calculated will not fire, so reset
+        // accumulated state here to prevent it bleeding into the next prompt.
+        this.currentSavedTokens = 0;
+        this.currentDurationMs = 0;
+      }
     });
 
     bus.on("prompt:optimized", (data) => {

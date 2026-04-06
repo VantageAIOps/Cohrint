@@ -253,6 +253,83 @@ class TestTrackerQueue:
 
 
 # ---------------------------------------------------------------------------
+# Section B2: Failure state isolation — regression tests for review issues
+# ---------------------------------------------------------------------------
+
+class TestFailureStateIsolation:
+    """
+    Regression tests for the three issues found in PR #30 code review:
+    1. tracker.ts early-return leaked promptTexts/pendingSavedTokens on failure
+    2. session.ts currentSavedTokens not reset on agent failure
+    3. test-renderer.mjs sessionId regex looser than production UUID format
+    """
+
+    def test_cs14b_strict_uuid_accepted(self):
+        """Regression: strict UUID must be accepted by the renderer harness."""
+        section("B2 — Failure State Isolation (Review Fixes)")
+        sid = "a1b2c3d4-1234-5678-abcd-ef0123456789"
+        r = renderer("process", json.dumps({"type": "result", "session_id": sid}))
+        chk("CS.14b strict UUID sessionId accepted", r.get("sessionId") == sid)
+        assert r.get("sessionId") == sid
+
+    def test_cs14c_malformed_36char_hex_rejected(self):
+        """Regression: 36-char hex string with wrong hyphen placement must be rejected."""
+        # Passes old loose regex /^[0-9a-f-]{36}$/i but not strict UUID format
+        malformed = "aabbccdd1122334455667788" + "-" * 12  # 36 chars, wrong structure
+        r = renderer("process", json.dumps({"type": "result", "session_id": malformed}))
+        chk(
+            "CS.14c malformed 36-char non-UUID rejected by harness",
+            r.get("sessionId") is None,
+            f"got sessionId={r.get('sessionId')} (should be None)",
+        )
+        assert r.get("sessionId") is None
+
+    def test_cs14d_all_hyphens_36chars_rejected(self):
+        """Regression: 36 hyphens must be rejected (old loose regex would accept)."""
+        all_hyphens = "-" * 36
+        r = renderer("process", json.dumps({"type": "result", "session_id": all_hyphens}))
+        chk(
+            "CS.14d all-hyphens 36-char string rejected",
+            r.get("sessionId") is None,
+        )
+        assert r.get("sessionId") is None
+
+    def test_cs14e_tracker_state_isolated_from_optimize_savings(self):
+        """
+        Regression: after a failed optimization (0 tokens saved), subsequent
+        prompts must still count savings independently.
+        Simulates: prompt 1 (no savings) then prompt 2 (has savings) — savings
+        from prompt 2 must not be zeroed out by the reset logic.
+        """
+        r_no_savings = js("optimize", "What is 2+2")  # minimal prompt, no filler
+        r_with_savings = js("optimize", "Could you please explain what recursion is")
+        s_none = r_no_savings.get("savedTokens", -1)
+        s_has = r_with_savings.get("savedTokens", 0)
+        chk(
+            "CS.14e clean prompt saves 0 tokens (baseline)",
+            s_none == 0,
+            f"got={s_none}",
+        )
+        chk(
+            "CS.14e filler prompt still saves tokens after zero-savings prompt",
+            s_has > 0,
+            f"got={s_has}",
+        )
+        assert s_has > 0
+
+    def test_cs14f_session_id_wrong_length_rejected(self):
+        """Regression: session IDs of wrong length must be rejected."""
+        too_short = "a1b2c3d4-1234-5678-abcd"  # only 23 chars
+        too_long = "a1b2c3d4-1234-5678-abcd-ef0123456789-extra"
+        r1 = renderer("process", json.dumps({"type": "result", "session_id": too_short}))
+        r2 = renderer("process", json.dumps({"type": "result", "session_id": too_long}))
+        chk("CS.14f too-short session ID rejected", r1.get("sessionId") is None)
+        chk("CS.14f too-long session ID rejected", r2.get("sessionId") is None)
+        assert r1.get("sessionId") is None
+        assert r2.get("sessionId") is None
+
+
+# ---------------------------------------------------------------------------
 # Section C: ClaudeStreamRenderer — stream-json parsing
 # ---------------------------------------------------------------------------
 

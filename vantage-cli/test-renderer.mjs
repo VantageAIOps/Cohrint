@@ -55,7 +55,7 @@ function formatToolInput(name, input) {
 }
 
 function isValidSessionId(sid) {
-  return typeof sid === "string" && /^[0-9a-f-]{36}$/i.test(sid);
+  return typeof sid === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sid);
 }
 
 class ClaudeStreamRenderer {
