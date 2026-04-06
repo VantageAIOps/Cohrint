@@ -1,6 +1,7 @@
 import { VantageEvent, flattenEvent } from "../models/event.js";
+import { VERSION } from "../_version.js";
 
-const SDK_VERSION = "1.0.0";
+const SDK_VERSION = VERSION;
 const MAX_RETRIES = 3;
 
 interface QueuedEvent {
