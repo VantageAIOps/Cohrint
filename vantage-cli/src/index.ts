@@ -14,6 +14,7 @@ import { bus } from "./event-bus.js";
 import { Tracker } from "./tracker.js";
 import { initSession, getSession } from "./session.js";
 import { runAgent, runAgentBuffered } from "./runner.js";
+import { checkCostAnomaly } from "./anomaly.js";
 import {
   printBanner,
   printOptimization,
@@ -45,16 +46,10 @@ function safeNum(v: unknown, fallback = 0): number {
 
 function checkAnomaly(cost: import("./event-bus.js").VantageEvents["cost:calculated"]): void {
   const sess = getSession();
-  // Need at least 2 prior prompts so the average is meaningful
-  if (sess.promptCount <= 2 || sess.totalCostUsd <= 0) return;
-  // Exclude the current prompt from the average (it's already in totalCostUsd)
+  // Exclude the current prompt from the baseline (it's already added to totalCostUsd)
   const priorTotal = sess.totalCostUsd - cost.costUsd;
   const priorCount = sess.promptCount - 1;
-  if (priorCount <= 0) return;
-  const avgCost = priorTotal / priorCount;
-  if (avgCost > 0 && Number.isFinite(avgCost) && cost.costUsd > avgCost * 3) {
-    console.log(yellow(`  ⚠ Anomaly: this prompt cost $${cost.costUsd.toFixed(4)} — ${(cost.costUsd / avgCost).toFixed(1)}x your session average`));
-  }
+  checkCostAnomaly(cost.costUsd, priorTotal, priorCount);
 }
 
 function buildSessionMetrics(): SessionMetrics {

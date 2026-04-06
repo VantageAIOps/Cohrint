@@ -8,6 +8,7 @@ export type InputType =
   | "agent-command"  // /compact, /clear, @file, !cmd — passthrough
   | "vantage-command" // /cost, /summary, /exit-session — handle internally
   | "structured"     // JSON, code, URLs — passthrough (don't corrupt)
+  | "followup"       // Reference/follow-up prompt — passthrough (skip optimization)
   | "unknown";       // Can't classify — passthrough to be safe
 
 /** User's optimization preference for the session */
@@ -20,6 +21,7 @@ export interface ProcessedInput {
   optimized: boolean;      // Was optimization applied?
   savedTokens: number;     // Tokens saved (0 if not optimized)
   reverted: boolean;       // Did we revert due to error?
+  skipOptimization: boolean; // Was optimization explicitly skipped?
 }
 
 /** Known agent commands per tool */
@@ -47,6 +49,24 @@ const VANTAGE_COMMANDS = [
 /** Short answer patterns — y/n, numbers, paths, single words */
 const SHORT_ANSWER_RE = /^(y|n|yes|no|ok|sure|cancel|abort|skip|retry|quit|exit|[0-9]+|\/[^\s]+\.[a-z]+|[a-z]:\\|~\/|\.\.?\/)$/i;
 
+/** Patterns that identify follow-up / reference prompts */
+const FOLLOWUP_PATTERNS = [
+  /^(fix|change|update|modify|redo|undo|revert|improve|refactor|test|run|try)\s+(that|it|this|the same|again)/i,
+  /\b(that bug|that error|that issue|that function|the same|as before|like before|previous|last time)\b/i,
+  /^(do it|try it|run it|yes|no|ok|okay|sure|sounds good|looks good|perfect|great)/i,
+  /\b(what you just|what we just|from before|earlier|you said|you wrote|above)\b/i,
+];
+
+/**
+ * Detect follow-up / reference prompts that should never be optimized.
+ * These are short instructions that reference prior context ("fix that",
+ * "do it again", "try the same approach") and would become incoherent
+ * if filler-phrase stripping were applied.
+ */
+export function isFollowUpPrompt(input: string): boolean {
+  return FOLLOWUP_PATTERNS.some(p => p.test(input.trim()));
+}
+
 /**
  * Classify user input to decide how to handle it.
  */
@@ -70,6 +90,9 @@ export function classifyInput(input: string, agentName: string): InputType {
   // Short answers (y/n/numbers/paths)
   if (SHORT_ANSWER_RE.test(trimmed)) return "short-answer";
 
+  // Follow-up / reference prompts — skip optimization to preserve meaning
+  if (isFollowUpPrompt(trimmed)) return "followup";
+
   // Structured data (JSON, code, URL-heavy)
   if (looksStructured(trimmed)) return "structured";
 
@@ -86,6 +109,10 @@ function looksStructured(text: string): boolean {
   const trimmed = text.trim();
   if (trimmed.startsWith("{") || trimmed.startsWith("[")) return true;
   if (trimmed.startsWith("```")) return true;
+  // Contains a fenced code block anywhere in the text (Bug 3 fix)
+  if (/```[\s\S]*?```/.test(text)) return true;
+  // Contains inline code (Bug 3 fix)
+  if (/`[^`\n]+`/.test(text)) return true;
   if ((text.match(/https?:\/\//g) || []).length > 2) return true;
   if ((text.match(/[{}()\[\];=<>]/g) || []).length > text.length * 0.1) return true;
   return false;
@@ -108,7 +135,14 @@ export function processInput(
     optimized: false,
     savedTokens: 0,
     reverted: false,
+    skipOptimization: false,
   };
+
+  // Follow-up prompts: skip optimization to avoid mangling reference phrases
+  if (type === "followup") {
+    result.skipOptimization = true;
+    return result;
+  }
 
   // Only optimize "prompt" type inputs
   if (type !== "prompt") return result;
@@ -123,11 +157,11 @@ export function processInput(
     // Skip if no meaningful savings (<3 tokens or <5%)
     if (opt.savedTokens < 3 || opt.savedPercent < 5) return result;
 
-    // Validate: optimized version should not be empty or drastically different
-    if (!opt.optimized || opt.optimized.length < input.length * 0.2) {
+    // Validate: optimized version should not be empty or remove more than half the content
+    if (!opt.optimized || opt.optimized.length < input.length * 0.5) {
       // Optimization removed too much — revert
       result.reverted = true;
-      console.log(dim("  [opt] Reverted: optimization removed >80% of content"));
+      console.log(dim("  [opt] Reverted: optimization removed >50% of content"));
       return result;
     }
 

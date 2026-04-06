@@ -126,6 +126,7 @@ export function runAgent(
     const timer = setTimeout(() => {
       timedOut = true;
       stopSpinner();
+      process.stderr.write(`\n  ⏱ Agent timed out after ${Math.round(timeoutMs / 1000)}s — terminating\n`);
       child.kill("SIGTERM");
       setTimeout(() => { if (!child.killed) child.kill("SIGKILL"); }, grace);
     }, timeoutMs);
@@ -199,6 +200,7 @@ export function runAgent(
         exitCode,
         outputText: stdout,
         durationMs,
+        sessionId: capturedSessionId ?? undefined,
       });
 
       if (timedOut) {
@@ -241,10 +243,22 @@ export function runAgentBuffered(
       return;
     }
 
+    const spinner = createSpinner(`Running ${agentName}...`);
+    let spinnerStopped = false;
+    const stopSpinner = () => {
+      if (!spinnerStopped) {
+        spinnerStopped = true;
+        spinner?.stop();
+      }
+    };
+    spinner?.start();
+
     // Timeout guard — kill process if it hangs (grace = 10% of timeout, max 10s)
     const grace = Math.min(Math.ceil(timeoutMs * 0.1), 10000);
     const timer = setTimeout(() => {
       timedOut = true;
+      stopSpinner();
+      process.stderr.write(`\n  ⏱ Agent timed out after ${Math.round(timeoutMs / 1000)}s — terminating\n`);
       child.kill("SIGTERM");
       setTimeout(() => { if (!child.killed) child.kill("SIGKILL"); }, grace);
     }, timeoutMs);
@@ -286,6 +300,7 @@ export function runAgentBuffered(
 
     child.on("error", (err) => {
       clearTimeout(timer);
+      stopSpinner();
       if ((err as NodeJS.ErrnoException).code === "ENOENT") {
         reject(new Error(`'${spawnArgs.command}' not found. Install it or check your PATH.`));
       } else {
@@ -295,6 +310,7 @@ export function runAgentBuffered(
 
     child.on("close", (code) => {
       clearTimeout(timer);
+      stopSpinner();
       // Flush any remaining buffered content
       if (lineBuffer.trim()) flushLine(lineBuffer);
       const durationMs = Date.now() - start;
@@ -306,6 +322,7 @@ export function runAgentBuffered(
         exitCode,
         outputText: stdout,
         durationMs,
+        sessionId: capturedSessionId ?? undefined,
       });
 
       if (timedOut) {

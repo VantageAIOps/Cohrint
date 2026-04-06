@@ -100,15 +100,34 @@ export function countTokens(text: string): number {
 }
 
 /**
- * 5-layer compression engine:
- * 1. Remove filler phrases
- * 2. Apply verbose rewrites
- * 3. Strip filler words
- * 4. Collapse whitespace
- * 5. Trim
+ * Split text into alternating code and prose segments.
+ * Code segments (fenced blocks and inline code) are never compressed.
  */
-export function compressPrompt(prompt: string): string {
-  let result = prompt;
+function splitCodeAndProse(text: string): Array<{ type: 'code' | 'prose', content: string }> {
+  const segments: Array<{ type: 'code' | 'prose', content: string }> = [];
+  // Match fenced code blocks (``` or ~~~) and inline code (`...`)
+  const codePattern = /```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]+`/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = codePattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({ type: 'prose', content: text.slice(lastIndex, match.index) });
+    }
+    segments.push({ type: 'code', content: match[0] });
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < text.length) {
+    segments.push({ type: 'prose', content: text.slice(lastIndex) });
+  }
+  return segments.length > 0 ? segments : [{ type: 'prose', content: text }];
+}
+
+/**
+ * Apply the 5-layer compression to prose-only text.
+ * Never call this on code segments.
+ */
+function applyCompressionLayers(prose: string): string {
+  let result = prose;
 
   // Layer 1: Remove filler phrases
   for (const phrase of FILLER_PHRASES) {
@@ -132,6 +151,22 @@ export function compressPrompt(prompt: string): string {
   result = result.trim();
 
   return result;
+}
+
+/**
+ * 5-layer compression engine — code blocks and inline code are never touched.
+ * 1. Remove filler phrases
+ * 2. Apply verbose rewrites
+ * 3. Strip filler words
+ * 4. Collapse whitespace
+ * 5. Trim
+ */
+export function compressPrompt(prompt: string): string {
+  const segments = splitCodeAndProse(prompt);
+  const compressed = segments.map(seg =>
+    seg.type === 'code' ? seg.content : applyCompressionLayers(seg.content)
+  );
+  return compressed.join('');
 }
 
 export function getOptimizationTips(prompt: string): string[] {

@@ -26,6 +26,7 @@ interface DashboardEvent {
   environment: string;
   agent_name: string;
   team: string;
+  session_id?: string;
 }
 
 export class Tracker {
@@ -86,6 +87,8 @@ export class Tracker {
       this.lastSavedTokens = 0; // reset for next prompt
       const savedCost = savedTokens > 0 ? calculateCost(model, savedTokens, 0) : 0;
 
+      const sessionId = data.sessionId;
+
       bus.emit("cost:calculated", {
         agent: data.agent,
         model,
@@ -93,6 +96,7 @@ export class Tracker {
         outputTokens,
         costUsd,
         savedUsd: savedCost,
+        sessionId,
       });
 
       const event: DashboardEvent = {
@@ -107,6 +111,7 @@ export class Tracker {
         environment: "production",
         agent_name: data.agent,
         team: "",
+        session_id: sessionId,
       };
 
       this.enqueue(event);

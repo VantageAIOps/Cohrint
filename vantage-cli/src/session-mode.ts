@@ -5,6 +5,7 @@ import { countTokens } from "./optimizer.js";
 import { calculateCost } from "./pricing.js";
 import { dim, green, red, yellow } from "./ui.js";
 import { processInput, printOptStatus, type OptMode, type ProcessedInput } from "./input-classifier.js";
+import { checkCostAnomaly } from "./anomaly.js";
 
 /**
  * Interactive session — agent process stays alive, stdin/stdout piped through.
@@ -21,6 +22,7 @@ export class AgentSession {
   private _ended = false;
   private optMode: OptMode = "auto";
   private totalSavedTokens = 0;
+  private totalCostUsd = 0;
 
   constructor(
     private agent: AgentAdapter,
@@ -125,9 +127,16 @@ export class AgentSession {
     printOptStatus(result);
 
     // Track stats — use countTokens() for consistency with optimizer.ts (4 chars/token)
+    const promptInputTokens = countTokens(result.forwarded);
+    const promptCost = calculateCost(this.model, promptInputTokens, 0);
+
+    // Anomaly check: run BEFORE updating totals so priorTotal/priorCount are accurate
+    checkCostAnomaly(promptCost, this.totalCostUsd, this.promptCount);
+
     this.promptCount++;
-    this.totalInputTokens += countTokens(result.forwarded);
+    this.totalInputTokens += promptInputTokens;
     this.totalSavedTokens += result.savedTokens;
+    this.totalCostUsd += promptCost;
 
     // Emit bus event so global session tracker and tracker.ts pick up savings
     if (result.savedTokens > 0) {
