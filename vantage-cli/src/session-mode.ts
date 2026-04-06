@@ -46,10 +46,10 @@ export class AgentSession {
 
     try {
       // stdin: pipe (we write to it)
-      // stdout + stderr: inherit — agent gets full TTY, preserving syntax highlighting,
-      // spinners, color output and interactive prompts (file approval, MCP dialogs, etc.)
+      // stdout: pipe (we relay to terminal ourselves so we can detect when the response ends)
+      // stderr: inherit — agent interactive prompts (file approval, MCP dialogs, etc.)
       this.child = spawn(cmd, interactiveArgs, {
-        stdio: ["pipe", "inherit", "inherit"],
+        stdio: ["pipe", "pipe", "inherit"],
         env: { ...process.env, TERM: process.env.TERM || "xterm-256color", FORCE_COLOR: "1" },
       });
     } catch (err) {
@@ -64,8 +64,11 @@ export class AgentSession {
       return false;
     }
 
-    // stdout + stderr are inherited — agent writes directly to terminal
-    // No need to pipe data; output token counting is unavailable in full-TTY mode
+    // Relay child stdout to terminal — preserves color/formatting while letting us
+    // detect response completion via silence detection in sendLine()
+    this.child.stdout?.on("data", (chunk: Buffer) => {
+      process.stdout.write(chunk);
+    });
 
     this.child.on("error", (err) => {
       if ((err as NodeJS.ErrnoException).code === "ENOENT") {
@@ -139,7 +142,48 @@ export class AgentSession {
       });
     }
 
+    // Wait for the agent to finish streaming its response before returning.
+    // This prevents the REPL prompt from appearing mid-response.
+    await this.waitForResponseEnd();
+
     return result;
+  }
+
+  /**
+   * Resolves when the agent's stdout has been silent for 300ms (response complete),
+   * or after 5s if no output arrives at all (e.g. agent is processing silently).
+   */
+  private waitForResponseEnd(): Promise<void> {
+    if (!this.child?.stdout) return Promise.resolve();
+    return new Promise((resolve) => {
+      const SILENCE_MS = 300;     // ms of silence = response done
+      const INITIAL_TIMEOUT = 5000; // max wait if no output at all
+
+      let silenceTimer: ReturnType<typeof setTimeout> | null = null;
+      let initialTimer: ReturnType<typeof setTimeout> | null = null;
+      let done = false;
+
+      const finish = () => {
+        if (done) return;
+        done = true;
+        if (silenceTimer) clearTimeout(silenceTimer);
+        if (initialTimer) clearTimeout(initialTimer);
+        this.child?.stdout?.removeListener("data", onData);
+        resolve();
+      };
+
+      const onData = () => {
+        // Cancel the initial fallback timer on first data
+        if (initialTimer) { clearTimeout(initialTimer); initialTimer = null; }
+        // Reset the silence timer
+        if (silenceTimer) clearTimeout(silenceTimer);
+        silenceTimer = setTimeout(finish, SILENCE_MS);
+      };
+
+      this.child!.stdout!.on("data", onData);
+      // Fallback: resolve if agent produces no output within 5s
+      initialTimer = setTimeout(finish, INITIAL_TIMEOUT);
+    });
   }
 
   /** Check if session is running */
