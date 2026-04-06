@@ -155,6 +155,18 @@ if (cmd === "optimize") {
   console.log(JSON.stringify(r));
 } else if (cmd === "models") {
   console.log(JSON.stringify({ count: Object.keys(PRICES).length, models: Object.keys(PRICES) }));
+} else if (cmd === "structured") {
+  // Mirror looksLikeStructuredData from index.ts
+  const text = arg1;
+  const trimmed = text.trim();
+  let isStructured = false;
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) isStructured = true;
+  else if (trimmed.startsWith("```")) isStructured = true;
+  else if (/```[\s\S]*?```/.test(text)) isStructured = true;
+  else if (/`[^`\n]+`/.test(text)) isStructured = true;
+  else if ((text.match(/https?:\/\//g) || []).length > 2) isStructured = true;
+  else if ((text.match(/[{}()\[\];=<>]/g) || []).length > text.length * 0.1) isStructured = true;
+  console.log(JSON.stringify({ isStructured }));
 } else {
-  console.log("Usage: node test-helpers.mjs <optimize|tokens|cost|cheapest|models> [args...]");
+  console.log("Usage: node test-helpers.mjs <optimize|tokens|cost|cheapest|models|structured> [args...]");
 }
