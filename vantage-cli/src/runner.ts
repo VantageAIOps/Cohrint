@@ -87,8 +87,15 @@ export function runAgent(
         stdio: ["pipe", "pipe", "pipe"],
         env: buildSafeEnv(spawnArgs.env),
       });
-      // Pipe host stdin into agent so @file refs and piped input work
-      process.stdin.pipe(child.stdin!);
+      // Only pipe stdin when data is actually being piped in (non-TTY).
+      // In interactive TTY mode, closing stdin immediately prevents claude from
+      // printing "Warning: no stdin data received in 3s" while waiting for input
+      // that will never arrive.
+      if (!process.stdin.isTTY) {
+        process.stdin.pipe(child.stdin!);
+      } else {
+        child.stdin?.end();
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       reject(new Error(`Failed to start '${spawnArgs.command}': ${msg}`));
