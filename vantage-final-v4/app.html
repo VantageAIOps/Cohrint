@@ -1803,7 +1803,7 @@ function renderLiveFeed(live) {
     }
     var provider = ev.provider || ev.source || '';
     var model = ev.model || '';
-    var cost = ev.cost || ev.total_cost || 0;
+    var cost = ev.cost_usd || ev.cost || ev.total_cost || 0;
     var color = toolColor(provider);
 
     var item = document.createElement('div');
@@ -1922,8 +1922,8 @@ function loadSpend() {
 
     if (summary) buildToolTabs(summary);
 
-    var totalCost = (summary && summary.total_cost) || (timeseries && timeseries.total_cost) || 0;
-    var totalReqs = (summary && summary.total_requests) || (timeseries && timeseries.total_requests) || 0;
+    var totalCost = (summary && (summary.total_cost_usd || summary.total_cost)) || 0;
+    var totalReqs = (summary && (summary.total_records || summary.total_requests)) || 0;
     document.getElementById('spendTotal').textContent = fmt(totalCost);
     document.getElementById('spendTotalReqs').textContent = fmtNum(totalReqs);
     document.getElementById('spendAvgCost').textContent = totalReqs > 0 ? fmt(totalCost / totalReqs) : '$0.00';
@@ -1932,7 +1932,7 @@ function loadSpend() {
     if (modelList.length > 0) {
       var top = modelList.slice().sort(function(a, b) { return (b.total_cost || b.cost || 0) - (a.total_cost || a.cost || 0); })[0];
       document.getElementById('spendTopModel').textContent = top.model || top.name || '-';
-      document.getElementById('spendTopModelSub').textContent = fmt(top.total_cost || top.cost);
+      document.getElementById('spendTopModelSub').textContent = fmt(top.cost_usd || top.total_cost || top.cost);
     }
 
     renderSpendTrend(timeseries);
@@ -1948,7 +1948,7 @@ function renderSpendTrend(timeseries) {
   var canvas = document.getElementById('spendTrendChart');
   if (!canvas) return;
 
-  var data = (timeseries && timeseries.data) || (timeseries && timeseries.timeseries) || [];
+  var data = (timeseries && (timeseries.series || timeseries.data || timeseries.timeseries)) || [];
   if (data.length === 0) {
     if (_spendChart) { _spendChart.destroy(); _spendChart = null; }
     return;
@@ -1958,7 +1958,7 @@ function renderSpendTrend(timeseries) {
     var dt = new Date(d.date || d.day);
     return (dt.getMonth() + 1) + '/' + dt.getDate();
   });
-  var values = data.map(function(d) { return d.total_cost || d.cost || 0; });
+  var values = data.map(function(d) { return d.cost_usd || d.total_cost || d.cost || 0; });
 
   if (_spendChart) _spendChart.destroy();
   _spendChart = new Chart(canvas, {
@@ -2005,7 +2005,7 @@ function renderSpendModels(modelList) {
     return;
   }
 
-  var sorted = modelList.slice().sort(function(a, b) { return (b.total_cost || b.cost || 0) - (a.total_cost || a.cost || 0); });
+  var sorted = modelList.slice().sort(function(a, b) { return (b.cost_usd || b.total_cost || b.cost || 0) - (a.cost_usd || a.total_cost || a.cost || 0); });
   sorted.slice(0, 20).forEach(function(m) {
     var tr = document.createElement('tr');
 
@@ -2021,7 +2021,7 @@ function renderSpendModels(modelList) {
 
     var td3 = document.createElement('td');
     td3.className = 'cost-highlight';
-    td3.textContent = fmt(m.total_cost || m.cost);
+    td3.textContent = fmt(m.cost_usd || m.total_cost || m.cost);
     tr.appendChild(td3);
 
     var td4 = document.createElement('td');
@@ -2054,7 +2054,7 @@ function renderTeamPie(teams) {
     data: {
       labels: data.map(function(t) { return t.team || t.name || 'Default'; }),
       datasets: [{
-        data: data.map(function(t) { return t.total_cost || t.cost || 0; }),
+        data: data.map(function(t) { return t.cost_usd || t.total_cost || t.cost || 0; }),
         backgroundColor: data.map(function(_, i) { return colors[i % colors.length]; }),
         borderWidth: 0,
       }]
@@ -2231,8 +2231,9 @@ function loadMembers() {
     document.getElementById('memberCount').textContent = fmtNum(memberList.length);
 
     if (overview) {
-      document.getElementById('memberMtdSpend').textContent = fmt(overview.mtd_spend || overview.total_cost || 0);
-      document.getElementById('memberBudget').textContent = overview.budget_limit ? fmt(overview.budget_limit) : 'Not set';
+      document.getElementById('memberMtdSpend').textContent = fmt((overview.org && overview.org.mtd_cost_usd) || (overview.totals && overview.totals.total_cost_usd) || 0);
+      var budgetLimit = (overview.org && overview.org.budget_usd) || overview.budget_limit || 0;
+      document.getElementById('memberBudget').textContent = budgetLimit > 0 ? fmt(budgetLimit) : 'Not set';
     }
 
     // Members table — DOM safe
@@ -2431,11 +2432,7 @@ function loadBudgets() {
     var budgets = results[0];
     var alerts = results[1];
 
-    if (budgets && budgets.org_budget) {
-      document.getElementById('orgBudgetInput').value = budgets.org_budget;
-    }
-
-    var teams = (budgets && budgets.teams) || (budgets && budgets.data) || [];
+    var teams = (budgets && budgets.budgets) || (budgets && budgets.teams) || (budgets && budgets.data) || [];
     var tbody = document.getElementById('budgetTeamsBody');
     tbody.textContent = '';
 
@@ -2475,12 +2472,12 @@ function loadBudgets() {
     }
 
     if (alerts) {
-      if (alerts.slack_webhook) document.getElementById('slackWebhookUrl').value = alerts.slack_webhook;
-      if (alerts.triggers) {
-        document.getElementById('slackBudget').checked = !!alerts.triggers.budget;
-        document.getElementById('slackAnomaly').checked = !!alerts.triggers.anomaly;
-        document.getElementById('slackDaily').checked = !!alerts.triggers.daily;
-      }
+      var webhookUrl = alerts.slack_url || alerts.slack_webhook || '';
+      if (webhookUrl) document.getElementById('slackWebhookUrl').value = webhookUrl;
+      // Flat fields: trigger_budget, trigger_anomaly, trigger_daily
+      document.getElementById('slackBudget').checked = !!(alerts.trigger_budget || (alerts.triggers && alerts.triggers.budget));
+      document.getElementById('slackAnomaly').checked = !!(alerts.trigger_anomaly || (alerts.triggers && alerts.triggers.anomaly));
+      document.getElementById('slackDaily').checked = !!(alerts.trigger_daily || (alerts.triggers && alerts.triggers.daily));
     }
 
   }).catch(function(e) {
@@ -2543,9 +2540,14 @@ function saveSlackConfig() {
     daily: document.getElementById('slackDaily').checked,
   };
 
-  apiFetch('/v1/alerts/' + orgId, {
-    method: 'PUT',
-    body: JSON.stringify({ slack_webhook: webhook, triggers: triggers }),
+  apiFetch('/v1/alerts/slack/' + orgId, {
+    method: 'POST',
+    body: JSON.stringify({
+      webhook_url:     webhook,
+      trigger_budget:  triggers.budget,
+      trigger_anomaly: triggers.anomaly,
+      trigger_daily:   triggers.daily,
+    }),
   }).then(function() {
     document.getElementById('slackStatus').textContent = 'Saved!';
     setTimeout(function() { document.getElementById('slackStatus').textContent = ''; }, 3000);
@@ -2807,8 +2809,8 @@ function loadIntegrations() {
 function loadAccount() {
   apiFetch('/v1/admin/overview').catch(function() { return null; }).then(function(overview) {
     if (overview) {
-      var used = overview.events_used || overview.event_count || 0;
-      var limit = overview.events_limit || overview.plan_limit || 0;
+      var used = (overview.org && overview.org.events_this_month) || overview.events_used || overview.event_count || 0;
+      var limit = (overview.org && overview.org.events_limit) || overview.events_limit || overview.plan_limit || 0;
       document.getElementById('accountEventsUsed').textContent = fmtNum(used);
       document.getElementById('accountEventsLimit').textContent = limit > 0 ? fmtNum(limit) : 'Unlimited';
       if (limit > 0) {
