@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 
+import { createRequire } from "node:module";
 import { createInterface } from "node:readline";
+
+const _require = createRequire(import.meta.url);
+const _pkg = _require("../package.json") as { version: string };
 import { loadConfig, configExists, saveConfig, type VantageConfig } from "./config.js";
 import { runSetup } from "./setup.js";
 import { getAgent, detectAll, ALL_AGENTS } from "./agents/registry.js";
@@ -517,7 +521,9 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
               prompt();
               return;
             }
-            process.stdout.write(cyan(`  ${sessionAgent.name}> `));
+            // Print newline before prompt — ensures we're on a fresh line even if
+            // the agent's last output didn't include a trailing newline
+            process.stdout.write("\n" + cyan(`  ${sessionAgent.name}> `));
             handleLine = async (sessionInput: string) => {
               try {
                 const sLine = sessionInput.trim();
@@ -895,7 +901,7 @@ async function main(): Promise<void> {
 
 async function checkForUpdate(): Promise<void> {
   try {
-    const current = "2.2.0";
+    const current = _pkg.version;
     const res = await fetch("https://registry.npmjs.org/vantageai-cli/latest",
       { signal: AbortSignal.timeout(2000) });
     if (!res.ok) return;
