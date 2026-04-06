@@ -34,7 +34,7 @@ admin.get('/overview', async (c) => {
     'SELECT budget_usd, plan, name, email FROM orgs WHERE id = ?'
   ).bind(orgId).first<{ budget_usd: number; plan: string; name: string; email: string }>();
 
-  // Per-team breakdown with budgets
+  // Per-team breakdown with budgets and member count
   const { results: teams } = await c.env.DB.prepare(`
     SELECT
       COALESCE(e.team, 'unassigned') AS team,
@@ -46,7 +46,11 @@ admin.get('/overview', async (c) => {
       CASE WHEN b.budget_usd > 0
         THEN ROUND(SUM(e.cost_usd) / b.budget_usd * 100, 1)
         ELSE NULL
-      END AS budget_pct
+      END AS budget_pct,
+      COALESCE((
+        SELECT COUNT(*) FROM org_members m
+        WHERE m.org_id = e.org_id AND m.scope_team = e.team
+      ), 0) AS member_count
     FROM events e
     LEFT JOIN team_budgets b ON b.org_id = e.org_id AND b.team = e.team
     WHERE e.org_id = ? AND e.created_at >= ?
