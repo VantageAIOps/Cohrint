@@ -170,15 +170,15 @@ class TestNonContinueAdapters:
         chk("PC.22 aider.ts has supportsContinue: false", "supportsContinue: false" in content)
         assert "supportsContinue: false" in content
 
-    def test_pc23_codex_no_supports_continue(self):
+    def test_pc23_codex_supports_continue(self):
         content = agent_src("codex.ts")
-        chk("PC.23 codex.ts has supportsContinue", "supportsContinue" in content)
-        assert "supportsContinue" in content
+        chk("PC.23 codex.ts has supportsContinue: true", "supportsContinue: true" in content)
+        assert "supportsContinue: true" in content
 
-    def test_pc24_chatgpt_no_supports_continue(self):
+    def test_pc24_chatgpt_supports_continue(self):
         content = agent_src("chatgpt.ts")
-        chk("PC.24 chatgpt.ts has supportsContinue", "supportsContinue" in content)
-        assert "supportsContinue" in content
+        chk("PC.24 chatgpt.ts has supportsContinue: true", "supportsContinue: true" in content)
+        assert "supportsContinue: true" in content
 
 
 # ── Section H: TypeScript Compilation ────────────────────────────────────

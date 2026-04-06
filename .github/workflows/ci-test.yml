@@ -103,8 +103,22 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: pip install -r tests/requirements.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: vantage-cli/package-lock.json
+
+      - name: Install CLI dependencies
+        working-directory: vantage-cli
+        run: npm ci
+
+      - name: Build CLI (required for dist/index.js + tsx harnesses)
+        working-directory: vantage-cli
+        run: npx tsup src/index.ts --format esm --dts --clean
 
       - name: Run API + core suites (no browser)
         env:

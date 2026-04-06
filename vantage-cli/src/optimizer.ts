@@ -171,7 +171,8 @@ function applyCompressionLayers(prose: string): string {
 }
 
 /**
- * 5-layer compression engine — code blocks and inline code are never touched.
+ * 6-layer compression engine — code blocks and inline code are never touched.
+ * 0. Remove duplicate sentences
  * 1. Remove filler phrases
  * 2. Apply verbose rewrites
  * 3. Strip filler words
