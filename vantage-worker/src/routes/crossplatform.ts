@@ -105,6 +105,15 @@ crossplatform.get('/summary', async (c) => {
     WHERE org_id = ? AND created_at >= ?
   `).bind(orgId, monthStart).first() as { month_cost: number } | null;
 
+  // Previous period for trend comparison
+  const prevSince = sqliteDateSince(days * 2);
+  const prevUntil = since;
+  const prevTotal = await c.env.DB.prepare(`
+    SELECT COALESCE(SUM(cost_usd), 0) as prev_cost
+    FROM cross_platform_usage
+    WHERE org_id = ? AND created_at >= ? AND created_at < ?
+  `).bind(orgId, prevSince, prevUntil).first() as { prev_cost: number } | null;
+
   const budgetLimit = budget?.monthly_limit_usd ?? 0;
   const budgetUsed = monthSpend?.month_cost ?? 0;
   const budgetPct = budgetLimit > 0 ? Math.round((budgetUsed / budgetLimit) * 100) : 0;
@@ -112,6 +121,7 @@ crossplatform.get('/summary', async (c) => {
   return c.json({
     period_days: days,
     total_cost_usd: total?.total_cost ?? 0,
+    previous_period_cost: prevTotal?.prev_cost ?? 0,
     total_input_tokens: total?.total_input_tokens ?? 0,
     total_output_tokens: total?.total_output_tokens ?? 0,
     total_cached_tokens: total?.total_cached_tokens ?? 0,

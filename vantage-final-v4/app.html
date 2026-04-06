@@ -1327,18 +1327,19 @@ function populateUserFromSession(s) {
   document.getElementById('topbarUser').textContent = name;
   document.getElementById('accountName').textContent = name;
   document.getElementById('accountEmail').textContent = user.email || '';
-  document.getElementById('accountOrg').textContent = user.org_name || user.org_id || '';
+  document.getElementById('accountOrg').textContent = (user.org && user.org.name) || user.org_name || user.org_id || '';
   document.getElementById('accountAvatar').textContent = name ? name.charAt(0).toUpperCase() : '?';
-  if (user.api_key) {
-    var k = user.api_key;
+  var apiKeyHint = user.api_key_hint || user.api_key;
+  if (apiKeyHint) {
+    var k = apiKeyHint;
     var el = document.getElementById('accountApiKey');
-    el.textContent = k.substring(0, 7) + '****...' + k.substring(k.length - 4);
+    el.textContent = k.length > 11 ? k.substring(0, 7) + '****...' + k.substring(k.length - 4) : k;
     el.dataset.full = k;
   }
   if (user.org_id) {
     document.getElementById('accountOrgId').textContent = user.org_id;
   }
-  var plan = user.plan || 'free';
+  var plan = (user.org && user.org.plan) || user.plan || 'free';
   document.getElementById('accountPlan').textContent = plan.charAt(0).toUpperCase() + plan.slice(1);
   var badge = document.getElementById('accountPlanBadge');
   badge.textContent = plan.toUpperCase();
@@ -1820,12 +1821,16 @@ function startSSE() {
   if (!_session) return;
 
   var user = _session.user || _session;
-  var orgId = user.org_id;
-  var sseToken = user.sse_token;
-  if (!orgId || !sseToken) return;
+  var sseUrl = _session.sse_url || user.sse_url;
+  if (!sseUrl) {
+    var orgId = user.org_id;
+    var sseToken = user.sse_token;
+    if (!orgId || !sseToken) return;
+    sseUrl = API_BASE + '/v1/stream/' + orgId + '?sse_token=' + sseToken;
+  }
 
   try {
-    _sseSource = new EventSource(API_BASE + '/v1/stream/' + orgId + '?sse_token=' + sseToken);
+    _sseSource = new EventSource(sseUrl);
     _sseSource.onmessage = function(e) {
       try {
         var ev = JSON.parse(e.data);
@@ -1905,7 +1910,17 @@ function loadSpend() {
     var totalCost = (summary && (summary.total_cost_usd || summary.total_cost)) || 0;
     var totalReqs = (summary && (summary.total_records || summary.total_requests)) || 0;
     document.getElementById('spendTotal').textContent = fmt(totalCost);
+    var prevCost = (summary && summary.previous_period_cost) || 0;
+    if (prevCost > 0) {
+      var pctChange = ((totalCost - prevCost) / prevCost * 100).toFixed(1);
+      var spendSub = document.getElementById('spendTotalSub');
+      spendSub.textContent = (pctChange >= 0 ? '\u2191 ' : '\u2193 ') + Math.abs(pctChange) + '% vs prev period';
+      spendSub.className = 'kpi-sub ' + (pctChange >= 0 ? 'up' : 'down');
+    }
     document.getElementById('spendTotalReqs').textContent = fmtNum(totalReqs);
+    if (totalReqs > 0 && period > 0) {
+      document.getElementById('spendTotalReqsSub').textContent = fmtNum(Math.round(totalReqs / period)) + '/day avg';
+    }
     document.getElementById('spendAvgCost').textContent = totalReqs > 0 ? fmt(totalCost / totalReqs) : '$0.00';
 
     var modelList = (models && models.models) || (models && models.data) || [];
@@ -2232,7 +2247,7 @@ function loadMembers() {
       memberList.forEach(function(m) {
         var role = m.role || 'member';
         var roleClass = role === 'admin' ? 'role-admin' : 'role-member';
-        var keyHint = m.api_key ? m.api_key.substring(0, 7) + '...' : '-';
+        var keyHint = (m.api_key_hint || m.api_key) ? (m.api_key_hint || m.api_key).substring(0, 7) + '...' : '-';
 
         var tr = document.createElement('tr');
 
@@ -2403,7 +2418,7 @@ function revokeMember(email) {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function loadBudgets() {
-  var orgId = _session ? (_session.user ? _session.user.org_id : _session.org_id) : '';
+  var orgId = _session ? ((_session.user || _session).org_id || '') : '';
 
   Promise.all([
     apiFetch('/v1/admin/team-budgets').catch(function() { return null; }),
@@ -2512,7 +2527,7 @@ function deleteTeamBudget(team) {
 }
 
 function saveSlackConfig() {
-  var orgId = _session ? (_session.user ? _session.user.org_id : _session.org_id) : '';
+  var orgId = _session ? ((_session.user || _session).org_id || '') : '';
   var webhook = document.getElementById('slackWebhookUrl').value.trim();
   var triggers = {
     budget: document.getElementById('slackBudget').checked,
@@ -2537,7 +2552,7 @@ function saveSlackConfig() {
 }
 
 function testSlack() {
-  var orgId = _session ? (_session.user ? _session.user.org_id : _session.org_id) : '';
+  var orgId = _session ? ((_session.user || _session).org_id || '') : '';
   apiFetch('/v1/alerts/' + orgId + '/test', { method: 'POST' }).then(function() {
     document.getElementById('slackStatus').textContent = 'Test message sent!';
     setTimeout(function() { document.getElementById('slackStatus').textContent = ''; }, 3000);
