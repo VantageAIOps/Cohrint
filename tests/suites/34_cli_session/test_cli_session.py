@@ -19,8 +19,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from helpers.output import section, chk, ok, fail, get_results, reset_results
 
 CLI_DIR = Path(__file__).parent.parent.parent.parent / "vantage-cli"
-HARNESS = CLI_DIR / "test-helpers.mjs"
-RENDERER_HARNESS = CLI_DIR / "test-renderer.mjs"
+TSX = CLI_DIR / "node_modules" / ".bin" / "tsx"
+HARNESS = CLI_DIR / "test-helpers.ts"
+RENDERER_HARNESS = CLI_DIR / "test-renderer.ts"
 
 
 # ---------------------------------------------------------------------------
@@ -28,9 +29,9 @@ RENDERER_HARNESS = CLI_DIR / "test-renderer.mjs"
 # ---------------------------------------------------------------------------
 
 def js(cmd: str, *args: str, timeout: int = 10) -> dict:
-    """Run test-helpers.mjs and return parsed JSON."""
+    """Run test-helpers.ts via tsx and return parsed JSON."""
     result = subprocess.run(
-        ["node", str(HARNESS), cmd, *[str(a) for a in args]],
+        [str(TSX), str(HARNESS), cmd, *[str(a) for a in args]],
         capture_output=True, text=True, timeout=timeout,
         cwd=str(CLI_DIR),
     )
@@ -43,7 +44,7 @@ def js(cmd: str, *args: str, timeout: int = 10) -> dict:
 def renderer(cmd: str, *args: str, timeout: int = 10) -> dict:
     """Run test-renderer.mjs and return parsed JSON."""
     result = subprocess.run(
-        ["node", str(RENDERER_HARNESS), cmd, *[str(a) for a in args]],
+        [str(TSX), str(RENDERER_HARNESS), cmd, *[str(a) for a in args]],
         capture_output=True, text=True, timeout=timeout,
         cwd=str(CLI_DIR),
     )
@@ -340,7 +341,7 @@ class TestFailureStateIsolation:
 renderer_available = RENDERER_HARNESS.exists()
 
 
-@pytest.mark.skipif(not renderer_available, reason="test-renderer.mjs not present")
+@pytest.mark.skipif(not renderer_available, reason="test-renderer.ts not present")
 class TestClaudeStreamRenderer:
     def test_cs15_text_block_produces_display(self):
         section("C — ClaudeStreamRenderer")
@@ -467,7 +468,7 @@ class TestClaudeStreamRenderer:
 # Section D: formatToolInput previews
 # ---------------------------------------------------------------------------
 
-@pytest.mark.skipif(not renderer_available, reason="test-renderer.mjs not present")
+@pytest.mark.skipif(not renderer_available, reason="test-renderer.ts not present")
 class TestFormatToolInput:
     def test_cs25_bash_shows_command(self):
         section("D — formatToolInput Previews")

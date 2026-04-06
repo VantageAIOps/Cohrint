@@ -66,7 +66,7 @@ function formatToolInput(name: string, input: Record<string, unknown>): string {
  *   display   — what gets written to the terminal
  *   tokenText — just the assistant text content (for token counting)
  */
-class ClaudeStreamRenderer {
+export class ClaudeStreamRenderer {
   private pendingTools = new Map<string, string>(); // tool_use_id → tool name
 
   process(line: string): { display?: string; tokenText?: string; sessionId?: string } {

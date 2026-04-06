@@ -14,6 +14,7 @@ import { bus } from "./event-bus.js";
 import { Tracker } from "./tracker.js";
 import { initSession, getSession } from "./session.js";
 import { runAgent, runAgentBuffered } from "./runner.js";
+import { looksLikeStructuredData } from "./classify.js";
 import { checkCostAnomaly } from "./anomaly.js";
 import {
   printBanner,
@@ -244,17 +245,7 @@ function parseArgs() {
 // Core execution logic
 // ---------------------------------------------------------------------------
 
-function looksLikeStructuredData(text: string): boolean {
-  // Skip optimization for JSON, code blocks, URLs-heavy content
-  const trimmed = text.trim();
-  if (trimmed.startsWith("{") || trimmed.startsWith("[")) return true; // JSON
-  if (trimmed.startsWith("```")) return true; // code block
-  if (/```[\s\S]*?```/.test(text)) return true; // fenced code block anywhere
-  if (/`[^`\n]+`/.test(text)) return true; // inline code
-  if ((text.match(/https?:\/\//g) || []).length > 2) return true; // URL-heavy
-  if ((text.match(/[{}()\[\];=<>]/g) || []).length > text.length * 0.1) return true; // code-like
-  return false;
-}
+// looksLikeStructuredData lives in classify.ts so test harnesses can import it directly
 
 async function executePrompt(
   prompt: string,
