@@ -1978,7 +1978,7 @@ function prependLiveItem(ev) {
 
   var provider = ev.provider || ev.source || '';
   var model = ev.model || '';
-  var cost = ev.cost || ev.total_cost || 0;
+  var cost = ev.cost_usd || ev.cost || ev.total_cost || 0;
   var color = toolColor(provider);
   var d = new Date();
   var timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
@@ -2834,15 +2834,13 @@ function exportAuditCsv() {
   var type    = document.getElementById('auditTypeFilter').value;
   var from    = document.getElementById('auditDateFrom').value;
   var to      = document.getElementById('auditDateTo').value;
-  var apiBase = localStorage.getItem('vantage_api_base') || 'https://api.vantageaiops.com';
-  var token   = localStorage.getItem('vantage_api_key') || '';
   var qs = '?format=csv&limit=500';
   if (type) qs += '&event_type=' + encodeURIComponent(type);
   if (from) qs += '&from='       + encodeURIComponent(from);
   if (to)   qs += '&to='         + encodeURIComponent(to);
-  // Fetch as blob and trigger download — avoids exposing key in URL
-  fetch(apiBase + '/v1/audit-log' + qs, {
-    headers: { 'Authorization': 'Bearer ' + token }
+  // Use session cookie auth (credentials: 'include') — same as all other apiFetch calls
+  fetch(API_BASE + '/v1/audit-log' + qs, {
+    credentials: 'include'
   }).then(function(res) {
     return res.blob();
   }).then(function(blob) {
@@ -2989,6 +2987,15 @@ function rotateApiKey() {
 }
 
 function signOut() {
+  // Clear cached API responses so next user can't see previous user's data
+  try {
+    Object.keys(localStorage).forEach(function(k) {
+      if (k.startsWith('vantage_cache:')) localStorage.removeItem(k);
+    });
+  } catch (_) {}
+  // Close SSE if open
+  if (_sseSource) { _sseSource.close(); _sseSource = null; }
+  _session = null;
   fetch(API_BASE + '/v1/auth/session', { method: 'DELETE', credentials: 'include' }).catch(function() {}).then(function() {
     window.location.replace('/auth.html');
   });

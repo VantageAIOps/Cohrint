@@ -10,7 +10,7 @@ admin.use('*', authMiddleware, adminOnly);
 // ── GET /v1/admin/overview — all teams with usage + budgets ──────────────────
 admin.get('/overview', async (c) => {
   const orgId  = c.get('orgId');
-  const period = Math.min(parseInt(c.req.query('period') ?? '30', 10), 365);
+  const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
   const since  = Math.floor(Date.now() / 1000) - period * 86_400;
 
   // Org-level totals
@@ -161,7 +161,7 @@ admin.get('/security', async (c) => {
 admin.get('/members/:id/usage', async (c) => {
   const orgId    = c.get('orgId');
   const memberId = c.req.param('id');
-  const period   = Math.min(parseInt(c.req.query('period') ?? '30', 10), 365);
+  const period   = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
   const since    = Math.floor(Date.now() / 1000) - period * 86_400;
 
   const member = await c.env.DB.prepare(
@@ -269,42 +269,6 @@ admin.patch('/org', async (c) => {
 
 // ── GET /audit-log — all orgs, admin only ────────────────────────────────────
 
-admin.get('/audit-log', async (c) => {
-  // Cross-org endpoint — not accessible to org-level keys; use /v1/audit-log instead
-  return c.json({ error: 'Access denied. Use /v1/audit-log for org audit log access.' }, 403);
-  const limit     = Math.max(1, Math.min(parseInt(c.req.query('limit')   ?? '100', 10), 500));
-  const offset    = parseInt(c.req.query('offset')  ?? '0', 10);
-  const eventType = c.req.query('event_type') ?? null;
-  const orgFilter = c.req.query('org_id')     ?? null;
-  const from      = c.req.query('from')
-    ? Math.floor(new Date(c.req.query('from')! + 'T00:00:00Z').getTime() / 1000) : null;
-  const to        = c.req.query('to')
-    ? Math.floor(new Date(c.req.query('to')!   + 'T23:59:59Z').getTime() / 1000) : null;
-
-  const conditions: string[] = [];
-  const bindings: unknown[]  = [];
-  if (orgFilter)    { conditions.push('org_id = ?');     bindings.push(orgFilter); }
-  if (eventType)    { conditions.push('event_type = ?'); bindings.push(eventType); }
-  if (from !== null){ conditions.push('created_at >= ?'); bindings.push(from); }
-  if (to !== null)  { conditions.push('created_at <= ?'); bindings.push(to); }
-  const where = conditions.length ? conditions.join(' AND ') : '1=1';
-
-  const [rows, countRow] = await c.env.DB.batch([
-    c.env.DB.prepare(
-      `SELECT id, org_id, actor_email, actor_role, action, resource, detail,
-              ip_address, event_type,
-              datetime(created_at, 'unixepoch') AS created_at
-       FROM audit_events WHERE ${where}
-       ORDER BY created_at DESC LIMIT ? OFFSET ?`
-    ).bind(...bindings, limit, offset),
-    c.env.DB.prepare(
-      `SELECT COUNT(*) AS total FROM audit_events WHERE ${where}`
-    ).bind(...bindings),
-  ]);
-
-  const events = rows.results;
-  const total  = (countRow.results[0] as { total: number }).total;
-  return c.json({ events, total, has_more: offset + events.length < total });
-});
+// /v1/admin/audit-log is intentionally disabled — org audit log is at /v1/audit-log
 
 export { admin };

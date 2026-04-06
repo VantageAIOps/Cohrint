@@ -15,7 +15,7 @@ async function checkRateLimit(kv: KVNamespace, orgId: string, limitRpm: number):
     const raw   = await kv.get(key);
     const count = raw ? parseInt(raw, 10) : 0;
     if (count >= limitRpm) return false;
-    kv.put(key, String(count + 1), { expirationTtl: 70 });
+    await kv.put(key, String(count + 1), { expirationTtl: 70 });
   } catch {
     // KV unavailable or quota exceeded — allow request through
   }

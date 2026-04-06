@@ -1884,12 +1884,29 @@ document.getElementById("docs-content").innerHTML = DOCS.quickstart;
     });
     if (!res.ok) return; // Not signed in — docs are public, no redirect needed
     const sess = await res.json();
-    const orgHint = `vnt_${sess.org_id}_…`;
-    document.querySelectorAll('pre, code').forEach(el => {
-      if (el.textContent.includes('vnt_your_key')) {
-        el.innerHTML = el.innerHTML.replace(/vnt_your_key/g,
-          `<span style="color:var(--accent)">${orgHint}</span>`);
-      }
+    // Replace placeholder text nodes safely (no innerHTML) to prevent XSS
+    const safeOrgId = String(sess.org_id || '').replace(/[^a-zA-Z0-9_-]/g, '');
+    const orgHint = `vnt_${safeOrgId}_…`;
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const toReplace: Text[] = [];
+    let node = walker.nextNode() as Text | null;
+    while (node) {
+      if (node.nodeValue && node.nodeValue.includes('vnt_your_key')) toReplace.push(node);
+      node = walker.nextNode() as Text | null;
+    }
+    toReplace.forEach(tn => {
+      const parts = tn.nodeValue!.split('vnt_your_key');
+      const frag = document.createDocumentFragment();
+      parts.forEach((part, i) => {
+        frag.appendChild(document.createTextNode(part));
+        if (i < parts.length - 1) {
+          const span = document.createElement('span');
+          span.style.color = 'var(--accent)';
+          span.textContent = orgHint;
+          frag.appendChild(span);
+        }
+      });
+      tn.parentNode!.replaceChild(frag, tn);
     });
   } catch {
     // Network error — docs still work without auth

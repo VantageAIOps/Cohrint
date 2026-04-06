@@ -45,7 +45,7 @@ function sqliteMonthStart(): string {
 
 crossplatform.get('/summary', async (c) => {
   const orgId = c.get('orgId');
-  const days = parseInt(c.req.query('days') ?? '30', 10);
+  const days = parseInt(c.req.query('days') ?? '30', 10) || 30;
   const since = sqliteDateSince(days);
 
   // Total spend
@@ -142,7 +142,7 @@ crossplatform.get('/summary', async (c) => {
 
 crossplatform.get('/developers', async (c) => {
   const orgId = c.get('orgId');
-  const days = parseInt(c.req.query('days') ?? '30', 10);
+  const days = parseInt(c.req.query('days') ?? '30', 10) || 30;
   const since = sqliteDateSince(days);
 
   const developers = await c.env.DB.prepare(`
@@ -206,7 +206,7 @@ crossplatform.get('/developers', async (c) => {
 crossplatform.get('/developer/:email', async (c) => {
   const orgId = c.get('orgId');
   const email = decodeURIComponent(c.req.param('email'));
-  const days = parseInt(c.req.query('days') ?? '30', 10);
+  const days = parseInt(c.req.query('days') ?? '30', 10) || 30;
   const since = sqliteDateSince(days);
 
   // By provider
@@ -284,7 +284,7 @@ crossplatform.get('/live', async (c) => {
 
 crossplatform.get('/models', async (c) => {
   const orgId = c.get('orgId');
-  const days = parseInt(c.req.query('days') ?? '30', 10);
+  const days = parseInt(c.req.query('days') ?? '30', 10) || 30;
   const since = sqliteDateSince(days);
 
   const models = await c.env.DB.prepare(`
