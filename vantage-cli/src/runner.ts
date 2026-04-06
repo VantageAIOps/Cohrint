@@ -256,8 +256,6 @@ export function runAgentBuffered(
         spinner?.stop();
       }
     };
-    spinner?.start();
-
     // Timeout guard — kill process if it hangs (grace = 10% of timeout, max 10s)
     const grace = Math.min(Math.ceil(timeoutMs * 0.1), 10000);
     const timer = setTimeout(() => {

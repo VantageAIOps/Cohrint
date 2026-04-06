@@ -242,6 +242,8 @@ function looksLikeStructuredData(text: string): boolean {
   const trimmed = text.trim();
   if (trimmed.startsWith("{") || trimmed.startsWith("[")) return true; // JSON
   if (trimmed.startsWith("```")) return true; // code block
+  if (/```[\s\S]*?```/.test(text)) return true; // fenced code block anywhere
+  if (/`[^`\n]+`/.test(text)) return true; // inline code
   if ((text.match(/https?:\/\//g) || []).length > 2) return true; // URL-heavy
   if ((text.match(/[{}()\[\];=<>]/g) || []).length > text.length * 0.1) return true; // code-like
   return false;
@@ -881,7 +883,6 @@ async function main(): Promise<void> {
     }
     // Wait for tracker to drain before exit to avoid dropped events
     await tracker.flush().catch(() => {});
-    await new Promise<void>((resolve) => setTimeout(resolve, 2000));
     process.exit(0);
   }
 
@@ -909,7 +910,6 @@ async function main(): Promise<void> {
       }
     }
     await tracker.flush().catch(() => {});
-    await new Promise<void>((resolve) => setTimeout(resolve, 2000));
     process.exit(0);
   }
 

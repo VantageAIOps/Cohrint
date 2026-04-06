@@ -23,6 +23,7 @@ export class AgentSession {
   private optMode: OptMode = "auto";
   private totalSavedTokens = 0;
   private totalCostUsd = 0;
+  private capturedSessionId: string | undefined = undefined;
 
   constructor(
     private agent: AgentAdapter,
@@ -66,9 +67,24 @@ export class AgentSession {
       return false;
     }
 
-    // Relay child stdout to terminal — preserves color/formatting while letting us
-    // detect response completion via silence detection in sendLine()
+    // Relay child stdout to terminal and capture sessionId from Claude's JSON stream.
+    // Claude Code emits JSON lines (type=system/result with session_id); plain text passes through.
     this.child.stdout?.on("data", (chunk: Buffer) => {
+      const text = chunk.toString("utf-8");
+      // Try to extract sessionId from any JSON lines in this chunk
+      for (const line of text.split("\n")) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith("{")) continue;
+        try {
+          const obj = JSON.parse(trimmed) as Record<string, unknown>;
+          if (obj["type"] === "system" || obj["type"] === "result") {
+            const sid = obj["session_id"] as string | undefined;
+            if (typeof sid === "string" && /^[0-9a-f-]{36}$/i.test(sid)) {
+              this.capturedSessionId = sid;
+            }
+          }
+        } catch { /* not JSON — ignore */ }
+      }
       process.stdout.write(chunk);
     });
 
@@ -186,8 +202,8 @@ export class AgentSession {
   private waitForResponseEnd(): Promise<void> {
     if (!this.child?.stdout) return Promise.resolve();
     return new Promise((resolve) => {
-      const SILENCE_MS = 300;     // ms of silence = response done
-      const INITIAL_TIMEOUT = 5000; // max wait if no output at all
+      const SILENCE_MS = 300;      // ms of silence = response done
+      const INITIAL_TIMEOUT = 30_000; // max wait for first token (complex tasks need time)
 
       const stdout = this.child!.stdout!;
       let silenceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -290,6 +306,7 @@ export class AgentSession {
       exitCode: 0,
       outputText: "",
       durationMs: duration,
+      sessionId: this.capturedSessionId,
     });
   }
 }
