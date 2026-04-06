@@ -84,7 +84,9 @@ export function hashPrompt(text: string): string {
   return createHash("sha256").update(text).digest("hex").slice(0, 12);
 }
 
-export function efficiencyScore(usage: TokenUsage): number {
+export function efficiencyScore(usage: TokenUsage): number | null {
+  const totalTokens = usage.promptTokens + usage.completionTokens;
+  if (!totalTokens) return null;
   const sysOverhead = usage.promptTokens > 0
     ? (usage.systemPromptTokens / usage.promptTokens) * 100 : 0;
   const cacheHit = usage.promptTokens > 0

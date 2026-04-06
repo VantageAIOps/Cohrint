@@ -72,17 +72,25 @@ stream.get('/:orgId', async (c) => {
       const deadline = Date.now() + 25_000; // 25s max
 
       while (Date.now() < deadline) {
-        const raw = await c.env.KV.get(`stream:${orgId}:latest`);
-        if (raw) {
-          try {
-            const ev = JSON.parse(raw) as { ts: number };
-            if (ev.ts > lastTs) {
-              lastTs = ev.ts;
-              await sendEvent(raw);
-            }
-          } catch { /* ignore parse errors */ }
-        } else {
-          await sendPing();
+        try {
+          const raw = await c.env.KV.get(`stream:${orgId}:latest`);
+          if (raw) {
+            try {
+              const ev = JSON.parse(raw) as { ts: number };
+              if (ev.ts > lastTs) {
+                lastTs = ev.ts;
+                await sendEvent(raw);
+              }
+            } catch { /* ignore parse errors */ }
+          } else {
+            await sendPing();
+          }
+        } catch (kvErr) {
+          console.error('[stream] KV read error:', kvErr);
+          // Send an error SSE event and close cleanly rather than aborting
+          try { await write('event: error\ndata: {"error":"stream_unavailable"}\n\n'); } catch { /* ignore */ }
+          await writer.close();
+          return;
         }
 
         // Wait 2s between polls

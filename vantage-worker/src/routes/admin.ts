@@ -204,7 +204,7 @@ admin.get('/team-budgets', async (c) => {
 admin.put('/team-budgets/:team', async (c) => {
   const orgId = c.get('orgId');
   const team  = c.req.param('team');
-  let body: { budget_usd?: number };
+  let body: { budget_usd?: number; updated_at?: number };
   try { body = await c.req.json(); }
   catch { return c.json({ error: 'Invalid JSON body' }, 400); }
 
@@ -212,11 +212,30 @@ admin.put('/team-budgets/:team', async (c) => {
     return c.json({ error: 'budget_usd must be a non-negative number' }, 400);
   }
 
-  await c.env.DB.prepare(`
-    INSERT INTO team_budgets (org_id, team, budget_usd, updated_at)
-    VALUES (?, ?, ?, unixepoch())
-    ON CONFLICT(org_id, team) DO UPDATE SET budget_usd = excluded.budget_usd, updated_at = unixepoch()
-  `).bind(orgId, team, body.budget_usd).run();
+  // Optimistic concurrency: if caller supplies updated_at, use it in the WHERE
+  // clause so a concurrent write that already changed the row returns 409.
+  const existingRow = await c.env.DB.prepare(
+    'SELECT updated_at FROM team_budgets WHERE org_id = ? AND team = ?'
+  ).bind(orgId, team).first<{ updated_at: number } | null>();
+
+  if (existingRow !== null) {
+    // Row exists — do a guarded UPDATE
+    const expectedUpdatedAt = body.updated_at ?? existingRow.updated_at;
+    const result = await c.env.DB.prepare(`
+      UPDATE team_budgets SET budget_usd = ?, updated_at = unixepoch()
+      WHERE org_id = ? AND team = ? AND updated_at = ?
+    `).bind(body.budget_usd, orgId, team, expectedUpdatedAt).run();
+
+    if (result.meta.changes === 0) {
+      return c.json({ error: 'Conflict: budget was updated by another request. Fetch the latest and retry.' }, 409);
+    }
+  } else {
+    // Row does not exist — safe to insert
+    await c.env.DB.prepare(`
+      INSERT INTO team_budgets (org_id, team, budget_usd, updated_at)
+      VALUES (?, ?, ?, unixepoch())
+    `).bind(orgId, team, body.budget_usd).run();
+  }
 
   logAudit(c, {
     event_type:    'admin_action',

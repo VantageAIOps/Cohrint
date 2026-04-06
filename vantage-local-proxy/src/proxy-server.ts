@@ -383,11 +383,19 @@ export function startProxyServer(config: LocalProxyConfig): void {
       const targetUrl = `${targetBase}${targetPath}`;
       if (debug) process.stderr.write(`[vantage-proxy] → ${provider} ${targetPath}\n`);
 
-      const upstreamRes = await fetch(targetUrl, {
-        method: "POST",
-        headers: forwardHeaders,
-        body: JSON.stringify(reqBody),
-      });
+      const fetchController = new AbortController();
+      const fetchTimeout = setTimeout(() => fetchController.abort(), 5 * 60 * 1000);
+      let upstreamRes: Response;
+      try {
+        upstreamRes = await fetch(targetUrl, {
+          method: "POST",
+          headers: forwardHeaders,
+          body: JSON.stringify(reqBody),
+          signal: fetchController.signal,
+        });
+      } finally {
+        clearTimeout(fetchTimeout);
+      }
 
       const latencyMs = performance.now() - t0;
 
@@ -401,20 +409,37 @@ export function startProxyServer(config: LocalProxyConfig): void {
           org_id: orgId, team, environment,
         });
 
-        // Forward headers
+        // Forward headers — strip hop-by-hop and sensitive upstream headers
+        const HOP_BY_HOP = new Set([
+          'transfer-encoding', 'content-length', 'connection', 'keep-alive',
+          'upgrade', 'te', 'trailer', 'proxy-authorization',
+          'x-ratelimit-limit-requests', 'x-ratelimit-limit-tokens',
+          'x-ratelimit-remaining-requests', 'x-ratelimit-remaining-tokens',
+          'x-ratelimit-reset-requests', 'x-ratelimit-reset-tokens', 'server',
+        ]);
         const headers: Record<string, string> = {
           "Access-Control-Allow-Origin": "*",
         };
-        upstreamRes.headers.forEach((v, k) => { headers[k] = v; });
+        upstreamRes.headers.forEach((v, k) => {
+          if (!HOP_BY_HOP.has(k.toLowerCase())) headers[k] = v;
+        });
         res.writeHead(upstreamRes.status, headers);
 
         // Pipe the stream
         const reader = upstreamRes.body.getReader();
         const pump = async () => {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) { res.end(); break; }
-            res.write(value);
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) { res.end(); break; }
+              res.write(value);
+            }
+          } catch (e) {
+            // Stream interrupted — close response cleanly
+            if (debug) process.stderr.write(`[vantage-proxy] Stream interrupted: ${e}\n`);
+            if (!res.writableEnded) res.end();
+          } finally {
+            reader.releaseLock();
           }
         };
         await pump();

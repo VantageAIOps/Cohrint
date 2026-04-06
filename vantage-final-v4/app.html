@@ -1248,7 +1248,16 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
    ═══════════════════════════════════════════════════════════════════════════ */
 
 // ── Constants ──
-var API_BASE = localStorage.getItem('api_base') || 'https://api.vantageaiops.com';
+(function() {
+  var _stored = localStorage.getItem('api_base');
+  // Only accept https:// URLs or relative paths (never http:// or protocol-relative)
+  if (_stored && (/^https:\/\//.test(_stored) || /^\/[^/]/.test(_stored))) {
+    window._API_BASE_VALIDATED = _stored;
+  } else {
+    window._API_BASE_VALIDATED = 'https://api.vantageaiops.com';
+  }
+})();
+var API_BASE = window._API_BASE_VALIDATED;
 var _session = null;
 var period = 30;
 var activeView = 'overview';
@@ -1513,8 +1522,10 @@ function selectToolTab(provider) {
    Overview
    ═══════════════════════════════════════════════════════════════════════════ */
 var _dailyChart = null;
+var _renderGen = 0;
 
 function loadOverview() {
+  var gen = ++_renderGen;
   _skelOn();
   Promise.all([
     apiFetch('/v1/cross-platform/summary?days=' + period).catch(function() { return null; }),
@@ -1523,6 +1534,7 @@ function loadOverview() {
     apiFetch('/v1/analytics/kpis?period=' + period).catch(function() { return null; }),
     apiFetch('/v1/analytics/timeseries?period=' + period).catch(function() { return null; }),
   ]).then(function(results) {
+    if (gen !== _renderGen) return; // stale render — a newer one is in flight
     _skelOff();
     var summary = results[0];
     var devs = results[1];
@@ -1690,7 +1702,9 @@ function renderDailyChart(summary, timeseries) {
 
   if (daily.length > 0) {
     labels = daily.map(function(d) {
-      var dt = new Date(d.date || d.day);
+      var raw = d.date || d.day || '';
+      var parts = raw.split('-');
+      var dt = parts.length === 3 ? new Date(+parts[0], +parts[1] - 1, +parts[2]) : new Date(raw);
       return (dt.getMonth() + 1) + '/' + dt.getDate();
     });
 
@@ -2022,6 +2036,7 @@ var _spendChart = null;
 var _teamPieChart = null;
 
 function loadSpend() {
+  var gen = ++_renderGen;
   _skelOn();
   Promise.all([
     apiFetch('/v1/analytics/timeseries?period=' + period).catch(function() { return null; }),
@@ -2029,6 +2044,7 @@ function loadSpend() {
     apiFetch('/v1/analytics/teams?period=' + period).catch(function() { return null; }),
     apiFetch('/v1/cross-platform/summary?days=' + period).catch(function() { return null; }),
   ]).then(function(results) {
+    if (gen !== _renderGen) return; // stale render — a newer one is in flight
     _skelOff();
     var timeseries = results[0];
     var models = results[1];
@@ -2065,7 +2081,16 @@ function loadSpend() {
     renderTeamPie(teams);
 
   }).catch(function(e) {
+    _skelOff();
     console.error('[vantage] spend error:', e);
+    var spendTotalEl = document.getElementById('spendTotal');
+    if (spendTotalEl) spendTotalEl.textContent = 'Error';
+    var spendTotalSubEl = document.getElementById('spendTotalSub');
+    if (spendTotalSubEl) {
+      spendTotalSubEl.textContent = 'Failed to load — retrying in 8s';
+      spendTotalSubEl.className = 'kpi-sub up';
+    }
+    setTimeout(loadSpend, 8000);
   });
 }
 
@@ -2080,7 +2105,9 @@ function renderSpendTrend(timeseries) {
   }
 
   var labels = data.map(function(d) {
-    var dt = new Date(d.date || d.day);
+    var raw = d.date || d.day || '';
+    var parts = raw.split('-');
+    var dt = parts.length === 3 ? new Date(+parts[0], +parts[1] - 1, +parts[2]) : new Date(raw);
     return (dt.getMonth() + 1) + '/' + dt.getDate();
   });
   var values = data.map(function(d) { return d.cost_usd || d.total_cost || d.cost || 0; });

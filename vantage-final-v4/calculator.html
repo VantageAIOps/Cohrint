@@ -324,6 +324,10 @@ const TIER_TAGS = {frontier:"frontier",mid:"mid",fast:"fast & cheap"};
 
 let activeFilter = "all";
 
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 function fmt(n) {
   if(n>=1e6) return "$"+(n/1e6).toFixed(2)+"M";
   if(n>=1000) return "$"+(n/1000).toFixed(2)+"K";
@@ -401,7 +405,7 @@ function update() {
     <div class="sum-card highlight">
       <div class="sum-label">Cheapest option</div>
       <div class="sum-val">${fmt(bestModel.monthly)}<span style="font-size:16px;color:var(--muted)">/mo</span></div>
-      <div class="sum-sub">${bestModel.model} · ${fmtTokens(prompt)}→${fmtTokens(completion)} tokens · ${fmtTokens(requests)} calls</div>
+      <div class="sum-sub">${escapeHtml(bestModel.model)} · ${fmtTokens(prompt)}→${fmtTokens(completion)} tokens · ${fmtTokens(requests)} calls</div>
     </div>
     <div class="sum-card">
       <div class="sum-label">GPT-4o equivalent</div>
@@ -411,7 +415,7 @@ function update() {
     <div class="sum-card">
       <div class="sum-label">Potential saving</div>
       <div class="sum-val" style="color:var(--accent)">${fmt(saving)}<span style="font-size:16px">/mo</span></div>
-      <div class="sum-sub">Switching from GPT-4o → ${bestModel.model}</div>
+      <div class="sum-sub">Switching from GPT-4o → ${escapeHtml(bestModel.model)}</div>
     </div>
   `;
 
@@ -431,8 +435,8 @@ function update() {
         <div class="model-cell">
           ${i===0?'<span style="color:var(--accent);margin-right:4px">★</span>':''}
           <div>
-            <div style="font-weight:500">${r.model}</div>
-            <div class="model-provider">${r.provider}</div>
+            <div style="font-weight:500">${escapeHtml(r.model)}</div>
+            <div class="model-provider">${escapeHtml(r.provider)}</div>
           </div>
         </div>
       </td>

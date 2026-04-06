@@ -43,7 +43,7 @@ auditlog.get('/', async (c) => {
 
   const orgId     = c.get('orgId');
   const limit     = Math.max(1, Math.min(parseInt(c.req.query('limit') ?? '50', 10), 500));
-  const offset    = parseInt(c.req.query('offset') ?? '0', 10);
+  const offset    = Math.max(0, parseInt(c.req.query('offset') ?? '0', 10));
   const eventType = c.req.query('event_type') ?? null;
   const format    = c.req.query('format')     ?? 'json';
   const from      = parseIsoDate(c.req.query('from'));

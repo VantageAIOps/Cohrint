@@ -36,7 +36,7 @@ async function checkFreeTierLimit(db: D1Database, orgId: string, adding = 1): Pr
 
   if (!row || row.plan !== 'free') return { blocked: false, used: row?.mtd_count ?? 0 };
   const used = Number(row.mtd_count);
-  return { blocked: used + adding > FREE_TIER_LIMIT, used };
+  return { blocked: used + adding >= FREE_TIER_LIMIT, used };
 }
 
 // ── POST /v1/events — ingest a single event ───────────────────────────────────
@@ -66,7 +66,13 @@ events.post('/', async (c) => {
     return c.json({ error: 'event_id is required' }, 400);
   }
 
-  const result = await insertEvent(c.env.DB, orgId, body);
+  let result;
+  try {
+    result = await insertEvent(c.env.DB, orgId, body);
+  } catch (err) {
+    if (err instanceof RangeError) return c.json({ error: err.message }, 400);
+    throw err;
+  }
   if (!result.success) return c.json({ error: 'Failed to insert event' }, 500);
 
   // Broadcast to SSE subscribers via KV pub channel
@@ -101,9 +107,15 @@ events.post('/batch', async (c) => {
   }
 
   // Bulk insert using D1 batch API
-  const stmts = body.events.map(ev =>
-    buildInsertStmt(c.env.DB, orgId, ev, body.sdk_language, body.sdk_version)
-  );
+  let stmts;
+  try {
+    stmts = body.events.map(ev =>
+      buildInsertStmt(c.env.DB, orgId, ev, body.sdk_language, body.sdk_version)
+    );
+  } catch (err) {
+    if (err instanceof RangeError) return c.json({ error: err.message }, 400);
+    throw err;
+  }
 
   const results = await c.env.DB.batch(stmts);
   const failed  = results.filter(r => !r.success).length;
@@ -165,6 +177,17 @@ function buildInsertStmt(
   const completionTok  = Number(ev.completion_tokens ?? r.usage_completion_tokens ?? 0);
   const cacheTok       = Number(ev.cache_tokens    ?? r.usage_cached_tokens   ?? r.cache_tokens   ?? 0);
   const totalTokens    = Number(ev.total_tokens    ?? r.usage_total_tokens    ?? (promptTokens + completionTok));
+
+  // Reject scientific-notation inflation and negative values (e.g. "1e10" = 10 billion)
+  const MAX_TOKENS = 10_000_000;
+  if (
+    promptTokens  < 0 || promptTokens  > MAX_TOKENS ||
+    completionTok < 0 || completionTok > MAX_TOKENS ||
+    cacheTok      < 0 || cacheTok      > MAX_TOKENS ||
+    totalTokens   < 0 || totalTokens   > MAX_TOKENS
+  ) {
+    throw new RangeError(`Token count out of valid range (0–${MAX_TOKENS})`);
+  }
   const costUsd        = Number(ev.total_cost_usd  ?? ev.cost_total_usd       ??
                          r.cost_total_cost_usd ?? r.cost_usd ?? 0);
   const latencyMs      = ev.latency_ms      ?? r.latency_ms            as number ?? 0;

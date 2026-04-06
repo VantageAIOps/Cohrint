@@ -267,11 +267,18 @@ document.getElementById('inp-email').addEventListener('keydown', e => {
     document.getElementById('inp-key').value = newKey;
     const banner = document.createElement('div');
     banner.style.cssText = 'background:rgba(0,212,161,.08);border:1px solid rgba(0,212,161,.25);border-radius:10px;padding:14px 16px;margin-bottom:16px';
-    banner.innerHTML = `
-      <div style="font-weight:600;margin-bottom:8px;color:var(--ac);font-size:13px">✓ New API key generated</div>
-      <div style="font-family:var(--mono);font-size:11px;background:var(--bg3);border:1px solid var(--b2);border-radius:6px;padding:8px 10px;word-break:break-all;margin-bottom:8px;color:var(--tx)">${newKey}</div>
-      <div style="font-size:11px;color:var(--mu)">⚠ Copy this key now — it won\'t be shown again. Then click Sign in below.</div>
-    `;
+    const bannerTitle = document.createElement('div');
+    bannerTitle.style.cssText = 'font-weight:600;margin-bottom:8px;color:var(--ac);font-size:13px';
+    bannerTitle.textContent = '✓ New API key generated';
+    const bannerKey = document.createElement('div');
+    bannerKey.style.cssText = 'font-family:var(--mono);font-size:11px;background:var(--bg3);border:1px solid var(--b2);border-radius:6px;padding:8px 10px;word-break:break-all;margin-bottom:8px;color:var(--tx)';
+    bannerKey.textContent = newKey;
+    const bannerNote = document.createElement('div');
+    bannerNote.style.cssText = 'font-size:11px;color:var(--mu)';
+    bannerNote.textContent = '⚠ Copy this key now — it won\'t be shown again. Then click Sign in below.';
+    banner.appendChild(bannerTitle);
+    banner.appendChild(bannerKey);
+    banner.appendChild(bannerNote);
     const box = document.getElementById('signin-box');
     box.insertBefore(banner, box.querySelector('.box-header'));
     window.history.replaceState({}, '', '/auth');
@@ -335,11 +342,18 @@ async function redeemToken() {
     document.getElementById('inp-key').value = data.api_key;
     const banner = document.createElement('div');
     banner.style.cssText = 'background:rgba(0,212,161,.08);border:1px solid rgba(0,212,161,.25);border-radius:10px;padding:14px 16px;margin-bottom:16px';
-    banner.innerHTML = `
-      <div style="font-weight:600;margin-bottom:8px;color:var(--ac);font-size:13px">✓ New API key generated</div>
-      <div style="font-family:var(--mono);font-size:11px;background:var(--bg3);border:1px solid var(--b2);border-radius:6px;padding:8px 10px;word-break:break-all;margin-bottom:8px;color:var(--tx)">${data.api_key}</div>
-      <div style="font-size:11px;color:var(--mu)">⚠ Copy this key now — it won\'t be shown again. Then click Sign in below.</div>
-    `;
+    const bannerTitle2 = document.createElement('div');
+    bannerTitle2.style.cssText = 'font-weight:600;margin-bottom:8px;color:var(--ac);font-size:13px';
+    bannerTitle2.textContent = '✓ New API key generated';
+    const bannerKey2 = document.createElement('div');
+    bannerKey2.style.cssText = 'font-family:var(--mono);font-size:11px;background:var(--bg3);border:1px solid var(--b2);border-radius:6px;padding:8px 10px;word-break:break-all;margin-bottom:8px;color:var(--tx)';
+    bannerKey2.textContent = data.api_key;
+    const bannerNote2 = document.createElement('div');
+    bannerNote2.style.cssText = 'font-size:11px;color:var(--mu)';
+    bannerNote2.textContent = '⚠ Copy this key now — it won\'t be shown again. Then click Sign in below.';
+    banner.appendChild(bannerTitle2);
+    banner.appendChild(bannerKey2);
+    banner.appendChild(bannerNote2);
     const signinBox = document.getElementById('signin-box');
     signinBox.insertBefore(banner, signinBox.querySelector('.box-header'));
   } catch(e) {

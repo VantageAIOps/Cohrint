@@ -278,9 +278,24 @@ async function executePrompt(
   }
 }
 
-function waitForCost(): Promise<import("./event-bus.js").VantageEvents["cost:calculated"]> {
+function waitForCost(): Promise<import("./event-bus.js").VantageEvents["cost:calculated"] | null> {
   return new Promise((resolve) => {
-    bus.once("cost:calculated", resolve);
+    let settled = false;
+    const handler = (data: import("./event-bus.js").VantageEvents["cost:calculated"]) => {
+      if (!settled) {
+        settled = true;
+        resolve(data);
+      }
+    };
+    bus.once("cost:calculated", handler);
+    // Auto-remove the listener after the cost timeout so it never leaks.
+    setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        bus.off("cost:calculated", handler);
+        resolve(null);
+      }
+    }, COST_TIMEOUT_MS);
   });
 }
 

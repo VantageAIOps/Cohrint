@@ -137,8 +137,13 @@ export class AgentSession {
     // Forward to agent with backpressure handling
     const ok = this.child.stdin.write(result.forwarded + "\n");
     if (!ok) {
-      await new Promise<void>((resolve) => {
-        this.child?.stdin?.once("drain", resolve) ?? resolve();
+      // stdin buffer is full — wait for drain, but don't hang if stdin closes
+      await new Promise<void>((resolve, reject) => {
+        const stdin = this.child?.stdin;
+        if (!stdin) { resolve(); return; }
+        stdin.once("drain", resolve);
+        stdin.once("close", resolve); // don't hang if stream closes before drain
+        stdin.once("error", reject);
       });
     }
 

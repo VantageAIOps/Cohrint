@@ -32,7 +32,11 @@ export class VantageClient {
   private readonly debug: boolean;
 
   constructor(opts: VantageClientOptions) {
-    this.orgId = opts.org ?? opts.apiKey.split("_")[1] ?? "";
+    const _keyParts = opts.apiKey.split("_");
+    if (!opts.org && _keyParts.length < 2) {
+      throw new Error("Invalid API key format: expected 'vnt_<orgId>_...' or provide opts.org explicitly.");
+    }
+    this.orgId = opts.org ?? _keyParts[1] ?? "";
     this.environment = opts.environment ?? "production";
     this.team = opts.team ?? "";
     this.project = opts.project ?? "";
