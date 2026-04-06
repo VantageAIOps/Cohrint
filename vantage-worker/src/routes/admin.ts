@@ -266,6 +266,8 @@ admin.patch('/org', async (c) => {
 // ── GET /audit-log — all orgs, admin only ────────────────────────────────────
 
 admin.get('/audit-log', async (c) => {
+  // Cross-org endpoint — not accessible to org-level keys; use /v1/audit-log instead
+  return c.json({ error: 'Access denied. Use /v1/audit-log for org audit log access.' }, 403);
   const limit     = Math.max(1, Math.min(parseInt(c.req.query('limit')   ?? '100', 10), 500));
   const offset    = parseInt(c.req.query('offset')  ?? '0', 10);
   const eventType = c.req.query('event_type') ?? null;

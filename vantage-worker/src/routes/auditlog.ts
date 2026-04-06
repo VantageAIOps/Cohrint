@@ -57,7 +57,7 @@ auditlog.get('/', async (c) => {
               ip_address, event_type,
               datetime(created_at, 'unixepoch') AS created_at
        FROM audit_events WHERE ${where}
-       ORDER BY created_at DESC LIMIT ? OFFSET ?`
+       ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`
     ).bind(...bindings, limit, offset),
     c.env.DB.prepare(
       `SELECT COUNT(*) AS total FROM audit_events WHERE ${where}`

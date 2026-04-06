@@ -141,7 +141,10 @@ export async function authMiddleware(
     return c.json({ error: 'Rate limit exceeded', retry_after: retryAt }, 429);
   }
 
-  logAudit(c, { event_type: 'auth', event_name: 'auth.login', resource_type: 'api_key' });
+  // Don't log auth.login for audit-log reads — it would shift offset pagination
+  if (!c.req.path.startsWith('/v1/audit-log')) {
+    logAudit(c, { event_type: 'auth', event_name: 'auth.login', resource_type: 'api_key' });
+  }
   return await next();
 }
 
