@@ -1418,7 +1418,7 @@ function loadOverview() {
 
     var byProvider = summary.by_provider || [];
     var filtered = activeToolFilter === 'all' ? byProvider : byProvider.filter(function(p) { return p.provider === activeToolFilter; });
-    var totalCost = filtered.reduce(function(s, p) { return s + (p.total_cost || 0); }, 0);
+    var totalCost = filtered.reduce(function(s, p) { return s + (p.total_cost || p.cost || 0); }, 0);
     var totalReqs = filtered.reduce(function(s, p) { return s + (p.request_count || 0); }, 0);
     var totalDevs = activeToolFilter === 'all'
       ? (summary.total_developers || (devs && devs.developers ? devs.developers.length : 0))
@@ -1436,11 +1436,12 @@ function loadOverview() {
 
     // Costliest tool
     if (filtered.length > 0) {
-      var costliest = filtered.slice().sort(function(a, b) { return (b.total_cost || 0) - (a.total_cost || 0); })[0];
+      var costliest = filtered.slice().sort(function(a, b) { return (b.total_cost || b.cost || 0) - (a.total_cost || a.cost || 0); })[0];
       document.getElementById('kpiCostliestTool').textContent = toolName(costliest.provider);
       document.getElementById('kpiCostliestTool').style.color = toolColor(costliest.provider);
-      var pct = totalCost > 0 ? ((costliest.total_cost / totalCost) * 100).toFixed(0) : 0;
-      document.getElementById('kpiCostliestToolSub').textContent = fmt(costliest.total_cost) + ' \u00b7 ' + pct + '% of total';
+      var costliestCost = costliest.total_cost || costliest.cost || 0;
+      var pct = totalCost > 0 ? ((costliestCost / totalCost) * 100).toFixed(0) : 0;
+      document.getElementById('kpiCostliestToolSub').textContent = fmt(costliestCost) + ' \u00b7 ' + pct + '% of total';
     }
 
     // Active developers
@@ -1499,7 +1500,7 @@ function loadOverview() {
 function buildToolTabs(summary) {
   var container = document.getElementById('toolTabs');
   var byProvider = summary.by_provider || [];
-  var totalCost = byProvider.reduce(function(s, p) { return s + (p.total_cost || 0); }, 0);
+  var totalCost = byProvider.reduce(function(s, p) { return s + (p.total_cost || p.cost || 0); }, 0);
 
   // Build DOM safely
   while (container.firstChild) container.removeChild(container.firstChild);
@@ -1532,7 +1533,7 @@ function buildToolTabs(summary) {
     tab.appendChild(document.createTextNode(' ' + toolName(p.provider) + ' '));
     var costSpan = document.createElement('span');
     costSpan.className = 'tab-cost';
-    costSpan.textContent = fmt(p.total_cost);
+    costSpan.textContent = fmt(p.total_cost || p.cost);
     tab.appendChild(costSpan);
     container.appendChild(tab);
   });
@@ -1543,7 +1544,7 @@ function renderDailyChart(summary, timeseries) {
   if (!canvas) return;
 
   var byProvider = summary.by_provider || [];
-  var daily = summary.daily || (timeseries && timeseries.data) || [];
+  var daily = summary.daily || (timeseries && (timeseries.series || timeseries.data)) || [];
 
   if (daily.length === 0 && byProvider.length === 0) {
     if (_dailyChart) { _dailyChart.destroy(); _dailyChart = null; }
@@ -1565,22 +1566,33 @@ function renderDailyChart(summary, timeseries) {
       return (dt.getMonth() + 1) + '/' + dt.getDate();
     });
 
-    providers.forEach(function(prov) {
-      if (activeToolFilter !== 'all' && prov !== activeToolFilter) return;
-      datasets.push({
-        label: toolName(prov),
-        data: daily.map(function(d) {
-          if (d.by_provider) {
+    // timeseries items: { date, cost_usd, tokens, requests } — aggregate only, no per-provider breakdown
+    var hasPerProvider = daily.length > 0 && daily[0].by_provider;
+    if (hasPerProvider) {
+      providers.forEach(function(prov) {
+        if (activeToolFilter !== 'all' && prov !== activeToolFilter) return;
+        datasets.push({
+          label: toolName(prov),
+          data: daily.map(function(d) {
             var found = d.by_provider.find(function(bp) { return bp.provider === prov; });
             return found ? (found.cost || found.total_cost || 0) : 0;
-          }
-          return d.provider === prov ? (d.cost || d.total_cost || 0) : 0;
-        }),
-        backgroundColor: toolColor(prov),
+          }),
+          backgroundColor: toolColor(prov),
+          borderRadius: 2,
+          borderSkipped: false,
+        });
+      });
+    } else {
+      // Single aggregate series (timeseries endpoint)
+      var provColors = providers.filter(function(p) { return activeToolFilter === 'all' || p === activeToolFilter; });
+      datasets.push({
+        label: activeToolFilter === 'all' ? 'All Tools' : toolName(activeToolFilter),
+        data: daily.map(function(d) { return d.cost_usd || d.cost || d.total_cost || 0; }),
+        backgroundColor: provColors.length === 1 ? toolColor(provColors[0]) : 'var(--accent-green)',
         borderRadius: 2,
         borderSkipped: false,
       });
-    });
+    }
   } else {
     var filteredProvs = providers.filter(function(p) { return activeToolFilter === 'all' || p === activeToolFilter; });
     labels = filteredProvs.map(function(p) { return toolName(p); });
@@ -1588,7 +1600,7 @@ function renderDailyChart(summary, timeseries) {
       label: 'Cost',
       data: filteredProvs.map(function(p) {
         var found = byProvider.find(function(bp) { return bp.provider === p; });
-        return found ? (found.total_cost || 0) : 0;
+        return found ? (found.total_cost || found.cost || 0) : 0;
       }),
       backgroundColor: filteredProvs.map(function(p) { return toolColor(p); }),
       borderRadius: 4,
@@ -1703,11 +1715,11 @@ function renderToolComparison(byProvider) {
     return;
   }
 
-  var sorted = byProvider.slice().sort(function(a, b) { return (b.total_cost || 0) - (a.total_cost || 0); });
+  var sorted = byProvider.slice().sort(function(a, b) { return (b.total_cost || b.cost || 0) - (a.total_cost || a.cost || 0); });
   tbody.textContent = '';
 
   sorted.forEach(function(p) {
-    var cost = p.total_cost || 0;
+    var cost = p.total_cost || p.cost || 0;
     var reqs = p.request_count || 0;
     var avgPerReq = reqs > 0 ? (cost / reqs) : 0;
     var color = toolColor(p.provider);
