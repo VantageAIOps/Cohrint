@@ -294,9 +294,12 @@ export function getRecommendations(metrics: SessionMetrics, maxTips: number = 3)
   // Fill in computed/optional fields so conditions never see undefined
   const durationMin = metrics.sessionDurationMin ?? (metrics.sessionStartTime ? (Date.now() - metrics.sessionStartTime) / 60000 : 0);
   const avgCost = metrics.avgCostPerPrompt ?? (metrics.promptCount > 0 ? metrics.totalCostUsd / metrics.promptCount : 0);
+  // Normalize agent name before building `filled` so condition functions
+  // receive the canonical name (e.g. "claude") not raw aliases ("claude-code").
+  const agentName = normalizeAgentName(metrics.agent ?? "unknown");
   const filled: SessionMetrics = {
     ...metrics,
-    agent: metrics.agent ?? "unknown",
+    agent: agentName,
     model: metrics.model ?? "unknown",
     avgCostPerPrompt: avgCost,
     avgLatencyMs: metrics.avgLatencyMs ?? 0,
@@ -304,7 +307,6 @@ export function getRecommendations(metrics: SessionMetrics, maxTips: number = 3)
     lastPromptTokens: metrics.lastPromptTokens ?? 0,
     sessionDurationMin: durationMin,
   };
-  const agentName = normalizeAgentName(filled.agent ?? "unknown");
   const applicable = AGENT_TIPS.filter(tip => {
     if (tip.agent !== "all" && tip.agent !== agentName) return false;
     try { return tip.condition(filled); } catch { return false; }
