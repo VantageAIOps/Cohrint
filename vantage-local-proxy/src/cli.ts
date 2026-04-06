@@ -40,6 +40,22 @@ function parseArgs(): Record<string, string> {
 const args = parseArgs();
 const command = args._command ?? "";
 
+// ── Update check (fire-and-forget) ───────────────────────────────────────────
+
+(async () => {
+  try {
+    const current = "1.0.0";
+    const res = await fetch("https://registry.npmjs.org/vantageai-local-proxy/latest",
+      { signal: AbortSignal.timeout(2000) });
+    if (!res.ok) return;
+    const { version } = await res.json() as { version: string };
+    if (version !== current) {
+      console.error(`\n  Update available: vantageai-local-proxy ${current} → ${version}`);
+      console.error(`  Run: npm install -g vantageai-local-proxy\n`);
+    }
+  } catch { /* silent */ }
+})();
+
 // ── SCAN command ─────────────────────────────────────────────────────────────
 
 if (command === "scan") {
