@@ -3,17 +3,23 @@ name: VantageAI Test Suite
 # Runs the full test suite as post-deploy validation on main.
 #
 # Triggers:
+#   - Every PR to main                           → merge barricade (full suite)
 #   - After CF Worker or Pages deploy on main    → post-deploy validation
 #   - After ci-version pipeline runs on v* branch → redundant safety net
 #   - Nightly at 02:00 UTC on main               → regression monitoring
 #   - Manual dispatch                             → on-demand
 #
-# NOTE: PRs to main are validated by ci-pr-gate.yml (separate workflow)
+# NOTE: ci-pr-gate.yml runs fast checks (type check, CLI build, unit tests).
+#       This workflow runs the full API + browser suite as the final PR gate.
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
+  # PR merge barricade — full suite must pass before merging to main
+  pull_request:
+    branches: [main]
+
   # Post-deploy validation (main) + after version branch pipeline
   workflow_run:
     workflows:
@@ -22,8 +28,6 @@ on:
       - "Version Branch Pipeline"
     types:
       - completed
-
-  # PRs are now handled by ci-pr-gate.yml
 
   # Weekly regression on main (Sunday 02:00 UTC) — saves ~6x CI minutes vs nightly
   schedule:

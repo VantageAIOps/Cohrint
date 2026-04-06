@@ -310,7 +310,7 @@ jobs:
         if: |
           needs.typecheck.result == 'failure' ||
           needs.cli-build.result == 'failure' ||
-needs.connector-tests.result == 'failure' ||
+          needs.connector-tests.result == 'failure' ||
           needs.cli-unit-tests.result == 'failure'
         run: |
           echo "❌ PR gate failed — fix the issues above before merging"
