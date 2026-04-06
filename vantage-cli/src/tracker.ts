@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { VERSION } from "./_version.js";
 import { bus } from "./event-bus.js";
 import { calculateCost } from "./pricing.js";
 import { countTokens } from "./optimizer.js";
@@ -25,6 +26,7 @@ interface DashboardEvent {
   environment: string;
   agent_name: string;
   team: string;
+  session_id?: string;
 }
 
 export class Tracker {
@@ -64,8 +66,15 @@ export class Tracker {
 
     bus.on("agent:completed", (data) => {
       const agent = getAgent(data.agent);
+      if (!agent && this.config?.debug) {
+        console.warn(`[vantage] Unknown agent: ${data.agent} — skipping cost calculation`);
+      }
       const model = agent?.defaultModel ?? "unknown";
       const outputTokens = countTokens(data.outputText);
+      if (outputTokens === 0 && data.exitCode !== 0) {
+        // Agent failed with no output — don't record $0 cost silently
+        return;
+      }
       // Use actual prompt text for input tokens when available
       const inputTokens = this.lastPromptText
         ? countTokens(this.lastPromptText)
@@ -78,6 +87,8 @@ export class Tracker {
       this.lastSavedTokens = 0; // reset for next prompt
       const savedCost = savedTokens > 0 ? calculateCost(model, savedTokens, 0) : 0;
 
+      const sessionId = data.sessionId;
+
       bus.emit("cost:calculated", {
         agent: data.agent,
         model,
@@ -85,6 +96,7 @@ export class Tracker {
         outputTokens,
         costUsd,
         savedUsd: savedCost,
+        sessionId,
       });
 
       const event: DashboardEvent = {
@@ -99,6 +111,7 @@ export class Tracker {
         environment: "production",
         agent_name: data.agent,
         team: "",
+        session_id: sessionId,
       };
 
       this.enqueue(event);
@@ -153,7 +166,7 @@ export class Tracker {
         },
         body: JSON.stringify({
           events: batch,
-          sdk_version: "vantage-cli-1.0.0",
+          sdk_version: `vantage-cli-${VERSION}`,
           sdk_language: "typescript",
         }),
         signal: AbortSignal.timeout(15000),
@@ -175,10 +188,14 @@ export class Tracker {
       } else {
         // Never log response body — could contain echoed credentials
         console.error(`  [vantage] Dashboard sync failed: HTTP ${response.status}`);
-        // Re-queue events so they're not lost on server-side errors (BUG 14 fix:
-        // sentIds no longer contains these IDs so the filter works correctly)
         const unsent = batch.filter((e) => !this.sentIds.has(e.event_id));
-        this.queue.unshift(...unsent);
+        if (response.status >= 500 || response.status === 429 || response.status === 408) {
+          // Retryable server-side errors — put back in queue
+          this.queue.unshift(...unsent);
+        } else if (response.status >= 400) {
+          // Permanent client error (e.g. 401/403) — drop events to avoid infinite loop
+          console.warn(`[vantage] Dropping ${unsent.length} events: HTTP ${response.status}`);
+        }
       }
     } catch (err) {
       bus.emit("cost:reported", { success: false });
@@ -197,12 +214,17 @@ export class Tracker {
       this.flush().catch(() => {});
     }, this.config.flushInterval);
 
-    // Ensure final flush on exit — register only once
+    // Flush on beforeExit only — SIGTERM/SIGINT are handled by the REPL's
+    // shutdown() which already calls tracker.flush() before process.exit().
+    // Registering our own exit handlers here would race with the REPL's cleanup,
+    // causing double-exit and skipping the session summary print.
     if (!this.exitRegistered) {
       this.exitRegistered = true;
-      process.on("beforeExit", () => this.flush().catch(() => {}));
-      process.on("SIGTERM", () => { this.flush().catch(() => {}); process.exit(0); });
-      process.on("SIGINT", () => { this.flush().catch(() => {}); process.exit(0); });
+      process.on("beforeExit", () => {
+        this.flush().catch((err) => {
+          if (this.config?.debug) console.error("[vantage] Final flush failed:", err);
+        });
+      });
     }
   }
 

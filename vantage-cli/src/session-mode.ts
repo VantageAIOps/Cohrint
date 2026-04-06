@@ -5,6 +5,7 @@ import { countTokens } from "./optimizer.js";
 import { calculateCost } from "./pricing.js";
 import { dim, green, red, yellow } from "./ui.js";
 import { processInput, printOptStatus, type OptMode, type ProcessedInput } from "./input-classifier.js";
+import { checkCostAnomaly } from "./anomaly.js";
 
 /**
  * Interactive session — agent process stays alive, stdin/stdout piped through.
@@ -21,6 +22,8 @@ export class AgentSession {
   private _ended = false;
   private optMode: OptMode = "auto";
   private totalSavedTokens = 0;
+  private totalCostUsd = 0;
+  private capturedSessionId: string | undefined = undefined;
 
   constructor(
     private agent: AgentAdapter,
@@ -46,10 +49,10 @@ export class AgentSession {
 
     try {
       // stdin: pipe (we write to it)
-      // stdout + stderr: inherit — agent gets full TTY, preserving syntax highlighting,
-      // spinners, color output and interactive prompts (file approval, MCP dialogs, etc.)
+      // stdout: pipe (we relay to terminal ourselves so we can detect when the response ends)
+      // stderr: inherit — agent interactive prompts (file approval, MCP dialogs, etc.)
       this.child = spawn(cmd, interactiveArgs, {
-        stdio: ["pipe", "inherit", "inherit"],
+        stdio: ["pipe", "pipe", "inherit"],
         env: { ...process.env, TERM: process.env.TERM || "xterm-256color", FORCE_COLOR: "1" },
       });
     } catch (err) {
@@ -64,8 +67,26 @@ export class AgentSession {
       return false;
     }
 
-    // stdout + stderr are inherited — agent writes directly to terminal
-    // No need to pipe data; output token counting is unavailable in full-TTY mode
+    // Relay child stdout to terminal and capture sessionId from Claude's JSON stream.
+    // Claude Code emits JSON lines (type=system/result with session_id); plain text passes through.
+    this.child.stdout?.on("data", (chunk: Buffer) => {
+      const text = chunk.toString("utf-8");
+      // Try to extract sessionId from any JSON lines in this chunk
+      for (const line of text.split("\n")) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith("{")) continue;
+        try {
+          const obj = JSON.parse(trimmed) as Record<string, unknown>;
+          if (obj["type"] === "system" || obj["type"] === "result") {
+            const sid = obj["session_id"] as string | undefined;
+            if (typeof sid === "string" && /^[0-9a-f-]{36}$/i.test(sid)) {
+              this.capturedSessionId = sid;
+            }
+          }
+        } catch { /* not JSON — ignore */ }
+      }
+      process.stdout.write(chunk);
+    });
 
     this.child.on("error", (err) => {
       if ((err as NodeJS.ErrnoException).code === "ENOENT") {
@@ -76,9 +97,9 @@ export class AgentSession {
       this.cleanup();
     });
 
-    // Use BOTH close and exit to ensure cleanup
-    this.child.on("exit", () => this.cleanup());
-    this.child.on("close", () => this.cleanup());
+    // Use once() to prevent double cleanup if both events fire
+    this.child.once("exit", () => this.cleanup());
+    this.child.once("close", () => this.cleanup());
 
     return true;
   }
@@ -121,25 +142,98 @@ export class AgentSession {
     // Print optimization status
     printOptStatus(result);
 
-    // Track stats
+    // Track stats — use countTokens() for consistency with optimizer.ts (4 chars/token)
+    const promptInputTokens = countTokens(result.forwarded);
+    const promptCost = calculateCost(this.model, promptInputTokens, 0);
+
+    // Anomaly check: run BEFORE updating totals so priorTotal/priorCount are accurate
+    checkCostAnomaly(promptCost, this.totalCostUsd, this.promptCount);
+
     this.promptCount++;
-    this.totalInputTokens += result.forwarded.split(/\s+/).length;
+    this.totalInputTokens += promptInputTokens;
     this.totalSavedTokens += result.savedTokens;
+    this.totalCostUsd += promptCost;
+
+    // Emit bus event so global session tracker and tracker.ts pick up savings
+    if (result.savedTokens > 0) {
+      const originalTokens = result.savedTokens + countTokens(result.forwarded);
+      bus.emit("prompt:optimized", {
+        original: line,
+        optimized: result.forwarded,
+        savedTokens: result.savedTokens,
+        savedPercent: originalTokens > 0
+          ? Math.round((result.savedTokens / originalTokens) * 100)
+          : 0,
+      });
+    }
 
     // Forward to agent with backpressure handling
     const ok = this.child.stdin.write(result.forwarded + "\n");
     if (!ok) {
-      // stdin buffer is full — wait for drain, but don't hang if stdin closes
-      await new Promise<void>((resolve, reject) => {
+      // stdin buffer is full — wait for drain, but don't hang if stdin closes or errors
+      await new Promise<void>((resolve) => {
         const stdin = this.child?.stdin;
         if (!stdin) { resolve(); return; }
-        stdin.once("drain", resolve);
-        stdin.once("close", resolve); // don't hang if stream closes before drain
-        stdin.once("error", reject);
+        const onDrain = () => { stdin.removeListener("error", onError); stdin.removeListener("close", onClose); resolve(); };
+        const onClose = () => { stdin.removeListener("drain", onDrain); stdin.removeListener("error", onError); resolve(); };
+        const onError = (err: Error) => {
+          stdin.removeListener("drain", onDrain);
+          stdin.removeListener("close", onClose);
+          console.error(`[vantage] stdin drain error: ${err.message}`);
+          resolve(); // Don't reject — let the prompt continue
+        };
+        stdin.once("drain", onDrain);
+        stdin.once("close", onClose);
+        stdin.once("error", onError);
       });
     }
 
+    // Wait for the agent to finish streaming its response before returning.
+    // This prevents the REPL prompt from appearing mid-response.
+    await this.waitForResponseEnd();
+
     return result;
+  }
+
+  /**
+   * Resolves when the agent's stdout has been silent for 300ms (response complete),
+   * or after 5s if no output arrives at all (e.g. agent is processing silently).
+   */
+  private waitForResponseEnd(): Promise<void> {
+    if (!this.child?.stdout) return Promise.resolve();
+    return new Promise((resolve) => {
+      const SILENCE_MS = 300;      // ms of silence = response done
+      const INITIAL_TIMEOUT = 30_000; // max wait for first token (complex tasks need time)
+
+      const stdout = this.child!.stdout!;
+      let silenceTimer: ReturnType<typeof setTimeout> | null = null;
+      let initialTimer: ReturnType<typeof setTimeout> | null = null;
+      let done = false;
+
+      const finish = () => {
+        if (done) return;
+        done = true;
+        if (silenceTimer) clearTimeout(silenceTimer);
+        if (initialTimer) clearTimeout(initialTimer);
+        stdout.removeListener("data", onData);
+        stdout.removeListener("end", finish);
+        resolve();
+      };
+
+      const onData = () => {
+        // Cancel the initial fallback timer on first data
+        if (initialTimer) { clearTimeout(initialTimer); initialTimer = null; }
+        // Reset the silence timer
+        if (silenceTimer) clearTimeout(silenceTimer);
+        silenceTimer = setTimeout(finish, SILENCE_MS);
+      };
+
+      stdout.on("data", onData);
+      // If stdout closes (session ends mid-response), resolve immediately
+      stdout.once("end", finish);
+      // Fallback: resolve if agent produces no output within 5s
+      initialTimer = setTimeout(finish, INITIAL_TIMEOUT);
+    });
   }
 
   /** Check if session is running */
@@ -212,6 +306,7 @@ export class AgentSession {
       exitCode: 0,
       outputText: "",
       durationMs: duration,
+      sessionId: this.capturedSessionId,
     });
   }
 }

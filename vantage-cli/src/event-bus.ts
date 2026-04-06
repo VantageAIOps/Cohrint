@@ -22,6 +22,7 @@ export interface VantageEvents {
     exitCode: number;
     outputText: string;
     durationMs: number;
+    sessionId?: string;
   };
   "cost:calculated": {
     agent: string;
@@ -30,6 +31,7 @@ export interface VantageEvents {
     outputTokens: number;
     costUsd: number;
     savedUsd: number;
+    sessionId?: string;
   };
   "cost:reported": {
     success: boolean;

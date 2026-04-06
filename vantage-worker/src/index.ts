@@ -56,6 +56,7 @@
  */
 
 import { Hono } from 'hono';
+import { VERSION } from './_version';
 import { Bindings, Variables } from './types';
 import { corsMiddleware } from './middleware/cors';
 import { auth }       from './routes/auth';
@@ -81,7 +82,7 @@ app.use('*', corsMiddleware);
 const healthResponse = (c: any) => c.json({
   status:  'ok',
   service: 'vantage-api',
-  version: '1.0.0',
+  version: VERSION,
   region:  (c.req.raw as Request & { cf?: { colo?: string } }).cf?.colo ?? 'unknown',
   ts:      new Date().toISOString(),
 });

@@ -22,11 +22,12 @@ export const claudeAdapter: AgentAdapter = {
 
   buildCommand(prompt: string, config?: AgentConfig): SpawnArgs {
     const cmd = config?.command || "claude";
-    const baseArgs = config?.args ?? ["-p"];
     const extraFlags = config?.extraFlags ?? [];
+    // -p must immediately precede the prompt — putting flags between -p and the prompt
+    // causes Claude Code to treat the first flag as the prompt text
     return {
       command: cmd,
-      args: [...baseArgs, "--verbose", "--output-format", "stream-json", ...extraFlags, prompt],
+      args: ["--verbose", "--output-format", "stream-json", ...extraFlags, "-p", prompt],
     };
   },
 

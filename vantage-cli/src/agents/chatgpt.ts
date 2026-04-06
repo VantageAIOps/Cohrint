@@ -9,6 +9,7 @@ export const chatgptAdapter: AgentAdapter = {
   provider: "openai",
   interactiveArgs: [],
   exitCommand: "/quit",
+  supportsContinue: true,
 
   async detect(): Promise<boolean> {
     try {
@@ -25,6 +26,19 @@ export const chatgptAdapter: AgentAdapter = {
     return {
       command: cmd,
       args: [...baseArgs, prompt],
+    };
+  },
+
+  buildContinueCommand(prompt: string, config?: AgentConfig, sessionId?: string): SpawnArgs {
+    const cmd = config?.command || "chatgpt-cli";
+    const extraArgs = config?.args ?? [];
+    // chatgpt-cli does not expose a documented --continue or --session flag.
+    // TODO: update resumeArgs once the chatgpt-cli project settles on a session resume API.
+    // For now we pass --continue as a best-effort fallback.
+    const resumeArgs = sessionId ? ["--conversation", sessionId] : ["--continue"];
+    return {
+      command: cmd,
+      args: [...resumeArgs, ...extraArgs, prompt],
     };
   },
 };

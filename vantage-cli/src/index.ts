@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { createInterface } from "node:readline";
+import { VERSION } from "./_version.js";
 import { loadConfig, configExists, saveConfig, type VantageConfig } from "./config.js";
 import { runSetup } from "./setup.js";
 import { getAgent, detectAll, ALL_AGENTS } from "./agents/registry.js";
@@ -13,6 +14,7 @@ import { bus } from "./event-bus.js";
 import { Tracker } from "./tracker.js";
 import { initSession, getSession } from "./session.js";
 import { runAgent, runAgentBuffered } from "./runner.js";
+import { checkCostAnomaly } from "./anomaly.js";
 import {
   printBanner,
   printOptimization,
@@ -44,11 +46,10 @@ function safeNum(v: unknown, fallback = 0): number {
 
 function checkAnomaly(cost: import("./event-bus.js").VantageEvents["cost:calculated"]): void {
   const sess = getSession();
-  if (sess.promptCount <= 2 || sess.totalCostUsd <= 0) return;
-  const avgCost = sess.totalCostUsd / sess.promptCount;
-  if (avgCost > 0 && Number.isFinite(avgCost) && cost.costUsd > avgCost * 3) {
-    console.log(yellow(`  ⚠ Anomaly: this prompt cost $${cost.costUsd.toFixed(4)} — ${(cost.costUsd / avgCost).toFixed(1)}x your session average`));
-  }
+  // Exclude the current prompt from the baseline (it's already added to totalCostUsd)
+  const priorTotal = sess.totalCostUsd - cost.costUsd;
+  const priorCount = sess.promptCount - 1;
+  checkCostAnomaly(cost.costUsd, priorTotal, priorCount);
 }
 
 function buildSessionMetrics(): SessionMetrics {
@@ -86,8 +87,8 @@ async function showDashboardSummary(config: VantageConfig): Promise<void> {
       fetch(`${base}/v1/analytics/kpis?period=30`, { headers, signal: AbortSignal.timeout(10000) }),
     ]);
 
-    const summary = summaryRes.ok ? await summaryRes.json() as Record<string, unknown> : null;
-    const kpis = kpisRes.ok ? await kpisRes.json() as Record<string, unknown> : null;
+    const summary = summaryRes.ok ? await summaryRes.json().catch(() => null) as Record<string, unknown> | null : null;
+    const kpis = kpisRes.ok ? await kpisRes.json().catch(() => null) as Record<string, unknown> | null : null;
 
     console.log("");
     console.log(bold(cyan("  Dashboard Summary")));
@@ -157,7 +158,8 @@ async function showBudgetStatus(config: VantageConfig): Promise<void> {
       signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json() as Record<string, unknown>;
+    const data = await res.json().catch(() => null) as Record<string, unknown> | null;
+    if (!data) throw new Error("Invalid JSON response from API");
 
     const budgetUsd = Number(data.budget_usd ?? 0);
     const budgetPct = Number(data.budget_pct ?? 0);
@@ -240,6 +242,8 @@ function looksLikeStructuredData(text: string): boolean {
   const trimmed = text.trim();
   if (trimmed.startsWith("{") || trimmed.startsWith("[")) return true; // JSON
   if (trimmed.startsWith("```")) return true; // code block
+  if (/```[\s\S]*?```/.test(text)) return true; // fenced code block anywhere
+  if (/`[^`\n]+`/.test(text)) return true; // inline code
   if ((text.match(/https?:\/\//g) || []).length > 2) return true; // URL-heavy
   if ((text.match(/[{}()\[\];=<>]/g) || []).length > text.length * 0.1) return true; // code-like
   return false;
@@ -385,6 +389,12 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
     output: process.stdout,
   });
 
+  rl.on("error", (err) => {
+    // Ignore EPIPE and EIO — these happen when terminal closes
+    if ((err as NodeJS.ErrnoException).code === "EPIPE" || (err as NodeJS.ErrnoException).code === "EIO") return;
+    console.error(red(`  Terminal error: ${err.message}`));
+  });
+
   // Multi-line paste detection: buffer lines that arrive rapidly, then join on pause.
   // Configurable via --paste-delay <ms> flag or VANTAGE_PASTE_DELAY env var (default 80ms).
   const PASTE_DELAY_MS = replFlags["paste-delay"]
@@ -517,7 +527,9 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
               prompt();
               return;
             }
-            process.stdout.write(cyan(`  ${sessionAgent.name}> `));
+            // Print newline before prompt — ensures we're on a fresh line even if
+            // the agent's last output didn't include a trailing newline
+            process.stdout.write("\n" + cyan(`  ${sessionAgent.name}> `));
             handleLine = async (sessionInput: string) => {
               try {
                 const sLine = sessionInput.trim();
@@ -607,7 +619,7 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
             const count = agentPromptCount.get(agent.name) ?? 0;
             const sid = await executePrompt(agentPrompt, agent, config, true, count > 0, agentSessionIds.get(agent.name));
             agentPromptCount.set(agent.name, count + 1);
-            if (sid) agentSessionIds.set(agent.name, sid);
+            if (sid) { agentSessionIds.set(agent.name, sid); } else { agentSessionIds.delete(agent.name); }
             try {
               const cost = await Promise.race([
                 costPromise,
@@ -656,7 +668,13 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
         const count = agentPromptCount.get(currentAgent.name) ?? 0;
         const sid = await executePrompt(line, currentAgent, config, true, count > 0, agentSessionIds.get(currentAgent.name));
         agentPromptCount.set(currentAgent.name, count + 1);
-        if (sid) agentSessionIds.set(currentAgent.name, sid);
+        // Always update the session ID map — clear stale ID if sid is undefined so
+        // the next prompt doesn't try to resume a session that no longer applies
+        if (sid) {
+          agentSessionIds.set(currentAgent.name, sid);
+        } else {
+          agentSessionIds.delete(currentAgent.name);
+        }
         try {
           const cost = await Promise.race([
             costPromise,
@@ -681,6 +699,15 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
   };
 
   const shutdown = async () => {
+    // Cancel any pending paste timer to prevent it firing after REPL closes
+    if (pasteTimer) {
+      clearTimeout(pasteTimer);
+      pasteTimer = null;
+    }
+    if (pasteBuffer.length > 0) {
+      console.warn(`[vantage] Discarded ${pasteBuffer.length} buffered lines on exit`);
+      pasteBuffer = [];
+    }
     // Clean up active session first
     if (activeSession?.isActive()) {
       await activeSession.end().catch(() => {});
@@ -856,16 +883,14 @@ async function main(): Promise<void> {
     }
     // Wait for tracker to drain before exit to avoid dropped events
     await tracker.flush().catch(() => {});
-    await new Promise<void>((resolve) => setTimeout(resolve, 200));
     process.exit(0);
   }
 
   // Mode 2: Pipe mode
   if (!process.stdin.isTTY) {
     const stdinPrompt = await readStdin();
-    if (!stdinPrompt) {
-      console.error(dim("  No prompt provided. Usage: echo 'prompt' | vantage"));
-      process.exit(1);
+    if (!stdinPrompt || stdinPrompt.trim() === "") {
+      process.exit(0);
     }
     if (stdinPrompt) {
       const costPromise = waitForCost();
@@ -885,7 +910,6 @@ async function main(): Promise<void> {
       }
     }
     await tracker.flush().catch(() => {});
-    await new Promise<void>((resolve) => setTimeout(resolve, 200));
     process.exit(0);
   }
 
@@ -893,14 +917,26 @@ async function main(): Promise<void> {
   await startRepl(config, flags);
 }
 
+function isNewerVersion(latest: string, current: string): boolean {
+  const parse = (v: string) => v.split('.').map(Number);
+  const [lMaj, lMin, lPat] = parse(latest);
+  const [cMaj, cMin, cPat] = parse(current);
+  if (lMaj !== cMaj) return lMaj > cMaj;
+  if (lMin !== cMin) return lMin > cMin;
+  return lPat > cPat;
+}
+
 async function checkForUpdate(): Promise<void> {
   try {
-    const current = "2.2.0";
+    const current = VERSION;
     const res = await fetch("https://registry.npmjs.org/vantageai-cli/latest",
       { signal: AbortSignal.timeout(2000) });
     if (!res.ok) return;
-    const { version } = await res.json() as { version: string };
-    if (version !== current) {
+    const data = await res.json().catch(() => null);
+    if (!data || typeof data !== 'object') return;
+    const version = (data as { version?: string }).version;
+    if (!version) return;
+    if (isNewerVersion(version, current)) {
       console.error(yellow(`\n  Update available: vantageai-cli ${current} → ${version}`));
       console.error(dim(`  Run: npm install -g vantageai-cli\n`));
     }
@@ -918,5 +954,8 @@ checkForUpdate();
 process.on("unhandledRejection", (reason) => {
   const msg = reason instanceof Error ? reason.message : String(reason);
   console.error(red(`  Unhandled error: ${msg}`));
-  // Don't exit — let the REPL continue
+  // In non-interactive mode, exit — can't recover without a REPL
+  if (!process.stdin.isTTY) {
+    process.exit(1);
+  }
 });

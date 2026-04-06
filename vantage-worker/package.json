@@ -4,8 +4,12 @@
   "description": "VantageAI ingest + analytics API — Cloudflare Worker",
   "private": true,
   "scripts": {
+    "gen-version": "node --input-type=commonjs -e \"const fs=require('fs');const v=require('./package.json').version;fs.writeFileSync('src/_version.ts','// AUTO-GENERATED — do not edit manually. Run: npm run gen-version\\nexport const VERSION = '+JSON.stringify(v)+';\\n');\"",
+    "predev": "npm run gen-version",
     "dev": "wrangler dev --env=\"\"",
+    "predeploy": "npm run gen-version",
     "deploy": "wrangler deploy --env=\"\"",
+    "pretypecheck": "npm run gen-version",
     "typecheck": "tsc --noEmit",
     "types": "wrangler types",
     "db:create": "wrangler d1 create vantage-events",

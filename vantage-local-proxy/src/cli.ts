@@ -17,6 +17,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { startProxyServer } from "./proxy-server.js";
+import { VERSION } from "./_version.js";
 import { scanAll, ALL_SCANNERS } from "./scanners/index.js";
 import type { PrivacyLevel } from "./privacy.js";
 import type { ToolName, ScanResult } from "./scanners/types.js";
@@ -44,7 +45,7 @@ const command = args._command ?? "";
 
 (async () => {
   try {
-    const current = "1.0.0";
+    const current = VERSION;
     const res = await fetch("https://registry.npmjs.org/vantageai-local-proxy/latest",
       { signal: AbortSignal.timeout(2000) });
     if (!res.ok) return;
@@ -302,7 +303,7 @@ async function pushScanResults(
         },
         body: JSON.stringify({
           events: batch,
-          sdk_version: "1.0.0",
+          sdk_version: VERSION,
           sdk_language: "local-scanner",
         }),
       });
