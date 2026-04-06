@@ -105,6 +105,15 @@ crossplatform.get('/summary', async (c) => {
     WHERE org_id = ? AND created_at >= ?
   `).bind(orgId, monthStart).first() as { month_cost: number } | null;
 
+  // Previous period for trend comparison
+  const prevSince = sqliteDateSince(days * 2);
+  const prevUntil = since;
+  const prevTotal = await c.env.DB.prepare(`
+    SELECT COALESCE(SUM(cost_usd), 0) as prev_cost
+    FROM cross_platform_usage
+    WHERE org_id = ? AND created_at >= ? AND created_at < ?
+  `).bind(orgId, prevSince, prevUntil).first() as { prev_cost: number } | null;
+
   const budgetLimit = budget?.monthly_limit_usd ?? 0;
   const budgetUsed = monthSpend?.month_cost ?? 0;
   const budgetPct = budgetLimit > 0 ? Math.round((budgetUsed / budgetLimit) * 100) : 0;
@@ -112,6 +121,7 @@ crossplatform.get('/summary', async (c) => {
   return c.json({
     period_days: days,
     total_cost_usd: total?.total_cost ?? 0,
+    previous_period_cost: prevTotal?.prev_cost ?? 0,
     total_input_tokens: total?.total_input_tokens ?? 0,
     total_output_tokens: total?.total_output_tokens ?? 0,
     total_cached_tokens: total?.total_cached_tokens ?? 0,
@@ -155,6 +165,24 @@ crossplatform.get('/developers', async (c) => {
     ORDER BY total_cost DESC
   `).bind(orgId, since).all();
 
+  // Per-developer per-provider cost breakdown (for bar chart segmentation)
+  const byProviderRows = await c.env.DB.prepare(`
+    SELECT developer_email,
+           provider,
+           COALESCE(SUM(cost_usd), 0) as cost,
+           COUNT(*) as records
+    FROM cross_platform_usage
+    WHERE org_id = ? AND created_at >= ? AND developer_email IS NOT NULL
+    GROUP BY developer_email, provider
+    ORDER BY developer_email, cost DESC
+  `).bind(orgId, since).all();
+
+  const byProviderMap: Record<string, { provider: string; cost: number; records: number }[]> = {};
+  for (const row of (byProviderRows.results ?? []) as any[]) {
+    if (!byProviderMap[row.developer_email]) byProviderMap[row.developer_email] = [];
+    byProviderMap[row.developer_email].push({ provider: row.provider, cost: row.cost, records: row.records });
+  }
+
   // Calculate ROI metrics per developer
   const devList = (developers.results ?? []).map((d: any) => {
     const costPerPR = d.pull_requests > 0 ? (d.total_cost / d.pull_requests) : null;
@@ -163,6 +191,7 @@ crossplatform.get('/developers', async (c) => {
     return {
       ...d,
       providers: d.providers ? d.providers.split(',') : [],
+      by_provider: byProviderMap[d.developer_email] ?? [],
       cost_per_pr: costPerPR ? Math.round(costPerPR * 100) / 100 : null,
       cost_per_commit: costPerCommit ? Math.round(costPerCommit * 100) / 100 : null,
       lines_per_dollar: linesPerDollar,

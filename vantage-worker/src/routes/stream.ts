@@ -106,8 +106,10 @@ stream.get('/:orgId', async (c) => {
       'Connection':                  'keep-alive',
       'Access-Control-Allow-Origin': (() => {
         const origin = c.req.header('Origin') ?? '';
-        const allowed = ['https://vantageaiops.com', 'https://www.vantageaiops.com', 'https://vantageai.pages.dev'];
-        return allowed.includes(origin) ? origin : 'https://vantageaiops.com';
+        const allowed = (c.env.ALLOWED_ORIGINS ?? 'https://vantageaiops.com').split(',').map((s: string) => s.trim());
+        return allowed.some((a: string) => a === '*' || a === origin || (a.includes('*') && new RegExp('^' + a.replace('*', '.*') + '$').test(origin)))
+          ? origin
+          : (allowed.find((a: string) => !a.includes('*')) ?? 'https://vantageaiops.com');
       })(),
       'X-Accel-Buffering':           'no',
     },

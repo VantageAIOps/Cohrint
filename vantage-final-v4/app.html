@@ -250,6 +250,31 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
   50% { opacity: 0.4; box-shadow: none; }
 }
 
+@keyframes skelshimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+
+.skel {
+  color: transparent !important;
+  background: linear-gradient(90deg, var(--bg-card) 25%, var(--border) 50%, var(--bg-card) 75%);
+  background-size: 400px 100%;
+  animation: skelshimmer 1.4s ease infinite;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+/* ── Offline banner ── */
+#offlineBanner {
+  display: none;
+  position: fixed; top: 0; left: 0; right: 0;
+  background: #92400e; color: #fef3c7;
+  text-align: center; font-size: 13px; font-weight: 500;
+  padding: 8px 16px; z-index: 99999;
+  animation: fadeUp 0.3s ease;
+}
+#offlineBanner.visible { display: block; }
+
 #theme-toggle {
   background: none; border: 1px solid var(--border); border-radius: 6px;
   padding: 4px 10px; cursor: pointer; font-size: 14px;
@@ -599,6 +624,8 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
 </head>
 <body>
 
+<div id="offlineBanner">&#9888; You are offline &mdash; showing last cached data. Dashboard will refresh when reconnected.</div>
+
 <div class="app">
   <!-- ══════════ Sidebar ══════════ -->
   <nav id="sidebar" class="sidebar">
@@ -711,6 +738,16 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
             </div>
             <div class="kpi-sub neutral" id="kpiBudgetSub">&nbsp;</div>
           </div>
+          <div class="kpi-card animate-in delay-5">
+            <div class="kpi-label">Token Usage</div>
+            <div class="kpi-value" id="kpiTokenUsage">&mdash;</div>
+            <div class="kpi-sub neutral" id="kpiTokenUsageSub">&nbsp;</div>
+          </div>
+          <div class="kpi-card animate-in delay-6">
+            <div class="kpi-label">Cache Savings</div>
+            <div class="kpi-value" id="kpiCacheSavings" style="color:var(--accent-green);">&mdash;</div>
+            <div class="kpi-sub neutral" id="kpiCacheSavingsSub">&nbsp;</div>
+          </div>
         </div>
 
         <div class="chart-row animate-in delay-5">
@@ -740,12 +777,11 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
           <table class="tool-table">
             <thead>
               <tr>
-                <th>Tool</th><th>Monthly Cost</th><th>Requests</th>
-                <th>Top Model</th><th>Avg $/Req</th><th>Developers</th><th>30d Trend</th>
+                <th>Tool</th><th>Cost</th><th>Requests</th><th>Avg $/Req</th>
               </tr>
             </thead>
             <tbody id="toolComparisonBody">
-              <tr><td colspan="7" class="empty-state">Loading...</td></tr>
+              <tr><td colspan="4" class="empty-state">Loading...</td></tr>
             </tbody>
           </table>
         </div>
@@ -1218,6 +1254,8 @@ var period = 30;
 var activeView = 'overview';
 var activeToolFilter = 'all';
 var _sseSource = null;
+var _isOnline = navigator.onLine;
+var _API_CACHE_TTL = 5 * 60 * 1000; // 5 min cache TTL
 
 var TOOL_NAMES = {
   anthropic: 'Claude Code', openai: 'GitHub Copilot', google: 'Gemini CLI',
@@ -1231,6 +1269,43 @@ var TOOL_COLORS = {
   cursor: '#f472b6', windsurf: '#fb923c', aider: '#a78bfa',
   codex: '#22d3ee', default: '#94a3b8'
 };
+
+// ── Offline detection ──
+function _setOnlineBanner(online) {
+  var banner = document.getElementById('offlineBanner');
+  if (!banner) return;
+  if (online) {
+    banner.classList.remove('visible');
+    // Refresh current view when we come back online
+    if (activeView) {
+      var switchEl = document.querySelector('button.sb-item.active');
+      if (switchEl) setTimeout(function() { nav(activeView, switchEl); }, 300);
+    }
+  } else {
+    banner.classList.add('visible');
+  }
+}
+window.addEventListener('online',  function() { _isOnline = true;  _setOnlineBanner(true);  });
+window.addEventListener('offline', function() { _isOnline = false; _setOnlineBanner(false); });
+
+// ── Skeleton helpers ──
+var _KPI_IDS = [
+  'kpiTotalSpend','kpiTotalSpendSub','kpiCostliestTool','kpiCostliestToolSub',
+  'kpiActiveDev','kpiActiveDevSub','kpiTokenUsage','kpiTokenUsageSub','kpiCacheSavings','kpiCacheSavingsSub',
+  'spendTotal','spendTotalSub','spendTopModel','spendTopModelSub','spendTotalReqs','spendTotalReqsSub','spendAvgCost',
+];
+function _skelOn() {
+  _KPI_IDS.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) { el.classList.add('skel'); el._skelText = el.textContent; el.textContent = '\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0'; }
+  });
+}
+function _skelOff() {
+  _KPI_IDS.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.classList.remove('skel');
+  });
+}
 
 // ── XSS-safe HTML escaping ──
 function esc(s) {
@@ -1253,6 +1328,14 @@ function fmtNum(n) {
   return Number(n).toLocaleString('en-US');
 }
 
+function fmtTok(n) {
+  if (n == null || isNaN(n)) return '\u2014';
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return String(n);
+}
+
 function toolName(provider) {
   return TOOL_NAMES[provider] || provider || 'Unknown';
 }
@@ -1270,17 +1353,64 @@ function toolInitial(provider) {
    Auth
    ═══════════════════════════════════════════════════════════════════════════ */
 
+// ── API cache (localStorage) ──
+function _cacheKey(path) { return 'vantage_cache:' + path; }
+function _cacheGet(path) {
+  try {
+    var raw = localStorage.getItem(_cacheKey(path));
+    if (!raw) return null;
+    var entry = JSON.parse(raw);
+    if (Date.now() - entry.ts > _API_CACHE_TTL) return null;
+    return entry.data;
+  } catch { return null; }
+}
+function _cacheSet(path, data) {
+  try { localStorage.setItem(_cacheKey(path), JSON.stringify({ ts: Date.now(), data: data })); } catch { /* storage full */ }
+}
+function _cacheGetStale(path) {
+  try {
+    var raw = localStorage.getItem(_cacheKey(path));
+    return raw ? JSON.parse(raw).data : null;
+  } catch { return null; }
+}
+
 function apiFetch(path, opts) {
   opts = opts || {};
+  var isRead = !opts.method || opts.method === 'GET';
   var headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+
+  // Serve from fresh cache first (GET only)
+  if (isRead) {
+    var cached = _cacheGet(path);
+    if (cached) return Promise.resolve(cached);
+  }
+
   return fetch(API_BASE + path, Object.assign({}, opts, { headers: headers, credentials: 'include' }))
     .then(function(res) {
       if (res.status === 401) {
         window.location.replace('/auth.html?next=' + encodeURIComponent(window.location.pathname));
         return;
       }
+      if (res.status === 429) {
+        var retryAfter = parseInt(res.headers.get('Retry-After') || '60', 10);
+        throw new Error('Rate limited. Retry in ' + retryAfter + 's');
+      }
       if (!res.ok) throw new Error('API ' + res.status);
-      return res.json();
+      return res.json().then(function(data) {
+        if (isRead && data) _cacheSet(path, data);
+        return data;
+      });
+    })
+    .catch(function(err) {
+      // Network failure or fetch error — serve stale cache for reads
+      if (isRead) {
+        var stale = _cacheGetStale(path);
+        if (stale) {
+          console.warn('[vantage] offline/error for ' + path + ', serving stale cache');
+          return stale;
+        }
+      }
+      throw err;
     });
 }
 
@@ -1310,18 +1440,19 @@ function populateUserFromSession(s) {
   document.getElementById('topbarUser').textContent = name;
   document.getElementById('accountName').textContent = name;
   document.getElementById('accountEmail').textContent = user.email || '';
-  document.getElementById('accountOrg').textContent = user.org_name || user.org_id || '';
+  document.getElementById('accountOrg').textContent = (user.org && user.org.name) || user.org_name || user.org_id || '';
   document.getElementById('accountAvatar').textContent = name ? name.charAt(0).toUpperCase() : '?';
-  if (user.api_key) {
-    var k = user.api_key;
+  var apiKeyHint = user.api_key_hint || user.api_key;
+  if (apiKeyHint) {
+    var k = apiKeyHint;
     var el = document.getElementById('accountApiKey');
-    el.textContent = k.substring(0, 7) + '****...' + k.substring(k.length - 4);
+    el.textContent = k.length > 11 ? k.substring(0, 7) + '****...' + k.substring(k.length - 4) : k;
     el.dataset.full = k;
   }
   if (user.org_id) {
     document.getElementById('accountOrgId').textContent = user.org_id;
   }
-  var plan = user.plan || 'free';
+  var plan = (user.org && user.org.plan) || user.plan || 'free';
   document.getElementById('accountPlan').textContent = plan.charAt(0).toUpperCase() + plan.slice(1);
   var badge = document.getElementById('accountPlanBadge');
   badge.textContent = plan.toUpperCase();
@@ -1381,30 +1512,35 @@ function selectToolTab(provider) {
 var _dailyChart = null;
 
 function loadOverview() {
+  _skelOn();
   Promise.all([
-    apiFetch('/v1/cross-platform/summary?days=' + period),
-    apiFetch('/v1/cross-platform/developers?days=' + period),
-    apiFetch('/v1/cross-platform/live?limit=30'),
+    apiFetch('/v1/cross-platform/summary?days=' + period).catch(function() { return null; }),
+    apiFetch('/v1/cross-platform/developers?days=' + period).catch(function() { return null; }),
+    apiFetch('/v1/cross-platform/live?limit=30').catch(function() { return null; }),
     apiFetch('/v1/analytics/kpis?period=' + period).catch(function() { return null; }),
     apiFetch('/v1/analytics/timeseries?period=' + period).catch(function() { return null; }),
   ]).then(function(results) {
+    _skelOff();
     var summary = results[0];
     var devs = results[1];
     var live = results[2];
     var kpis = results[3];
     var timeseries = results[4];
 
-    if (!summary) return;
+    if (!summary) {
+      document.getElementById('kpiTotalSpend').textContent = 'Error';
+      document.getElementById('kpiTotalSpendSub').textContent = 'Failed to load \u2014 retrying...';
+      setTimeout(loadOverview, 8000);
+      return;
+    }
 
     buildToolTabs(summary);
 
     var byProvider = summary.by_provider || [];
     var filtered = activeToolFilter === 'all' ? byProvider : byProvider.filter(function(p) { return p.provider === activeToolFilter; });
-    var totalCost = filtered.reduce(function(s, p) { return s + (p.total_cost || 0); }, 0);
-    var totalReqs = filtered.reduce(function(s, p) { return s + (p.request_count || 0); }, 0);
-    var totalDevs = activeToolFilter === 'all'
-      ? (summary.total_developers || (devs && devs.developers ? devs.developers.length : 0))
-      : filtered.reduce(function(s, p) { return s + (p.developer_count || 0); }, 0);
+    var totalCost = filtered.reduce(function(s, p) { return s + (p.total_cost || p.cost || 0); }, 0);
+    var totalReqs = filtered.reduce(function(s, p) { return s + (p.records || p.request_count || 0); }, 0);
+    var totalDevs = (devs && devs.developers ? devs.developers.length : 0) || summary.total_developers || 0;
 
     // KPIs
     document.getElementById('kpiTotalSpend').textContent = fmt(totalCost);
@@ -1418,11 +1554,12 @@ function loadOverview() {
 
     // Costliest tool
     if (filtered.length > 0) {
-      var costliest = filtered.slice().sort(function(a, b) { return (b.total_cost || 0) - (a.total_cost || 0); })[0];
+      var costliest = filtered.slice().sort(function(a, b) { return (b.total_cost || b.cost || 0) - (a.total_cost || a.cost || 0); })[0];
       document.getElementById('kpiCostliestTool').textContent = toolName(costliest.provider);
       document.getElementById('kpiCostliestTool').style.color = toolColor(costliest.provider);
-      var pct = totalCost > 0 ? ((costliest.total_cost / totalCost) * 100).toFixed(0) : 0;
-      document.getElementById('kpiCostliestToolSub').textContent = fmt(costliest.total_cost) + ' \u00b7 ' + pct + '% of total';
+      var costliestCost = costliest.total_cost || costliest.cost || 0;
+      var pct = totalCost > 0 ? ((costliestCost / totalCost) * 100).toFixed(0) : 0;
+      document.getElementById('kpiCostliestToolSub').textContent = fmt(costliestCost) + ' \u00b7 ' + pct + '% of total';
     }
 
     // Active developers
@@ -1431,16 +1568,42 @@ function loadOverview() {
       document.getElementById('kpiActiveDevSub').textContent = 'avg ' + fmt(totalCost / totalDevs) + '/dev/' + (period <= 7 ? 'week' : 'month');
     }
 
-    // Budget status
-    var budget = summary.budget || (kpis ? kpis.budget : null) || null;
-    if (budget && budget.limit > 0) {
-      var budgetPct = Math.min(100, ((budget.used || totalCost) / budget.limit * 100)).toFixed(0);
+    // Budget status — summary.budget uses monthly_limit_usd / month_spend_usd
+    var budget = summary.budget || null;
+    var budgetLimit = budget && (budget.monthly_limit_usd || budget.limit) || 0;
+    var budgetSpend = budget && (budget.month_spend_usd || budget.used) || totalCost;
+    if (budgetLimit > 0) {
+      var budgetPct = Math.min(100, (budgetSpend / budgetLimit * 100)).toFixed(0);
       document.getElementById('kpiBudgetPct').textContent = budgetPct + '%';
       document.getElementById('kpiBudgetFill').style.width = budgetPct + '%';
-      document.getElementById('kpiBudgetSub').textContent = fmt(budget.limit - (budget.used || totalCost)) + ' remaining';
+      document.getElementById('kpiBudgetSub').textContent = fmt(budgetLimit - budgetSpend) + ' remaining';
     } else {
       document.getElementById('kpiBudgetPct').textContent = 'N/A';
       document.getElementById('kpiBudgetSub').textContent = 'No budget set';
+    }
+
+    // Token usage
+    var inputTok = summary.total_input_tokens || 0;
+    var outputTok = summary.total_output_tokens || 0;
+    var totalTok = inputTok + outputTok;
+    if (totalTok > 0) {
+      document.getElementById('kpiTokenUsage').textContent = fmtTok(totalTok);
+      document.getElementById('kpiTokenUsageSub').textContent =
+        fmtTok(inputTok) + ' in \u00b7 ' + fmtTok(outputTok) + ' out';
+    }
+
+    // Cache savings — cached tokens cost ~10% vs full price; savings ≈ 90% of what they would have cost
+    var cachedTok = summary.total_cached_tokens || 0;
+    if (cachedTok > 0 && totalCost > 0) {
+      // Estimate: cached tokens saved ~$2.70/MTok (Claude rate: $3 input - $0.30 cache)
+      var cacheSavingsUsd = (cachedTok / 1e6) * 2.70;
+      document.getElementById('kpiCacheSavings').textContent = fmt(cacheSavingsUsd);
+      var cacheHitPct = totalTok > 0 ? ((cachedTok / (totalTok + cachedTok)) * 100).toFixed(0) : 0;
+      document.getElementById('kpiCacheSavingsSub').textContent =
+        fmtTok(cachedTok) + ' cached \u00b7 ' + cacheHitPct + '% hit rate';
+    } else {
+      document.getElementById('kpiCacheSavings').textContent = '$0.00';
+      document.getElementById('kpiCacheSavingsSub').textContent = 'No cache hits yet';
     }
 
     renderDailyChart(summary, timeseries);
@@ -1450,14 +1613,19 @@ function loadOverview() {
     startSSE();
 
   }).catch(function(e) {
+    _skelOff();
     console.error('[vantage] overview error:', e);
+    var isRateLimit = e && e.message && e.message.indexOf('Rate limit') !== -1;
+    document.getElementById('kpiTotalSpend').textContent = isRateLimit ? 'Rate limited' : 'Error';
+    document.getElementById('kpiTotalSpendSub').textContent = isRateLimit ? e.message : 'Network error \u2014 retrying in 8s';
+    setTimeout(loadOverview, 8000);
   });
 }
 
 function buildToolTabs(summary) {
   var container = document.getElementById('toolTabs');
   var byProvider = summary.by_provider || [];
-  var totalCost = byProvider.reduce(function(s, p) { return s + (p.total_cost || 0); }, 0);
+  var totalCost = byProvider.reduce(function(s, p) { return s + (p.total_cost || p.cost || 0); }, 0);
 
   // Build DOM safely
   while (container.firstChild) container.removeChild(container.firstChild);
@@ -1490,7 +1658,7 @@ function buildToolTabs(summary) {
     tab.appendChild(document.createTextNode(' ' + toolName(p.provider) + ' '));
     var costSpan = document.createElement('span');
     costSpan.className = 'tab-cost';
-    costSpan.textContent = fmt(p.total_cost);
+    costSpan.textContent = fmt(p.total_cost || p.cost);
     tab.appendChild(costSpan);
     container.appendChild(tab);
   });
@@ -1501,7 +1669,7 @@ function renderDailyChart(summary, timeseries) {
   if (!canvas) return;
 
   var byProvider = summary.by_provider || [];
-  var daily = summary.daily || (timeseries && timeseries.data) || [];
+  var daily = summary.daily || (timeseries && (timeseries.series || timeseries.data)) || [];
 
   if (daily.length === 0 && byProvider.length === 0) {
     if (_dailyChart) { _dailyChart.destroy(); _dailyChart = null; }
@@ -1523,22 +1691,33 @@ function renderDailyChart(summary, timeseries) {
       return (dt.getMonth() + 1) + '/' + dt.getDate();
     });
 
-    providers.forEach(function(prov) {
-      if (activeToolFilter !== 'all' && prov !== activeToolFilter) return;
-      datasets.push({
-        label: toolName(prov),
-        data: daily.map(function(d) {
-          if (d.by_provider) {
+    // timeseries items: { date, cost_usd, tokens, requests } — aggregate only, no per-provider breakdown
+    var hasPerProvider = daily.length > 0 && daily[0].by_provider;
+    if (hasPerProvider) {
+      providers.forEach(function(prov) {
+        if (activeToolFilter !== 'all' && prov !== activeToolFilter) return;
+        datasets.push({
+          label: toolName(prov),
+          data: daily.map(function(d) {
             var found = d.by_provider.find(function(bp) { return bp.provider === prov; });
             return found ? (found.cost || found.total_cost || 0) : 0;
-          }
-          return d.provider === prov ? (d.cost || d.total_cost || 0) : 0;
-        }),
-        backgroundColor: toolColor(prov),
+          }),
+          backgroundColor: toolColor(prov),
+          borderRadius: 2,
+          borderSkipped: false,
+        });
+      });
+    } else {
+      // Single aggregate series (timeseries endpoint)
+      var provColors = providers.filter(function(p) { return activeToolFilter === 'all' || p === activeToolFilter; });
+      datasets.push({
+        label: activeToolFilter === 'all' ? 'All Tools' : toolName(activeToolFilter),
+        data: daily.map(function(d) { return d.cost_usd || d.cost || d.total_cost || 0; }),
+        backgroundColor: provColors.length === 1 ? toolColor(provColors[0]) : 'var(--accent-green)',
         borderRadius: 2,
         borderSkipped: false,
       });
-    });
+    }
   } else {
     var filteredProvs = providers.filter(function(p) { return activeToolFilter === 'all' || p === activeToolFilter; });
     labels = filteredProvs.map(function(p) { return toolName(p); });
@@ -1546,7 +1725,7 @@ function renderDailyChart(summary, timeseries) {
       label: 'Cost',
       data: filteredProvs.map(function(p) {
         var found = byProvider.find(function(bp) { return bp.provider === p; });
-        return found ? (found.total_cost || 0) : 0;
+        return found ? (found.total_cost || found.cost || 0) : 0;
       }),
       backgroundColor: filteredProvs.map(function(p) { return toolColor(p); }),
       borderRadius: 4,
@@ -1600,7 +1779,7 @@ function renderDevCosts(devs, byProvider) {
   // Build DOM safely
   container.textContent = '';
   sorted.forEach(function(dev) {
-    var name = dev.developer || dev.name || dev.email || 'Unknown';
+    var name = dev.developer_email || dev.developer || dev.name || dev.email || 'Unknown';
     var cost = dev.total_cost || 0;
 
     var row = document.createElement('div');
@@ -1621,7 +1800,7 @@ function renderDevCosts(devs, byProvider) {
     var bar = document.createElement('div');
     bar.className = 'dev-bar';
 
-    var providers = dev.by_provider || [];
+    var providers = dev.providers || dev.by_provider || [];
     if (providers.length > 0) {
       providers.forEach(function(p) {
         var w = cost > 0 ? ((p.total_cost || p.cost || 0) / cost * 100) : 0;
@@ -1653,7 +1832,7 @@ function renderToolComparison(byProvider) {
     tbody.textContent = '';
     var tr = document.createElement('tr');
     var td = document.createElement('td');
-    td.colSpan = 7;
+    td.colSpan = 4;
     td.className = 'empty-state';
     td.textContent = 'No tool data yet';
     tr.appendChild(td);
@@ -1661,17 +1840,14 @@ function renderToolComparison(byProvider) {
     return;
   }
 
-  var sorted = byProvider.slice().sort(function(a, b) { return (b.total_cost || 0) - (a.total_cost || 0); });
+  var sorted = byProvider.slice().sort(function(a, b) { return (b.total_cost || b.cost || 0) - (a.total_cost || a.cost || 0); });
   tbody.textContent = '';
 
   sorted.forEach(function(p) {
-    var cost = p.total_cost || 0;
-    var reqs = p.request_count || 0;
+    var cost = p.total_cost || p.cost || 0;
+    var reqs = p.records || p.request_count || 0;
     var avgPerReq = reqs > 0 ? (cost / reqs) : 0;
     var color = toolColor(p.provider);
-    var trend = p.trend || 0;
-    var trendClass = trend > 0 ? 'trend-up' : trend < 0 ? 'trend-down' : 'trend-flat';
-    var trendArrow = trend > 0 ? '\u2191' : trend < 0 ? '\u2193' : '\u2192';
 
     var tr = document.createElement('tr');
     tr.onclick = function() { selectToolTab(p.provider); };
@@ -1701,26 +1877,10 @@ function renderToolComparison(byProvider) {
     td3.textContent = fmtNum(reqs);
     tr.appendChild(td3);
 
-    // Top model
-    var td4 = document.createElement('td');
-    td4.textContent = p.top_model || '-';
-    tr.appendChild(td4);
-
     // Avg per req
-    var td5 = document.createElement('td');
-    td5.textContent = fmt(avgPerReq);
-    tr.appendChild(td5);
-
-    // Developers
-    var td6 = document.createElement('td');
-    td6.textContent = fmtNum(p.developer_count || 0);
-    tr.appendChild(td6);
-
-    // Trend
-    var td7 = document.createElement('td');
-    td7.className = trendClass;
-    td7.textContent = trendArrow + ' ' + Math.abs(trend).toFixed(0) + '%';
-    tr.appendChild(td7);
+    var td4 = document.createElement('td');
+    td4.textContent = fmt(avgPerReq);
+    tr.appendChild(td4);
 
     tbody.appendChild(tr);
   });
@@ -1749,7 +1909,7 @@ function renderLiveFeed(live) {
     }
     var provider = ev.provider || ev.source || '';
     var model = ev.model || '';
-    var cost = ev.cost || ev.total_cost || 0;
+    var cost = ev.cost_usd || ev.cost || ev.total_cost || 0;
     var color = toolColor(provider);
 
     var item = document.createElement('div');
@@ -1786,12 +1946,16 @@ function startSSE() {
   if (!_session) return;
 
   var user = _session.user || _session;
-  var orgId = user.org_id;
-  var sseToken = user.sse_token;
-  if (!orgId || !sseToken) return;
+  var sseUrl = _session.sse_url || user.sse_url;
+  if (!sseUrl) {
+    var orgId = user.org_id;
+    var sseToken = user.sse_token;
+    if (!orgId || !sseToken) return;
+    sseUrl = API_BASE + '/v1/stream/' + orgId + '?sse_token=' + sseToken;
+  }
 
   try {
-    _sseSource = new EventSource(API_BASE + '/v1/stream/' + orgId + '?sse_token=' + sseToken);
+    _sseSource = new EventSource(sseUrl);
     _sseSource.onmessage = function(e) {
       try {
         var ev = JSON.parse(e.data);
@@ -1855,12 +2019,14 @@ var _spendChart = null;
 var _teamPieChart = null;
 
 function loadSpend() {
+  _skelOn();
   Promise.all([
     apiFetch('/v1/analytics/timeseries?period=' + period).catch(function() { return null; }),
     apiFetch('/v1/analytics/models?period=' + period).catch(function() { return null; }),
     apiFetch('/v1/analytics/teams?period=' + period).catch(function() { return null; }),
     apiFetch('/v1/cross-platform/summary?days=' + period).catch(function() { return null; }),
   ]).then(function(results) {
+    _skelOff();
     var timeseries = results[0];
     var models = results[1];
     var teams = results[2];
@@ -1868,17 +2034,27 @@ function loadSpend() {
 
     if (summary) buildToolTabs(summary);
 
-    var totalCost = (summary && summary.total_cost) || (timeseries && timeseries.total_cost) || 0;
-    var totalReqs = (summary && summary.total_requests) || (timeseries && timeseries.total_requests) || 0;
+    var totalCost = (summary && (summary.total_cost_usd || summary.total_cost)) || 0;
+    var totalReqs = (summary && (summary.total_records || summary.total_requests)) || 0;
     document.getElementById('spendTotal').textContent = fmt(totalCost);
+    var prevCost = (summary && summary.previous_period_cost) || 0;
+    if (prevCost > 0) {
+      var pctChange = ((totalCost - prevCost) / prevCost * 100).toFixed(1);
+      var spendSub = document.getElementById('spendTotalSub');
+      spendSub.textContent = (pctChange >= 0 ? '\u2191 ' : '\u2193 ') + Math.abs(pctChange) + '% vs prev period';
+      spendSub.className = 'kpi-sub ' + (pctChange >= 0 ? 'up' : 'down');
+    }
     document.getElementById('spendTotalReqs').textContent = fmtNum(totalReqs);
+    if (totalReqs > 0 && period > 0) {
+      document.getElementById('spendTotalReqsSub').textContent = fmtNum(Math.round(totalReqs / period)) + '/day avg';
+    }
     document.getElementById('spendAvgCost').textContent = totalReqs > 0 ? fmt(totalCost / totalReqs) : '$0.00';
 
     var modelList = (models && models.models) || (models && models.data) || [];
     if (modelList.length > 0) {
       var top = modelList.slice().sort(function(a, b) { return (b.total_cost || b.cost || 0) - (a.total_cost || a.cost || 0); })[0];
       document.getElementById('spendTopModel').textContent = top.model || top.name || '-';
-      document.getElementById('spendTopModelSub').textContent = fmt(top.total_cost || top.cost);
+      document.getElementById('spendTopModelSub').textContent = fmt(top.cost_usd || top.total_cost || top.cost);
     }
 
     renderSpendTrend(timeseries);
@@ -1894,7 +2070,7 @@ function renderSpendTrend(timeseries) {
   var canvas = document.getElementById('spendTrendChart');
   if (!canvas) return;
 
-  var data = (timeseries && timeseries.data) || (timeseries && timeseries.timeseries) || [];
+  var data = (timeseries && (timeseries.series || timeseries.data || timeseries.timeseries)) || [];
   if (data.length === 0) {
     if (_spendChart) { _spendChart.destroy(); _spendChart = null; }
     return;
@@ -1904,7 +2080,7 @@ function renderSpendTrend(timeseries) {
     var dt = new Date(d.date || d.day);
     return (dt.getMonth() + 1) + '/' + dt.getDate();
   });
-  var values = data.map(function(d) { return d.total_cost || d.cost || 0; });
+  var values = data.map(function(d) { return d.cost_usd || d.total_cost || d.cost || 0; });
 
   if (_spendChart) _spendChart.destroy();
   _spendChart = new Chart(canvas, {
@@ -1951,7 +2127,7 @@ function renderSpendModels(modelList) {
     return;
   }
 
-  var sorted = modelList.slice().sort(function(a, b) { return (b.total_cost || b.cost || 0) - (a.total_cost || a.cost || 0); });
+  var sorted = modelList.slice().sort(function(a, b) { return (b.cost_usd || b.total_cost || b.cost || 0) - (a.cost_usd || a.total_cost || a.cost || 0); });
   sorted.slice(0, 20).forEach(function(m) {
     var tr = document.createElement('tr');
 
@@ -1967,7 +2143,7 @@ function renderSpendModels(modelList) {
 
     var td3 = document.createElement('td');
     td3.className = 'cost-highlight';
-    td3.textContent = fmt(m.total_cost || m.cost);
+    td3.textContent = fmt(m.cost_usd || m.total_cost || m.cost);
     tr.appendChild(td3);
 
     var td4 = document.createElement('td');
@@ -1975,7 +2151,7 @@ function renderSpendModels(modelList) {
     tr.appendChild(td4);
 
     var td5 = document.createElement('td');
-    td5.textContent = fmtNum(m.request_count || m.requests || 0);
+    td5.textContent = fmtNum(m.requests || m.request_count || 0);
     tr.appendChild(td5);
 
     tbody.appendChild(tr);
@@ -2000,7 +2176,7 @@ function renderTeamPie(teams) {
     data: {
       labels: data.map(function(t) { return t.team || t.name || 'Default'; }),
       datasets: [{
-        data: data.map(function(t) { return t.total_cost || t.cost || 0; }),
+        data: data.map(function(t) { return t.cost_usd || t.total_cost || t.cost || 0; }),
         backgroundColor: data.map(function(_, i) { return colors[i % colors.length]; }),
         borderWidth: 0,
       }]
@@ -2177,8 +2353,9 @@ function loadMembers() {
     document.getElementById('memberCount').textContent = fmtNum(memberList.length);
 
     if (overview) {
-      document.getElementById('memberMtdSpend').textContent = fmt(overview.mtd_spend || overview.total_cost || 0);
-      document.getElementById('memberBudget').textContent = overview.budget_limit ? fmt(overview.budget_limit) : 'Not set';
+      document.getElementById('memberMtdSpend').textContent = fmt((overview.org && overview.org.mtd_cost_usd) || (overview.totals && overview.totals.total_cost_usd) || 0);
+      var budgetLimit = (overview.org && overview.org.budget_usd) || overview.budget_limit || 0;
+      document.getElementById('memberBudget').textContent = budgetLimit > 0 ? fmt(budgetLimit) : 'Not set';
     }
 
     // Members table — DOM safe
@@ -2190,14 +2367,14 @@ function loadMembers() {
       var td = document.createElement('td');
       td.colSpan = 6;
       td.className = 'empty-state';
-      td.textContent = 'No members yet';
+      td.textContent = members === null ? 'Failed to load members \u2014 check your connection' : 'No members yet. Invite your team above.';
       tr.appendChild(td);
       tbody.appendChild(tr);
     } else {
       memberList.forEach(function(m) {
         var role = m.role || 'member';
         var roleClass = role === 'admin' ? 'role-admin' : 'role-member';
-        var keyHint = m.api_key ? m.api_key.substring(0, 7) + '...' : '-';
+        var keyHint = (m.api_key_hint || m.api_key) ? (m.api_key_hint || m.api_key).substring(0, 7) + '...' : '-';
 
         var tr = document.createElement('tr');
 
@@ -2297,7 +2474,7 @@ function renderTeamBudgets(overview) {
 
     var td3 = document.createElement('td');
     td3.className = 'cost-highlight';
-    td3.textContent = fmt(t.mtd_spend || t.total_cost || 0);
+    td3.textContent = fmt(t.cost_usd || t.mtd_spend || t.total_cost || 0);
     tr.appendChild(td3);
 
     var td4 = document.createElement('td');
@@ -2368,7 +2545,7 @@ function revokeMember(email) {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function loadBudgets() {
-  var orgId = _session ? (_session.user ? _session.user.org_id : _session.org_id) : '';
+  var orgId = _session ? ((_session.user || _session).org_id || '') : '';
 
   Promise.all([
     apiFetch('/v1/admin/team-budgets').catch(function() { return null; }),
@@ -2377,11 +2554,7 @@ function loadBudgets() {
     var budgets = results[0];
     var alerts = results[1];
 
-    if (budgets && budgets.org_budget) {
-      document.getElementById('orgBudgetInput').value = budgets.org_budget;
-    }
-
-    var teams = (budgets && budgets.teams) || (budgets && budgets.data) || [];
+    var teams = (budgets && budgets.budgets) || (budgets && budgets.teams) || (budgets && budgets.data) || [];
     var tbody = document.getElementById('budgetTeamsBody');
     tbody.textContent = '';
 
@@ -2390,7 +2563,7 @@ function loadBudgets() {
       var td = document.createElement('td');
       td.colSpan = 3;
       td.className = 'empty-state';
-      td.textContent = 'No team budgets configured';
+      td.textContent = budgets === null ? 'Failed to load budgets \u2014 check your connection' : 'No team budgets configured. Add one above.';
       tr.appendChild(td);
       tbody.appendChild(tr);
     } else {
@@ -2421,12 +2594,12 @@ function loadBudgets() {
     }
 
     if (alerts) {
-      if (alerts.slack_webhook) document.getElementById('slackWebhookUrl').value = alerts.slack_webhook;
-      if (alerts.triggers) {
-        document.getElementById('slackBudget').checked = !!alerts.triggers.budget;
-        document.getElementById('slackAnomaly').checked = !!alerts.triggers.anomaly;
-        document.getElementById('slackDaily').checked = !!alerts.triggers.daily;
-      }
+      var webhookUrl = alerts.slack_url || alerts.slack_webhook || '';
+      if (webhookUrl) document.getElementById('slackWebhookUrl').value = webhookUrl;
+      // Flat fields: trigger_budget, trigger_anomaly, trigger_daily
+      document.getElementById('slackBudget').checked = !!(alerts.trigger_budget || (alerts.triggers && alerts.triggers.budget));
+      document.getElementById('slackAnomaly').checked = !!(alerts.trigger_anomaly || (alerts.triggers && alerts.triggers.anomaly));
+      document.getElementById('slackDaily').checked = !!(alerts.trigger_daily || (alerts.triggers && alerts.triggers.daily));
     }
 
   }).catch(function(e) {
@@ -2481,7 +2654,7 @@ function deleteTeamBudget(team) {
 }
 
 function saveSlackConfig() {
-  var orgId = _session ? (_session.user ? _session.user.org_id : _session.org_id) : '';
+  var orgId = _session ? ((_session.user || _session).org_id || '') : '';
   var webhook = document.getElementById('slackWebhookUrl').value.trim();
   var triggers = {
     budget: document.getElementById('slackBudget').checked,
@@ -2489,9 +2662,14 @@ function saveSlackConfig() {
     daily: document.getElementById('slackDaily').checked,
   };
 
-  apiFetch('/v1/alerts/' + orgId, {
-    method: 'PUT',
-    body: JSON.stringify({ slack_webhook: webhook, triggers: triggers }),
+  apiFetch('/v1/alerts/slack/' + orgId, {
+    method: 'POST',
+    body: JSON.stringify({
+      webhook_url:     webhook,
+      trigger_budget:  triggers.budget,
+      trigger_anomaly: triggers.anomaly,
+      trigger_daily:   triggers.daily,
+    }),
   }).then(function() {
     document.getElementById('slackStatus').textContent = 'Saved!';
     setTimeout(function() { document.getElementById('slackStatus').textContent = ''; }, 3000);
@@ -2501,8 +2679,8 @@ function saveSlackConfig() {
 }
 
 function testSlack() {
-  var orgId = _session ? (_session.user ? _session.user.org_id : _session.org_id) : '';
-  apiFetch('/v1/alerts/' + orgId + '/test', { method: 'POST' }).then(function() {
+  var orgId = _session ? ((_session.user || _session).org_id || '') : '';
+  apiFetch('/v1/alerts/slack/' + orgId + '/test', { method: 'POST' }).then(function() {
     document.getElementById('slackStatus').textContent = 'Test message sent!';
     setTimeout(function() { document.getElementById('slackStatus').textContent = ''; }, 3000);
   }).catch(function(e) {
@@ -2753,8 +2931,8 @@ function loadIntegrations() {
 function loadAccount() {
   apiFetch('/v1/admin/overview').catch(function() { return null; }).then(function(overview) {
     if (overview) {
-      var used = overview.events_used || overview.event_count || 0;
-      var limit = overview.events_limit || overview.plan_limit || 0;
+      var used = (overview.org && overview.org.events_this_month) || overview.events_used || overview.event_count || 0;
+      var limit = (overview.org && overview.org.events_limit) || overview.events_limit || overview.plan_limit || 0;
       document.getElementById('accountEventsUsed').textContent = fmtNum(used);
       document.getElementById('accountEventsLimit').textContent = limit > 0 ? fmtNum(limit) : 'Unlimited';
       if (limit > 0) {

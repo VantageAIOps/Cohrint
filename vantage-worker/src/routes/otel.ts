@@ -206,6 +206,18 @@ function extractAuth(c: any): string | null {
   return null;
 }
 
+// KV-based rate limiter — mirrors auth.ts but for OTel ingest (higher limit: 3000 RPM)
+async function otelRateLimit(kv: KVNamespace, orgId: string, limitRpm: number): Promise<boolean> {
+  try {
+    const key   = `rl:otel:${orgId}:${Math.floor(Date.now() / 60_000)}`;
+    const raw   = await kv.get(key);
+    const count = raw ? parseInt(raw, 10) : 0;
+    if (count >= limitRpm) return false;
+    kv.put(key, String(count + 1), { expirationTtl: 70 });
+  } catch { /* KV unavailable — allow through */ }
+  return true;
+}
+
 // Validate API key and return org_id
 // Auth uses orgs.api_key_hash (owner) or org_members.api_key_hash (member)
 async function resolveOrg(apiKey: string | null, db: D1Database): Promise<string | null> {
@@ -235,6 +247,15 @@ otel.post('/v1/metrics', async (c) => {
   const orgId = await resolveOrg(apiKey, c.env.DB);
   if (!orgId) {
     return c.json({ error: 'Invalid or missing API key. Set OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer vnt_YOUR_KEY"' }, 401);
+  }
+
+  // Rate limit: 3000 OTel ingest requests per minute per org
+  const otelRpm = parseInt(c.env.RATE_LIMIT_RPM ?? '1000', 10) * 3;
+  const allowed = await otelRateLimit(c.env.KV, orgId, otelRpm);
+  if (!allowed) {
+    const retryAt = Math.ceil(Date.now() / 60_000) * 60;
+    c.header('Retry-After', String(retryAt - Math.floor(Date.now() / 1000)));
+    return c.json({ error: 'Rate limit exceeded', retry_after: retryAt }, 429);
   }
 
   // Parse OTLP JSON body
@@ -545,6 +566,15 @@ otel.post('/v1/logs', async (c) => {
   const orgId = await resolveOrg(apiKey, c.env.DB);
   if (!orgId) {
     return c.json({ error: 'Invalid or missing API key' }, 401);
+  }
+
+  // Rate limit: shared OTel bucket with /v1/metrics
+  const otelRpm = parseInt(c.env.RATE_LIMIT_RPM ?? '1000', 10) * 3;
+  const allowed = await otelRateLimit(c.env.KV, orgId, otelRpm);
+  if (!allowed) {
+    const retryAt = Math.ceil(Date.now() / 60_000) * 60;
+    c.header('Retry-After', String(retryAt - Math.floor(Date.now() / 1000)));
+    return c.json({ error: 'Rate limit exceeded', retry_after: retryAt }, 429);
   }
 
   let body: OTLPLogsRequest;
