@@ -610,7 +610,7 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
             const count = agentPromptCount.get(agent.name) ?? 0;
             const sid = await executePrompt(agentPrompt, agent, config, true, count > 0, agentSessionIds.get(agent.name));
             agentPromptCount.set(agent.name, count + 1);
-            if (sid) agentSessionIds.set(agent.name, sid);
+            if (sid) { agentSessionIds.set(agent.name, sid); } else { agentSessionIds.delete(agent.name); }
             try {
               const cost = await Promise.race([
                 costPromise,
@@ -659,7 +659,13 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
         const count = agentPromptCount.get(currentAgent.name) ?? 0;
         const sid = await executePrompt(line, currentAgent, config, true, count > 0, agentSessionIds.get(currentAgent.name));
         agentPromptCount.set(currentAgent.name, count + 1);
-        if (sid) agentSessionIds.set(currentAgent.name, sid);
+        // Always update the session ID map — clear stale ID if sid is undefined so
+        // the next prompt doesn't try to resume a session that no longer applies
+        if (sid) {
+          agentSessionIds.set(currentAgent.name, sid);
+        } else {
+          agentSessionIds.delete(currentAgent.name);
+        }
         try {
           const cost = await Promise.race([
             costPromise,
