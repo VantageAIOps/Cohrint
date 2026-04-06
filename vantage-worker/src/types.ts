@@ -20,10 +20,11 @@ export type Bindings = {
 };
 
 export type Variables = {
-  orgId:     string;
-  role:      string;        // 'owner' | 'admin' | 'member' | 'viewer'
-  scopeTeam: string | null; // null = see all; 'backend' = scoped to that team
-  memberId:  string | null; // null when using the org owner key
+  orgId:       string;
+  role:        string;        // 'owner' | 'admin' | 'member' | 'viewer'
+  scopeTeam:   string | null; // null = see all; 'backend' = scoped to that team
+  memberId:    string | null; // null when using the org owner key
+  memberEmail: string | null; // actual member email; null for owner key
 };
 
 // Inbound event from SDK

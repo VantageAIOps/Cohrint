@@ -50,16 +50,19 @@ export async function authMiddleware(
 
     if (session) {
       let scopeTeam: string | null = null;
+      let memberEmail: string | null = null;
       if (session.member_id) {
         const m = await c.env.DB.prepare(
-          'SELECT scope_team FROM org_members WHERE id = ?'
-        ).bind(session.member_id).first<{ scope_team: string | null }>();
-        scopeTeam = m?.scope_team ?? null;
+          'SELECT scope_team, email FROM org_members WHERE id = ?'
+        ).bind(session.member_id).first<{ scope_team: string | null; email: string | null }>();
+        scopeTeam   = m?.scope_team ?? null;
+        memberEmail = m?.email ?? null;
       }
-      c.set('orgId',     session.org_id);
-      c.set('role',      session.role);
-      c.set('scopeTeam', scopeTeam);
-      c.set('memberId',  session.member_id);
+      c.set('orgId',       session.org_id);
+      c.set('role',        session.role);
+      c.set('scopeTeam',   scopeTeam);
+      c.set('memberId',    session.member_id);
+      c.set('memberEmail', memberEmail);
 
       const rpm     = parseInt(c.env.RATE_LIMIT_RPM ?? '1000', 10);
       const allowed = await checkRateLimit(c.env.KV, session.org_id, rpm);
@@ -103,15 +106,16 @@ export async function authMiddleware(
   ).bind(hash).first<{ id: string; plan: string }>();
 
   if (org) {
-    c.set('orgId',     org.id);
-    c.set('role',      'owner');
-    c.set('scopeTeam', null);
-    c.set('memberId',  null);
+    c.set('orgId',       org.id);
+    c.set('role',        'owner');
+    c.set('scopeTeam',   null);
+    c.set('memberId',    null);
+    c.set('memberEmail', null);
   } else {
     // 2b. Check member key (org_members table)
     const member = await c.env.DB.prepare(
-      'SELECT id, org_id, role, scope_team FROM org_members WHERE api_key_hash = ?'
-    ).bind(hash).first<{ id: string; org_id: string; role: string; scope_team: string | null }>();
+      'SELECT id, org_id, role, scope_team, email FROM org_members WHERE api_key_hash = ?'
+    ).bind(hash).first<{ id: string; org_id: string; role: string; scope_team: string | null; email: string | null }>();
 
     if (!member) {
       const ip = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For') ?? '';
@@ -123,10 +127,11 @@ export async function authMiddleware(
         });
       return c.json({ error: 'API key not found. Sign up at vantageaiops.com' }, 401);
     } else {
-      c.set('orgId',     member.org_id);
-      c.set('role',      member.role);
-      c.set('scopeTeam', member.scope_team ?? null);
-      c.set('memberId',  member.id);
+      c.set('orgId',       member.org_id);
+      c.set('role',        member.role);
+      c.set('scopeTeam',   member.scope_team ?? null);
+      c.set('memberId',    member.id);
+      c.set('memberEmail', member.email ?? null);
     }
   }
 
