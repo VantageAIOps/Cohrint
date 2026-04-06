@@ -30,11 +30,14 @@ function parseStreamLine(line: string): { text?: string; sessionId?: string } {
         .join("") ?? "";
       return text ? { text } : {};
     }
-    if (obj["type"] === "result") {
+    // Capture session_id from both the "system" (init, first event) and "result"
+    // (last event) events. "system" is more reliable — it appears even on error exits.
+    if (obj["type"] === "result" || obj["type"] === "system") {
       const sid = obj["session_id"] as string | undefined;
-      return { sessionId: isValidSessionId(sid) ? sid : undefined };
+      if (isValidSessionId(sid)) return { sessionId: sid };
+      return {};
     }
-    // system/init/tool lines — suppress from display
+    // tool/other lines — suppress from display
     return {};
   } catch {
     // Not JSON — display as-is (non-Claude agents or plain text output)
