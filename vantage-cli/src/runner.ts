@@ -12,10 +12,147 @@ export interface RunResult {
 
 const MAX_OUTPUT_BYTES = 5 * 1024 * 1024; // 5MB output cap
 
+// ⏺ bullet matching Claude terminal (U+23FA) + ⎿ result prefix (U+23BF)
+const TOOL_BULLET = "\u23FA";
+const RESULT_PREFIX = "\u23BF";
+
+/** Format a tool's input object into a short preview string (max 70 chars). */
+function formatToolInput(name: string, input: Record<string, unknown>): string {
+  const MAX = 70;
+  const s = (v: unknown) => (typeof v === "string" ? v : JSON.stringify(v));
+
+  let preview: string;
+  switch (name) {
+    case "Bash":
+      preview = s(input["command"] ?? "").replace(/\s+/g, " ").trim();
+      break;
+    case "Write": case "Read": case "Edit": case "MultiEdit":
+      preview = s(input["file_path"] ?? "");
+      break;
+    case "Grep":
+      preview = s(input["pattern"] ?? "") +
+        (input["path"] ? ` in ${s(input["path"])}` : "");
+      break;
+    case "Glob":
+      preview = s(input["pattern"] ?? "");
+      break;
+    case "Agent":
+      preview = s(input["description"] ?? input["prompt"] ?? "");
+      break;
+    case "WebFetch":
+      preview = s(input["url"] ?? "");
+      break;
+    case "WebSearch":
+      preview = s(input["query"] ?? "");
+      break;
+    default: {
+      const first = Object.entries(input)[0];
+      preview = first ? `${first[0]}=${s(first[1])}` : "";
+    }
+  }
+
+  return preview.length > MAX ? preview.slice(0, MAX - 1) + "\u2026" : preview;
+}
+
 /**
- * Parse a single stream-json line from Claude Code.
- * Returns the displayable text and/or session ID extracted from it.
- * Falls back to returning the raw line as text if it's not valid JSON.
+ * Stateful renderer for Claude Code's stream-json format.
+ * Produces terminal output that matches Claude's native display:
+ *   ⏺ Bash(command...)
+ *     ⎿  output line 1
+ *        output line 2
+ *        … +N lines
+ *
+ * Returns { display, tokenText, sessionId } where:
+ *   display   — what gets written to the terminal
+ *   tokenText — just the assistant text content (for token counting)
+ */
+class ClaudeStreamRenderer {
+  private pendingTools = new Map<string, string>(); // tool_use_id → tool name
+
+  process(line: string): { display?: string; tokenText?: string; sessionId?: string } {
+    if (!line.trim()) return {};
+    try {
+      const obj = JSON.parse(line) as Record<string, unknown>;
+
+      // ── assistant turn: text + tool_use blocks ──────────────────────────────
+      if (obj["type"] === "assistant") {
+        const content = (
+          (obj["message"] as Record<string, unknown> | undefined)?.["content"]
+        ) as Array<Record<string, unknown>> | undefined;
+        if (!content?.length) return {};
+
+        const displayParts: string[] = [];
+        const tokenParts: string[] = [];
+
+        for (const block of content) {
+          if (block["type"] === "text") {
+            const t = String(block["text"] ?? "");
+            if (t) { displayParts.push(t); tokenParts.push(t); }
+          } else if (block["type"] === "tool_use") {
+            const toolName = String(block["name"] ?? "Tool");
+            const toolId   = String(block["id"]   ?? "");
+            const input    = (block["input"] as Record<string, unknown>) ?? {};
+            const preview  = formatToolInput(toolName, input);
+            displayParts.push(`\n${TOOL_BULLET} ${toolName}(${preview})\n`);
+            if (toolId) this.pendingTools.set(toolId, toolName);
+          }
+        }
+
+        const display   = displayParts.join("");
+        const tokenText = tokenParts.join("");
+        return display ? { display, tokenText: tokenText || undefined } : {};
+      }
+
+      // ── tool result ─────────────────────────────────────────────────────────
+      if (obj["type"] === "tool_result") {
+        const toolId = String(obj["tool_use_id"] ?? "");
+        this.pendingTools.delete(toolId);
+
+        const raw = obj["content"];
+        let resultText = "";
+        if (typeof raw === "string") {
+          resultText = raw;
+        } else if (Array.isArray(raw)) {
+          resultText = (raw as Array<Record<string, unknown>>)
+            .filter(b => b["type"] === "text")
+            .map(b => String(b["text"] ?? ""))
+            .join("");
+        }
+
+        if (!resultText.trim()) return {};
+
+        const lines = resultText.split("\n");
+        const MAX_RESULT_LINES = 10;
+        const shown    = lines.slice(0, MAX_RESULT_LINES);
+        const overflow = lines.length - MAX_RESULT_LINES;
+
+        const indented = shown
+          .map((l, i) => (i === 0 ? `  ${RESULT_PREFIX}  ${l}` : `     ${l}`))
+          .join("\n");
+        const suffix = overflow > 0
+          ? `\n     \u2026 +${overflow} lines (ctrl+o to expand)` : "";
+
+        return { display: `${indented}${suffix}\n` };
+      }
+
+      // ── session ID (system init + result events) ────────────────────────────
+      if (obj["type"] === "result" || obj["type"] === "system") {
+        const sid = obj["session_id"] as string | undefined;
+        if (isValidSessionId(sid)) return { sessionId: sid };
+        return {};
+      }
+
+      return {};
+    } catch {
+      // Non-JSON line (non-Claude agents) — pass through as-is
+      return { display: line + "\n", tokenText: line + "\n" };
+    }
+  }
+}
+
+/**
+ * Stateless parser for buffered mode — extracts text content and session ID only.
+ * Used by runAgentBuffered where display formatting is not needed.
  */
 function parseStreamLine(line: string): { text?: string; sessionId?: string } {
   if (!line.trim()) return {};
@@ -30,17 +167,13 @@ function parseStreamLine(line: string): { text?: string; sessionId?: string } {
         .join("") ?? "";
       return text ? { text } : {};
     }
-    // Capture session_id from both the "system" (init, first event) and "result"
-    // (last event) events. "system" is more reliable — it appears even on error exits.
     if (obj["type"] === "result" || obj["type"] === "system") {
       const sid = obj["session_id"] as string | undefined;
       if (isValidSessionId(sid)) return { sessionId: sid };
       return {};
     }
-    // tool/other lines — suppress from display
     return {};
   } catch {
-    // Not JSON — display as-is (non-Claude agents or plain text output)
     return { text: line + "\n" };
   }
 }
@@ -146,22 +279,27 @@ export function runAgent(
       });
     }
 
+    const renderer = new ClaudeStreamRenderer();
     let firstChunk = true;
     let truncationWarned = false;
 
     function flushLine(line: string) {
-      const { text, sessionId } = parseStreamLine(line);
+      const { display, tokenText, sessionId } = renderer.process(line);
       if (sessionId) capturedSessionId = sessionId;
-      if (!text) return;
+      if (!display) return;
       if (firstChunk) {
         stopSpinner();
         firstChunk = false;
       }
-      const buf = Buffer.from(text);
-      totalBytes += buf.length;
+      // Store only assistant text content for token counting (not tool formatting)
+      if (tokenText) {
+        const tbuf = Buffer.from(tokenText);
+        totalBytes += tbuf.length;
+        if (totalBytes <= MAX_OUTPUT_BYTES) chunks.push(tbuf);
+      }
+      // Always write the full display output (includes tool bullets + results)
       if (totalBytes <= MAX_OUTPUT_BYTES) {
-        chunks.push(buf);
-        const ok = process.stdout.write(buf);
+        const ok = process.stdout.write(display);
         if (!ok) {
           child.stdout?.pause();
           process.stdout.once("drain", () => child.stdout?.resume());
