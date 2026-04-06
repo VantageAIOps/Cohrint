@@ -33,6 +33,13 @@ analytics.get('/summary', async (c) => {
   const scopeTeam = c.get('scopeTeam');
   const { clause, args } = teamScope(scopeTeam);
 
+  // KV cache — 5 min TTL, invalidated on new event insert
+  const cacheKey = `analytics:summary:${orgId}:${scopeTeam ?? 'all'}`;
+  try {
+    const cached = await c.env.KV.get(cacheKey);
+    if (cached) return c.json(JSON.parse(cached));
+  } catch { /* KV unavailable — continue to DB */ }
+
   const now   = Math.floor(Date.now() / 1000);
   const today = now - 86_400;
   const month = now - 30 * 86_400;
@@ -59,28 +66,30 @@ analytics.get('/summary', async (c) => {
 
   // Budget: per-team when scoped, org-wide otherwise
   let budgetUsd = 0;
+  let orgPlan = 'free';
   if (scopeTeam) {
     const tb = await c.env.DB.prepare(
       'SELECT budget_usd FROM team_budgets WHERE org_id = ? AND team = ?'
     ).bind(orgId, scopeTeam).first<{ budget_usd: number }>();
     budgetUsd = tb?.budget_usd ?? 0;
+    const org = await c.env.DB.prepare('SELECT plan FROM orgs WHERE id = ?')
+      .bind(orgId).first<{ plan: string }>();
+    orgPlan = org?.plan ?? 'free';
   } else {
     const org = await c.env.DB.prepare(
       'SELECT budget_usd, plan FROM orgs WHERE id = ?'
     ).bind(orgId).first<{ budget_usd: number; plan: string }>();
     budgetUsd = org?.budget_usd ?? 0;
+    orgPlan = org?.plan ?? 'free';
   }
-
-  const org = await c.env.DB.prepare('SELECT plan FROM orgs WHERE id = ?')
-    .bind(orgId).first<{ plan: string }>();
 
   const t = totals.results[0] as Record<string, number>;
   const s = (session.results[0] as Record<string, number>) ?? {};
-  const budgetPct = budgetUsd
+  const budgetPct = budgetUsd > 0
     ? Math.round(((mtd?.mtd_cost_usd ?? 0) / budgetUsd) * 100)
-    : 0;
+    : null; // null = no budget set; 0 = budget set but 0% used
 
-  return c.json({
+  const result = {
     today_cost_usd:   t?.today_cost_usd   ?? 0,
     today_tokens:     t?.today_tokens     ?? 0,
     today_requests:   t?.today_requests   ?? 0,
@@ -88,9 +97,11 @@ analytics.get('/summary', async (c) => {
     session_cost_usd: s?.session_cost_usd ?? 0,
     budget_pct:       budgetPct,
     budget_usd:       budgetUsd,
-    plan:             org?.plan ?? 'free',
+    plan:             orgPlan,
     scope_team:       scopeTeam ?? null,
-  });
+  };
+  try { await c.env.KV.put(cacheKey, JSON.stringify(result), { expirationTtl: 300 }); } catch { /* best-effort */ }
+  return c.json(result);
 });
 
 // ── GET /v1/analytics/kpis?period=30 ─────────────────────────────────────────
@@ -98,8 +109,14 @@ analytics.get('/kpis', async (c) => {
   const orgId     = c.get('orgId');
   const scopeTeam = c.get('scopeTeam');
   const { clause, args } = teamScope(scopeTeam);
-  const period = Math.min(parseInt(c.req.query('period') ?? '30', 10), 365);
+  const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
   const since  = Math.floor(Date.now() / 1000) - period * 86_400;
+
+  const kpisCacheKey = `analytics:kpis:${orgId}:${period}:${scopeTeam ?? 'all'}`;
+  try {
+    const cached = await c.env.KV.get(kpisCacheKey);
+    if (cached) return c.json(JSON.parse(cached));
+  } catch { /* KV unavailable */ }
 
   const row = await c.env.DB.prepare(`
     SELECT
@@ -112,7 +129,9 @@ analytics.get('/kpis', async (c) => {
     FROM events WHERE org_id = ? AND created_at >= ?${clause}
   `).bind(orgId, since, ...args).first();
 
-  return c.json(row ?? {});
+  const kpisResult = row ?? {};
+  try { await c.env.KV.put(kpisCacheKey, JSON.stringify(kpisResult), { expirationTtl: 300 }); } catch { /* best-effort */ }
+  return c.json(kpisResult);
 });
 
 // ── GET /v1/analytics/timeseries?period=30 ───────────────────────────────────
@@ -120,7 +139,7 @@ analytics.get('/timeseries', async (c) => {
   const orgId     = c.get('orgId');
   const scopeTeam = c.get('scopeTeam');
   const { clause, args } = teamScope(scopeTeam);
-  const period = Math.min(parseInt(c.req.query('period') ?? '30', 10), 365);
+  const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
   const since  = Math.floor(Date.now() / 1000) - period * 86_400;
 
   const { results } = await c.env.DB.prepare(`
@@ -143,7 +162,7 @@ analytics.get('/models', async (c) => {
   const orgId     = c.get('orgId');
   const scopeTeam = c.get('scopeTeam');
   const { clause, args } = teamScope(scopeTeam);
-  const period = Math.min(parseInt(c.req.query('period') ?? '30', 10), 365);
+  const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
   const since  = Math.floor(Date.now() / 1000) - period * 86_400;
 
   const { results } = await c.env.DB.prepare(`
@@ -171,7 +190,7 @@ analytics.get('/teams', async (c) => {
   const orgId     = c.get('orgId');
   const scopeTeam = c.get('scopeTeam');
   const { clause, args } = teamScope(scopeTeam);
-  const period = Math.min(parseInt(c.req.query('period') ?? '30', 10), 365);
+  const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
   const since  = Math.floor(Date.now() / 1000) - period * 86_400;
 
   const { results } = await c.env.DB.prepare(`
@@ -201,7 +220,7 @@ analytics.get('/traces', async (c) => {
   const orgId     = c.get('orgId');
   const scopeTeam = c.get('scopeTeam');
   const { clause, args } = teamScope(scopeTeam);
-  const period = Math.min(parseInt(c.req.query('period') ?? '1', 10), 30);
+  const period = Math.min(parseInt(c.req.query('period') ?? '1', 10) || 1, 30);
   const since  = Math.floor(Date.now() / 1000) - period * 86_400;
 
   const { results } = await c.env.DB.prepare(`
@@ -228,7 +247,7 @@ analytics.get('/cost', async (c) => {
   const orgId     = c.get('orgId');
   const scopeTeam = c.get('scopeTeam');
   const { clause, args } = teamScope(scopeTeam);
-  const period = Math.min(parseInt(c.req.query('period') ?? '7', 10), 30);
+  const period = Math.min(parseInt(c.req.query('period') ?? '7', 10) || 7, 30);
   const since  = Math.floor(Date.now() / 1000) - period * 86_400;
   const today  = Math.floor(Date.now() / 1000) - 86_400;
 

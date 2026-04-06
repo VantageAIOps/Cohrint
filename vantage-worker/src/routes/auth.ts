@@ -31,7 +31,8 @@ auth.post('/signup', async (c) => {
     const rlKey = `rl:signup:${ip}`;
     const count = parseInt(await c.env.KV.get(rlKey) ?? '0', 10);
     if (count >= 10) {
-      return c.json({ error: 'Too many signup attempts. Try again later.' }, 429);
+      const retryAfter = 3600; // TTL is fixed at 3600s; remaining unknown without stored timestamp
+      return c.json({ error: 'Too many signup attempts. Try again later.' }, 429, { 'Retry-After': String(retryAfter) });
     }
     await c.env.KV.put(rlKey, String(count + 1), { expirationTtl: 3600 });
   } catch { /* KV unavailable — allow signup to proceed */ }
@@ -50,7 +51,7 @@ auth.post('/signup', async (c) => {
       const rlKey = `rl:signup:${ip}`;
       const count = parseInt(await c.env.KV.get(rlKey) ?? '0', 10);
       if (count >= 30) {
-        return c.json({ error: 'Too many signup attempts. Try again later.' }, 429);
+        return c.json({ error: 'Too many signup attempts. Try again later.' }, 429, { 'Retry-After': '3600' });
       }
       await c.env.KV.put(rlKey, String(count + 1), { expirationTtl: 3600 });
     }
@@ -105,7 +106,7 @@ auth.post('/recover', async (c) => {
     const rlKey = `rl:recover:${ip}`;
     const count = parseInt(await c.env.KV.get(rlKey) ?? '0', 10);
     if (count >= 5) {
-      return c.json({ error: 'Too many recovery attempts. Try again later.' }, 429);
+      return c.json({ error: 'Too many recovery attempts. Try again later.' }, 429, { 'Retry-After': '3600' });
     }
     await c.env.KV.put(rlKey, String(count + 1), { expirationTtl: 3600 });
   } catch { /* KV unavailable — allow recovery to proceed */ }
@@ -509,12 +510,12 @@ auth.get('/session', authMiddleware, async (c) => {
   crypto.getRandomValues(sseTokenBytes);
   const sseToken = Array.from(sseTokenBytes).map(b => b.toString(16).padStart(2, '0')).join('');
 
-  // Store in KV with 120-second TTL — one-time use, consumed by stream.ts
+  // Store in KV with 1-hour TTL — reusable across reconnects within the session.
   // If KV write fails (e.g. free tier limit), return null sse_token so the
   // client knows SSE is unavailable instead of getting a phantom token.
   let sseTokenFinal: string | null = sseToken;
   try {
-    await c.env.KV.put(`sse:${orgId}:${sseToken}`, '1', { expirationTtl: 120 });
+    await c.env.KV.put(`sse:${orgId}:${sseToken}`, '1', { expirationTtl: 3600 });
   } catch {
     sseTokenFinal = null; // KV unavailable — SSE disabled for this session
   }

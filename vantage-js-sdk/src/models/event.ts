@@ -81,10 +81,12 @@ export function makeEventId(): string {
 }
 
 export function hashPrompt(text: string): string {
-  return createHash("md5").update(text).digest("hex").slice(0, 12);
+  return createHash("sha256").update(text).digest("hex").slice(0, 12);
 }
 
-export function efficiencyScore(usage: TokenUsage): number {
+export function efficiencyScore(usage: TokenUsage): number | null {
+  const totalTokens = usage.promptTokens + usage.completionTokens;
+  if (!totalTokens) return null;
   const sysOverhead = usage.promptTokens > 0
     ? (usage.systemPromptTokens / usage.promptTokens) * 100 : 0;
   const cacheHit = usage.promptTokens > 0
@@ -114,7 +116,7 @@ export function flattenEvent(e: VantageEvent): Record<string, unknown> {
     prompt_tokens: e.usage.promptTokens,
     completion_tokens: e.usage.completionTokens,
     total_tokens: e.usage.totalTokens,
-    cached_tokens: e.usage.cachedTokens,
+    cache_tokens: e.usage.cachedTokens,
     system_prompt_tokens: e.usage.systemPromptTokens,
     cost_input_usd: e.cost.inputCostUsd,
     cost_output_usd: e.cost.outputCostUsd,

@@ -1007,10 +1007,25 @@ const items = [
 ];
 const ticker = document.getElementById("ticker");
 const all = [...items,...items]; // double for seamless loop
+const tickerFrag = document.createDocumentFragment();
 all.forEach(([name,val],i) => {
-  ticker.innerHTML += `<span class="ticker-item">${name} <span class="ticker-val">${val}</span></span>`;
-  if(i < all.length-1) ticker.innerHTML += `<span class="ticker-item" style="color:var(--border2)">·</span>`;
+  const item = document.createElement('span');
+  item.className = 'ticker-item';
+  const valEl = document.createElement('span');
+  valEl.className = 'ticker-val';
+  valEl.textContent = val;
+  item.textContent = name + ' ';
+  item.appendChild(valEl);
+  tickerFrag.appendChild(item);
+  if(i < all.length-1) {
+    const dot = document.createElement('span');
+    dot.className = 'ticker-item';
+    dot.style.color = 'var(--border2)';
+    dot.textContent = '·';
+    tickerFrag.appendChild(dot);
+  }
 });
+ticker.appendChild(tickerFrag);
 
 // ── Demo bars ────────────────────────────────────────────────────────────────
 const heights = [45,52,38,61,70,55,43,67,72,58,80,65,74,60,82,78,90,75,68,85,72,95,88,92,78,84,88,76,92,100];

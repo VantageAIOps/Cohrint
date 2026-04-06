@@ -31,7 +31,8 @@ export class Tracker {
   private queue: DashboardEvent[] = [];
   private timer: ReturnType<typeof setInterval> | null = null;
   private config: TrackerConfig;
-  private sentIds = new Set<string>();
+  private sentIds = new Set<string>();   // confirmed-delivered IDs
+  private queuedIds = new Set<string>(); // IDs currently in the send queue
   private exitRegistered = false;
   private lastSavedTokens = 0;
   private lastPromptText = "";
@@ -113,14 +114,14 @@ export class Tracker {
       event.team = "";
     }
 
-    // Deduplication guard
+    // Deduplication guard — check both confirmed-sent and in-queue sets
     const eventKey = event.event_id;
-    if (this.sentIds.has(eventKey)) return;
-    this.sentIds.add(eventKey);
-    // Cap dedup set to prevent memory leak in long sessions
-    if (this.sentIds.size > 10000) {
-      const arr = Array.from(this.sentIds);
-      this.sentIds = new Set(arr.slice(-5000));
+    if (this.sentIds.has(eventKey) || this.queuedIds.has(eventKey)) return;
+    this.queuedIds.add(eventKey);
+    // Prune queuedIds more aggressively to avoid memory spikes in long sessions
+    if (this.queuedIds.size > 1000) {
+      const arr = Array.from(this.queuedIds);
+      this.queuedIds = new Set(arr.slice(-500));
     }
 
     this.queue.push(event);
@@ -160,9 +161,24 @@ export class Tracker {
 
       bus.emit("cost:reported", { success: response.ok });
 
-      if (!response.ok) {
+      if (response.ok) {
+        // Only mark as confirmed-delivered after a 2xx response
+        for (const e of batch) {
+          this.sentIds.add(e.event_id);
+          this.queuedIds.delete(e.event_id);
+        }
+        // Cap sentIds to prevent unbounded growth in long sessions
+        if (this.sentIds.size > 1000) {
+          const arr = Array.from(this.sentIds);
+          this.sentIds = new Set(arr.slice(-500));
+        }
+      } else {
         // Never log response body — could contain echoed credentials
         console.error(`  [vantage] Dashboard sync failed: HTTP ${response.status}`);
+        // Re-queue events so they're not lost on server-side errors (BUG 14 fix:
+        // sentIds no longer contains these IDs so the filter works correctly)
+        const unsent = batch.filter((e) => !this.sentIds.has(e.event_id));
+        this.queue.unshift(...unsent);
       }
     } catch (err) {
       bus.emit("cost:reported", { success: false });
@@ -170,10 +186,7 @@ export class Tracker {
         console.error("[vantage] Failed to send events:", err);
       }
       // Re-queue failed events (skip any already confirmed sent)
-      const unsent = batch.filter((e) => {
-        const key = e.event_id;
-        return !this.sentIds.has(key);
-      });
+      const unsent = batch.filter((e) => !this.sentIds.has(e.event_id));
       this.queue.unshift(...unsent);
     }
   }

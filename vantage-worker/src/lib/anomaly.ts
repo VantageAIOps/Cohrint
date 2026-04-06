@@ -88,8 +88,9 @@ async function detectAnomalyForOrg(
   // Need at least 24 hours of data for meaningful Z-score
   if (hourlyCosts.length < 24) return null;
 
-  // Normalize current 10-min cost to hourly rate for comparison
-  const currentHourlyRate = current.cost * 6; // 10min → 1hr
+  // Normalize current window cost to hourly rate for comparison
+  const windowSec = now - tenMinAgo;
+  const currentHourlyRate = current.cost * (3600 / windowSec);
 
   const m = mean(hourlyCosts);
   const s = stdev(hourlyCosts);

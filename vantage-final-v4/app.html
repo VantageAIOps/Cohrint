@@ -1248,7 +1248,16 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
    ═══════════════════════════════════════════════════════════════════════════ */
 
 // ── Constants ──
-var API_BASE = localStorage.getItem('api_base') || 'https://api.vantageaiops.com';
+(function() {
+  var _stored = localStorage.getItem('api_base');
+  // Only accept https:// URLs or relative paths (never http:// or protocol-relative)
+  if (_stored && (/^https:\/\//.test(_stored) || /^\/[^/]/.test(_stored))) {
+    window._API_BASE_VALIDATED = _stored;
+  } else {
+    window._API_BASE_VALIDATED = 'https://api.vantageaiops.com';
+  }
+})();
+var API_BASE = window._API_BASE_VALIDATED;
 var _session = null;
 var period = 30;
 var activeView = 'overview';
@@ -1354,7 +1363,10 @@ function toolInitial(provider) {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 // ── API cache (localStorage) ──
-function _cacheKey(path) { return 'vantage_cache:' + path; }
+function _cacheKey(path) {
+  var orgId = _session ? ((_session.user || _session).org_id || '') : '';
+  return 'vantage_cache:' + orgId + ':' + path;
+}
 function _cacheGet(path) {
   try {
     var raw = localStorage.getItem(_cacheKey(path));
@@ -1510,8 +1522,10 @@ function selectToolTab(provider) {
    Overview
    ═══════════════════════════════════════════════════════════════════════════ */
 var _dailyChart = null;
+var _renderGen = 0;
 
 function loadOverview() {
+  var gen = ++_renderGen;
   _skelOn();
   Promise.all([
     apiFetch('/v1/cross-platform/summary?days=' + period).catch(function() { return null; }),
@@ -1520,6 +1534,7 @@ function loadOverview() {
     apiFetch('/v1/analytics/kpis?period=' + period).catch(function() { return null; }),
     apiFetch('/v1/analytics/timeseries?period=' + period).catch(function() { return null; }),
   ]).then(function(results) {
+    if (gen !== _renderGen) return; // stale render — a newer one is in flight
     _skelOff();
     var summary = results[0];
     var devs = results[1];
@@ -1687,7 +1702,9 @@ function renderDailyChart(summary, timeseries) {
 
   if (daily.length > 0) {
     labels = daily.map(function(d) {
-      var dt = new Date(d.date || d.day);
+      var raw = d.date || d.day || '';
+      var parts = raw.split('-');
+      var dt = parts.length === 3 ? new Date(+parts[0], +parts[1] - 1, +parts[2]) : new Date(raw);
       return (dt.getMonth() + 1) + '/' + dt.getDate();
     });
 
@@ -1699,7 +1716,7 @@ function renderDailyChart(summary, timeseries) {
         datasets.push({
           label: toolName(prov),
           data: daily.map(function(d) {
-            var found = d.by_provider.find(function(bp) { return bp.provider === prov; });
+            var found = (d.by_provider || []).find(function(bp) { return bp.provider === prov; });
             return found ? (found.cost || found.total_cost || 0) : 0;
           }),
           backgroundColor: toolColor(prov),
@@ -1978,7 +1995,7 @@ function prependLiveItem(ev) {
 
   var provider = ev.provider || ev.source || '';
   var model = ev.model || '';
-  var cost = ev.cost || ev.total_cost || 0;
+  var cost = ev.cost_usd || ev.cost || ev.total_cost || 0;
   var color = toolColor(provider);
   var d = new Date();
   var timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
@@ -2019,6 +2036,7 @@ var _spendChart = null;
 var _teamPieChart = null;
 
 function loadSpend() {
+  var gen = ++_renderGen;
   _skelOn();
   Promise.all([
     apiFetch('/v1/analytics/timeseries?period=' + period).catch(function() { return null; }),
@@ -2026,6 +2044,7 @@ function loadSpend() {
     apiFetch('/v1/analytics/teams?period=' + period).catch(function() { return null; }),
     apiFetch('/v1/cross-platform/summary?days=' + period).catch(function() { return null; }),
   ]).then(function(results) {
+    if (gen !== _renderGen) return; // stale render — a newer one is in flight
     _skelOff();
     var timeseries = results[0];
     var models = results[1];
@@ -2062,7 +2081,16 @@ function loadSpend() {
     renderTeamPie(teams);
 
   }).catch(function(e) {
+    _skelOff();
     console.error('[vantage] spend error:', e);
+    var spendTotalEl = document.getElementById('spendTotal');
+    if (spendTotalEl) spendTotalEl.textContent = 'Error';
+    var spendTotalSubEl = document.getElementById('spendTotalSub');
+    if (spendTotalSubEl) {
+      spendTotalSubEl.textContent = 'Failed to load — retrying in 8s';
+      spendTotalSubEl.className = 'kpi-sub up';
+    }
+    setTimeout(loadSpend, 8000);
   });
 }
 
@@ -2077,7 +2105,9 @@ function renderSpendTrend(timeseries) {
   }
 
   var labels = data.map(function(d) {
-    var dt = new Date(d.date || d.day);
+    var raw = d.date || d.day || '';
+    var parts = raw.split('-');
+    var dt = parts.length === 3 ? new Date(+parts[0], +parts[1] - 1, +parts[2]) : new Date(raw);
     return (dt.getMonth() + 1) + '/' + dt.getDate();
   });
   var values = data.map(function(d) { return d.cost_usd || d.total_cost || d.cost || 0; });
@@ -2655,6 +2685,7 @@ function deleteTeamBudget(team) {
 
 function saveSlackConfig() {
   var orgId = _session ? ((_session.user || _session).org_id || '') : '';
+  if (!orgId) { alert('Session error: please reload the page'); return; }
   var webhook = document.getElementById('slackWebhookUrl').value.trim();
   var triggers = {
     budget: document.getElementById('slackBudget').checked,
@@ -2680,6 +2711,7 @@ function saveSlackConfig() {
 
 function testSlack() {
   var orgId = _session ? ((_session.user || _session).org_id || '') : '';
+  if (!orgId) { alert('Session error: please reload the page'); return; }
   apiFetch('/v1/alerts/slack/' + orgId + '/test', { method: 'POST' }).then(function() {
     document.getElementById('slackStatus').textContent = 'Test message sent!';
     setTimeout(function() { document.getElementById('slackStatus').textContent = ''; }, 3000);
@@ -2834,15 +2866,13 @@ function exportAuditCsv() {
   var type    = document.getElementById('auditTypeFilter').value;
   var from    = document.getElementById('auditDateFrom').value;
   var to      = document.getElementById('auditDateTo').value;
-  var apiBase = localStorage.getItem('vantage_api_base') || 'https://api.vantageaiops.com';
-  var token   = localStorage.getItem('vantage_api_key') || '';
   var qs = '?format=csv&limit=500';
   if (type) qs += '&event_type=' + encodeURIComponent(type);
   if (from) qs += '&from='       + encodeURIComponent(from);
   if (to)   qs += '&to='         + encodeURIComponent(to);
-  // Fetch as blob and trigger download — avoids exposing key in URL
-  fetch(apiBase + '/v1/audit-log' + qs, {
-    headers: { 'Authorization': 'Bearer ' + token }
+  // Use session cookie auth (credentials: 'include') — same as all other apiFetch calls
+  fetch(API_BASE + '/v1/audit-log' + qs, {
+    credentials: 'include'
   }).then(function(res) {
     return res.blob();
   }).then(function(blob) {
@@ -2965,12 +2995,20 @@ function copyApiKey() {
       var full = el.dataset.full || '';
       if (full) el.textContent = full.substring(0, 7) + '****...' + full.substring(full.length - 4);
     }, 1000);
+  }).catch(function() {
+    el.textContent = 'Copy failed';
+    setTimeout(function() { el.textContent = (el.dataset.full || '').substring(0, 7) + '****...'; }, 2000);
   });
 }
 
 function copyOrgId() {
-  var text = document.getElementById('accountOrgId').textContent;
-  navigator.clipboard.writeText(text);
+  var el = document.getElementById('accountOrgId');
+  var text = el.textContent;
+  navigator.clipboard.writeText(text).then(function() {
+    var orig = el.textContent;
+    el.textContent = 'Copied!';
+    setTimeout(function() { el.textContent = orig; }, 1000);
+  }).catch(function() { /* silent — orgId is visible on screen */ });
 }
 
 function rotateApiKey() {
@@ -2989,6 +3027,15 @@ function rotateApiKey() {
 }
 
 function signOut() {
+  // Clear cached API responses so next user can't see previous user's data
+  try {
+    Object.keys(localStorage).forEach(function(k) {
+      if (k.startsWith('vantage_cache:')) localStorage.removeItem(k);
+    });
+  } catch (_) {}
+  // Close SSE if open
+  if (_sseSource) { _sseSource.close(); _sseSource = null; }
+  _session = null;
   fetch(API_BASE + '/v1/auth/session', { method: 'DELETE', credentials: 'include' }).catch(function() {}).then(function() {
     window.location.replace('/auth.html');
   });

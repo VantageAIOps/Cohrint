@@ -43,7 +43,7 @@ auditlog.get('/', async (c) => {
 
   const orgId     = c.get('orgId');
   const limit     = Math.max(1, Math.min(parseInt(c.req.query('limit') ?? '50', 10), 500));
-  const offset    = parseInt(c.req.query('offset') ?? '0', 10);
+  const offset    = Math.max(0, parseInt(c.req.query('offset') ?? '0', 10));
   const eventType = c.req.query('event_type') ?? null;
   const format    = c.req.query('format')     ?? 'json';
   const from      = parseIsoDate(c.req.query('from'));
@@ -65,7 +65,7 @@ auditlog.get('/', async (c) => {
   ]);
 
   const events = rows.results as Record<string, unknown>[];
-  const total  = (countRow.results[0] as { total: number }).total;
+  const total  = (countRow.results?.[0] as { total: number } | undefined)?.total ?? 0;
 
   if (format === 'csv') {
     return csvResponse(orgId, events);
@@ -77,7 +77,7 @@ auditlog.get('/', async (c) => {
 // ── CSV helper ────────────────────────────────────────────────────────────────
 
 function csvResponse(orgId: string, events: Record<string, unknown>[]): Response {
-  const header = 'id,org_id,actor_id,actor_role,event_type,event_name,resource,detail,ip_address,created_at\n';
+  const header = 'id,org_id,actor_email,actor_role,event_type,action,resource,detail,ip_address,created_at\n';
   const rows = events.map(e =>
     [e['id'], orgId, e['actor_email'], e['actor_role'], e['event_type'],
      e['action'], e['resource'], e['detail'], e['ip_address'], e['created_at']]

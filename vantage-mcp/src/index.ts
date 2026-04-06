@@ -719,9 +719,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const compressedTokens = countTokens(compressed);
         const saved = originalTokens - compressedTokens;
         const tips = getOptimizationTips(prompt);
-        const costBefore = calcCost(model, originalTokens, originalTokens);
-        const costAfter = calcCost(model, compressedTokens, compressedTokens);
-        const cheapest = findCheapest(compressedTokens, compressedTokens);
+        // Use a fixed output estimate (half of original input) so cost comparison is fair
+        const estimatedOutputTokens = Math.round(originalTokens / 2);
+        const costBefore = calcCost(model, originalTokens, estimatedOutputTokens);
+        const costAfter = calcCost(model, compressedTokens, estimatedOutputTokens);
+        const cheapest = findCheapest(compressedTokens, estimatedOutputTokens);
 
         const lines = [
           `🔧 **Prompt Optimizer** (${model})`,
@@ -828,7 +830,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             compressed.unshift(msg);
             usedTokens += msgTokens;
           } else {
-            for (let j = 0; j <= i; j++) skipped.push(safeMsgs[j]);
+            for (let j = 0; j < i; j++) skipped.push(safeMsgs[j]);
             break;
           }
         }
@@ -1124,13 +1126,14 @@ async function main() {
   process.stderr.write('[vantage-mcp] Server started\n');
 }
 
-// Catch unhandled errors so the server never silently dies
+// Catch unhandled errors — log and exit so the process manager can restart clean
 process.on('uncaughtException', (err) => {
   errorLog('uncaughtException', err);
-  // Don't exit — keep the server alive for remaining tool calls
+  process.exit(1);
 });
 process.on('unhandledRejection', (reason) => {
   errorLog('unhandledRejection', reason);
+  process.exit(1);
 });
 
 main().catch((err) => {

@@ -33,12 +33,12 @@ stream.get('/:orgId', async (c) => {
   const token    = c.req.query('token') ?? '';
 
   if (sseToken) {
-    // Look up short-lived token in KV; delete on use (one-time)
+    // Look up token in KV — reusable for 1 hour (not one-time use)
     const val = await c.env.KV.get(`sse:${orgId}:${sseToken}`);
     if (!val) {
       return c.json({ error: 'Invalid or expired sse_token' }, 401);
     }
-    await c.env.KV.delete(`sse:${orgId}:${sseToken}`);
+    // Token stays in KV until its TTL expires — allows reconnects without re-auth
   } else if (token.startsWith('vnt_')) {
     // Validate API key against DB (same pattern as authMiddleware)
     const hash = await sha256hex(token);
@@ -63,33 +63,61 @@ stream.get('/:orgId', async (c) => {
 
   const write = (data: string) => writer.write(encoder.encode(data));
   const sendEvent = (payload: string) => write(`data: ${payload}\n\n`);
-  const sendPing  = () => write(':ping\n\n');
 
   // Run the polling loop in background (don't await)
   (async () => {
     try {
-      let lastTs = 0;
-      const deadline = Date.now() + 25_000; // 25s max
+      let lastSeqno = 0;
+      let lastDataSent = Date.now();
+      const deadline = Date.now() + 50_000; // 50s max (well within CF streaming limits)
 
       while (Date.now() < deadline) {
-        const raw = await c.env.KV.get(`stream:${orgId}:latest`);
-        if (raw) {
-          try {
-            const ev = JSON.parse(raw) as { ts: number };
-            if (ev.ts > lastTs) {
-              lastTs = ev.ts;
-              await sendEvent(raw);
+        try {
+          // Read circular buffer (StreamEvent[], newest first, max 25 items)
+          const bufRaw = await c.env.KV.get(`stream:${orgId}:buf`);
+          if (bufRaw) {
+            const buf = JSON.parse(bufRaw) as Array<{ seqno: number; [k: string]: unknown }>;
+            const newEvents = lastSeqno > 0
+              ? buf.filter(e => e.seqno > lastSeqno)
+              : buf.slice(0, 1); // first poll: only the most recent event
+            if (newEvents.length > 0) {
+              for (const ev of [...newEvents].reverse()) { // send oldest-first
+                await sendEvent(JSON.stringify(ev));
+              }
+              lastSeqno = newEvents[0].seqno; // newEvents[0] is newest
+              lastDataSent = Date.now();
             }
-          } catch { /* ignore parse errors */ }
-        } else {
-          await sendPing();
+          } else {
+            // Fallback: legacy 'latest' key during transition
+            const raw = await c.env.KV.get(`stream:${orgId}:latest`);
+            if (raw) {
+              try {
+                const ev = JSON.parse(raw) as { seqno?: number; ts?: number };
+                const seq = ev.seqno ?? ev.ts ?? 0;
+                if (seq > lastSeqno) {
+                  lastSeqno = seq;
+                  await sendEvent(raw);
+                  lastDataSent = Date.now();
+                }
+              } catch { /* ignore parse errors */ }
+            }
+          }
+        } catch (kvErr) {
+          console.error('[stream] KV read error:', kvErr);
+          // Send an error SSE event and close cleanly rather than aborting
+          try { await write('event: error\ndata: {"error":"stream_unavailable"}\n\n'); } catch { /* ignore */ }
+          await writer.close();
+          return;
+        }
+
+        // Heartbeat: keep connection alive if no data sent in 5s
+        if (Date.now() - lastDataSent > 5000) {
+          await write(': keep-alive\n\n');
+          lastDataSent = Date.now();
         }
 
         // Wait 2s between polls
         await new Promise(r => setTimeout(r, 2000));
-
-        // Ping every ~20s to keep connection alive through proxies
-        if ((Date.now() % 20_000) < 2000) await sendPing();
       }
 
       // Close gracefully — client will reconnect automatically

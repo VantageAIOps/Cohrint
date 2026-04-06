@@ -45,7 +45,7 @@ function sqliteMonthStart(): string {
 
 crossplatform.get('/summary', async (c) => {
   const orgId = c.get('orgId');
-  const days = parseInt(c.req.query('days') ?? '30', 10);
+  const days = parseInt(c.req.query('days') ?? '30', 10) || 30;
   const since = sqliteDateSince(days);
 
   // Total spend
@@ -142,7 +142,7 @@ crossplatform.get('/summary', async (c) => {
 
 crossplatform.get('/developers', async (c) => {
   const orgId = c.get('orgId');
-  const days = parseInt(c.req.query('days') ?? '30', 10);
+  const days = parseInt(c.req.query('days') ?? '30', 10) || 30;
   const since = sqliteDateSince(days);
 
   const developers = await c.env.DB.prepare(`
@@ -206,7 +206,7 @@ crossplatform.get('/developers', async (c) => {
 crossplatform.get('/developer/:email', async (c) => {
   const orgId = c.get('orgId');
   const email = decodeURIComponent(c.req.param('email'));
-  const days = parseInt(c.req.query('days') ?? '30', 10);
+  const days = parseInt(c.req.query('days') ?? '30', 10) || 30;
   const since = sqliteDateSince(days);
 
   // By provider
@@ -267,7 +267,23 @@ crossplatform.get('/live', async (c) => {
   const orgId = c.get('orgId');
   const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10), 200);
 
-  const events = await c.env.DB.prepare(`
+  // Primary: last 5 minutes only (truly live)
+  const recent = await c.env.DB.prepare(`
+    SELECT
+      provider, developer_email, model, event_name,
+      cost_usd, tokens_in, tokens_out, duration_ms, timestamp
+    FROM otel_events
+    WHERE org_id = ? AND timestamp > datetime('now', '-5 minutes')
+    ORDER BY timestamp DESC
+    LIMIT ?
+  `).bind(orgId, limit).all();
+
+  if (recent.results && recent.results.length > 0) {
+    return c.json({ events: recent.results, is_stale: false });
+  }
+
+  // Fallback: no recent activity — return last known events with staleness flag
+  const fallback = await c.env.DB.prepare(`
     SELECT
       provider, developer_email, model, event_name,
       cost_usd, tokens_in, tokens_out, duration_ms, timestamp
@@ -275,16 +291,20 @@ crossplatform.get('/live', async (c) => {
     WHERE org_id = ?
     ORDER BY timestamp DESC
     LIMIT ?
-  `).bind(orgId, limit).all();
+  `).bind(orgId, Math.min(limit, 20)).all();
 
-  return c.json({ events: events.results });
+  return c.json({
+    events: fallback.results ?? [],
+    is_stale: true,
+    message: 'No activity in the last 5 minutes — showing most recent events',
+  });
 });
 
 // ── GET /models — cost by model across all providers ────────────────────────
 
 crossplatform.get('/models', async (c) => {
   const orgId = c.get('orgId');
-  const days = parseInt(c.req.query('days') ?? '30', 10);
+  const days = parseInt(c.req.query('days') ?? '30', 10) || 30;
   const since = sqliteDateSince(days);
 
   const models = await c.env.DB.prepare(`

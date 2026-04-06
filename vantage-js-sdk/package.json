@@ -1,8 +1,18 @@
 {
   "name": "vantageaiops",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "LLM cost tracking and AI API monitoring SDK for TypeScript and JavaScript — track OpenAI, Anthropic, Google and Mistral spending",
-  "keywords": ["ai", "llm", "openai", "anthropic", "cost", "observability", "tokens", "cost-tracking", "llm-monitoring"],
+  "keywords": [
+    "ai",
+    "llm",
+    "openai",
+    "anthropic",
+    "cost",
+    "observability",
+    "tokens",
+    "cost-tracking",
+    "llm-monitoring"
+  ],
   "homepage": "https://vantageaiops.com",
   "repository": {
     "type": "git",
@@ -20,7 +30,9 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup src/index.ts --format esm,cjs --dts --clean",
     "dev": "tsup src/index.ts --format esm,cjs --dts --watch",
@@ -37,8 +49,14 @@
     "@anthropic-ai/sdk": ">=0.20.0"
   },
   "peerDependenciesMeta": {
-    "openai": { "optional": true },
-    "@anthropic-ai/sdk": { "optional": true }
+    "openai": {
+      "optional": true
+    },
+    "@anthropic-ai/sdk": {
+      "optional": true
+    }
   },
-  "engines": { "node": ">=18.0.0" }
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }

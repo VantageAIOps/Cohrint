@@ -36,7 +36,7 @@ async function checkFreeTierLimit(db: D1Database, orgId: string, adding = 1): Pr
 
   if (!row || row.plan !== 'free') return { blocked: false, used: row?.mtd_count ?? 0 };
   const used = Number(row.mtd_count);
-  return { blocked: used + adding > FREE_TIER_LIMIT, used };
+  return { blocked: used + adding >= FREE_TIER_LIMIT, used };
 }
 
 // ── POST /v1/events — ingest a single event ───────────────────────────────────
@@ -66,11 +66,20 @@ events.post('/', async (c) => {
     return c.json({ error: 'event_id is required' }, 400);
   }
 
-  const result = await insertEvent(c.env.DB, orgId, body);
+  let result;
+  try {
+    result = await insertEvent(c.env.DB, orgId, body);
+  } catch (err) {
+    if (err instanceof RangeError) return c.json({ error: err.message }, 400);
+    throw err;
+  }
   if (!result.success) return c.json({ error: 'Failed to insert event' }, 500);
 
   // Broadcast to SSE subscribers via KV pub channel
   await broadcastEvent(c.env.KV, orgId, body);
+
+  // Invalidate analytics summary cache for this org
+  try { await c.env.KV.delete(`analytics:summary:${orgId}`); } catch { /* best-effort */ }
 
   return c.json({ ok: true, id: body.event_id }, 201);
 });
@@ -101,9 +110,15 @@ events.post('/batch', async (c) => {
   }
 
   // Bulk insert using D1 batch API
-  const stmts = body.events.map(ev =>
-    buildInsertStmt(c.env.DB, orgId, ev, body.sdk_language, body.sdk_version)
-  );
+  let stmts;
+  try {
+    stmts = body.events.map(ev =>
+      buildInsertStmt(c.env.DB, orgId, ev, body.sdk_language, body.sdk_version)
+    );
+  } catch (err) {
+    if (err instanceof RangeError) return c.json({ error: err.message }, 400);
+    throw err;
+  }
 
   const results = await c.env.DB.batch(stmts);
   const failed  = results.filter(r => !r.success).length;
@@ -112,6 +127,9 @@ events.post('/batch', async (c) => {
   if (body.events.length > 0) {
     await broadcastEvent(c.env.KV, orgId, body.events[body.events.length - 1]);
   }
+
+  // Invalidate analytics summary cache for this org
+  try { await c.env.KV.delete(`analytics:summary:${orgId}`); } catch { /* best-effort */ }
 
   return c.json({
     ok:       true,
@@ -161,12 +179,23 @@ function buildInsertStmt(
   const r = ev as unknown as Record<string, unknown>;
 
   const eventId        = ev.event_id ?? r.id as string | undefined;
-  const promptTokens   = ev.prompt_tokens   ?? r.usage_prompt_tokens   as number ?? 0;
-  const completionTok  = ev.completion_tokens ?? r.usage_completion_tokens as number ?? 0;
-  const cacheTok       = ev.cache_tokens    ?? r.usage_cached_tokens   as number ?? r.cache_tokens as number ?? 0;
-  const totalTokens    = ev.total_tokens    ?? r.usage_total_tokens    as number ?? (promptTokens + completionTok);
-  const costUsd        = ev.total_cost_usd  ?? ev.cost_total_usd       ??
-                         r.cost_total_cost_usd as number ?? r.cost_usd as number ?? 0;
+  const promptTokens   = Number(ev.prompt_tokens   ?? r.usage_prompt_tokens   ?? 0);
+  const completionTok  = Number(ev.completion_tokens ?? r.usage_completion_tokens ?? 0);
+  const cacheTok       = Number(ev.cache_tokens    ?? r.usage_cached_tokens   ?? r.cache_tokens   ?? 0);
+  const totalTokens    = Number(ev.total_tokens    ?? r.usage_total_tokens    ?? (promptTokens + completionTok));
+
+  // Reject scientific-notation inflation and negative values (e.g. "1e10" = 10 billion)
+  const MAX_TOKENS = 10_000_000;
+  if (
+    promptTokens  < 0 || promptTokens  > MAX_TOKENS ||
+    completionTok < 0 || completionTok > MAX_TOKENS ||
+    cacheTok      < 0 || cacheTok      > MAX_TOKENS ||
+    totalTokens   < 0 || totalTokens   > MAX_TOKENS
+  ) {
+    throw new RangeError(`Token count out of valid range (0–${MAX_TOKENS})`);
+  }
+  const costUsd        = Number(ev.total_cost_usd  ?? ev.cost_total_usd       ??
+                         r.cost_total_cost_usd ?? r.cost_usd ?? 0);
   const latencyMs      = ev.latency_ms      ?? r.latency_ms            as number ?? 0;
   const tagsValue      = ev.tags ?? (r.tags as Record<string, string> | undefined);
 
@@ -206,22 +235,42 @@ async function insertEvent(db: D1Database, orgId: string, ev: EventIn) {
   return buildInsertStmt(db, orgId, ev).run();
 }
 
+interface StreamEvent {
+  seqno: number;
+  ts: number;
+  provider: string;
+  cost_usd: number;
+  model: string | null;
+  tokens: number;
+}
+
 async function broadcastEvent(kv: KVNamespace, orgId: string, ev: EventIn) {
-  // Store last event per org in KV so SSE stream can serve it
-  // TTL 60s — only recent events matter for live stream
-  const payload = JSON.stringify({
-    provider: ev.provider,
-    model:    ev.model,
-    total_tokens: ev.total_tokens ?? ((ev.prompt_tokens ?? 0) + (ev.completion_tokens ?? 0)),
-    cost_total_usd: ev.total_cost_usd ?? ev.cost_total_usd,
-    latency_ms: ev.latency_ms,
-    team: ev.team,
-    ts: Date.now(),
-  });
   try {
+    const seqno = Date.now();
+    const r = ev as unknown as Record<string, unknown>;
+    const streamEv: StreamEvent = {
+      seqno,
+      ts: seqno,
+      provider: ev.provider ?? 'unknown',
+      cost_usd: ev.total_cost_usd ?? ev.cost_total_usd ?? 0,
+      model: ev.model ?? null,
+      tokens: (Number(r.input_tokens ?? ev.prompt_tokens ?? 0)) +
+              (Number(r.output_tokens ?? ev.completion_tokens ?? 0)),
+    };
+    const payload = JSON.stringify(streamEv);
+
+    // Write latest (backwards compat for SSE reader during transition)
     await kv.put(`stream:${orgId}:latest`, payload, { expirationTtl: 60 });
+
+    // Write circular buffer (max 25 events, newest first)
+    const bufKey = `stream:${orgId}:buf`;
+    const rawBuf = await kv.get(bufKey);
+    const buf: StreamEvent[] = rawBuf ? JSON.parse(rawBuf) : [];
+    buf.unshift(streamEv);
+    if (buf.length > 25) buf.length = 25;
+    await kv.put(bufKey, JSON.stringify(buf), { expirationTtl: 300 });
   } catch {
-    // KV unavailable — event still recorded in D1, SSE broadcast skipped
+    // KV unavailable — event still recorded in D1, live feed skipped
   }
 }
 

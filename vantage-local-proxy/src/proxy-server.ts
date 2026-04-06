@@ -109,6 +109,8 @@ class StatsQueue {
     const batch = this.queue.splice(0, this.batchSize);
     this._send(batch.map((s) => s.event)).catch((err) => {
       if (this.debug) process.stderr.write(`[vantage-proxy] Flush error: ${err}\n`);
+      // Re-queue on failure so stats aren't permanently lost
+      this.queue.unshift(...batch);
     });
   }
 
@@ -127,11 +129,13 @@ class StatsQueue {
         },
         body,
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       if (this.debug) {
         process.stderr.write(`[vantage-proxy] Sent ${events.length} stats → ${res.status}\n`);
       }
     } catch (err) {
       if (this.debug) process.stderr.write(`[vantage-proxy] Send failed: ${err}\n`);
+      throw err; // re-throw so flush() re-queues the batch
     }
   }
 }
@@ -155,7 +159,7 @@ function extractOpenAIStats(
   return {
     provider: "openai", model, endpoint: "/chat/completions",
     prompt_tokens: promptTokens, completion_tokens: completionTokens,
-    total_tokens: promptTokens + completionTokens, cached_tokens: cachedTokens,
+    total_tokens: promptTokens + completionTokens, cache_tokens: cachedTokens,
     latency_ms: Math.round(latencyMs), status_code: statusCode,
     cost_input_usd: inputCostUsd, cost_output_usd: outputCostUsd, cost_total_usd: totalCostUsd,
     cheapest_model: cheapest?.model ?? "", cheapest_cost_usd: cheapest?.costUsd ?? 0,
@@ -180,7 +184,7 @@ function extractAnthropicStats(
   return {
     provider: "anthropic", model, endpoint: "/messages",
     prompt_tokens: promptTokens, completion_tokens: completionTokens,
-    total_tokens: promptTokens + completionTokens, cached_tokens: cachedTokens,
+    total_tokens: promptTokens + completionTokens, cache_tokens: cachedTokens,
     latency_ms: Math.round(latencyMs), status_code: statusCode,
     cost_input_usd: inputCostUsd, cost_output_usd: outputCostUsd, cost_total_usd: totalCostUsd,
     cheapest_model: cheapest?.model ?? "", cheapest_cost_usd: cheapest?.costUsd ?? 0,
@@ -379,11 +383,19 @@ export function startProxyServer(config: LocalProxyConfig): void {
       const targetUrl = `${targetBase}${targetPath}`;
       if (debug) process.stderr.write(`[vantage-proxy] → ${provider} ${targetPath}\n`);
 
-      const upstreamRes = await fetch(targetUrl, {
-        method: "POST",
-        headers: forwardHeaders,
-        body: JSON.stringify(reqBody),
-      });
+      const fetchController = new AbortController();
+      const fetchTimeout = setTimeout(() => fetchController.abort(), 5 * 60 * 1000);
+      let upstreamRes: Response;
+      try {
+        upstreamRes = await fetch(targetUrl, {
+          method: "POST",
+          headers: forwardHeaders,
+          body: JSON.stringify(reqBody),
+          signal: fetchController.signal,
+        });
+      } finally {
+        clearTimeout(fetchTimeout);
+      }
 
       const latencyMs = performance.now() - t0;
 
@@ -393,24 +405,41 @@ export function startProxyServer(config: LocalProxyConfig): void {
           provider, model: String(reqBody.model ?? "unknown"), endpoint: targetPath,
           latency_ms: Math.round(latencyMs), status_code: upstreamRes.status,
           prompt_tokens: 0, completion_tokens: 0, total_tokens: 0,
-          cached_tokens: 0, cost_total_usd: 0, cost_input_usd: 0, cost_output_usd: 0,
+          cache_tokens: 0, cost_total_usd: 0, cost_input_usd: 0, cost_output_usd: 0,
           org_id: orgId, team, environment,
         });
 
-        // Forward headers
+        // Forward headers — strip hop-by-hop and sensitive upstream headers
+        const HOP_BY_HOP = new Set([
+          'transfer-encoding', 'content-length', 'connection', 'keep-alive',
+          'upgrade', 'te', 'trailer', 'proxy-authorization',
+          'x-ratelimit-limit-requests', 'x-ratelimit-limit-tokens',
+          'x-ratelimit-remaining-requests', 'x-ratelimit-remaining-tokens',
+          'x-ratelimit-reset-requests', 'x-ratelimit-reset-tokens', 'server',
+        ]);
         const headers: Record<string, string> = {
           "Access-Control-Allow-Origin": "*",
         };
-        upstreamRes.headers.forEach((v, k) => { headers[k] = v; });
+        upstreamRes.headers.forEach((v, k) => {
+          if (!HOP_BY_HOP.has(k.toLowerCase())) headers[k] = v;
+        });
         res.writeHead(upstreamRes.status, headers);
 
         // Pipe the stream
         const reader = upstreamRes.body.getReader();
         const pump = async () => {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) { res.end(); break; }
-            res.write(value);
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) { res.end(); break; }
+              res.write(value);
+            }
+          } catch (e) {
+            // Stream interrupted — close response cleanly
+            if (debug) process.stderr.write(`[vantage-proxy] Stream interrupted: ${e}\n`);
+            if (!res.writableEnded) res.end();
+          } finally {
+            reader.releaseLock();
           }
         };
         await pump();

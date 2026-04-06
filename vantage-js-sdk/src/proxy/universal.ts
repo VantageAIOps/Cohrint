@@ -112,9 +112,9 @@ export function buildEvent(opts: BuildEventOptions): VantageEvent {
     usage,
     cost,
     quality: defaultQualityMetrics(),
-    requestPreview: (opts.promptText ?? "").slice(0, 600),
-    responsePreview: (opts.responseText ?? "").slice(0, 600),
-    systemPreview: (opts.systemPrompt ?? "").slice(0, 200),
+    requestPreview: (typeof opts.promptText === "string" ? opts.promptText : "").slice(0, 600),
+    responsePreview: (typeof opts.responseText === "string" ? opts.responseText : "").slice(0, 600),
+    systemPreview: (typeof opts.systemPrompt === "string" ? opts.systemPrompt : "").slice(0, 200),
     promptHash: opts.systemPrompt ? hashPrompt(opts.systemPrompt) : "",
   };
 }

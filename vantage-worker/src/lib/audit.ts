@@ -29,11 +29,13 @@ export function logAudit(
 ): void {
   const orgId    = overrides?.orgId     ?? c.get('orgId')    ?? 'unknown';
   const role     = overrides?.actorRole ?? c.get('role')     ?? 'unknown';
-  const memberId = c.get('memberId');
-  const defaultActorId = memberId
-    ? `member:${String(memberId).substring(0, 8)}`
-    : role === 'owner' ? 'owner' : 'unknown';
-  const actorId  = overrides?.actorId   ?? defaultActorId;
+  const memberId    = c.get('memberId');
+  const memberEmail = c.get('memberEmail');
+  const defaultActorId = memberEmail
+    ?? (memberId
+      ? `member:${String(memberId).substring(0, 8)}`
+      : role === 'owner' ? 'owner' : 'unknown');
+  const actorId = overrides?.actorId ?? defaultActorId;
   const ip       = c.req.header('CF-Connecting-IP')
     ?? c.req.header('X-Forwarded-For')
     ?? '';
