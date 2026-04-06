@@ -87,8 +87,8 @@ async function showDashboardSummary(config: VantageConfig): Promise<void> {
       fetch(`${base}/v1/analytics/kpis?period=30`, { headers, signal: AbortSignal.timeout(10000) }),
     ]);
 
-    const summary = summaryRes.ok ? await summaryRes.json() as Record<string, unknown> : null;
-    const kpis = kpisRes.ok ? await kpisRes.json() as Record<string, unknown> : null;
+    const summary = summaryRes.ok ? await summaryRes.json().catch(() => null) as Record<string, unknown> | null : null;
+    const kpis = kpisRes.ok ? await kpisRes.json().catch(() => null) as Record<string, unknown> | null : null;
 
     console.log("");
     console.log(bold(cyan("  Dashboard Summary")));
@@ -158,7 +158,8 @@ async function showBudgetStatus(config: VantageConfig): Promise<void> {
       signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json() as Record<string, unknown>;
+    const data = await res.json().catch(() => null) as Record<string, unknown> | null;
+    if (!data) throw new Error("Invalid JSON response from API");
 
     const budgetUsd = Number(data.budget_usd ?? 0);
     const budgetPct = Number(data.budget_pct ?? 0);
@@ -384,6 +385,12 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
   const rl = createInterface({
     input: process.stdin,
     output: process.stdout,
+  });
+
+  rl.on("error", (err) => {
+    // Ignore EPIPE and EIO — these happen when terminal closes
+    if ((err as NodeJS.ErrnoException).code === "EPIPE" || (err as NodeJS.ErrnoException).code === "EIO") return;
+    console.error(red(`  Terminal error: ${err.message}`));
   });
 
   // Multi-line paste detection: buffer lines that arrive rapidly, then join on pause.
@@ -874,7 +881,7 @@ async function main(): Promise<void> {
     }
     // Wait for tracker to drain before exit to avoid dropped events
     await tracker.flush().catch(() => {});
-    await new Promise<void>((resolve) => setTimeout(resolve, 200));
+    await new Promise<void>((resolve) => setTimeout(resolve, 2000));
     process.exit(0);
   }
 
@@ -902,12 +909,21 @@ async function main(): Promise<void> {
       }
     }
     await tracker.flush().catch(() => {});
-    await new Promise<void>((resolve) => setTimeout(resolve, 200));
+    await new Promise<void>((resolve) => setTimeout(resolve, 2000));
     process.exit(0);
   }
 
   // Mode 3: REPL
   await startRepl(config, flags);
+}
+
+function isNewerVersion(latest: string, current: string): boolean {
+  const parse = (v: string) => v.split('.').map(Number);
+  const [lMaj, lMin, lPat] = parse(latest);
+  const [cMaj, cMin, cPat] = parse(current);
+  if (lMaj !== cMaj) return lMaj > cMaj;
+  if (lMin !== cMin) return lMin > cMin;
+  return lPat > cPat;
 }
 
 async function checkForUpdate(): Promise<void> {
@@ -916,8 +932,11 @@ async function checkForUpdate(): Promise<void> {
     const res = await fetch("https://registry.npmjs.org/vantageai-cli/latest",
       { signal: AbortSignal.timeout(2000) });
     if (!res.ok) return;
-    const { version } = await res.json() as { version: string };
-    if (version !== current) {
+    const data = await res.json().catch(() => null);
+    if (!data || typeof data !== 'object') return;
+    const version = (data as { version?: string }).version;
+    if (!version) return;
+    if (isNewerVersion(version, current)) {
       console.error(yellow(`\n  Update available: vantageai-cli ${current} → ${version}`));
       console.error(dim(`  Run: npm install -g vantageai-cli\n`));
     }
@@ -935,5 +954,8 @@ checkForUpdate();
 process.on("unhandledRejection", (reason) => {
   const msg = reason instanceof Error ? reason.message : String(reason);
   console.error(red(`  Unhandled error: ${msg}`));
-  // Don't exit — let the REPL continue
+  // In non-interactive mode, exit — can't recover without a REPL
+  if (!process.stdin.isTTY) {
+    process.exit(1);
+  }
 });

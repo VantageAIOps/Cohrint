@@ -29,9 +29,11 @@ export const geminiAdapter: AgentAdapter = {
     };
   },
 
-  buildContinueCommand(prompt: string, config?: AgentConfig): SpawnArgs {
+  buildContinueCommand(prompt: string, config?: AgentConfig, _sessionId?: string): SpawnArgs {
     const cmd = config?.command || "gemini";
     const extraArgs = config?.args?.filter(a => a !== "-p") ?? [];
+    // Gemini CLI uses --continue for session resumption; it does not support explicit session IDs.
+    // sessionId is tracked by Vantage for auditing but cannot be passed to the Gemini binary.
     return {
       command: cmd,
       args: ["--continue", ...extraArgs, "-p", prompt],

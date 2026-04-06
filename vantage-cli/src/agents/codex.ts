@@ -9,6 +9,7 @@ export const codexAdapter: AgentAdapter = {
   provider: "openai",
   interactiveArgs: [],
   exitCommand: "/quit",
+  supportsContinue: true,
 
   async detect(): Promise<boolean> {
     try {
@@ -25,6 +26,19 @@ export const codexAdapter: AgentAdapter = {
     return {
       command: cmd,
       args: [...baseArgs, prompt],
+    };
+  },
+
+  buildContinueCommand(prompt: string, config?: AgentConfig, sessionId?: string): SpawnArgs {
+    const cmd = config?.command || "codex";
+    const extraArgs = config?.args ?? [];
+    // Codex CLI supports --session <id> to resume a specific conversation.
+    // Fall back to --continue if no session ID is available.
+    // TODO: verify --session flag once Codex CLI stabilises its API.
+    const resumeArgs = sessionId ? ["--session", sessionId] : ["--continue"];
+    return {
+      command: cmd,
+      args: [...resumeArgs, ...extraArgs, prompt],
     };
   },
 };

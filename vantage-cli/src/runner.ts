@@ -48,7 +48,8 @@ function parseStreamLine(line: string): { text?: string; sessionId?: string } {
 const DEFAULT_TIMEOUT_MS = Number(process.env.VANTAGE_TIMEOUT) || 300_000;
 
 /** Env vars that could be used to inject code into child processes */
-const BLOCKED_ENV = ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'DYLD_INSERT_LIBRARIES', 'PYTHONPATH', 'NODE_OPTIONS'];
+const BLOCKED_ENV = ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'DYLD_INSERT_LIBRARIES', 'PYTHONPATH'];
+// NODE_OPTIONS intentionally not blocked — legitimate for memory/debug config
 
 /** Safe vars that VANTAGE_PASS_ENV is allowed to re-enable (prevents arbitrary env injection) */
 const SAFE_PASS_ENV = new Set(["PATH", "HOME", "SHELL", "TERM", "LANG", "COLORTERM", "TERM_PROGRAM"]);
@@ -94,7 +95,7 @@ export function runAgent(
     let child: ReturnType<typeof spawn>;
     try {
       child = spawn(spawnArgs.command, spawnArgs.args, {
-        stdio: ["pipe", "pipe", "pipe"],
+        stdio: ["pipe", "pipe", "inherit"],  // stderr → terminal directly (permission prompts visible)
         env: buildSafeEnv(spawnArgs.env),
       });
       // Only pipe stdin when data is actually being piped in (non-TTY).
@@ -102,7 +103,13 @@ export function runAgent(
       // printing "Warning: no stdin data received in 3s" while waiting for input
       // that will never arrive.
       if (!process.stdin.isTTY) {
-        process.stdin.pipe(child.stdin!);
+        // Pipe available stdin data but don't close child stdin after — agent may need
+        // to read interactive input (e.g. permission prompt responses) from the terminal.
+        process.stdin.pipe(child.stdin!, { end: false });
+        process.stdin.once("end", () => {
+          // Only close child stdin when parent stdin truly ends
+          child.stdin?.end();
+        });
       } else {
         child.stdin?.end();
       }
@@ -172,9 +179,7 @@ export function runAgent(
       for (const line of lines) flushLine(line);
     });
 
-    child.stderr?.on("data", (chunk: Buffer) => {
-      process.stderr.write(chunk);
-    });
+    // stderr is inherited — no relay handler needed; permission prompts go directly to terminal
 
     child.on("error", (err) => {
       clearTimeout(timer);

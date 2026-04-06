@@ -9,6 +9,9 @@ export const aiderAdapter: AgentAdapter = {
   provider: "anthropic",
   interactiveArgs: [],
   exitCommand: "/quit",
+  // Aider manages conversation history via git and in-repo files — there is no session ID concept.
+  // Each invocation automatically continues from the current git/file state.
+  supportsContinue: false,
 
   async detect(): Promise<boolean> {
     try {

@@ -154,13 +154,21 @@ export class AgentSession {
     // Forward to agent with backpressure handling
     const ok = this.child.stdin.write(result.forwarded + "\n");
     if (!ok) {
-      // stdin buffer is full — wait for drain, but don't hang if stdin closes
-      await new Promise<void>((resolve, reject) => {
+      // stdin buffer is full — wait for drain, but don't hang if stdin closes or errors
+      await new Promise<void>((resolve) => {
         const stdin = this.child?.stdin;
         if (!stdin) { resolve(); return; }
-        stdin.once("drain", resolve);
-        stdin.once("close", resolve); // don't hang if stream closes before drain
-        stdin.once("error", reject);
+        const onDrain = () => { stdin.removeListener("error", onError); stdin.removeListener("close", onClose); resolve(); };
+        const onClose = () => { stdin.removeListener("drain", onDrain); stdin.removeListener("error", onError); resolve(); };
+        const onError = (err: Error) => {
+          stdin.removeListener("drain", onDrain);
+          stdin.removeListener("close", onClose);
+          console.error(`[vantage] stdin drain error: ${err.message}`);
+          resolve(); // Don't reject — let the prompt continue
+        };
+        stdin.once("drain", onDrain);
+        stdin.once("close", onClose);
+        stdin.once("error", onError);
       });
     }
 
