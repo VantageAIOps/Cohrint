@@ -845,10 +845,27 @@ async function main(): Promise<void> {
   await startRepl(config);
 }
 
+async function checkForUpdate(): Promise<void> {
+  try {
+    const current = "2.2.0";
+    const res = await fetch("https://registry.npmjs.org/vantageai-cli/latest",
+      { signal: AbortSignal.timeout(2000) });
+    if (!res.ok) return;
+    const { version } = await res.json() as { version: string };
+    if (version !== current) {
+      console.error(yellow(`\n  Update available: vantageai-cli ${current} → ${version}`));
+      console.error(dim(`  Run: npm install -g vantageai-cli\n`));
+    }
+  } catch { /* silent — never block the CLI */ }
+}
+
 main().catch((err) => {
   console.error(red(`Fatal error: ${err instanceof Error ? err.message : String(err)}`));
   process.exit(1);
 });
+
+// Fire-and-forget — does not block startup
+checkForUpdate();
 
 process.on("unhandledRejection", (reason) => {
   const msg = reason instanceof Error ? reason.message : String(reason);

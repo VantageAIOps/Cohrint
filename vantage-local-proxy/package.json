@@ -1,6 +1,6 @@
 {
   "name": "vantageai-local-proxy",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Secure local proxy for LLM cost tracking — keeps API keys and prompts local, sends only anonymized stats to VantageAI dashboard",
   "keywords": ["ai", "llm", "proxy", "privacy", "cost-tracking", "openai", "anthropic"],
   "homepage": "https://vantageaiops.com",

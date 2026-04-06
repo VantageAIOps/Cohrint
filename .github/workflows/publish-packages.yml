@@ -73,8 +73,11 @@ jobs:
           npm ci
           npm run build
           npm publish --access public
+          NEW_VER=$(node -e "console.log(require('./package.json').version)")
+          npm deprecate "vantageai-cli@<${NEW_VER}" "Upgrade to ${NEW_VER}: run npm install -g vantageai-cli"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # NEW_VER is derived from package.json — not user input, no injection risk
 
   publish-mcp:
     name: Publish vantageaiops-mcp
@@ -133,8 +136,11 @@ jobs:
           npm ci
           npm run build
           npm publish --access public
+          NEW_VER=$(node -e "console.log(require('./package.json').version)")
+          npm deprecate "vantageai-local-proxy@<${NEW_VER}" "Upgrade to ${NEW_VER}: run npm install -g vantageai-local-proxy"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # NEW_VER is derived from package.json — not user input, no injection risk
 
   summary:
     name: Publish Summary
