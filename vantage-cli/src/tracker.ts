@@ -65,8 +65,15 @@ export class Tracker {
 
     bus.on("agent:completed", (data) => {
       const agent = getAgent(data.agent);
+      if (!agent && this.config?.debug) {
+        console.warn(`[vantage] Unknown agent: ${data.agent} — skipping cost calculation`);
+      }
       const model = agent?.defaultModel ?? "unknown";
       const outputTokens = countTokens(data.outputText);
+      if (outputTokens === 0 && data.exitCode !== 0) {
+        // Agent failed with no output — don't record $0 cost silently
+        return;
+      }
       // Use actual prompt text for input tokens when available
       const inputTokens = this.lastPromptText
         ? countTokens(this.lastPromptText)
@@ -176,10 +183,14 @@ export class Tracker {
       } else {
         // Never log response body — could contain echoed credentials
         console.error(`  [vantage] Dashboard sync failed: HTTP ${response.status}`);
-        // Re-queue events so they're not lost on server-side errors (BUG 14 fix:
-        // sentIds no longer contains these IDs so the filter works correctly)
         const unsent = batch.filter((e) => !this.sentIds.has(e.event_id));
-        this.queue.unshift(...unsent);
+        if (response.status >= 500 || response.status === 429 || response.status === 408) {
+          // Retryable server-side errors — put back in queue
+          this.queue.unshift(...unsent);
+        } else if (response.status >= 400) {
+          // Permanent client error (e.g. 401/403) — drop events to avoid infinite loop
+          console.warn(`[vantage] Dropping ${unsent.length} events: HTTP ${response.status}`);
+        }
       }
     } catch (err) {
       bus.emit("cost:reported", { success: false });
@@ -204,7 +215,11 @@ export class Tracker {
     // causing double-exit and skipping the session summary print.
     if (!this.exitRegistered) {
       this.exitRegistered = true;
-      process.on("beforeExit", () => this.flush().catch(() => {}));
+      process.on("beforeExit", () => {
+        this.flush().catch((err) => {
+          if (this.config?.debug) console.error("[vantage] Final flush failed:", err);
+        });
+      });
     }
   }
 

@@ -152,6 +152,7 @@ export function getOptimizationTips(prompt: string): string[] {
   }
 
   const fillerMatches = prompt.match(FILLER_WORDS_RE);
+  if (FILLER_WORDS_RE.global) FILLER_WORDS_RE.lastIndex = 0;
   if (fillerMatches && fillerMatches.length > 0) {
     const unique = [...new Set(fillerMatches.map((w) => w.toLowerCase()))];
     tips.push(`Remove filler words: ${unique.join(", ")}`);

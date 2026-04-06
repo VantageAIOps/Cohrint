@@ -700,7 +700,10 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
       clearTimeout(pasteTimer);
       pasteTimer = null;
     }
-    pasteBuffer = [];
+    if (pasteBuffer.length > 0) {
+      console.warn(`[vantage] Discarded ${pasteBuffer.length} buffered lines on exit`);
+      pasteBuffer = [];
+    }
     // Clean up active session first
     if (activeSession?.isActive()) {
       await activeSession.end().catch(() => {});
@@ -883,9 +886,8 @@ async function main(): Promise<void> {
   // Mode 2: Pipe mode
   if (!process.stdin.isTTY) {
     const stdinPrompt = await readStdin();
-    if (!stdinPrompt) {
-      console.error(dim("  No prompt provided. Usage: echo 'prompt' | vantage"));
-      process.exit(1);
+    if (!stdinPrompt || stdinPrompt.trim() === "") {
+      process.exit(0);
     }
     if (stdinPrompt) {
       const costPromise = waitForCost();

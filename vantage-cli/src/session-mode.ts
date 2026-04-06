@@ -79,9 +79,9 @@ export class AgentSession {
       this.cleanup();
     });
 
-    // Use BOTH close and exit to ensure cleanup
-    this.child.on("exit", () => this.cleanup());
-    this.child.on("close", () => this.cleanup());
+    // Use once() to prevent double cleanup if both events fire
+    this.child.once("exit", () => this.cleanup());
+    this.child.once("close", () => this.cleanup());
 
     return true;
   }
@@ -172,6 +172,7 @@ export class AgentSession {
       const SILENCE_MS = 300;     // ms of silence = response done
       const INITIAL_TIMEOUT = 5000; // max wait if no output at all
 
+      const stdout = this.child!.stdout!;
       let silenceTimer: ReturnType<typeof setTimeout> | null = null;
       let initialTimer: ReturnType<typeof setTimeout> | null = null;
       let done = false;
@@ -181,7 +182,8 @@ export class AgentSession {
         done = true;
         if (silenceTimer) clearTimeout(silenceTimer);
         if (initialTimer) clearTimeout(initialTimer);
-        this.child?.stdout?.removeListener("data", onData);
+        stdout.removeListener("data", onData);
+        stdout.removeListener("end", finish);
         resolve();
       };
 
@@ -193,17 +195,11 @@ export class AgentSession {
         silenceTimer = setTimeout(finish, SILENCE_MS);
       };
 
-      const stdout = this.child!.stdout!;
       stdout.on("data", onData);
       // If stdout closes (session ends mid-response), resolve immediately
       stdout.once("end", finish);
       // Fallback: resolve if agent produces no output within 5s
       initialTimer = setTimeout(finish, INITIAL_TIMEOUT);
-
-      // Patch finish to also remove the "end" listener
-      const origFinish = finish;
-      // (reassign not possible on const — handled inline: end listener uses once()
-      //  so it auto-removes itself after firing)
     });
   }
 

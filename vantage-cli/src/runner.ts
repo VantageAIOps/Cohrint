@@ -50,12 +50,19 @@ const DEFAULT_TIMEOUT_MS = Number(process.env.VANTAGE_TIMEOUT) || 300_000;
 /** Env vars that could be used to inject code into child processes */
 const BLOCKED_ENV = ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'DYLD_INSERT_LIBRARIES', 'PYTHONPATH', 'NODE_OPTIONS'];
 
+/** Safe vars that VANTAGE_PASS_ENV is allowed to re-enable (prevents arbitrary env injection) */
+const SAFE_PASS_ENV = new Set(["PATH", "HOME", "SHELL", "TERM", "LANG", "COLORTERM", "TERM_PROGRAM"]);
+
 /**
  * Build a safe env by blocking injection vectors.
- * Callers can whitelist additional vars via VANTAGE_PASS_ENV (comma-separated).
+ * Callers can whitelist additional vars via VANTAGE_PASS_ENV (comma-separated),
+ * but only vars present in SAFE_PASS_ENV are accepted to prevent arbitrary injection.
  */
 function buildSafeEnv(extra?: Record<string, string>): Record<string, string> {
-  const passEnv = (process.env.VANTAGE_PASS_ENV ?? "").split(",").map(s => s.trim()).filter(Boolean);
+  const passEnv = (process.env.VANTAGE_PASS_ENV ?? "")
+    .split(",")
+    .map(s => s.trim())
+    .filter(k => k && SAFE_PASS_ENV.has(k));
   const env = Object.fromEntries(
     Object.entries(process.env).filter(([k]) => !BLOCKED_ENV.includes(k) || passEnv.includes(k))
   ) as Record<string, string>;
@@ -106,12 +113,19 @@ export function runAgent(
     }
 
     const spinner = createSpinner("Thinking");
+    let spinnerStopped = false;
+    const stopSpinner = () => {
+      if (!spinnerStopped) {
+        spinnerStopped = true;
+        spinner?.stop();
+      }
+    };
 
     // Timeout guard — kill process if it hangs (grace = 10% of timeout, max 10s)
     const grace = Math.min(Math.ceil(timeoutMs * 0.1), 10000);
     const timer = setTimeout(() => {
       timedOut = true;
-      spinner.stop();
+      stopSpinner();
       child.kill("SIGTERM");
       setTimeout(() => { if (!child.killed) child.kill("SIGKILL"); }, grace);
     }, timeoutMs);
@@ -125,22 +139,28 @@ export function runAgent(
     }
 
     let firstChunk = true;
+    let truncationWarned = false;
 
     function flushLine(line: string) {
       const { text, sessionId } = parseStreamLine(line);
       if (sessionId) capturedSessionId = sessionId;
       if (!text) return;
       if (firstChunk) {
-        spinner.stop();
+        stopSpinner();
         firstChunk = false;
       }
       const buf = Buffer.from(text);
       totalBytes += buf.length;
-      if (totalBytes <= MAX_OUTPUT_BYTES) chunks.push(buf);
-      const ok = process.stdout.write(buf);
-      if (!ok) {
-        child.stdout?.pause();
-        process.stdout.once("drain", () => child.stdout?.resume());
+      if (totalBytes <= MAX_OUTPUT_BYTES) {
+        chunks.push(buf);
+        const ok = process.stdout.write(buf);
+        if (!ok) {
+          child.stdout?.pause();
+          process.stdout.once("drain", () => child.stdout?.resume());
+        }
+      } else if (!truncationWarned) {
+        truncationWarned = true;
+        console.warn(`[vantage] Output truncated at ${Math.round(MAX_OUTPUT_BYTES / 1024 / 1024)}MB limit`);
       }
     }
 
@@ -157,7 +177,7 @@ export function runAgent(
 
     child.on("error", (err) => {
       clearTimeout(timer);
-      spinner.stop();
+      stopSpinner();
       if ((err as NodeJS.ErrnoException).code === "ENOENT") {
         reject(new Error(`'${spawnArgs.command}' not found. Install it or check your PATH.`));
       } else {
@@ -167,7 +187,7 @@ export function runAgent(
 
     child.on("close", (code) => {
       clearTimeout(timer);
-      spinner.stop();
+      stopSpinner();
       // Flush any remaining buffered content
       if (lineBuffer.trim()) flushLine(lineBuffer);
       const durationMs = Date.now() - start;
@@ -237,13 +257,20 @@ export function runAgentBuffered(
       });
     }
 
+    let truncationWarned = false;
+
     function flushLine(line: string) {
       const { text, sessionId } = parseStreamLine(line);
       if (sessionId) capturedSessionId = sessionId;
       if (!text) return;
       const buf = Buffer.from(text);
       textBytes += buf.length;
-      if (textBytes <= MAX_OUTPUT_BYTES) textChunks.push(buf);
+      if (textBytes <= MAX_OUTPUT_BYTES) {
+        textChunks.push(buf);
+      } else if (!truncationWarned) {
+        truncationWarned = true;
+        console.warn(`[vantage] Output truncated at ${Math.round(MAX_OUTPUT_BYTES / 1024 / 1024)}MB limit`);
+      }
     }
 
     child.stdout?.on("data", (chunk: Buffer) => {

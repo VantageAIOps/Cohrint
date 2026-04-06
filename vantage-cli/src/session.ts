@@ -85,6 +85,9 @@ class Session {
       };
 
       this.state.history.push(record);
+      if (this.state.history.length > 1000) {
+        this.state.history.shift();
+      }
       this.currentSavedTokens = 0;
       this.currentDurationMs = 0;
 
