@@ -207,7 +207,7 @@ jobs:
 
       - name: Run CLI unit tests (suites 34 + 35)
         run: |
-          python -m pytest tests/suites/34_cli_session/ tests/suites/35_recommendations/ -v --tb=short
+          python -m pytest             tests/suites/21_vantage_cli/             tests/suites/22_landing_page/             tests/suites/24_docs_and_cli_edge/             tests/suites/25_smart_session/             tests/suites/34_cli_session/             tests/suites/35_recommendations/             -v --tb=short
 
   # ── 4. Preview Deploy ────────────────────────────────────────────────────────
   preview-deploy:
