@@ -129,6 +129,18 @@ export class AgentSession {
     this.totalInputTokens += result.forwarded.split(/\s+/).length;
     this.totalSavedTokens += result.savedTokens;
 
+    // Emit bus event so global session tracker and tracker.ts pick up savings
+    if (result.savedTokens > 0) {
+      bus.emit("prompt:optimized", {
+        original: line,
+        optimized: result.forwarded,
+        savedTokens: result.savedTokens,
+        savedPercent: result.savedTokens > 0
+          ? Math.round((result.savedTokens / (result.savedTokens + result.forwarded.split(/\s+/).length)) * 100)
+          : 0,
+      });
+    }
+
     // Forward to agent with backpressure handling
     const ok = this.child.stdin.write(result.forwarded + "\n");
     if (!ok) {

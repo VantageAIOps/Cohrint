@@ -121,7 +121,12 @@ export function printSessionSummary(session: SessionState): void {
   console.log(`  Input tokens:   ${session.totalInputTokens.toLocaleString()}`);
   console.log(`  Output tokens:  ${session.totalOutputTokens.toLocaleString()}`);
   console.log(`  Total cost:     ${green("$" + session.totalCostUsd.toFixed(6))}`);
-  console.log(`  Tokens saved:   ${session.totalSavedTokens.toLocaleString()}`);
+  if (session.totalSavedTokens > 0) {
+    console.log(`  Tokens saved:   ${green(session.totalSavedTokens.toLocaleString())}`);
+  }
+  if (session.totalSavedUsd > 0) {
+    console.log(`  Cost saved:     ${green("$" + session.totalSavedUsd.toFixed(6))}`);
+  }
   console.log(`  Duration:       ${((Date.now() - session.startedAt) / 1000).toFixed(1)}s`);
   console.log(dim("  " + "-".repeat(40)));
   console.log("");
