@@ -555,8 +555,8 @@ otel.post('/v1/metrics', async (c) => {
   const elapsed = Date.now() - startMs;
   console.log(`[otel] ingested ${records.length} metric records in ${elapsed}ms from org=${orgId}`);
 
-  // OTLP success response
-  return c.json({ partialSuccess: {} }, 200);
+  // OTLP success response (spec: partialSuccess with rejectedDataPoints = 0 means full success)
+  return c.json({ partialSuccess: { rejectedDataPoints: 0 } }, 200);
 });
 
 // ── Logs/Events Endpoint ────────────────────────────────────────────────────

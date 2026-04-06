@@ -80,7 +80,7 @@ analytics.get('/summary', async (c) => {
   const s = (session.results[0] as Record<string, number>) ?? {};
   const budgetPct = budgetUsd > 0
     ? Math.round(((mtd?.mtd_cost_usd ?? 0) / budgetUsd) * 100)
-    : 0;
+    : null; // null = no budget set; 0 = budget set but 0% used
 
   return c.json({
     today_cost_usd:   t?.today_cost_usd   ?? 0,

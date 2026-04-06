@@ -2685,6 +2685,7 @@ function deleteTeamBudget(team) {
 
 function saveSlackConfig() {
   var orgId = _session ? ((_session.user || _session).org_id || '') : '';
+  if (!orgId) { alert('Session error: please reload the page'); return; }
   var webhook = document.getElementById('slackWebhookUrl').value.trim();
   var triggers = {
     budget: document.getElementById('slackBudget').checked,
@@ -2710,6 +2711,7 @@ function saveSlackConfig() {
 
 function testSlack() {
   var orgId = _session ? ((_session.user || _session).org_id || '') : '';
+  if (!orgId) { alert('Session error: please reload the page'); return; }
   apiFetch('/v1/alerts/slack/' + orgId + '/test', { method: 'POST' }).then(function() {
     document.getElementById('slackStatus').textContent = 'Test message sent!';
     setTimeout(function() { document.getElementById('slackStatus').textContent = ''; }, 3000);
