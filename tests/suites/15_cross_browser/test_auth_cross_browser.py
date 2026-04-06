@@ -112,7 +112,11 @@ def _run_auth_flow(page, errors, api_key: str, prefix: str, label: str) -> int:
     # Step 4: reload preserves session
     try:
         page.reload(wait_until="domcontentloaded", timeout=15_000)
-        time.sleep(0.8)
+        # Wait for JS auth-check redirect to settle (WebKit ITP needs more time)
+        try:
+            page.wait_for_url(lambda url: "/app" in url or "/auth" in url, timeout=5_000)
+        except Exception:
+            pass
         chk(f"{prefix}.{n}  [{label}] Session persists after reload",
             "/app" in page.url, f"url after reload: {page.url}")
     except Exception as e:

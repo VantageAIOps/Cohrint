@@ -1,26 +1,7 @@
 import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
 import { authMiddleware, adminOnly } from '../middleware/auth';
-
-export async function logAudit(
-  db: D1Database,
-  orgId: string,
-  action: string,
-  actorEmail: string,
-  actorRole: string,
-  resource: string = '',
-  detail: string = '',
-  ipAddress: string = '',
-) {
-  try {
-    await db.prepare(`
-      INSERT INTO audit_events (org_id, actor_email, actor_role, action, resource, detail, ip_address)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).bind(orgId, actorEmail, actorRole, action, resource, detail, ipAddress).run();
-  } catch {
-    // Audit logging should never block the main operation
-  }
-}
+import { logAudit } from '../lib/audit';
 
 const admin = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -233,6 +214,14 @@ admin.put('/team-budgets/:team', async (c) => {
     ON CONFLICT(org_id, team) DO UPDATE SET budget_usd = excluded.budget_usd, updated_at = unixepoch()
   `).bind(orgId, team, body.budget_usd).run();
 
+  logAudit(c, {
+    event_type:    'admin_action',
+    event_name:    'admin_action.budget_policy_changed',
+    resource_type: 'budget_policy',
+    resource_id:   team,
+    metadata:      { budget_usd: body.budget_usd, updated_at: new Date().toISOString() },
+  });
+
   return c.json({ ok: true, team, budget_usd: body.budget_usd });
 });
 
@@ -272,6 +261,46 @@ admin.patch('/org', async (c) => {
   ).bind(...params).run();
 
   return c.json({ ok: true });
+});
+
+// ── GET /audit-log — all orgs, admin only ────────────────────────────────────
+
+admin.get('/audit-log', async (c) => {
+  // Cross-org endpoint — not accessible to org-level keys; use /v1/audit-log instead
+  return c.json({ error: 'Access denied. Use /v1/audit-log for org audit log access.' }, 403);
+  const limit     = Math.max(1, Math.min(parseInt(c.req.query('limit')   ?? '100', 10), 500));
+  const offset    = parseInt(c.req.query('offset')  ?? '0', 10);
+  const eventType = c.req.query('event_type') ?? null;
+  const orgFilter = c.req.query('org_id')     ?? null;
+  const from      = c.req.query('from')
+    ? Math.floor(new Date(c.req.query('from')! + 'T00:00:00Z').getTime() / 1000) : null;
+  const to        = c.req.query('to')
+    ? Math.floor(new Date(c.req.query('to')!   + 'T23:59:59Z').getTime() / 1000) : null;
+
+  const conditions: string[] = [];
+  const bindings: unknown[]  = [];
+  if (orgFilter)    { conditions.push('org_id = ?');     bindings.push(orgFilter); }
+  if (eventType)    { conditions.push('event_type = ?'); bindings.push(eventType); }
+  if (from !== null){ conditions.push('created_at >= ?'); bindings.push(from); }
+  if (to !== null)  { conditions.push('created_at <= ?'); bindings.push(to); }
+  const where = conditions.length ? conditions.join(' AND ') : '1=1';
+
+  const [rows, countRow] = await c.env.DB.batch([
+    c.env.DB.prepare(
+      `SELECT id, org_id, actor_email, actor_role, action, resource, detail,
+              ip_address, event_type,
+              datetime(created_at, 'unixepoch') AS created_at
+       FROM audit_events WHERE ${where}
+       ORDER BY created_at DESC LIMIT ? OFFSET ?`
+    ).bind(...bindings, limit, offset),
+    c.env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM audit_events WHERE ${where}`
+    ).bind(...bindings),
+  ]);
+
+  const events = rows.results;
+  const total  = (countRow.results[0] as { total: number }).total;
+  return c.json({ events, total, has_more: offset + events.length < total });
 });
 
 export { admin };

@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Integration Roadmap — VantageAI</title>
+  <style>
+    :root {
+      --bg-primary: #0d1117;
+      --bg-card: #161b22;
+      --text-primary: #e6edf3;
+      --text-secondary: #8b949e;
+      --text-muted: #6e7681;
+      --border: #30363d;
+      --accent-green: #3fb950;
+      --accent-amber: #d29922;
+      --accent-blue: #5b8dee;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 14px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header a { color: var(--text-primary); text-decoration: none; font-weight: 600; font-size: 16px; }
+    header span { color: var(--text-muted); }
+    main { max-width: 900px; margin: 0 auto; padding: 48px 24px; }
+    h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+    .subtitle { color: var(--text-secondary); margin-bottom: 48px; font-size: 15px; }
+    h2 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .section { margin-bottom: 48px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+    }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot.live  { background: var(--accent-green); box-shadow: 0 0 6px var(--accent-green); }
+    .dot.q2    { background: var(--accent-amber); }
+    .dot.q3    { background: var(--accent-blue); }
+    .card-body { flex: 1; min-width: 0; }
+    .card-name { font-size: 13px; font-weight: 500; }
+    .card-method { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .badge {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      white-space: nowrap;
+    }
+    .badge.live { background: rgba(63,185,80,0.15); color: var(--accent-green); }
+    .badge.q2   { background: rgba(210,153,34,0.15); color: var(--accent-amber); }
+    .badge.q3   { background: rgba(91,141,238,0.15); color: var(--accent-blue); }
+    .cta {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      margin-top: 48px;
+    }
+    .cta h3 { font-size: 16px; margin-bottom: 12px; }
+    .cta code {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 10px 14px;
+      margin: 12px 0;
+      color: var(--accent-green);
+      overflow-x: auto;
+    }
+    .cta a { color: var(--accent-green); text-decoration: none; }
+    .cta a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="/">VantageAI</a>
+  <span>/</span>
+  <span>Integration Roadmap</span>
+</header>
+
+<main>
+  <h1>Integration Roadmap</h1>
+  <p class="subtitle">Real-time OTel tracking is live across 10+ tools today. Billing API connectors and browser extensions are coming in 2026.</p>
+
+  <!-- Live Now -->
+  <div class="section">
+    <h2>Live Now — OTel Real-Time Tracking</h2>
+    <div class="grid">
+      <div class="card">
+        <div class="dot live"></div>
+        <div class="card-body">
+          <div class="card-name">Claude Code</div>
+          <div class="card-method">OTel</div>
+        </div>
+        <span class="badge live">Live</span>
+      </div>
+      <div class="card">
+        <div class="dot live"></div>
+        <div class="card-body">
+          <div class="card-name">Gemini CLI</div>
+          <div class="card-method">OTel</div>
+        </div>
+        <span class="badge live">Live</span>
+      </div>
+      <div class="card">
+        <div class="dot live"></div>
+        <div class="card-body">
+          <div class="card-name">GitHub Copilot</div>
+          <div class="card-method">OTel</div>
+        </div>
+        <span class="badge live">Live</span>
+      </div>
+      <div class="card">
+        <div class="dot live"></div>
+        <div class="card-body">
+          <div class="card-name">Codex CLI</div>
+          <div class="card-method">OTel</div>
+        </div>
+        <span class="badge live">Live</span>
+      </div>
+      <div class="card">
+        <div class="dot live"></div>
+        <div class="card-body">
+          <div class="card-name">Cline</div>
+          <div class="card-method">OTel</div>
+        </div>
+        <span class="badge live">Live</span>
+      </div>
+      <div class="card">
+        <div class="dot live"></div>
+        <div class="card-body">
+          <div class="card-name">Windsurf</div>
+          <div class="card-method">OTel</div>
+        </div>
+        <span class="badge live">Live</span>
+      </div>
+      <div class="card">
+        <div class="dot live"></div>
+        <div class="card-body">
+          <div class="card-name">Aider</div>
+          <div class="card-method">OTel</div>
+        </div>
+        <span class="badge live">Live</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Q2 2026 -->
+  <div class="section">
+    <h2>Coming Q2 2026 — Billing API Connectors</h2>
+    <div class="grid">
+      <div class="card">
+        <div class="dot q2"></div>
+        <div class="card-body">
+          <div class="card-name">GitHub Copilot</div>
+          <div class="card-method">Billing API</div>
+        </div>
+        <span class="badge q2">Q2 2026</span>
+      </div>
+      <div class="card">
+        <div class="dot q2"></div>
+        <div class="card-body">
+          <div class="card-name">Cursor</div>
+          <div class="card-method">Billing API</div>
+        </div>
+        <span class="badge q2">Q2 2026</span>
+      </div>
+      <div class="card">
+        <div class="dot q2"></div>
+        <div class="card-body">
+          <div class="card-name">OpenAI</div>
+          <div class="card-method">Billing API</div>
+        </div>
+        <span class="badge q2">Q2 2026</span>
+      </div>
+      <div class="card">
+        <div class="dot q2"></div>
+        <div class="card-body">
+          <div class="card-name">Anthropic</div>
+          <div class="card-method">Billing API</div>
+        </div>
+        <span class="badge q2">Q2 2026</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Q3 2026 -->
+  <div class="section">
+    <h2>Coming Q3 2026</h2>
+    <div class="grid">
+      <div class="card">
+        <div class="dot q3"></div>
+        <div class="card-body">
+          <div class="card-name">Local file scanner</div>
+          <div class="card-method">CLI</div>
+        </div>
+        <span class="badge q3">Q3 2026</span>
+      </div>
+      <div class="card">
+        <div class="dot q3"></div>
+        <div class="card-body">
+          <div class="card-name">ChatGPT web</div>
+          <div class="card-method">Browser ext</div>
+        </div>
+        <span class="badge q3">Q3 2026</span>
+      </div>
+      <div class="card">
+        <div class="dot q3"></div>
+        <div class="card-body">
+          <div class="card-name">Claude Console</div>
+          <div class="card-method">Browser ext</div>
+        </div>
+        <span class="badge q3">Q3 2026</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="cta">
+    <h3>Start tracking in 30 seconds</h3>
+    <p style="color: var(--text-secondary); font-size: 13px;">Set one environment variable and all your OTel-compatible tools start reporting:</p>
+    <code>OTEL_EXPORTER_OTLP_ENDPOINT=https://api.vantageaiops.com/v1/otel</code>
+    <p style="font-size: 13px;"><a href="/docs.html#otel-setup">Full setup guide →</a></p>
+  </div>
+</main>
+
+</body>
+</html>

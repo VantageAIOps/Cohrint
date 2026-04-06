@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
 import { authMiddleware } from '../middleware/auth';
+import { logAudit } from '../lib/audit';
 
 const alerts = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -40,6 +41,13 @@ alerts.post('/slack/:orgId', async (c) => {
   // Cache in KV for fast lookup during event ingest (best-effort — D1 is the source of truth)
   try { await c.env.KV.put(`slack:${orgId}`, body.webhook_url, { expirationTtl: 3600 }); }
   catch { /* KV write limit reached — cached only in D1 */ }
+
+  logAudit(c, {
+    event_type:    'admin_action',
+    event_name:    'admin_action.alert_config_changed',
+    resource_type: 'alert_config',
+    metadata:      { action: 'slack_webhook_updated' },
+  });
 
   return c.json({ ok: true });
 });
