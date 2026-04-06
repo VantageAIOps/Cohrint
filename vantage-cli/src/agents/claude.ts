@@ -23,14 +23,16 @@ export const claudeAdapter: AgentAdapter = {
   buildCommand(prompt: string, config?: AgentConfig): SpawnArgs {
     const cmd = config?.command || "claude";
     const extraFlags = config?.extraFlags ?? [];
-    // --output-format stream-json (no --verbose): emits complete content-block
-    // objects per line.  Adding --verbose can trigger Anthropic API-style
-    // streaming deltas (content_block_delta) that our ClaudeStreamRenderer
-    // cannot reassemble, silencing all live tool output.
+    // Claude Code requires --verbose when --output-format=stream-json is used
+    // with -p (--print). Without it the CLI exits with:
+    //   "When using --print, --output-format=stream-json requires --verbose"
+    // --verbose does NOT change the per-line JSON format; it only adds extra
+    // event types (system prompt, usage stats). Our ClaudeStreamRenderer
+    // ignores unknown types so this is safe.
     // -p must immediately precede the prompt.
     return {
       command: cmd,
-      args: ["--output-format", "stream-json", ...extraFlags, "-p", prompt],
+      args: ["--verbose", "--output-format", "stream-json", ...extraFlags, "-p", prompt],
     };
   },
 
@@ -40,8 +42,8 @@ export const claudeAdapter: AgentAdapter = {
     const extraFlags = config?.extraFlags ?? [];
     // Use --resume with session ID for reliable context (--continue picks up wrong conversation)
     const resumeArgs = sessionId
-      ? ["--resume", sessionId, ...extraArgs, "--output-format", "stream-json", ...extraFlags, "-p", prompt]
-      : ["--continue", ...extraArgs, "--output-format", "stream-json", ...extraFlags, "-p", prompt];
+      ? ["--resume", sessionId, ...extraArgs, "--verbose", "--output-format", "stream-json", ...extraFlags, "-p", prompt]
+      : ["--continue", ...extraArgs, "--verbose", "--output-format", "stream-json", ...extraFlags, "-p", prompt];
     return {
       command: cmd,
       args: resumeArgs,
