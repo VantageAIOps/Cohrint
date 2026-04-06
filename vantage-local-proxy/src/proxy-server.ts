@@ -16,6 +16,7 @@
  */
 
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
+import { VERSION } from "./_version.js";
 import { sanitizeEvent, PrivacyConfig, DEFAULT_PRIVACY } from "./privacy.js";
 import { calculateCost, findCheapest } from "./pricing.js";
 import { scanAll } from "./scanners/index.js";
@@ -117,7 +118,7 @@ class StatsQueue {
   private async _send(events: Record<string, unknown>[]): Promise<void> {
     const body = JSON.stringify({
       events,
-      sdk_version: "1.0.0",
+      sdk_version: VERSION,
       sdk_language: "local-proxy",
     });
     try {

@@ -29,6 +29,7 @@
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { VERSION } from './_version.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
   CallToolRequestSchema,
@@ -333,7 +334,7 @@ function getOptimizationTips(prompt: string): string[] {
 // ── MCP Server ────────────────────────────────────────────────────────────────
 
 const server = new Server(
-  { name: 'vantage-mcp', version: '1.1.0' },
+  { name: 'vantage-mcp', version: VERSION },
   { capabilities: { tools: {}, resources: {} } },
 );
 

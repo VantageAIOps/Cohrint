@@ -34,7 +34,10 @@
     "dist"
   ],
   "scripts": {
+    "gen-version": "node --input-type=commonjs -e \"const fs=require('fs');const v=require('./package.json').version;fs.writeFileSync('src/_version.ts','// AUTO-GENERATED — do not edit manually. Run: npm run gen-version\\nexport const VERSION = '+JSON.stringify(v)+';\\n');\"",
+    "prebuild": "npm run gen-version",
     "build": "tsup src/index.ts src/cli.ts --format esm,cjs --dts --clean",
+    "predev": "npm run gen-version",
     "dev": "tsx watch src/cli.ts",
     "start": "node dist/cli.js",
     "typecheck": "tsc --noEmit"

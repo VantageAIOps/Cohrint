@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { VERSION } from "./_version.js";
 import { bus } from "./event-bus.js";
 import { calculateCost } from "./pricing.js";
 import { countTokens } from "./optimizer.js";
@@ -153,7 +154,7 @@ export class Tracker {
         },
         body: JSON.stringify({
           events: batch,
-          sdk_version: "vantage-cli-1.0.0",
+          sdk_version: `vantage-cli-${VERSION}`,
           sdk_language: "typescript",
         }),
         signal: AbortSignal.timeout(15000),
