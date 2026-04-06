@@ -198,12 +198,13 @@ export class Tracker {
       this.flush().catch(() => {});
     }, this.config.flushInterval);
 
-    // Ensure final flush on exit — register only once
+    // Flush on beforeExit only — SIGTERM/SIGINT are handled by the REPL's
+    // shutdown() which already calls tracker.flush() before process.exit().
+    // Registering our own exit handlers here would race with the REPL's cleanup,
+    // causing double-exit and skipping the session summary print.
     if (!this.exitRegistered) {
       this.exitRegistered = true;
       process.on("beforeExit", () => this.flush().catch(() => {}));
-      process.on("SIGTERM", () => { this.flush().catch(() => {}); process.exit(0); });
-      process.on("SIGINT", () => { this.flush().catch(() => {}); process.exit(0); });
     }
   }
 

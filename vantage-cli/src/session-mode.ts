@@ -124,19 +124,20 @@ export class AgentSession {
     // Print optimization status
     printOptStatus(result);
 
-    // Track stats
+    // Track stats — use countTokens() for consistency with optimizer.ts (4 chars/token)
     this.promptCount++;
-    this.totalInputTokens += result.forwarded.split(/\s+/).length;
+    this.totalInputTokens += countTokens(result.forwarded);
     this.totalSavedTokens += result.savedTokens;
 
     // Emit bus event so global session tracker and tracker.ts pick up savings
     if (result.savedTokens > 0) {
+      const originalTokens = result.savedTokens + countTokens(result.forwarded);
       bus.emit("prompt:optimized", {
         original: line,
         optimized: result.forwarded,
         savedTokens: result.savedTokens,
-        savedPercent: result.savedTokens > 0
-          ? Math.round((result.savedTokens / (result.savedTokens + result.forwarded.split(/\s+/).length)) * 100)
+        savedPercent: originalTokens > 0
+          ? Math.round((result.savedTokens / originalTokens) * 100)
           : 0,
       });
     }
@@ -192,9 +193,17 @@ export class AgentSession {
         silenceTimer = setTimeout(finish, SILENCE_MS);
       };
 
-      this.child!.stdout!.on("data", onData);
+      const stdout = this.child!.stdout!;
+      stdout.on("data", onData);
+      // If stdout closes (session ends mid-response), resolve immediately
+      stdout.once("end", finish);
       // Fallback: resolve if agent produces no output within 5s
       initialTimer = setTimeout(finish, INITIAL_TIMEOUT);
+
+      // Patch finish to also remove the "end" listener
+      const origFinish = finish;
+      // (reassign not possible on const — handled inline: end listener uses once()
+      //  so it auto-removes itself after firing)
     });
   }
 

@@ -45,8 +45,13 @@ function safeNum(v: unknown, fallback = 0): number {
 
 function checkAnomaly(cost: import("./event-bus.js").VantageEvents["cost:calculated"]): void {
   const sess = getSession();
+  // Need at least 2 prior prompts so the average is meaningful
   if (sess.promptCount <= 2 || sess.totalCostUsd <= 0) return;
-  const avgCost = sess.totalCostUsd / sess.promptCount;
+  // Exclude the current prompt from the average (it's already in totalCostUsd)
+  const priorTotal = sess.totalCostUsd - cost.costUsd;
+  const priorCount = sess.promptCount - 1;
+  if (priorCount <= 0) return;
+  const avgCost = priorTotal / priorCount;
   if (avgCost > 0 && Number.isFinite(avgCost) && cost.costUsd > avgCost * 3) {
     console.log(yellow(`  ⚠ Anomaly: this prompt cost $${cost.costUsd.toFixed(4)} — ${(cost.costUsd / avgCost).toFixed(1)}x your session average`));
   }
@@ -690,6 +695,12 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
   };
 
   const shutdown = async () => {
+    // Cancel any pending paste timer to prevent it firing after REPL closes
+    if (pasteTimer) {
+      clearTimeout(pasteTimer);
+      pasteTimer = null;
+    }
+    pasteBuffer = [];
     // Clean up active session first
     if (activeSession?.isActive()) {
       await activeSession.end().catch(() => {});
