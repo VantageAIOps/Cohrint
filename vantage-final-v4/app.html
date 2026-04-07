@@ -1580,7 +1580,7 @@ function loadOverview() {
     // Active developers
     document.getElementById('kpiActiveDev').textContent = fmtNum(totalDevs);
     if (totalDevs > 0) {
-      document.getElementById('kpiActiveDevSub').textContent = 'avg ' + fmt(totalCost / totalDevs) + '/dev/' + (period <= 7 ? 'week' : 'month');
+      document.getElementById('kpiActiveDevSub').textContent = 'avg ' + fmt(totalCost / totalDevs) + '/dev/' + (period <= 7 ? 'week' : period + 'd');
     }
 
     // Budget status — summary.budget uses monthly_limit_usd / month_spend_usd
@@ -2066,7 +2066,11 @@ function loadSpend() {
     }
     document.getElementById('spendTotalReqs').textContent = fmtNum(totalReqs);
     if (totalReqs > 0 && period > 0) {
-      document.getElementById('spendTotalReqsSub').textContent = fmtNum(Math.round(totalReqs / period)) + '/day avg';
+      // Use the actual number of days returned by timeseries so partial-day
+      // periods (first/last day) don't deflate the average.
+      var seriesDays = (timeseries && (timeseries.series || timeseries.data || [])).length || period;
+      var activeDays = Math.max(seriesDays, 1);
+      document.getElementById('spendTotalReqsSub').textContent = fmtNum(Math.round(totalReqs / activeDays)) + '/day avg';
     }
     document.getElementById('spendAvgCost').textContent = totalReqs > 0 ? fmt(totalCost / totalReqs) : '$0.00';
 
