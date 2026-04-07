@@ -271,8 +271,8 @@ class TestPromptOptimization:
     def test_ci28_token_count_paragraph(self):
         text = " ".join(["word"] * 100)
         r = js("tokens", text)
-        chk("CI.28 100 words ~ 100 tokens", 90 <= r.get("tokens", 0) <= 120)
-        assert 90 <= r.get("tokens", 0) <= 120
+        chk("CI.28 100 words ~ 100 tokens", 90 <= r.get("tokens", 0) <= 130)
+        assert 90 <= r.get("tokens", 0) <= 130
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

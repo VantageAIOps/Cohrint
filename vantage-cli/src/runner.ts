@@ -240,10 +240,17 @@ export function runAgent(
         env: buildSafeEnv(spawnArgs.env),
       });
       if (!process.stdin.isTTY) {
-        // Pipe available stdin data; don't close child stdin after so the agent
-        // can still receive interactive input if it asks for it.
-        process.stdin.pipe(child.stdin!, { end: false });
-        process.stdin.once("end", () => { child.stdin?.end(); });
+        // If stdin was already consumed (e.g. readStdin() read it before this
+        // call), the "end" event already fired and won't fire again.  Close the
+        // child's stdin immediately so the agent doesn't wait for input it will
+        // never receive (avoids the 3-second "no stdin data" warning from the
+        // Claude CLI that pushes total runtime past COST_TIMEOUT_MS).
+        if (process.stdin.readableEnded || process.stdin.destroyed) {
+          child.stdin?.end();
+        } else {
+          process.stdin.pipe(child.stdin!, { end: false });
+          process.stdin.once("end", () => { child.stdin?.end(); });
+        }
       }
       // TTY mode: stdin is the terminal itself — no piping needed.
     } catch (err) {
@@ -380,10 +387,12 @@ export function runAgentBuffered(
         env: buildSafeEnv(spawnArgs.env),
       });
       if (!process.stdin.isTTY) {
-        // Pipe available stdin data; don't close child stdin after so the agent
-        // can still receive interactive input if it asks for it.
-        process.stdin.pipe(child.stdin!, { end: false });
-        process.stdin.once("end", () => { child.stdin?.end(); });
+        if (process.stdin.readableEnded || process.stdin.destroyed) {
+          child.stdin?.end();
+        } else {
+          process.stdin.pipe(child.stdin!, { end: false });
+          process.stdin.once("end", () => { child.stdin?.end(); });
+        }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

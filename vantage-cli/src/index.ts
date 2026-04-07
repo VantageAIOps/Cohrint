@@ -35,6 +35,12 @@ import {
 import { getInlineTip, getRecommendations, formatRecommendations, type SessionMetrics } from "./recommendations.js";
 
 const COST_TIMEOUT_MS = 5000;
+// How long the bus listener inside waitForCost stays alive before auto-cleanup.
+// Must be longer than the longest plausible agent run so the cost:calculated
+// event (which fires synchronously inside child.on("close")) is still heard
+// even for slow agents.  The user-facing wait is still COST_TIMEOUT_MS via the
+// outer Promise.race in each call site.
+const COST_LISTEN_MS = 600_000; // 10 minutes
 
 // ---------------------------------------------------------------------------
 // Dashboard helpers
@@ -310,14 +316,16 @@ function waitForCost(): Promise<import("./event-bus.js").VantageEvents["cost:cal
       }
     };
     bus.once("cost:calculated", handler);
-    // Auto-remove the listener after the cost timeout so it never leaks.
+    // Auto-remove the listener after a generous window so it never leaks.
+    // This must exceed the longest plausible agent run; the user-facing wait
+    // is controlled by the COST_TIMEOUT_MS race at each call site.
     setTimeout(() => {
       if (!settled) {
         settled = true;
         bus.off("cost:calculated", handler);
         resolve(null);
       }
-    }, COST_TIMEOUT_MS);
+    }, COST_LISTEN_MS);
   });
 }
 
