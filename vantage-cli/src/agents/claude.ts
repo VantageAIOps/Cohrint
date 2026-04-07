@@ -23,8 +23,13 @@ export const claudeAdapter: AgentAdapter = {
   buildCommand(prompt: string, config?: AgentConfig): SpawnArgs {
     const cmd = config?.command || "claude";
     const extraFlags = config?.extraFlags ?? [];
-    // -p must immediately precede the prompt — putting flags between -p and the prompt
-    // causes Claude Code to treat the first flag as the prompt text
+    // Claude Code requires --verbose when --output-format=stream-json is used
+    // with -p (--print). Without it the CLI exits with:
+    //   "When using --print, --output-format=stream-json requires --verbose"
+    // --verbose does NOT change the per-line JSON format; it only adds extra
+    // event types (system prompt, usage stats). Our ClaudeStreamRenderer
+    // ignores unknown types so this is safe.
+    // -p must immediately precede the prompt.
     return {
       command: cmd,
       args: ["--verbose", "--output-format", "stream-json", ...extraFlags, "-p", prompt],

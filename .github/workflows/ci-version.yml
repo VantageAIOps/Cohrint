@@ -284,31 +284,36 @@ jobs:
             gh pr comment "$EXISTING" --body \
               "✅ **All checks passed** on push \`${{ github.sha }}\` — ready for review and manual approval."
           else
-            PR_BODY="## Release ${VERSION} → main
-
-All automated checks have passed. This PR requires manual review before merging to production.
-
-### Checks completed
-- ✅ TypeScript type check
-- ✅ Frontend build validation
-- ✅ API test suites
-- ✅ UI / Playwright tests
-- ✅ Environment & health tests
-- ✅ Backup created: \`${BACKUP}\`
-
-### Review checklist
-- [ ] Review all commits on this version branch
-- [ ] Verify no regressions in test results (see artifacts)
-- [ ] Confirm backup branch \`${BACKUP}\` was created
-- [ ] Approve and merge when satisfied
-
-> ⚠️ **Do not merge until you have reviewed.** Merging to main triggers Cloudflare production deploy."
-
+            # Build PR body via echo into a temp file — avoids YAML block scalar
+            # indentation issues that occur with multi-line bash string assignments.
+            PR_BODY_FILE=$(mktemp)
+            {
+              echo "## Release ${VERSION} → main"
+              echo ""
+              echo "All automated checks have passed. This PR requires manual review before merging to production."
+              echo ""
+              echo "### Checks completed"
+              echo "- ✅ TypeScript type check"
+              echo "- ✅ Frontend build validation"
+              echo "- ✅ API test suites"
+              echo "- ✅ UI / Playwright tests"
+              echo "- ✅ Environment & health tests"
+              echo "- ✅ Backup created: \`${BACKUP}\`"
+              echo ""
+              echo "### Review checklist"
+              echo "- [ ] Review all commits on this version branch"
+              echo "- [ ] Verify no regressions in test results (see artifacts)"
+              echo "- [ ] Confirm backup branch \`${BACKUP}\` was created"
+              echo "- [ ] Approve and merge when satisfied"
+              echo ""
+              echo "> ⚠️ **Do not merge until you have reviewed.** Merging to main triggers Cloudflare production deploy."
+            } > "$PR_BODY_FILE"
             gh pr create \
               --title "Release ${VERSION} → main" \
               --base main \
               --head "${VERSION}" \
-              --body "${PR_BODY}"
+              --body-file "$PR_BODY_FILE"
+            rm -f "$PR_BODY_FILE"
             echo "✅ PR opened: ${VERSION} → main"
           fi
 

@@ -66,7 +66,7 @@ function formatToolInput(name: string, input: Record<string, unknown>): string {
  *   display   — what gets written to the terminal
  *   tokenText — just the assistant text content (for token counting)
  */
-class ClaudeStreamRenderer {
+export class ClaudeStreamRenderer {
   private pendingTools = new Map<string, string>(); // tool_use_id → tool name
 
   process(line: string): { display?: string; tokenText?: string; sessionId?: string } {
@@ -227,25 +227,32 @@ export function runAgent(
 
     let child: ReturnType<typeof spawn>;
     try {
+      // stdin: "inherit" in TTY mode passes the real terminal fd to the child.
+      //   This lets the agent show permission prompts and receive the user's
+      //   y/n response directly — exactly like running the agent manually.
+      // stdin: "pipe" in non-TTY (pipe) mode — the prompt is already passed via
+      //   -p flag, so we feed whatever is left in stdin without closing it early.
+      // stdout: always "pipe" so we can parse stream-json and relay formatted output.
+      // stderr: "inherit" so native errors / warnings go straight to the terminal.
+      const stdinMode = process.stdin.isTTY ? "inherit" : "pipe";
       child = spawn(spawnArgs.command, spawnArgs.args, {
-        stdio: ["pipe", "pipe", "inherit"],  // stderr → terminal directly (permission prompts visible)
+        stdio: [stdinMode, "pipe", "inherit"],
         env: buildSafeEnv(spawnArgs.env),
       });
-      // Only pipe stdin when data is actually being piped in (non-TTY).
-      // In interactive TTY mode, closing stdin immediately prevents claude from
-      // printing "Warning: no stdin data received in 3s" while waiting for input
-      // that will never arrive.
       if (!process.stdin.isTTY) {
-        // Pipe available stdin data but don't close child stdin after — agent may need
-        // to read interactive input (e.g. permission prompt responses) from the terminal.
-        process.stdin.pipe(child.stdin!, { end: false });
-        process.stdin.once("end", () => {
-          // Only close child stdin when parent stdin truly ends
+        // If stdin was already consumed (e.g. readStdin() read it before this
+        // call), the "end" event already fired and won't fire again.  Close the
+        // child's stdin immediately so the agent doesn't wait for input it will
+        // never receive (avoids the 3-second "no stdin data" warning from the
+        // Claude CLI that pushes total runtime past COST_TIMEOUT_MS).
+        if (process.stdin.readableEnded || process.stdin.destroyed) {
           child.stdin?.end();
-        });
-      } else {
-        child.stdin?.end();
+        } else {
+          process.stdin.pipe(child.stdin!, { end: false });
+          process.stdin.once("end", () => { child.stdin?.end(); });
+        }
       }
+      // TTY mode: stdin is the terminal itself — no piping needed.
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       reject(new Error(`Failed to start '${spawnArgs.command}': ${msg}`));
@@ -374,12 +381,19 @@ export function runAgentBuffered(
 
     let child: ReturnType<typeof spawn>;
     try {
+      const stdinMode = process.stdin.isTTY ? "inherit" : "pipe";
       child = spawn(spawnArgs.command, spawnArgs.args, {
-        stdio: ["pipe", "pipe", "pipe"],
+        stdio: [stdinMode, "pipe", "pipe"],
         env: buildSafeEnv(spawnArgs.env),
       });
-      // Pipe host stdin so buffered mode also supports stdin-based workflows
-      process.stdin.pipe(child.stdin!);
+      if (!process.stdin.isTTY) {
+        if (process.stdin.readableEnded || process.stdin.destroyed) {
+          child.stdin?.end();
+        } else {
+          process.stdin.pipe(child.stdin!, { end: false });
+          process.stdin.once("end", () => { child.stdin?.end(); });
+        }
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       reject(new Error(`Failed to start '${spawnArgs.command}': ${msg}`));

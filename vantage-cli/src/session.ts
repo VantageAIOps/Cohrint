@@ -54,10 +54,19 @@ class Session {
 
     bus.on("agent:completed", (data) => {
       this.currentDurationMs = data.durationMs;
+      if (data.exitCode !== 0 && !data.outputText?.trim()) {
+        // Agent failed with no output — cost:calculated will not fire, so reset
+        // accumulated state here to prevent it bleeding into the next prompt.
+        this.currentSavedTokens = 0;
+        this.currentDurationMs = 0;
+      }
     });
 
     bus.on("prompt:optimized", (data) => {
-      this.currentSavedTokens = data.savedTokens;
+      // Accumulate — in session mode multiple prompts emit prompt:optimized
+      // before the single cost:calculated fires at session end.
+      // Overwriting with = meant history records only showed last prompt's savings.
+      this.currentSavedTokens += data.savedTokens;
       this.state.totalSavedTokens += data.savedTokens;
     });
 

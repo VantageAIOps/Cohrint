@@ -14,6 +14,7 @@ import { bus } from "./event-bus.js";
 import { Tracker } from "./tracker.js";
 import { initSession, getSession } from "./session.js";
 import { runAgent, runAgentBuffered } from "./runner.js";
+import { looksLikeStructuredData } from "./classify.js";
 import { checkCostAnomaly } from "./anomaly.js";
 import {
   printBanner,
@@ -34,6 +35,12 @@ import {
 import { getInlineTip, getRecommendations, formatRecommendations, type SessionMetrics } from "./recommendations.js";
 
 const COST_TIMEOUT_MS = 5000;
+// How long the bus listener inside waitForCost stays alive before auto-cleanup.
+// Must be longer than the longest plausible agent run so the cost:calculated
+// event (which fires synchronously inside child.on("close")) is still heard
+// even for slow agents.  The user-facing wait is still COST_TIMEOUT_MS via the
+// outer Promise.race in each call site.
+const COST_LISTEN_MS = 600_000; // 10 minutes
 
 // ---------------------------------------------------------------------------
 // Dashboard helpers
@@ -52,8 +59,13 @@ function checkAnomaly(cost: import("./event-bus.js").VantageEvents["cost:calcula
   checkCostAnomaly(cost.costUsd, priorTotal, priorCount);
 }
 
+// Tracks the active agent so buildSessionMetrics can populate agent/model.
+// Updated whenever the REPL switches agents or main() resolves the active agent.
+let _activeAgentName = "";
+
 function buildSessionMetrics(): SessionMetrics {
   const sess = getSession();
+  const agent = _activeAgentName ? getAgent(_activeAgentName) : undefined;
   return {
     totalInputTokens: sess.totalInputTokens,
     totalOutputTokens: sess.totalOutputTokens,
@@ -61,6 +73,8 @@ function buildSessionMetrics(): SessionMetrics {
     promptCount: sess.promptCount,
     totalCostUsd: sess.totalCostUsd,
     sessionStartTime: sess.startedAt,
+    agent: _activeAgentName || undefined,
+    model: agent?.defaultModel,
   };
 }
 
@@ -237,17 +251,7 @@ function parseArgs() {
 // Core execution logic
 // ---------------------------------------------------------------------------
 
-function looksLikeStructuredData(text: string): boolean {
-  // Skip optimization for JSON, code blocks, URLs-heavy content
-  const trimmed = text.trim();
-  if (trimmed.startsWith("{") || trimmed.startsWith("[")) return true; // JSON
-  if (trimmed.startsWith("```")) return true; // code block
-  if (/```[\s\S]*?```/.test(text)) return true; // fenced code block anywhere
-  if (/`[^`\n]+`/.test(text)) return true; // inline code
-  if ((text.match(/https?:\/\//g) || []).length > 2) return true; // URL-heavy
-  if ((text.match(/[{}()\[\];=<>]/g) || []).length > text.length * 0.1) return true; // code-like
-  return false;
-}
+// looksLikeStructuredData lives in classify.ts so test harnesses can import it directly
 
 async function executePrompt(
   prompt: string,
@@ -312,14 +316,16 @@ function waitForCost(): Promise<import("./event-bus.js").VantageEvents["cost:cal
       }
     };
     bus.once("cost:calculated", handler);
-    // Auto-remove the listener after the cost timeout so it never leaks.
+    // Auto-remove the listener after a generous window so it never leaks.
+    // This must exceed the longest plausible agent run; the user-facing wait
+    // is controlled by the COST_TIMEOUT_MS race at each call site.
     setTimeout(() => {
       if (!settled) {
         settled = true;
         bus.off("cost:calculated", handler);
         resolve(null);
       }
-    }, COST_TIMEOUT_MS);
+    }, COST_LISTEN_MS);
   });
 }
 
@@ -378,6 +384,7 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
   printBanner();
 
   let currentAgent = getAgent(config.defaultAgent) ?? ALL_AGENTS[0];
+  _activeAgentName = currentAgent.name;
   let activeSession: AgentSession | null = null;
 
   // Track per-agent prompt count and session ID for --resume support
@@ -588,6 +595,7 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
           const agent = getAgent(name);
           if (agent) {
             currentAgent = agent;
+            _activeAgentName = agent.name;
             console.log(green(`  Default agent set to ${agent.displayName}`));
           } else {
             console.log(red(`  Unknown agent: ${name}`));
@@ -840,6 +848,7 @@ async function main(): Promise<void> {
   // Override agent from flag
   const agentName = flags.agent ?? config.defaultAgent;
   const agent = getAgent(agentName) ?? ALL_AGENTS[0];
+  _activeAgentName = agent.name;
 
   // Build extra flags for the agent from named flags + unknown passthrough flags
   const extraAgentFlags: string[] = [...agentFlags];

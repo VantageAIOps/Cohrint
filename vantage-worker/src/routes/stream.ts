@@ -88,7 +88,7 @@ stream.get('/:orgId', async (c) => {
               lastDataSent = Date.now();
             }
           } else {
-            // Fallback: legacy 'latest' key during transition
+            // Fallback 1: legacy 'latest' key during transition
             const raw = await c.env.KV.get(`stream:${orgId}:latest`);
             if (raw) {
               try {
@@ -100,6 +100,28 @@ stream.get('/:orgId', async (c) => {
                   lastDataSent = Date.now();
                 }
               } catch { /* ignore parse errors */ }
+            } else if (lastSeqno === 0) {
+              // Fallback 2: KV propagation lag — query D1 otel_events on first connection
+              try {
+                const row = await c.env.DB.prepare(
+                  `SELECT provider, model, cost_usd,
+                          tokens_in + tokens_out AS total_tokens, timestamp
+                   FROM otel_events WHERE org_id = ?
+                   ORDER BY timestamp DESC LIMIT 1`
+                ).bind(orgId).first<Record<string, unknown>>();
+                if (row) {
+                  const seqno = Date.now();
+                  lastSeqno = seqno;
+                  await sendEvent(JSON.stringify({
+                    seqno, ts: seqno,
+                    provider: row.provider,
+                    model:    row.model,
+                    cost_usd: row.cost_usd,
+                    tokens:   row.total_tokens,
+                  }));
+                  lastDataSent = Date.now();
+                }
+              } catch { /* D1 also unavailable — keep alive until KV catches up */ }
             }
           }
         } catch (kvErr) {

@@ -126,8 +126,25 @@ function splitCodeAndProse(text: string): Array<{ type: 'code' | 'prose', conten
  * Apply the 5-layer compression to prose-only text.
  * Never call this on code segments.
  */
+function deduplicateSentences(text: string): string {
+  // Split on sentence boundaries, deduplicate by normalized form, reassemble
+  const parts = text.split(/(?<=[.!?])\s+/);
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const part of parts) {
+    const key = part.trim().toLowerCase().replace(/[.!?]+$/, "").trim();
+    if (key && seen.has(key)) continue;
+    if (key) seen.add(key);
+    unique.push(part);
+  }
+  return unique.join(" ");
+}
+
 function applyCompressionLayers(prose: string): string {
   let result = prose;
+
+  // Layer 0: Remove duplicate sentences
+  result = deduplicateSentences(result);
 
   // Layer 1: Remove filler phrases
   for (const phrase of FILLER_PHRASES) {
@@ -154,7 +171,8 @@ function applyCompressionLayers(prose: string): string {
 }
 
 /**
- * 5-layer compression engine — code blocks and inline code are never touched.
+ * 6-layer compression engine — code blocks and inline code are never touched.
+ * 0. Remove duplicate sentences
  * 1. Remove filler phrases
  * 2. Apply verbose rewrites
  * 3. Strip filler words

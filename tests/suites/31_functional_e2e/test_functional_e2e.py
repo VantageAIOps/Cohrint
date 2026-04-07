@@ -32,7 +32,8 @@ from helpers.output import section, chk, ok, fail, info, get_results, reset_resu
 CLI_DIR = Path(__file__).parent.parent.parent.parent / "vantage-cli"
 MCP_DIR = Path(__file__).parent.parent.parent.parent / "vantage-mcp"
 PROXY_DIR = Path(__file__).parent.parent.parent.parent / "vantage-local-proxy"
-HARNESS = CLI_DIR / "test-helpers.mjs"
+TSX = CLI_DIR / "node_modules" / ".bin" / "tsx"
+HARNESS = CLI_DIR / "test-helpers.ts"
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -44,7 +45,7 @@ def ts_nano():
 def js(cmd: str, *args: str, timeout: int = 10) -> dict:
     """Run CLI test harness."""
     result = subprocess.run(
-        ["node", str(HARNESS), cmd, *[str(a) for a in args]],
+        [str(TSX), str(HARNESS), cmd, *[str(a) for a in args]],
         capture_output=True, text=True, timeout=timeout,
         cwd=str(CLI_DIR),
     )

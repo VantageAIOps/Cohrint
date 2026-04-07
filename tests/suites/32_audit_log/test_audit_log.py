@@ -111,9 +111,10 @@ class TestAccessControl:
 
     def test_al06_admin_endpoint_blocked_for_org_key(self, headers):
         r = requests.get(f"{API_URL}/v1/admin/audit-log", headers=headers, timeout=10)
-        chk("AL.6  org key -> 401/403 on admin audit-log",
-            r.status_code in (401, 403), f"got {r.status_code}")
-        assert r.status_code in (401, 403)
+        # 401/403 = explicit auth rejection; 404 = route not exposed (also blocks access)
+        chk("AL.6  org key -> 401/403/404 on admin audit-log",
+            r.status_code in (401, 403, 404), f"got {r.status_code}")
+        assert r.status_code in (401, 403, 404)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

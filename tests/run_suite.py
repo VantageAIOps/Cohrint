@@ -16,9 +16,19 @@ Flags:
   --security        Include security + rate-limiting suites
   --superadmin      Include superadmin suite (14_superadmin)
   --cross-browser   Include cross-browser suite (15_cross_browser)
-  --all             Run everything
+  --all             Run everything including opt-in-only suites
   --no-report       Skip writing summary artifact
   --clean           Run cleanup before starting
+
+Default behaviour (no flags):
+  Runs ALL discovered suites except the opt-in-only ones below.
+  New suites are automatically included — no whitelist needed.
+  Opt-in-only (excluded by default, included via flag or --all):
+    06, 07, 08  — stress / load / latency (--all)
+    09, 10      — security + rate-limiting (--security / --all)
+    11, 12      — external integrations   (--integrations / --all)
+    14          — superadmin              (--superadmin / --all)
+    15          — cross-browser           (--cross-browser / --all)
 """
 
 import os
@@ -61,15 +71,19 @@ B     = "\033[34mℹ\033[0m"
 
 SUITES_DIR = TESTS_ROOT / "suites"
 
-# Category groupings
-CAT_DEFAULT      = {"01_api", "02_ui", "03_user_individual", "04_user_team", "05_user_org"}
-CAT_HEAVY        = {"06_stress", "07_load", "08_latency"}
-CAT_SECURITY_RL  = {"09_rate_limiting", "10_security"}
-CAT_INTEGRATIONS = {"11_integrations", "12_mcp"}
-CAT_DASHBOARD    = {"13_dashboard"}
+# Opt-in-only categories — excluded from the default run, need explicit flag or --all.
+# Everything else (including new suites) is included automatically.
+CAT_HEAVY         = {"06_stress", "07_load", "08_latency"}
+CAT_SECURITY_RL   = {"09_rate_limiting", "10_security"}
+CAT_INTEGRATIONS  = {"11_integrations", "12_mcp"}
 CAT_SUPERADMIN    = {"14_superadmin"}
 CAT_CROSS_BROWSER = {"15_cross_browser"}
 CAT_BROWSER       = {"02_ui", "13_dashboard"}
+
+# Combined set of all opt-in-only suites (used to compute the default inclusion set)
+CAT_OPT_IN_ONLY = (
+    CAT_HEAVY | CAT_SECURITY_RL | CAT_INTEGRATIONS | CAT_SUPERADMIN | CAT_CROSS_BROWSER
+)
 
 
 def discover_suites(filter_categories=None):
@@ -146,47 +160,37 @@ def parse_args():
 
 
 def build_category_filter(args):
-    """Determine which categories to run based on flags."""
+    """Determine which categories to run based on flags.
+
+    Default (no flags): all discovered suites MINUS opt-in-only ones.
+    This means new suites are automatically included without any whitelist.
+    """
     if args.suite:
-        # --suite prefix matches categories starting with that prefix
-        return None  # Handled separately
+        return None  # Handled separately in main()
 
     if args.all:
-        return None  # All categories
+        return None  # Include everything, even opt-in-only suites
 
-    # Build from flags
-    cats = set(CAT_DEFAULT)
+    if args.category:
+        return {args.category}
 
-    if not args.fast:
-        pass  # Default doesn't include heavy; fast = default minus nothing extra
+    # Default: every discovered suite directory minus the opt-in-only set
+    all_discovered = {d.name for d in SUITES_DIR.iterdir() if d.is_dir()}
+    cats = all_discovered - CAT_OPT_IN_ONLY
 
-    # --fast: run default but label it; heavy still excluded by default
-    # Actually --fast means same as default (heavy tests excluded by default)
-
+    # Opt-in additions
     if args.security:
         cats.update(CAT_SECURITY_RL)
-
     if args.integrations:
         cats.update(CAT_INTEGRATIONS)
-
     if args.superadmin:
         cats.update(CAT_SUPERADMIN)
-
     if getattr(args, 'cross_browser', False):
         cats.update(CAT_CROSS_BROWSER)
 
-    if not args.no_browser:
-        cats.update(CAT_DASHBOARD)  # 13_dashboard included unless --no-browser
-
+    # Browser exclusion
     if args.no_browser:
         cats -= CAT_BROWSER
-
-    # Heavy suites only if explicitly requested via --all
-    # (neither --fast nor default includes them)
-
-    if args.category:
-        # Filter to only the specified category
-        return {args.category}
 
     return cats
 
