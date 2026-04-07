@@ -40,10 +40,11 @@ analytics.get('/summary', async (c) => {
     if (cached) return c.json(JSON.parse(cached));
   } catch { /* KV unavailable — continue to DB */ }
 
-  const now   = Math.floor(Date.now() / 1000);
-  const today = now - 86_400;
-  const month = now - 30 * 86_400;
-  const thirty = now - 30 * 60;
+  const now        = Math.floor(Date.now() / 1000);
+  // Align to UTC midnight so "today" is a calendar day, not a rolling 24-hour window
+  const today      = Math.floor(Date.now() / 86_400_000) * 86_400;
+  const month      = now - 30 * 86_400;
+  const thirty     = now - 30 * 60;
 
   const [totals, session] = await c.env.DB.batch([
     c.env.DB.prepare(`
@@ -114,7 +115,8 @@ analytics.get('/kpis', async (c) => {
   const scopeTeam = c.get('scopeTeam');
   const { clause, args } = teamScope(scopeTeam);
   const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
-  const since  = Math.floor(Date.now() / 1000) - period * 86_400;
+  // Align to UTC midnight: show today + previous (period-1) days = exactly `period` calendar days
+  const since  = Math.floor(Date.now() / 86_400_000) * 86_400 - (period - 1) * 86_400;
 
   const kpisCacheKey = `analytics:kpis:${orgId}:${period}:${scopeTeam ?? 'all'}`;
   try {
@@ -144,7 +146,8 @@ analytics.get('/timeseries', async (c) => {
   const scopeTeam = c.get('scopeTeam');
   const { clause, args } = teamScope(scopeTeam);
   const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
-  const since  = Math.floor(Date.now() / 1000) - period * 86_400;
+  // Align to UTC midnight: show today + previous (period-1) days = exactly `period` calendar days
+  const since  = Math.floor(Date.now() / 86_400_000) * 86_400 - (period - 1) * 86_400;
 
   const tsCacheKey = `analytics:timeseries:${orgId}:${period}:${scopeTeam ?? 'all'}`;
   try {
@@ -178,7 +181,7 @@ analytics.get('/models', async (c) => {
   const scopeTeam = c.get('scopeTeam');
   const { clause, args } = teamScope(scopeTeam);
   const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
-  const since  = Math.floor(Date.now() / 1000) - period * 86_400;
+  const since  = Math.floor(Date.now() / 86_400_000) * 86_400 - (period - 1) * 86_400;
 
   const { results } = await c.env.DB.prepare(`
     SELECT
@@ -206,7 +209,7 @@ analytics.get('/teams', async (c) => {
   const scopeTeam = c.get('scopeTeam');
   const { clause, args } = teamScope(scopeTeam);
   const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
-  const since  = Math.floor(Date.now() / 1000) - period * 86_400;
+  const since  = Math.floor(Date.now() / 86_400_000) * 86_400 - (period - 1) * 86_400;
 
   const { results } = await c.env.DB.prepare(`
     SELECT
@@ -236,7 +239,7 @@ analytics.get('/traces', async (c) => {
   const scopeTeam = c.get('scopeTeam');
   const { clause, args } = teamScope(scopeTeam);
   const period = Math.min(parseInt(c.req.query('period') ?? '1', 10) || 1, 30);
-  const since  = Math.floor(Date.now() / 1000) - period * 86_400;
+  const since  = Math.floor(Date.now() / 86_400_000) * 86_400 - (period - 1) * 86_400;
 
   const { results } = await c.env.DB.prepare(`
     SELECT
@@ -257,14 +260,36 @@ analytics.get('/traces', async (c) => {
   return c.json({ traces: results });
 });
 
+// ── GET /v1/analytics/today — hourly spend for the current UTC day ───────────
+analytics.get('/today', async (c) => {
+  const orgId     = c.get('orgId');
+  const scopeTeam = c.get('scopeTeam');
+  const { clause, args } = teamScope(scopeTeam);
+  const todayStart = Math.floor(Date.now() / 86_400_000) * 86_400;
+
+  const { results } = await c.env.DB.prepare(`
+    SELECT
+      CAST(strftime('%H', datetime(created_at, 'unixepoch')) AS INTEGER) AS hour,
+      SUM(cost_usd)   AS cost_usd,
+      SUM(total_tokens) AS tokens,
+      COUNT(*)        AS requests
+    FROM events
+    WHERE org_id = ? AND created_at >= ?${clause}
+    GROUP BY hour
+    ORDER BY hour ASC
+  `).bind(orgId, todayStart, ...args).all();
+
+  return c.json({ date: new Date(todayStart * 1000).toISOString().slice(0, 10), hours: results });
+});
+
 // ── GET /v1/analytics/cost — CI cost gate ────────────────────────────────────
 analytics.get('/cost', async (c) => {
   const orgId     = c.get('orgId');
   const scopeTeam = c.get('scopeTeam');
   const { clause, args } = teamScope(scopeTeam);
   const period = Math.min(parseInt(c.req.query('period') ?? '7', 10) || 7, 30);
-  const since  = Math.floor(Date.now() / 1000) - period * 86_400;
-  const today  = Math.floor(Date.now() / 1000) - 86_400;
+  const since  = Math.floor(Date.now() / 86_400_000) * 86_400 - (period - 1) * 86_400;
+  const today  = Math.floor(Date.now() / 86_400_000) * 86_400;
 
   const [total, todayRow] = await c.env.DB.batch([
     c.env.DB.prepare(

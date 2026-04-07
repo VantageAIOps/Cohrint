@@ -26,8 +26,11 @@ crossplatform.use('*', authMiddleware);
 
 // SQLite datetime('now') produces 'YYYY-MM-DD HH:MM:SS' (no T, no Z).
 // All date comparisons must use the same format to avoid string comparison bugs.
+// Align to UTC midnight so the window covers exactly `days` calendar days
+// (today + previous days-1), not a rolling window from the current timestamp.
 function sqliteDateSince(days: number): string {
-  const d = new Date(Date.now() - days * 86400000);
+  const todayMidnightMs = Math.floor(Date.now() / 86400000) * 86400000;
+  const d = new Date(todayMidnightMs - (days - 1) * 86400000);
   return d.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
 }
 
