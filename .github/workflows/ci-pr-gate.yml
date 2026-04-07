@@ -9,8 +9,9 @@ name: PR Gate
 #   2. CLI Build                 — type check + bundle vantage-cli (~3 min)
 #   3. Environment & Health Tests — verify API + frontend reachable (~2 min)
 #   4. Connector Tests           — skipped unless connector files changed (~1 min)
-#   5. Preview Deploy            — deploy preview, post URL as PR comment (~5 min)
-#   6. PR Gate Summary           — fail if any critical job failed
+#   5. Secret Scan               — grep vantage-worker/src/ for credential patterns (~1 min)
+#   6. Preview Deploy            — deploy preview, post URL as PR comment (~5 min)
+#   7. PR Gate Summary           — fail if any critical job failed
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -284,14 +285,39 @@ jobs:
               });
             }
 
-  # ── 5. PR Gate Summary (required check — blocks merge on failure) ───────────
+  # ── 5. Secret Scan (every PR — replaces deleted ci-connectors.yml scan) ──────
+  secret-scan:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan worker source for leaked credentials
+        run: |
+          FOUND=$(grep -rn --include='*.ts' --include='*.js' \
+            -E 'sk-ant-admin-|sk-ant-api[0-9]+-|sk-proj-|ghp_[a-zA-Z0-9]{36}|gho_[a-zA-Z0-9]{36}|AKIA[0-9A-Z]{16}' \
+            vantage-worker/src/ 2>/dev/null | \
+            grep -v -E 'test|mock|fake|example|placeholder' || true)
+          if [ -n "$FOUND" ]; then
+            echo "Potential secrets detected in worker source:"
+            echo "$FOUND"
+            exit 1
+          fi
+          echo "No secrets detected in vantage-worker/src/"
+
+  # ── 6. PR Gate Summary (required check — blocks merge on failure) ───────────
   pr-summary:
     name: PR Gate Summary
     runs-on: ubuntu-latest
-    needs: [typecheck, cli-build, env-tests, connector-tests, cli-unit-tests, preview-deploy]
+    needs: [typecheck, cli-build, env-tests, connector-tests, cli-unit-tests, secret-scan, preview-deploy]
     if: always()
     steps:
       - name: Write summary
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+          BRANCH: ${{ github.head_ref }}
+          COMMIT: ${{ github.event.pull_request.head.sha }}
         run: |
           echo "## PR Gate Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -302,20 +328,22 @@ jobs:
           echo "| Environment & Health | ${{ needs.env-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Connector Tests | ${{ needs.connector-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| CLI Unit Tests | ${{ needs.cli-unit-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Secret Scan | ${{ needs.secret-scan.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Preview Deploy | ${{ needs.preview-deploy.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "> API, cross-browser, and MCP tests run via ci-test.yml (post-deploy / manual dispatch)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**PR:** #${{ github.event.number }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Branch:** \`${{ github.head_ref }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Commit:** \`${{ github.event.pull_request.head.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**PR:** #${PR_NUMBER}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`${BRANCH}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${COMMIT}\`" >> $GITHUB_STEP_SUMMARY
 
       - name: Fail if critical checks failed
         if: |
           needs.typecheck.result == 'failure' ||
           needs.cli-build.result == 'failure' ||
           needs.connector-tests.result == 'failure' ||
-          needs.cli-unit-tests.result == 'failure'
+          needs.cli-unit-tests.result == 'failure' ||
+          needs.secret-scan.result == 'failure'
         run: |
-          echo "❌ PR gate failed — fix the issues above before merging"
+          echo "PR gate failed — fix the issues above before merging"
           exit 1
