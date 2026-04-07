@@ -559,3 +559,76 @@ cache: {
 *Last updated: 24 March 2026 (v3.1 — added semantic cache strategy, market analysis, phased rollout)*
 *Sprint: March 24 – April 6, 2026*
 *Next review: April 7, 2026 (post-sprint retro)*
+
+## CLI Agent Integration Roadmap (v2.3+)
+
+_Added: 2026-04-07_
+
+### Problem Statement
+
+The vantage CLI wraps AI coding agents (Claude, Gemini, Codex, Aider, ChatGPT) but has four integration gaps:
+
+1. **Permission prompts invisible**: In one-shot REPL mode, agent stdout is piped for stream-json parsing — MCP tool permission prompts are auto-denied silently, never reaching the user
+2. **Session state lost on restart**: `agentSessionIds` map lives in process memory only — closing the CLI loses all conversation context
+3. **Incomplete live feed**: `ClaudeStreamRenderer` only handles `assistant` and `tool_result` events — misses `content_block_delta` (real-time streaming), `message_delta` (token counts), and `thinking_delta`
+4. **Agent config silos**: Each agent has rich config/memory files (`~/.claude/settings.json`, `~/.gemini/settings.json`, `~/.codex/config.toml`) that vantage never reads — leading to hardcoded model assumptions and missed optimization opportunities
+
+### Solution Architecture
+
+#### P0 — Permission Mode Passthrough
+- Add `permissionMode` and `allowedTools` to agent adapter config
+- Claude: pass `--permission-mode` and `--allowedTools` flags in `buildCommand`/`buildContinueCommand`
+- Codex: pass `--approval` mode flag
+- Aider: already uses `--yes` (auto-accept)
+- Configurable via `~/.vantage/config.json` per agent
+
+#### P0 — Session Persistence
+- Persist `agentSessionIds` to `~/.vantage/sessions/active.json` on every `agent:completed`
+- On startup, restore map from `active.json` → enables cross-restart `--resume`
+- Add `/reset` command to clear session state
+- Append-only `history.jsonl` for cross-session cost tracking
+
+#### P1 — Real-time Streaming
+- Parse `content_block_delta` (type: `text_delta`) for character-by-character output
+- Parse `message_delta` for real token counts (vs estimation from output length)
+- Parse `content_block_start` with `tool_use` for "Using tool X..." before result
+- Use `--include-partial-messages` flag for finer granularity
+
+#### P1 — Agent Config Reading
+- Read `~/.claude/settings.json` for actual model, MCP servers, permission mode
+- Read `~/.codex/config.toml` for model, skills
+- Read `~/.gemini/settings.json` for MCP config
+- Auto-detect model changes → accurate cost calculation
+- Read MCP server list → populate `--allowedTools` automatically
+
+### Agent Config File Locations
+
+| Agent | Config | Memory/Context | Settings |
+|-------|--------|----------------|----------|
+| Claude | `~/.claude/settings.json` | `~/.claude/projects/{slug}/memory/` | Permissions, plugins, hooks, model |
+| Gemini | `~/.gemini/settings.json` | `~/.gemini/antigravity/` (protobuf) | MCP servers |
+| Codex | `~/.codex/config.toml` | `~/.codex/sessions/` (JSONL) | Model, skills |
+| Aider | `.aider.conf.yml` | Git history | Model, git integration |
+| Cursor | `.cursorrules` | IDE-managed | Project rules |
+| Windsurf | `.windsurfrules` | IDE-managed | Project rules |
+
+### Claude Stream-JSON Event Types (Reference)
+
+| Event | Currently Parsed | Purpose |
+|-------|-----------------|---------|
+| `system` | ✓ (session ID) | Session init |
+| `assistant` | ✓ (text + tool_use) | Full message blocks |
+| `tool_result` | ✓ (first 10 lines) | Tool output |
+| `result` | ✓ (session ID) | Final result |
+| `content_block_delta` | ✗ | Real-time text streaming |
+| `message_delta` | ✗ | Token usage stats |
+| `content_block_start` | ✗ | Tool use announcement |
+| `thinking_delta` | ✗ | Extended thinking |
+| `ping` | ✗ | Keepalive |
+
+### Permission Behavior in Print Mode
+
+Claude `-p` mode auto-denies unpermitted tools silently. No JSON event emitted. Solutions:
+- `--permission-mode acceptEdits` — auto-approves file edits
+- `--allowedTools "Bash(git:*),Read,Edit,Write,Glob,Grep"` — pre-approve specific tools
+- `--permission-mode bypassPermissions` — skip all checks (power users only)

@@ -14,6 +14,8 @@ import { bus } from "./event-bus.js";
 import { Tracker } from "./tracker.js";
 import { initSession, getSession } from "./session.js";
 import { runAgent, runAgentBuffered } from "./runner.js";
+import { saveSessionIds, loadSessionIds, clearSessionIds } from "./session-persist.js";
+import { readClaudeConfig } from "./agent-config.js";
 import { looksLikeStructuredData } from "./classify.js";
 import { checkCostAnomaly } from "./anomaly.js";
 import {
@@ -286,6 +288,15 @@ async function executePrompt(
     }
   }
 
+  // Inject agent-specific flags (permission mode, allowed tools) from config
+  if (agent.name === "claude") {
+    const agentCfg = config.agents?.["claude"] as Record<string, unknown> | undefined;
+    const permMode = agentCfg?.["permissionMode"] as string | undefined;
+    const allowedTools = agentCfg?.["allowedTools"] as string[] | undefined;
+    if (permMode) extraFlags.push("--permission-mode", permMode);
+    if (allowedTools?.length) extraFlags.push("--allowedTools", allowedTools.join(","));
+  }
+
   // Build command — use continue if this is a follow-up prompt
   const agentConfig = extraFlags.length > 0 ? { extraFlags } as import("./agents/types.js").AgentConfig : undefined;
   const useContinue = continueConversation && agent.supportsContinue && agent.buildContinueCommand;
@@ -304,6 +315,15 @@ async function executePrompt(
     console.error(dim(`  Make sure '${agent.binary}' is installed and in your PATH.`));
     return undefined;
   }
+}
+
+/** Persist the agentSessionIds map to disk (best-effort). */
+function persistSessions(ids: Map<string, string>): void {
+  try {
+    const obj: Record<string, string> = {};
+    for (const [k, v] of ids) obj[k] = v;
+    saveSessionIds(obj);
+  } catch { /* best-effort — don't crash the REPL */ }
 }
 
 function waitForCost(): Promise<import("./event-bus.js").VantageEvents["cost:calculated"] | null> {
@@ -388,8 +408,14 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
   let activeSession: AgentSession | null = null;
 
   // Track per-agent prompt count and session ID for --resume support
+  // Restore persisted session IDs so context carries across CLI restarts
   const agentPromptCount = new Map<string, number>();
   const agentSessionIds = new Map<string, string>();
+  const restored = loadSessionIds();
+  for (const [agent, sid] of Object.entries(restored)) {
+    agentSessionIds.set(agent, sid);
+    agentPromptCount.set(agent, 1); // mark as having prior context
+  }
 
   const rl = createInterface({
     input: process.stdin,
@@ -460,6 +486,15 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
 
         if (line === "/budget") {
           await showBudgetStatus(config);
+          prompt();
+          return;
+        }
+
+        if (line === "/reset") {
+          clearSessionIds();
+          agentSessionIds.clear();
+          agentPromptCount.clear();
+          console.log(green("  Session state cleared. All agent contexts reset."));
           prompt();
           return;
         }
@@ -628,6 +663,7 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
             const sid = await executePrompt(agentPrompt, agent, config, true, count > 0, agentSessionIds.get(agent.name));
             agentPromptCount.set(agent.name, count + 1);
             if (sid) { agentSessionIds.set(agent.name, sid); } else { agentSessionIds.delete(agent.name); }
+            persistSessions(agentSessionIds);
             try {
               const cost = await Promise.race([
                 costPromise,
@@ -683,6 +719,7 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
         } else {
           agentSessionIds.delete(currentAgent.name);
         }
+        persistSessions(agentSessionIds);
         try {
           const cost = await Promise.race([
             costPromise,
