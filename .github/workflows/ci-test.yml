@@ -120,6 +120,22 @@ jobs:
         working-directory: vantage-cli
         run: npx tsup src/index.ts --format esm --dts --clean
 
+      - name: Install MCP dependencies
+        working-directory: vantage-mcp
+        run: npm ci
+
+      - name: Build MCP (required for dist/ + functional tests)
+        working-directory: vantage-mcp
+        run: npm run build
+
+      - name: Install proxy dependencies
+        working-directory: vantage-local-proxy
+        run: npm ci
+
+      - name: Build proxy (required for dist/ + functional tests)
+        working-directory: vantage-local-proxy
+        run: npm run build
+
       - name: Run API + core suites (no browser)
         env:
           HEADLESS: "1"

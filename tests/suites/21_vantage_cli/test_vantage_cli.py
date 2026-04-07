@@ -2,7 +2,7 @@
 Test Suite 21 — VantageAI CLI (vantage-cli)
 Tests the prompt optimizer, pricing engine, and CLI end-to-end pipe mode.
 """
-import sys, json, shutil, subprocess, re, time
+import sys, json, os, shutil, subprocess, re, time
 from pathlib import Path
 
 import pytest
@@ -105,7 +105,12 @@ class TestOptimizerEngine:
 
 # ── Section B: CLI Pipe Mode ──────────────────────────────────────────────
 
-has_claude = shutil.which("claude") is not None
+# Pipe mode tests require claude CLI with a real API key.
+# Skip gracefully when running in environments without one (e.g. CI without ANTHROPIC_API_KEY).
+has_claude = (
+    shutil.which("claude") is not None
+    and bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("CLAUDE_API_KEY"))
+)
 
 
 @pytest.mark.skipif(not has_claude, reason="claude CLI not installed")
