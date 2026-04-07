@@ -295,10 +295,10 @@ auth.post('/members', authMiddleware, adminOnly, async (c) => {
 
   logAudit(c, {
     event_type:    'admin_action',
-    event_name:    'admin_action.member_added',
+    event_name:    'member.invited',
     resource_type: 'member',
     resource_id:   email,
-    metadata:      { role },
+    metadata:      { role, scope_team: scopeTeam ?? null, key_hint: keyHint },
   });
 
   return c.json({
@@ -356,15 +356,21 @@ auth.patch('/members/:id', authMiddleware, adminOnly, async (c) => {
 auth.delete('/members/:id', authMiddleware, adminOnly, async (c) => {
   const orgId    = c.get('orgId');
   const memberId = c.req.param('id');
+
+  const removed = await c.env.DB.prepare(
+    'SELECT email, role FROM org_members WHERE id = ? AND org_id = ?'
+  ).bind(memberId, orgId).first<{ email: string; role: string }>();
+
   await c.env.DB.prepare(
     'DELETE FROM org_members WHERE id = ? AND org_id = ?'
   ).bind(memberId, orgId).run();
 
   logAudit(c, {
     event_type:    'admin_action',
-    event_name:    'admin_action.member_removed',
+    event_name:    'member.removed',
     resource_type: 'member',
-    resource_id:   memberId,
+    resource_id:   removed?.email ?? memberId,
+    metadata:      { role: removed?.role ?? 'unknown' },
   });
 
   return c.json({ ok: true });
@@ -406,9 +412,10 @@ auth.post('/members/:id/rotate', authMiddleware, adminOnly, async (c) => {
 
   logAudit(c, {
     event_type:    'admin_action',
-    event_name:    'admin_action.key_rotated',
+    event_name:    'key.rotated',
     resource_type: 'member',
-    resource_id:   memberId,
+    resource_id:   member.email,
+    metadata:      { role: member.role, scope_team: member.scope_team ?? null, key_hint: keyHint },
   });
 
   return c.json({
@@ -598,8 +605,9 @@ auth.post('/rotate', authMiddleware, async (c) => {
 
   logAudit(c, {
     event_type:    'admin_action',
-    event_name:    'admin_action.owner_key_rotated',
+    event_name:    'key.rotated',
     resource_type: 'org',
+    metadata:      { key_hint: keyHint, scope: 'owner' },
   });
 
   return c.json({
