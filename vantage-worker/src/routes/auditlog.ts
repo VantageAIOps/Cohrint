@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Bindings, Variables } from '../types';
 import { authMiddleware } from '../middleware/auth';
+import { logAudit } from '../lib/audit';
 
 const auditlog = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -68,6 +69,12 @@ auditlog.get('/', async (c) => {
   const total  = (countRow.results?.[0] as { total: number } | undefined)?.total ?? 0;
 
   if (format === 'csv') {
+    logAudit(c, {
+      event_type:    'data_access',
+      event_name:    'audit_log.exported',
+      resource_type: 'audit_log',
+      metadata:      { rows: events.length, event_type: eventType ?? 'all', from: c.req.query('from'), to: c.req.query('to') },
+    });
     return csvResponse(orgId, events);
   }
 

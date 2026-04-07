@@ -44,9 +44,8 @@ alerts.post('/slack/:orgId', async (c) => {
 
   logAudit(c, {
     event_type:    'admin_action',
-    event_name:    'admin_action.alert_config_changed',
+    event_name:    'alert.slack_configured',
     resource_type: 'alert_config',
-    metadata:      { action: 'slack_webhook_updated' },
   });
 
   return c.json({ ok: true });

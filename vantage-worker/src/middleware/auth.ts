@@ -71,7 +71,8 @@ export async function authMiddleware(
         c.header('Retry-After', String(retryAt - Math.floor(Date.now() / 1000)));
         return c.json({ error: 'Rate limit exceeded', retry_after: retryAt }, 429);
       }
-      logAudit(c, { event_type: 'auth', event_name: 'auth.login', resource_type: 'session' });
+      logAudit(c, { event_type: 'auth', event_name: 'auth.login', resource_type: 'session',
+        metadata: { method: 'session', ua: (c.req.header('User-Agent') ?? '').slice(0, 80) } });
       return await next();
     }
     // Expired / invalid session — fall through to API key check
@@ -148,7 +149,8 @@ export async function authMiddleware(
 
   // Don't log auth.login for audit-log reads — it would shift offset pagination
   if (!c.req.path.startsWith('/v1/audit-log')) {
-    logAudit(c, { event_type: 'auth', event_name: 'auth.login', resource_type: 'api_key' });
+    logAudit(c, { event_type: 'auth', event_name: 'auth.login', resource_type: 'api_key',
+      metadata: { method: 'api_key', role: c.get('role'), ua: (c.req.header('User-Agent') ?? '').slice(0, 80) } });
   }
   return await next();
 }

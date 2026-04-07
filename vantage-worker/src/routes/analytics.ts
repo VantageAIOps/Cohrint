@@ -1,22 +1,11 @@
 import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
 import { authMiddleware } from '../middleware/auth';
-import { logAudit } from '../lib/audit';
-
 const analytics = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 analytics.use('*', authMiddleware);
 
-// Log every analytics read as a data_access event (fire-and-forget after response)
-analytics.use('*', async (c, next) => {
-  await next();
-  logAudit(c, {
-    event_type:    'data_access',
-    event_name:    'data_access.analytics',
-    resource_type: 'analytics',
-    metadata:      { endpoint: c.req.path },
-  });
-});
+// Only log CSV exports — routine dashboard reads are too noisy to audit individually
 
 // ── Scope helper — appends "AND e.team = ?" when member has a team scope ──────
 // Always qualify with table alias "e" to avoid ambiguity when other joined
