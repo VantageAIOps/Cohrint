@@ -14,27 +14,32 @@ import sys
 
 from rich.console import Console
 
+from .anomaly import check_cost_anomaly
 from .api_client import AgentClient, DEFAULT_MODEL
 from .cost_tracker import SessionCost
+from .optimizer import optimize_prompt, OptimizationResult
 from .permissions import PermissionManager
 from .renderer import render_cost_summary, render_error
+from .tracker import Tracker, TrackerConfig
 from .tools import TOOL_MAP
 
 console = Console()
 
 BANNER = """
   [bold]Vantage Agent[/bold] [dim]v0.1.0[/dim]
-  [dim]AI coding agent with per-tool permissions & cost tracking[/dim]
+  [dim]AI coding agent with per-tool permissions, cost tracking & optimization[/dim]
   [dim]Model: {model}  |  CWD: {cwd}[/dim]
 
   [dim]Commands:[/dim]
-    [bold]/help[/bold]          Show commands
-    [bold]/allow[/bold] Tool    Approve a tool (e.g. /allow Bash,Write)
-    [bold]/tools[/bold]         Show tool approval status
-    [bold]/cost[/bold]          Show session cost
-    [bold]/reset[/bold]         Reset permissions & history
-    [bold]/model[/bold] name    Switch model
-    [bold]/quit[/bold]          Exit
+    [bold]/help[/bold]              Show commands
+    [bold]/allow[/bold] Tool        Approve a tool (e.g. /allow Bash,Write,Edit)
+    [bold]/allow all[/bold]         Approve all tools
+    [bold]/tools[/bold]             Show tool approval status
+    [bold]/cost[/bold]              Show session cost
+    [bold]/optimize[/bold] on|off   Toggle prompt optimization
+    [bold]/reset[/bold]             Reset permissions & history
+    [bold]/model[/bold] name        Switch model
+    [bold]/quit[/bold]              Exit
 """
 
 
@@ -47,23 +52,40 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-tokens", type=int, default=16384, help="Max output tokens")
     parser.add_argument("--cwd", default=None, help="Working directory")
     parser.add_argument("--system", default=None, help="Custom system prompt")
+    parser.add_argument("--no-optimize", action="store_true", help="Disable prompt optimization")
+    parser.add_argument("--api-key", default=None, help="Anthropic API key (or set ANTHROPIC_API_KEY)")
+    parser.add_argument("--vantage-key", default=None, help="VantageAI dashboard API key for telemetry")
+    parser.add_argument("--debug", action="store_true", help="Enable debug output")
     return parser.parse_args()
 
 
-def _build_client(args: argparse.Namespace) -> AgentClient:
+def _build_client(args: argparse.Namespace) -> tuple[AgentClient, Tracker | None]:
     model = args.model or os.environ.get("VANTAGE_MODEL", DEFAULT_MODEL)
     cwd = args.cwd or os.getcwd()
     permissions = PermissionManager()
     cost = SessionCost(model=model)
 
-    return AgentClient(
+    if args.api_key:
+        os.environ["ANTHROPIC_API_KEY"] = args.api_key
+
+    client = AgentClient(
         model=model,
         max_tokens=args.max_tokens,
         permissions=permissions,
         cost=cost,
         cwd=cwd,
         system_prompt=args.system,
+        optimization=not args.no_optimize,
     )
+
+    # Dashboard tracker
+    tracker = None
+    vantage_key = args.vantage_key or os.environ.get("VANTAGE_API_KEY", "")
+    if vantage_key:
+        tracker = Tracker(TrackerConfig(api_key=vantage_key, debug=args.debug))
+        tracker.start()
+
+    return client, tracker
 
 
 def _handle_command(line: str, client: AgentClient) -> bool:
@@ -127,6 +149,17 @@ def _handle_command(line: str, client: AgentClient) -> bool:
         console.print("  [yellow]Reset: permissions, history, and cost cleared[/yellow]")
         return True
 
+    if stripped.startswith("/optimize"):
+        parts = stripped.split(None, 1)
+        if len(parts) < 2:
+            state = "on" if client.optimization else "off"
+            console.print(f"  [dim]Optimization: {state}[/dim]")
+            return True
+        flag = parts[1].strip().lower()
+        client.optimization = flag in ("on", "true", "1", "yes")
+        console.print(f"  [green]Optimization: {'on' if client.optimization else 'off'}[/green]")
+        return True
+
     if stripped.startswith("/model"):
         parts = stripped.split(None, 1)
         if len(parts) < 2:
@@ -145,7 +178,7 @@ def _handle_command(line: str, client: AgentClient) -> bool:
     return False
 
 
-def run_repl(client: AgentClient) -> None:
+def run_repl(client: AgentClient, tracker: Tracker | None = None) -> None:
     """Interactive REPL."""
     console.print(BANNER.format(model=client.model, cwd=client.cwd))
 
@@ -174,6 +207,8 @@ def run_repl(client: AgentClient) -> None:
                         prompt_count=c.prompt_count,
                         session_cost=c.total_cost_usd,
                     )
+                if tracker:
+                    tracker.stop()
                 console.print("  [dim]Goodbye.[/dim]")
                 break
             _handle_command(line, client)
@@ -181,20 +216,31 @@ def run_repl(client: AgentClient) -> None:
 
         # Send prompt to API
         try:
+            prior_total = client.cost.total_cost_usd
+            prior_count = client.cost.prompt_count - 1  # before this prompt
             client.send(line)
-            # Show per-turn cost
+            # Show per-turn cost + anomaly check
             if client.cost.turns:
                 last = client.cost.turns[-1]
                 console.print(
                     f"  [dim]↳ {last.input_tokens + last.output_tokens:,} tokens · ${last.cost_usd:.4f}[/dim]"
                 )
+                check_cost_anomaly(last.cost_usd, prior_total, prior_count)
+                if tracker:
+                    tracker.record(
+                        model=client.model,
+                        input_tokens=last.input_tokens,
+                        output_tokens=last.output_tokens,
+                        cost_usd=last.cost_usd,
+                        latency_ms=0,
+                    )
         except KeyboardInterrupt:
             console.print("\n  [yellow]Interrupted[/yellow]")
         except Exception as e:
             render_error(str(e))
 
 
-def run_oneshot(client: AgentClient, prompt: str) -> None:
+def run_oneshot(client: AgentClient, prompt: str, tracker: Tracker | None = None) -> None:
     """One-shot mode: send prompt, print result, exit."""
     try:
         client.send(prompt)
@@ -207,6 +253,16 @@ def run_oneshot(client: AgentClient, prompt: str) -> None:
             prompt_count=c.prompt_count,
             session_cost=c.total_cost_usd,
         )
+        if tracker and c.turns:
+            last = c.turns[-1]
+            tracker.record(
+                model=client.model,
+                input_tokens=last.input_tokens,
+                output_tokens=last.output_tokens,
+                cost_usd=last.cost_usd,
+                latency_ms=0,
+            )
+            tracker.stop()
     except KeyboardInterrupt:
         console.print("\n  [yellow]Interrupted[/yellow]")
     except Exception as e:
@@ -218,7 +274,7 @@ def main() -> None:
     args = parse_args()
 
     try:
-        client = _build_client(args)
+        client, tracker = _build_client(args)
     except ValueError as e:
         render_error(str(e))
         sys.exit(1)
@@ -226,14 +282,14 @@ def main() -> None:
     prompt = " ".join(args.prompt) if args.prompt else ""
 
     if prompt:
-        run_oneshot(client, prompt)
+        run_oneshot(client, prompt, tracker)
     elif sys.stdin.isatty():
-        run_repl(client)
+        run_repl(client, tracker)
     else:
         # Pipe mode: read stdin
         prompt = sys.stdin.read().strip()
         if prompt:
-            run_oneshot(client, prompt)
+            run_oneshot(client, prompt, tracker)
 
 
 if __name__ == "__main__":

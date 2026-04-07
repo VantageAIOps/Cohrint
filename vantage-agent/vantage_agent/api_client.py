@@ -26,6 +26,8 @@ from .renderer import (
     render_tool_use_start,
     render_thinking,
 )
+from .anomaly import check_cost_anomaly
+from .optimizer import optimize_prompt, count_tokens
 from .tools import TOOL_DEFINITIONS, TOOL_MAP, execute_tool
 
 DEFAULT_MODEL = "claude-sonnet-4-6"
@@ -44,6 +46,7 @@ class AgentClient:
         cost: SessionCost | None = None,
         cwd: str | None = None,
         system_prompt: str | None = None,
+        optimization: bool = True,
     ):
         api_key = os.environ.get("ANTHROPIC_API_KEY", "")
         if not api_key:
@@ -68,6 +71,7 @@ class AgentClient:
         self.cwd = cwd or os.getcwd()
         self.messages: list[dict[str, Any]] = []
         self.system_prompt = system_prompt or self._default_system()
+        self.optimization = optimization
         self._available_tools = self._build_tool_list()
 
     def _default_system(self) -> str:
@@ -82,14 +86,26 @@ class AgentClient:
         """Return tool definitions for all known tools."""
         return TOOL_DEFINITIONS
 
-    def send(self, user_prompt: str) -> str:
+    def send(self, user_prompt: str, no_optimize: bool = False) -> str:
         """
         Send a user prompt. Handles the full tool-use loop:
         prompt → stream response → execute tools → send results → repeat.
 
         Returns the final text response.
         """
-        self.messages.append({"role": "user", "content": user_prompt})
+        # Optimize prompt (skip for short/structured input)
+        final_prompt = user_prompt
+        if not no_optimize and self.optimization and len(user_prompt) > 20:
+            result = optimize_prompt(user_prompt)
+            if result.saved_tokens > 0:
+                final_prompt = result.optimized
+                from rich.console import Console
+                Console().print(
+                    f"  [dim]Optimized: {result.original_tokens} → {result.optimized_tokens} tokens "
+                    f"(saved {result.saved_tokens}, -{result.saved_percent}%)[/dim]"
+                )
+
+        self.messages.append({"role": "user", "content": final_prompt})
         self.cost.record_prompt()
 
         final_text = ""
