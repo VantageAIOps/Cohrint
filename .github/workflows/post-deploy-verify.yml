@@ -1,0 +1,71 @@
+name: Post-Deploy Verification
+
+# Run manually after a worker deploy to verify deployment-dependent tests.
+# These tests require the latest worker code to be live on production.
+# They are intentionally excluded from the PR gate (ci-test.yml).
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: false
+        default: "production"
+        type: choice
+        options:
+          - production
+
+jobs:
+  post-deploy-tests:
+    name: Deployment-Dependent Test Suites
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      API_URL:      ${{ secrets.API_URL }}
+      API_KEY:      ${{ secrets.API_KEY }}
+      TEST_ORG_ID:  ${{ secrets.TEST_ORG_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        run: pip install -r tests/requirements.txt
+
+      - name: Run deployment-dependent suites
+        run: |
+          python tests/run_suite.py \
+            --category 17_otel \
+            --category 18_sdk_privacy \
+            --category 26_cli_integration \
+            --category 27_sdk_integration \
+            2>&1 | tee /tmp/post-deploy-output.txt
+          exit "${PIPESTATUS[0]}"
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: post-deploy-results-${{ github.run_id }}
+          path: /tmp/post-deploy-output.txt
+          retention-days: 14
+
+      - name: Summary
+        if: always()
+        run: |
+          PASSED=$(grep -c "✓" /tmp/post-deploy-output.txt 2>/dev/null || echo 0)
+          FAILED=$(grep -c "✗" /tmp/post-deploy-output.txt 2>/dev/null || echo 0)
+          RUN_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          {
+            echo "### Post-Deploy Verification — ${RUN_TIME}"
+            echo "- ✅ Passed: ${PASSED}"
+            echo "- ❌ Failed: ${FAILED}"
+            echo ""
+            echo "**Suites:** 17_otel · 18_sdk_privacy · 26_cli_integration · 27_sdk_integration"
+            echo ""
+            echo "_Tests in this workflow require the latest worker to be deployed to production._"
+          } >> "$GITHUB_STEP_SUMMARY"
