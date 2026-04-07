@@ -2551,71 +2551,157 @@ The dashboard (`app.html`) has been restructured to use **only real API data**. 
 - AI Intelligence Layer — removed from sidebar (smart router not yet implemented)
 - Performance percentiles (p50/p95/p99) — requires per-request latency tracking
 
-## 26. VantageAI CLI — AI Agent Wrapper
+## 26. Vantage Agent — Python AI Coding Agent
 
-The `vantage-cli` package (`vantage-cli/`) is a transparent terminal wrapper for AI coding tools (Claude Code, Codex, Gemini CLI, Aider). It adds zero-latency prompt optimization and cost tracking to any AI agent without changing the user's workflow.
+The `vantage-agent` package (`vantage-agent/`) is a standalone Python AI coding agent that calls the Anthropic API directly. It provides per-tool permissions, cost tracking, prompt optimization, and dashboard telemetry — no external CLI dependency required.
+
+> **Note:** This replaces the previous `vantage-cli` TypeScript wrapper (deleted). All unique features have been ported to Python with full test parity.
 
 **How it works:**
-1. User types a prompt
-2. CLI optimizes it (5-layer compression, <1ms, local)
-3. Forwards optimized prompt to the user's AI tool (Claude Code, Codex, Gemini CLI, Aider)
-4. Streams output in real-time (zero added latency); for Claude Code, parses `stream-json` output to extract text and capture session ID
-5. Calculates cost + token savings after response
-6. Sends tracking data to dashboard asynchronously (fire-and-forget)
+1. User types a prompt (REPL, one-shot, or pipe)
+2. Classifier determines input type (prompt/command/structured/short-answer)
+3. Optimizer compresses prompt (6-layer, <1ms, preserves code blocks)
+4. Sends to Anthropic API with streaming
+5. When model returns `tool_use` → permission check → local execution → `tool_result` → API continues
+6. Repeats tool loop until model sends `end_turn`
+7. Tracks cost from real API usage, sends telemetry to dashboard
 
 **3 Modes:**
-- **REPL**: `vantage` — interactive mode with agent switching
-- **One-shot**: `vantage "prompt"` — run and exit
-- **Pipe**: `echo "prompt" | vantage` — scriptable
+- **REPL**: `vantage-agent` — interactive with `/commands`
+- **One-shot**: `vantage-agent "prompt"` — run and exit
+- **Pipe**: `echo "prompt" | vantage-agent` — scriptable
 
-**Agent switching:**
-- `/claude <prompt>` — run with Claude Code
-- `/gemini <prompt>` — run with Gemini CLI
-- `/codex <prompt>` — run with OpenAI Codex
-- `/compare <prompt>` — run on all agents, show cost comparison
-- `/cost` — show session totals
-- `/summary` (or `/stats`) — show dashboard spend, tokens, and budget from API
-- `/budget` — check budget status with alerts
-- `/help` — show all commands
+**REPL commands:**
+- `/help` — show commands
+- `/allow Tool` or `/allow all` — approve tools
+- `/tools` — show tool approval status
+- `/cost` — show session cost summary
+- `/optimize on|off` — toggle prompt optimization
+- `/model name` — switch model
+- `/reset` — reset permissions, history, and cost
+- `/quit` — exit (shows final cost)
 
-**Dashboard integration:**
-- Events are pushed to `/v1/events/batch` using the correct `EventIn` format (model, provider, tokens, cost, latency, agent name)
-- Tracking is async fire-and-forget — zero impact on response latency
-- Configure via `~/.vantage/config.json` or `VANTAGE_API_KEY` environment variable
+**Per-tool permissions:**
+- Safe tools auto-approved: Read, Glob, Grep
+- Dangerous tools prompt user: Bash, Write, Edit
+- User responds: `[y]es once / [a]lways / [n]o`
+- Persisted to `~/.vantage-agent/permissions.json`
 
-**Anomaly detection:**
-- The CLI warns when a prompt's cost exceeds 3x the session average, helping catch runaway token usage early
+**6 local tools:**
+| Tool | Description |
+|------|-------------|
+| Bash | Shell commands with timeout |
+| Read | Line-numbered file output |
+| Write | Create/overwrite files (creates parent dirs) |
+| Edit | Unique string replacement in files |
+| Glob | File pattern matching |
+| Grep | Regex content search |
 
-**Context continuation (Claude Code):**
-- CLI invokes Claude with `--output-format stream-json`, parses each newline-delimited JSON line to extract text for display and capture `session_id` from the result line
-- On follow-up prompts, uses `--resume <sessionId>` instead of `--continue` — deterministic context regardless of Claude usage outside vantage between prompts
-- Falls back to `--continue` if no session ID was captured (e.g. first prompt, or non-Claude agents)
-- Session IDs are tracked per-agent in the REPL (`agentSessionIds` map in `src/index.ts`)
+**Prompt optimization (6 layers):**
+1. Deduplicate sentences
+2. Remove filler phrases (36 patterns)
+3. Apply verbose rewrites (42 regex rules)
+4. Strip filler words (25 words)
+5. Collapse whitespace
+6. Trim
 
-**Stability:**
-- 5-minute timeout per agent invocation (prevents hung processes)
-- ENOENT handling for missing agent binaries (graceful error instead of crash)
-- 5 MB output cap (prevents memory exhaustion on large responses)
-- REPL crash recovery (catches unhandled rejections, keeps session alive)
-- Structured data detection (identifies JSON/code blocks in output for better cost attribution)
-- Non-Claude agents: stream-json parsing gracefully falls back — non-JSON lines are displayed as-is
+Structured data (JSON, code blocks, URLs, high-symbol text) is auto-detected and skipped.
 
-**Setup wizard:** First run auto-detects installed AI tools and creates `~/.vantage/config.json`. The wizard validates binary paths and sets the default agent.
+**Input classifier:**
+- `prompt` — natural language (5+ words) → eligible for optimization
+- `short-answer` — y/n, numbers, ≤2 words → pass through
+- `vantage-command` — /cost, /opt-off, /exit-session → handle locally
+- `agent-command` — /compact, /clear, @file, !cmd → agent-specific dispatch
+- `structured` — JSON, code, URLs → skip optimizer
+- `unknown` — empty input
 
-**Security:**
-- 50 deny rules strip secrets, credentials, and PII before prompts leave the terminal
-- HTTPS-only tracking — all dashboard reporting uses TLS; no plaintext telemetry
-- Privacy anonymization — prompt content is never stored; only token counts and cost metadata are sent
+**Multi-model pricing (15 models):**
+| Provider | Models |
+|----------|--------|
+| Anthropic | claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5 |
+| OpenAI | gpt-4o, gpt-4o-mini, o1, o3-mini, gpt-3.5-turbo |
+| Google | gemini-2.0-flash, gemini-1.5-pro, gemini-1.5-flash |
+| Other | llama-3.3-70b, mistral-large-latest, deepseek-chat, grok-2 |
+
+- `calculate_cost(model, input, output, cached)` — exact USD with cache discounts
+- `find_cheapest(model, input, output)` — cheaper alternative with savings %
+
+**Recommendations engine (24 tips):**
+- Agent-specific: Claude (6), Gemini (4), Codex (3), Aider (4), Cursor/ChatGPT (3)
+- Universal: high cost alert, cost per prompt, large prompt, low cache (4)
+- Priority sorted: critical → high → medium → low
+- Dynamic placeholders: ${cost}, ${avg}, ${tokens}, ${pct}
+- Inline tips with emoji: 🔴 critical, 🟡 high, 💡 medium
+
+**Cost anomaly detection:**
+- Warns when prompt cost exceeds 3x session average
+- Minimum 2 prior prompts, minimum $0.001 average before flagging
+
+**Dashboard telemetry:**
+- Batched event sending via `httpx` to `/v1/events/batch`
+- Configurable: batch size, flush interval, privacy mode
+- Privacy modes: full, strict (strips agent name), anonymized, local-only
+- Background timer for periodic flush
 
 **Key files:**
-- `src/optimizer.ts` — 5-layer prompt compression (filler phrases, verbose rewrites, dedup)
-- `src/pricing.ts` — 15+ model pricing table with cost calculation
-- `src/event-bus.ts` — Typed EventEmitter for async processing
-- `src/agents/` — Adapter plugins for each AI CLI tool
-- `src/tracker.ts` — Async batch queue for dashboard reporting (`/v1/events/batch` EventIn format)
-- `src/security.ts` — 50 deny-rule engine for prompt sanitization
+| File | Purpose |
+|------|---------|
+| `cli.py` | REPL, one-shot, pipe modes, /commands |
+| `api_client.py` | Anthropic API streaming + tool-use loop |
+| `tools.py` | 6 local tool implementations |
+| `permissions.py` | Per-tool approval with persistence |
+| `cost_tracker.py` | Real token cost from API usage objects |
+| `pricing.py` | 15-model pricing table, cheapest finder |
+| `optimizer.py` | 6-layer prompt compression + structured data guard |
+| `classifier.py` | Input classification + optimization pipeline |
+| `recommendations.py` | 24 agent-specific tips engine |
+| `anomaly.py` | Cost spike detection |
+| `tracker.py` | Batched dashboard telemetry |
+| `renderer.py` | Terminal output (streaming, tools, cost) |
 
-**Test coverage:** `tests/suites/21_vantage_cli/` (suite 21) — 38+ checks (optimizer, pricing, pipe mode, config, security deny rules, dashboard integration, anomaly detection)
+### Feature Comparison: Previous TypeScript CLI vs Current Python Agent
+
+| Feature | TS CLI (deleted) | Python Agent | Status |
+|---------|-----------------|--------------|--------|
+| Prompt optimizer (6 layers) | ✅ | ✅ | Ported |
+| Structured data guard | ✅ | ✅ | Ported |
+| Input classifier | ✅ | ✅ | Ported |
+| Multi-model pricing (15) | ✅ | ✅ | Ported |
+| Cheapest model finder | ✅ | ✅ | Ported |
+| Cost anomaly detection | ✅ | ✅ | Ported |
+| Dashboard telemetry | ✅ | ✅ | Ported |
+| Recommendations (24 tips) | ✅ | ✅ | Ported |
+| Agent name normalization | ✅ | ✅ | Ported |
+| REPL + one-shot + pipe | ✅ | ✅ | Ported |
+| Direct API execution | ❌ (wrapped CLI) | ✅ | **New** |
+| Per-tool permissions | ❌ (relied on agent) | ✅ | **New** |
+| Local tool execution | ❌ (delegated) | ✅ (6 tools) | **New** |
+| Real API cost tracking | ❌ (estimated) | ✅ (from usage) | **New** |
+| Agent adapter registry | ✅ (5 agents) | ❌ | Dropped |
+| Session persistence | ✅ (~/.vantage/) | ❌ | Dropped |
+| Setup wizard | ✅ | ❌ | Dropped |
+| Event bus | ✅ | ❌ | Dropped |
+| Claude config reading | ✅ | ❌ | Dropped |
+
+**Dropped features rationale:** Python agent calls the Anthropic API directly — it doesn't wrap other CLI tools, so agent adapters, CLI config reading, session IDs, and the setup wizard are unnecessary.
+
+### Test Coverage
+
+**273 tests** across 11 test files (273 pass, 40 skip for live API):
+
+| Test File | Tests | Covers |
+|-----------|-------|--------|
+| `test_integration.py` | 60 | Multi-turn, all 6 tools, permissions, cost, CLI, edge cases |
+| `test_classifier.py` | 45 | Input classification (SS01-SS40), structured guard (CS01-CS08) |
+| `test_rendering.py` | 43 | Text/tool/cost rendering, permission flow, API tool loop (mocked) |
+| `test_tools.py` | 36 | Bash, Read, Write, Edit, Glob, Grep execution |
+| `test_recommendations.py` | 30 | 24 tips, conditions, priorities, templates, formatting (R01-R30) |
+| `test_optimizer.py` | 28 | 6-layer compression, dedup, filler, code preservation |
+| `test_pricing.py` | 22 | 15 models, cache, cheapest, cross-provider (CL19-CL25) |
+| `test_permissions.py` | 18 | Safe defaults, approve/deny, always/session, persistence |
+| `test_cost_tracker.py` | 13 | Token recording, session accumulation, cache pricing |
+| `test_tracker.py` | 11 | Batched telemetry, auto-flush, privacy, errors |
+| `test_anomaly.py` | 7 | 3x threshold, min average, edge cases |
 
 ## 27. Security & Governance
 
@@ -2657,70 +2743,41 @@ The Security & Governance view in `app.html` shows:
 - `tests/suites/18_sdk_privacy/test_sdk_privacy.py` — 50+ checks (privacy modes, pricing engine, date format, dual-write)
 - `tests/suites/19_local_proxy/test_local_proxy.py` — 42+ checks (privacy engine, pricing accuracy, proxy integration, scanner coverage)
 - `tests/suites/20_dashboard_real_data/test_dashboard_real_data.py` — 42+ checks (enterprise reporting, cost intelligence, no fake data, cross-platform integration)
-- `tests/suites/21_vantage_cli/test_vantage_cli.py` — 38+ checks (optimizer engine, pricing engine, CLI pipe mode, config & file structure, dashboard integration, anomaly detection)
+- `vantage-agent/tests/` — 273 checks across 11 files (optimizer, pricing, classifier, recommendations, permissions, tools, rendering, cost tracking, anomaly detection, telemetry, API tool loop)
 - `tests/suites/22_landing_page/test_landing_page.py` — 41 checks (landing page content, v2 feature coverage, HTML structure)
 - `tests/suites/23_security_governance/` — audit logging, security overview API, RBAC, data retention
-- Total: **332+ checks** across 23 suites covering OTel + cross-platform + privacy + pricing + dashboard + CLI + landing page + security & governance features
+- Total: **567+ checks** across suites covering OTel + cross-platform + privacy + pricing + dashboard + Python agent (273) + landing page + security & governance features
 
 ---
 
-*Last updated: 24 March 2026 — v2.3 security & governance (audit logging, security overview API, RBAC dashboard), landing page tests. 332+ test checks across 23 suites.*
+*Last updated: 7 April 2026 — v2.4 consolidated Python agent (vantage-cli deleted, all features ported to vantage-agent). 273 agent tests + 294 backend tests = 567+ total checks.*
 
-## CLI Agent Integration Configuration
+## CLI Agent Configuration
 
-_Added: 2026-04-07_
+### Permission Persistence
 
-### Session Persistence
-
-Vantage CLI persists agent session IDs across restarts:
+Vantage Agent persists per-tool approvals:
 
 ```
-~/.vantage/
-├── config.json              # Main configuration
-├── sessions/
-│   ├── active.json          # { "claude": "session-uuid", "gemini": null }
-│   └── history.jsonl        # Append-only prompt + cost log
-└── state.json               # Lifetime aggregate stats
+~/.vantage-agent/
+├── permissions.json         # { "always_approved": ["Bash", "Write", "Edit"] }
 ```
 
-**Commands:**
-- `/reset` — Clear all session state, start fresh
-- `/resume` — Continue last session (auto if session exists)
-- `/history` — Show recent prompts with costs
+**REPL commands:**
+- `/allow Tool` — Approve a specific tool permanently
+- `/allow all` — Approve all tools
+- `/tools` — Show current approval status
+- `/reset` — Clear permissions, history, and cost
 
-### Agent Permission Configuration
+### CLI Arguments
 
-Configure per-agent permission handling in `~/.vantage/config.json`:
-
-```json
-{
-  "agents": {
-    "claude": {
-      "permissionMode": "acceptEdits",
-      "allowedTools": ["Bash(git:*)", "Read", "Edit", "Write", "Glob", "Grep"],
-      "readAgentConfig": true
-    },
-    "codex": {
-      "approvalMode": "auto-edit"
-    }
-  }
-}
 ```
-
-**Permission modes for Claude:**
-| Mode | Behavior |
-|------|----------|
-| `default` | Prompts user (blocks in -p mode) |
-| `acceptEdits` | Auto-approves file edits, denies others |
-| `plan` | Read-only, all else denied |
-| `auto` | AI classifier checks actions |
-| `bypassPermissions` | Skip all checks (not recommended) |
-
-### Agent Config Auto-Detection
-
-When `readAgentConfig: true`, vantage reads the agent's native config:
-- **Claude**: `~/.claude/settings.json` → model, MCP servers, permission mode
-- **Codex**: `~/.codex/config.toml` → model, approval mode
-- **Gemini**: `~/.gemini/settings.json` → MCP servers
-
-This enables accurate cost calculation (real model vs hardcoded default) and automatic tool pre-approval based on installed MCP servers.
+vantage-agent                           # Start interactive REPL
+vantage-agent "fix the bug"             # One-shot mode
+echo "fix the bug" | vantage-agent      # Pipe mode
+vantage-agent --model claude-opus-4-6   # Use specific model
+vantage-agent --no-optimize             # Disable prompt optimization
+vantage-agent --api-key sk-ant-...      # Provide API key
+vantage-agent --vantage-key vnt_...     # Enable dashboard telemetry
+vantage-agent --debug                   # Enable debug output
+```
