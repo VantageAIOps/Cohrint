@@ -78,8 +78,19 @@ events.post('/', async (c) => {
   // Broadcast to SSE subscribers via KV pub channel
   await broadcastEvent(c.env.KV, orgId, body);
 
-  // Invalidate analytics summary cache for this org
-  try { await c.env.KV.delete(`analytics:summary:${orgId}`); } catch { /* best-effort */ }
+  // Invalidate all analytics caches so charts reflect new events immediately
+  try {
+    await Promise.all([
+      c.env.KV.delete(`analytics:summary:${orgId}`),
+      c.env.KV.delete(`analytics:summary:${orgId}:all`),
+      c.env.KV.delete(`analytics:kpis:${orgId}:7:all`),
+      c.env.KV.delete(`analytics:kpis:${orgId}:30:all`),
+      c.env.KV.delete(`analytics:kpis:${orgId}:90:all`),
+      c.env.KV.delete(`analytics:timeseries:${orgId}:7:all`),
+      c.env.KV.delete(`analytics:timeseries:${orgId}:30:all`),
+      c.env.KV.delete(`analytics:timeseries:${orgId}:90:all`),
+    ]);
+  } catch { /* best-effort */ }
 
   return c.json({ ok: true, id: body.event_id }, 201);
 });
@@ -128,8 +139,19 @@ events.post('/batch', async (c) => {
     await broadcastEvent(c.env.KV, orgId, body.events[body.events.length - 1]);
   }
 
-  // Invalidate analytics summary cache for this org
-  try { await c.env.KV.delete(`analytics:summary:${orgId}`); } catch { /* best-effort */ }
+  // Invalidate all analytics caches so charts reflect new batch immediately
+  try {
+    await Promise.all([
+      c.env.KV.delete(`analytics:summary:${orgId}`),
+      c.env.KV.delete(`analytics:summary:${orgId}:all`),
+      c.env.KV.delete(`analytics:kpis:${orgId}:7:all`),
+      c.env.KV.delete(`analytics:kpis:${orgId}:30:all`),
+      c.env.KV.delete(`analytics:kpis:${orgId}:90:all`),
+      c.env.KV.delete(`analytics:timeseries:${orgId}:7:all`),
+      c.env.KV.delete(`analytics:timeseries:${orgId}:30:all`),
+      c.env.KV.delete(`analytics:timeseries:${orgId}:90:all`),
+    ]);
+  } catch { /* best-effort */ }
 
   return c.json({
     ok:       true,

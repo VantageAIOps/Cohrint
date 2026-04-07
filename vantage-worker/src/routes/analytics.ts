@@ -146,6 +146,15 @@ analytics.get('/timeseries', async (c) => {
   const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
   const since  = Math.floor(Date.now() / 1000) - period * 86_400;
 
+  const tsCacheKey = `analytics:timeseries:${orgId}:${period}:${scopeTeam ?? 'all'}`;
+  try {
+    const cached = await c.env.KV.get(tsCacheKey);
+    if (cached) return c.json(JSON.parse(cached));
+  } catch { /* KV unavailable */ }
+
+  // DATE(created_at, 'unixepoch') always produces UTC dates; the frontend
+  // must parse them as UTC (e.g. new Date(raw + 'T00:00:00Z')) so daily
+  // buckets line up correctly across timezones.
   const { results } = await c.env.DB.prepare(`
     SELECT
       DATE(created_at, 'unixepoch') AS date,
@@ -158,7 +167,9 @@ analytics.get('/timeseries', async (c) => {
     ORDER BY date ASC
   `).bind(orgId, since, ...args).all();
 
-  return c.json({ period, series: results });
+  const tsResult = { period, series: results };
+  try { await c.env.KV.put(tsCacheKey, JSON.stringify(tsResult), { expirationTtl: 300 }); } catch { /* best-effort */ }
+  return c.json(tsResult);
 });
 
 // ── GET /v1/analytics/models?period=30 ───────────────────────────────────────

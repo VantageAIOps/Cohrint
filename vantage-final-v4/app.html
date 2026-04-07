@@ -1703,9 +1703,10 @@ function renderDailyChart(summary, timeseries) {
   if (daily.length > 0) {
     labels = daily.map(function(d) {
       var raw = d.date || d.day || '';
-      var parts = raw.split('-');
-      var dt = parts.length === 3 ? new Date(+parts[0], +parts[1] - 1, +parts[2]) : new Date(raw);
-      return (dt.getMonth() + 1) + '/' + dt.getDate();
+      // Backend returns UTC dates (YYYY-MM-DD); append T00:00:00Z so the
+      // browser interprets them as UTC midnight, not local midnight.
+      var dt = new Date(raw.length === 10 ? raw + 'T00:00:00Z' : raw);
+      return (dt.getUTCMonth() + 1) + '/' + dt.getUTCDate();
     });
 
     // timeseries items: { date, cost_usd, tokens, requests } — aggregate only, no per-provider breakdown
@@ -2106,9 +2107,9 @@ function renderSpendTrend(timeseries) {
 
   var labels = data.map(function(d) {
     var raw = d.date || d.day || '';
-    var parts = raw.split('-');
-    var dt = parts.length === 3 ? new Date(+parts[0], +parts[1] - 1, +parts[2]) : new Date(raw);
-    return (dt.getMonth() + 1) + '/' + dt.getDate();
+    // Force UTC parse so the day label matches the UTC date from the backend.
+    var dt = new Date(raw.length === 10 ? raw + 'T00:00:00Z' : raw);
+    return (dt.getUTCMonth() + 1) + '/' + dt.getUTCDate();
   });
   var values = data.map(function(d) { return d.cost_usd || d.total_cost || d.cost || 0; });
 
