@@ -24,11 +24,12 @@ Default behaviour (no flags):
   Runs ALL discovered suites except the opt-in-only ones below.
   New suites are automatically included — no whitelist needed.
   Opt-in-only (excluded by default, included via flag or --all):
-    06, 07, 08  — stress / load / latency (--all)
-    09, 10      — security + rate-limiting (--security / --all)
-    11, 12      — external integrations   (--integrations / --all)
-    14          — superadmin              (--superadmin / --all)
-    15          — cross-browser           (--cross-browser / --all)
+    06, 07, 08        — stress / load / latency (--all)
+    09, 10            — security + rate-limiting (--security / --all)
+    11, 12            — external integrations   (--integrations / --all)
+    14                — superadmin              (--superadmin / --all)
+    15                — cross-browser           (--cross-browser / --all)
+    17, 18, 26, 27    — post-deploy (require live worker; run via post-deploy-verify.yml)
 """
 
 import os
@@ -79,10 +80,14 @@ CAT_INTEGRATIONS  = {"11_integrations", "12_mcp"}
 CAT_SUPERADMIN    = {"14_superadmin"}
 CAT_CROSS_BROWSER = {"15_cross_browser"}
 CAT_BROWSER       = {"02_ui", "13_dashboard"}
+# Deployment-dependent suites — require latest worker live on production.
+# Run via post-deploy-verify.yml after wrangler deploy, not in the PR gate.
+CAT_POST_DEPLOY   = {"17_otel", "18_sdk_privacy", "26_cli_integration", "27_sdk_integration"}
 
 # Combined set of all opt-in-only suites (used to compute the default inclusion set)
 CAT_OPT_IN_ONLY = (
     CAT_HEAVY | CAT_SECURITY_RL | CAT_INTEGRATIONS | CAT_SUPERADMIN | CAT_CROSS_BROWSER
+    | CAT_POST_DEPLOY
 )
 
 
