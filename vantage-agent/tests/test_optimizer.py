@@ -3,6 +3,7 @@ import pytest
 from vantage_agent.optimizer import (
     compress_prompt,
     count_tokens,
+    looks_like_structured_data,
     optimize_prompt,
     OptimizationResult,
     _compress_prose,
@@ -100,6 +101,35 @@ class TestCompressPrompt:
     def test_short_input_unchanged(self):
         result = compress_prompt("fix bug")
         assert result == "fix bug"
+
+
+class TestLooksLikeStructuredData:
+    def test_json_object(self):
+        assert looks_like_structured_data('{"key": "value"}') is True
+
+    def test_json_array(self):
+        assert looks_like_structured_data('[1, 2, 3]') is True
+
+    def test_fenced_code_block(self):
+        assert looks_like_structured_data("```python\nx=1\n```") is True
+
+    def test_inline_code(self):
+        assert looks_like_structured_data("use `foo()` here") is True
+
+    def test_url_heavy(self):
+        assert looks_like_structured_data("see https://a.com https://b.com https://c.com") is True
+
+    def test_code_like_symbols(self):
+        text = "if (x > 0) { return foo(bar[i]); } else { baz(); }"
+        assert looks_like_structured_data(text) is True
+
+    def test_plain_prose(self):
+        assert looks_like_structured_data("please fix the login bug") is False
+
+    def test_skips_optimization_for_json(self):
+        result = optimize_prompt('{"key": "value", "nested": {"a": 1}}')
+        assert result.saved_tokens == 0
+        assert result.optimized == result.original
 
 
 class TestOptimizePrompt:

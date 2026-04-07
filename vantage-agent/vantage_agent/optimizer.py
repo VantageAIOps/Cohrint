@@ -95,6 +95,29 @@ FILLER_WORDS_RE = re.compile(
 
 
 # ---------------------------------------------------------------------------
+# Structured data detection — skip optimization for code/JSON/URLs
+# ---------------------------------------------------------------------------
+
+def looks_like_structured_data(text: str) -> bool:
+    """Return True if text is JSON, code, or URL-heavy (should skip optimizer)."""
+    trimmed = text.strip()
+    if trimmed.startswith("{") or trimmed.startswith("["):
+        return True
+    if trimmed.startswith("```"):
+        return True
+    if re.search(r"```[\s\S]*?```", text):
+        return True
+    if re.search(r"`[^`\n]+`", text):
+        return True
+    if len(re.findall(r"https?://", text)) > 2:
+        return True
+    symbols = len(re.findall(r"[{}()\[\];=<>]", text))
+    if symbols > len(text) * 0.1:
+        return True
+    return False
+
+
+# ---------------------------------------------------------------------------
 # Token counting
 # ---------------------------------------------------------------------------
 
@@ -186,7 +209,14 @@ class OptimizationResult:
 
 
 def optimize_prompt(prompt: str) -> OptimizationResult:
-    """Optimize a prompt and return before/after stats."""
+    """Optimize a prompt and return before/after stats. Skips structured data."""
+    if looks_like_structured_data(prompt):
+        tokens = count_tokens(prompt)
+        return OptimizationResult(
+            original=prompt, optimized=prompt,
+            original_tokens=tokens, optimized_tokens=tokens,
+            saved_tokens=0, saved_percent=0,
+        )
     optimized = compress_prompt(prompt)
     orig_tokens = count_tokens(prompt)
     opt_tokens = count_tokens(optimized)
