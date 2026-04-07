@@ -286,8 +286,11 @@ admin.patch('/org', async (c) => {
   return c.json({ ok: true });
 });
 
-// ── GET /audit-log — all orgs, admin only ────────────────────────────────────
-
-// /v1/admin/audit-log is intentionally disabled — org audit log is at /v1/audit-log
+// /v1/admin/audit-log is intentionally disabled for org API keys.
+// The org audit log is at /v1/audit-log.  Return 403 so callers get a
+// proper authorization error rather than a 404 "not found".
+admin.get('/audit-log', (c) => {
+  return c.json({ error: 'Forbidden: use /v1/audit-log for org audit logs' }, 403);
+});
 
 export { admin };
