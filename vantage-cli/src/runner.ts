@@ -69,10 +69,42 @@ function formatToolInput(name: string, input: Record<string, unknown>): string {
 export class ClaudeStreamRenderer {
   private pendingTools = new Map<string, string>(); // tool_use_id → tool name
 
-  process(line: string): { display?: string; tokenText?: string; sessionId?: string } {
+  process(line: string): { display?: string; tokenText?: string; sessionId?: string; outputTokens?: number } {
     if (!line.trim()) return {};
     try {
       const obj = JSON.parse(line) as Record<string, unknown>;
+
+      // ── content_block_delta: real-time text streaming ───────────────────────
+      if (obj["type"] === "content_block_delta") {
+        const delta = obj["delta"] as Record<string, unknown> | undefined;
+        if (delta?.["type"] === "text_delta") {
+          const text = String(delta["text"] ?? "");
+          if (text) return { display: text, tokenText: text };
+        }
+        // input_json_delta, thinking_delta, signature_delta — no display
+        return {};
+      }
+
+      // ── content_block_start: announce tool use before it executes ───────────
+      if (obj["type"] === "content_block_start") {
+        const block = obj["content_block"] as Record<string, unknown> | undefined;
+        if (block?.["type"] === "tool_use") {
+          const toolName = String(block["name"] ?? "Tool");
+          const toolId   = String(block["id"]   ?? "");
+          if (toolId) this.pendingTools.set(toolId, toolName);
+          return { display: `\n${TOOL_BULLET} ${toolName}\n` };
+        }
+        return {};
+      }
+
+      // ── message_delta: token usage stats ────────────────────────────────────
+      if (obj["type"] === "message_delta") {
+        const usage = obj["usage"] as Record<string, unknown> | undefined;
+        const outputTokens = typeof usage?.["output_tokens"] === "number"
+          ? usage["output_tokens"] as number : undefined;
+        if (outputTokens !== undefined) return { outputTokens };
+        return {};
+      }
 
       // ── assistant turn: text + tool_use blocks ──────────────────────────────
       if (obj["type"] === "assistant") {

@@ -2665,3 +2665,62 @@ The Security & Governance view in `app.html` shows:
 ---
 
 *Last updated: 24 March 2026 — v2.3 security & governance (audit logging, security overview API, RBAC dashboard), landing page tests. 332+ test checks across 23 suites.*
+
+## CLI Agent Integration Configuration
+
+_Added: 2026-04-07_
+
+### Session Persistence
+
+Vantage CLI persists agent session IDs across restarts:
+
+```
+~/.vantage/
+├── config.json              # Main configuration
+├── sessions/
+│   ├── active.json          # { "claude": "session-uuid", "gemini": null }
+│   └── history.jsonl        # Append-only prompt + cost log
+└── state.json               # Lifetime aggregate stats
+```
+
+**Commands:**
+- `/reset` — Clear all session state, start fresh
+- `/resume` — Continue last session (auto if session exists)
+- `/history` — Show recent prompts with costs
+
+### Agent Permission Configuration
+
+Configure per-agent permission handling in `~/.vantage/config.json`:
+
+```json
+{
+  "agents": {
+    "claude": {
+      "permissionMode": "acceptEdits",
+      "allowedTools": ["Bash(git:*)", "Read", "Edit", "Write", "Glob", "Grep"],
+      "readAgentConfig": true
+    },
+    "codex": {
+      "approvalMode": "auto-edit"
+    }
+  }
+}
+```
+
+**Permission modes for Claude:**
+| Mode | Behavior |
+|------|----------|
+| `default` | Prompts user (blocks in -p mode) |
+| `acceptEdits` | Auto-approves file edits, denies others |
+| `plan` | Read-only, all else denied |
+| `auto` | AI classifier checks actions |
+| `bypassPermissions` | Skip all checks (not recommended) |
+
+### Agent Config Auto-Detection
+
+When `readAgentConfig: true`, vantage reads the agent's native config:
+- **Claude**: `~/.claude/settings.json` → model, MCP servers, permission mode
+- **Codex**: `~/.codex/config.toml` → model, approval mode
+- **Gemini**: `~/.gemini/settings.json` → MCP servers
+
+This enables accurate cost calculation (real model vs hardcoded default) and automatic tool pre-approval based on installed MCP servers.

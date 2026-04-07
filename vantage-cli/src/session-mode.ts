@@ -48,11 +48,14 @@ export class AgentSession {
     this._ended = false;
 
     try {
-      // stdin: pipe (we write to it)
-      // stdout: pipe (we relay to terminal ourselves so we can detect when the response ends)
-      // stderr: inherit — agent interactive prompts (file approval, MCP dialogs, etc.)
+      // stdin: pipe so we can write prompts programmatically
+      // stdout + stderr: inherit so the agent runs as a true interactive TTY.
+      //   This lets the agent render permission prompts, MCP tool dialogs,
+      //   colour output, and spinner animations exactly as if run directly.
+      //   Trade-off: we cannot parse the output stream for token/cost tracking
+      //   in session mode — stats are estimated from input tokens only.
       this.child = spawn(cmd, interactiveArgs, {
-        stdio: ["pipe", "pipe", "inherit"],
+        stdio: ["pipe", "inherit", "inherit"],
         env: { ...process.env, TERM: process.env.TERM || "xterm-256color", FORCE_COLOR: "1" },
       });
     } catch (err) {
@@ -66,27 +69,6 @@ export class AgentSession {
       this.child = null;
       return false;
     }
-
-    // Relay child stdout to terminal and capture sessionId from Claude's JSON stream.
-    // Claude Code emits JSON lines (type=system/result with session_id); plain text passes through.
-    this.child.stdout?.on("data", (chunk: Buffer) => {
-      const text = chunk.toString("utf-8");
-      // Try to extract sessionId from any JSON lines in this chunk
-      for (const line of text.split("\n")) {
-        const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith("{")) continue;
-        try {
-          const obj = JSON.parse(trimmed) as Record<string, unknown>;
-          if (obj["type"] === "system" || obj["type"] === "result") {
-            const sid = obj["session_id"] as string | undefined;
-            if (typeof sid === "string" && /^[0-9a-f-]{36}$/i.test(sid)) {
-              this.capturedSessionId = sid;
-            }
-          }
-        } catch { /* not JSON — ignore */ }
-      }
-      process.stdout.write(chunk);
-    });
 
     this.child.on("error", (err) => {
       if ((err as NodeJS.ErrnoException).code === "ENOENT") {
@@ -167,7 +149,10 @@ export class AgentSession {
       });
     }
 
-    // Forward to agent with backpressure handling
+    // Forward to agent stdin. stdout/stderr are inherited (direct TTY) so the
+    // agent renders its response straight to the terminal — no relaying needed.
+    // We don't wait for the response to finish here; the user interacts directly
+    // with the agent's output until they type the next prompt.
     const ok = this.child.stdin.write(result.forwarded + "\n");
     if (!ok) {
       // stdin buffer is full — wait for drain, but don't hang if stdin closes or errors
@@ -180,7 +165,7 @@ export class AgentSession {
           stdin.removeListener("drain", onDrain);
           stdin.removeListener("close", onClose);
           console.error(`[vantage] stdin drain error: ${err.message}`);
-          resolve(); // Don't reject — let the prompt continue
+          resolve();
         };
         stdin.once("drain", onDrain);
         stdin.once("close", onClose);
@@ -188,52 +173,7 @@ export class AgentSession {
       });
     }
 
-    // Wait for the agent to finish streaming its response before returning.
-    // This prevents the REPL prompt from appearing mid-response.
-    await this.waitForResponseEnd();
-
     return result;
-  }
-
-  /**
-   * Resolves when the agent's stdout has been silent for 300ms (response complete),
-   * or after 5s if no output arrives at all (e.g. agent is processing silently).
-   */
-  private waitForResponseEnd(): Promise<void> {
-    if (!this.child?.stdout) return Promise.resolve();
-    return new Promise((resolve) => {
-      const SILENCE_MS = 300;      // ms of silence = response done
-      const INITIAL_TIMEOUT = 30_000; // max wait for first token (complex tasks need time)
-
-      const stdout = this.child!.stdout!;
-      let silenceTimer: ReturnType<typeof setTimeout> | null = null;
-      let initialTimer: ReturnType<typeof setTimeout> | null = null;
-      let done = false;
-
-      const finish = () => {
-        if (done) return;
-        done = true;
-        if (silenceTimer) clearTimeout(silenceTimer);
-        if (initialTimer) clearTimeout(initialTimer);
-        stdout.removeListener("data", onData);
-        stdout.removeListener("end", finish);
-        resolve();
-      };
-
-      const onData = () => {
-        // Cancel the initial fallback timer on first data
-        if (initialTimer) { clearTimeout(initialTimer); initialTimer = null; }
-        // Reset the silence timer
-        if (silenceTimer) clearTimeout(silenceTimer);
-        silenceTimer = setTimeout(finish, SILENCE_MS);
-      };
-
-      stdout.on("data", onData);
-      // If stdout closes (session ends mid-response), resolve immediately
-      stdout.once("end", finish);
-      // Fallback: resolve if agent produces no output within 5s
-      initialTimer = setTimeout(finish, INITIAL_TIMEOUT);
-    });
   }
 
   /** Check if session is running */
