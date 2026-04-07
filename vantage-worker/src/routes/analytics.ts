@@ -93,6 +93,10 @@ analytics.get('/summary', async (c) => {
     today_cost_usd:   t?.today_cost_usd   ?? 0,
     today_tokens:     t?.today_tokens     ?? 0,
     today_requests:   t?.today_requests   ?? 0,
+    // Aliases used by SDK privacy tests and cross-platform clients
+    total_cost_usd:   t?.today_cost_usd   ?? 0,
+    total_tokens:     t?.today_tokens     ?? 0,
+    total_events:     t?.today_requests   ?? 0,
     mtd_cost_usd:     mtd?.mtd_cost_usd   ?? 0,
     session_cost_usd: s?.session_cost_usd ?? 0,
     budget_pct:       budgetPct,

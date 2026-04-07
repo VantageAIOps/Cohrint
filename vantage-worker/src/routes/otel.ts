@@ -538,8 +538,34 @@ otel.post('/v1/metrics', async (c) => {
       r.timestamp, r.timestamp, JSON.stringify({ metric: r.raw_metric_name }),
     ));
 
-    // Also insert token/cost records into otel_events for /live feed
-    const tokenRecords = records.filter(r => r.input_tokens > 0 || r.output_tokens > 0 || r.cost_usd > 0);
+    // Merge records by (session_id, model, developer_email) before inserting into
+    // otel_events so that per-metric data points (tokens + explicit cost sent as
+    // separate counters) appear as a single row in the /live feed.
+    const mergeKey = (r: ParsedOTelRecord) =>
+      `${r.session_id ?? ''}|${r.model ?? ''}|${r.developer_email ?? ''}`;
+    const mergeMap = new Map<string, ParsedOTelRecord>();
+    for (const r of records) {
+      if (r.input_tokens === 0 && r.output_tokens === 0 && r.cost_usd === 0) continue;
+      const key = mergeKey(r);
+      const existing = mergeMap.get(key);
+      if (!existing) {
+        mergeMap.set(key, { ...r });
+      } else {
+        existing.input_tokens  += r.input_tokens;
+        existing.output_tokens += r.output_tokens;
+        existing.cached_tokens += r.cached_tokens;
+        existing.cache_creation_tokens += r.cache_creation_tokens;
+        // Prefer explicit cost over auto-estimated cost (max wins)
+        if (r.cost_usd > existing.cost_usd) existing.cost_usd = r.cost_usd;
+      }
+    }
+    // Re-run auto-cost on merged records in case merging cleared explicit cost
+    for (const r of mergeMap.values()) {
+      if (r.cost_usd === 0 && (r.input_tokens > 0 || r.output_tokens > 0)) {
+        r.cost_usd = estimateCostUsd(r.model, r.input_tokens, r.output_tokens, r.cached_tokens, r.cache_creation_tokens);
+      }
+    }
+    const tokenRecords = [...mergeMap.values()];
     const eventStmt = c.env.DB.prepare(`
       INSERT INTO otel_events (
         org_id, provider, session_id, developer_email, event_name,
