@@ -13,6 +13,7 @@
 
 import { claudeAdapter } from "./src/agents/claude.js";
 import { readClaudeConfig } from "./src/agent-config.js";
+import type { AgentConfig } from "./src/agents/types.js";
 
 const cmd  = process.argv[2] ?? "";
 const arg1 = process.argv[3] ?? "";
@@ -47,7 +48,7 @@ switch (cmd) {
     if (overrides.allowedTools?.length) {
       extraFlags.push("--allowedTools", overrides.allowedTools.join(","));
     }
-    const result = claudeAdapter.buildCommand("test prompt", { extraFlags } as never);
+    const result = claudeAdapter.buildCommand("test prompt", { extraFlags } as Partial<AgentConfig>);
     console.log(JSON.stringify({ command: result.command, args: result.args }));
     break;
   }
@@ -59,7 +60,7 @@ switch (cmd) {
       extraFlags.push("--permission-mode", overrides.permissionMode);
     }
     const sessionId = arg2 || undefined;
-    const result = claudeAdapter.buildContinueCommand!("test prompt", { extraFlags } as never, sessionId);
+    const result = claudeAdapter.buildContinueCommand!("test prompt", { extraFlags } as Partial<AgentConfig>, sessionId);
     console.log(JSON.stringify({ command: result.command, args: result.args }));
     break;
   }

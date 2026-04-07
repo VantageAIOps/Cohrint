@@ -499,6 +499,41 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
           return;
         }
 
+        if (line === "/resume") {
+          const saved = loadSessionIds();
+          const entries = Object.entries(saved);
+          if (entries.length === 0) {
+            console.log(dim("  No saved sessions. Start prompting to create one."));
+          } else {
+            console.log(dim("  Saved sessions (will auto-resume on next prompt):"));
+            for (const [agent, sid] of entries) {
+              console.log(`  ${dim(agent.padEnd(12))} ${sid.slice(0, 8)}...`);
+              agentSessionIds.set(agent, sid);
+              agentPromptCount.set(agent, 1);
+            }
+            console.log(green("  Sessions restored. Next prompt will use --resume."));
+          }
+          prompt();
+          return;
+        }
+
+        if (line === "/history") {
+          const session = getSession();
+          if (session.history.length === 0) {
+            console.log(dim("  No prompts in this session yet."));
+          } else {
+            console.log(dim(`  Last ${Math.min(session.history.length, 20)} prompts:`));
+            const recent = session.history.slice(-20);
+            for (const h of recent) {
+              const preview = (h.promptPreview ?? "").slice(0, 60);
+              const cost = h.costUsd != null ? `$${h.costUsd.toFixed(6)}` : "";
+              console.log(`  ${dim(preview.padEnd(62))} ${cost}`);
+            }
+          }
+          prompt();
+          return;
+        }
+
         if (line === "/tips") {
           const metrics = buildSessionMetrics();
           const tips = getRecommendations(metrics);
