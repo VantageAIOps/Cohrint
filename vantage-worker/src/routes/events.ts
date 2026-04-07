@@ -4,6 +4,23 @@ import { authMiddleware } from '../middleware/auth';
 
 const events = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
+// Invalidate all analytics KV cache keys for an org — including team-scoped
+// variants (e.g. analytics:summary:orgId:engineering). Uses KV.list so new
+// team names never cause stale data.
+async function invalidateOrgAnalyticsCache(kv: KVNamespace, orgId: string): Promise<void> {
+  const prefixes = [
+    `analytics:summary:${orgId}:`,
+    `analytics:kpis:${orgId}:`,
+    `analytics:timeseries:${orgId}:`,
+  ];
+  await Promise.all(prefixes.map(async (prefix) => {
+    const listed = await kv.list({ prefix });
+    if (listed.keys.length > 0) {
+      await Promise.all(listed.keys.map(k => kv.delete(k.name)));
+    }
+  }));
+}
+
 events.use('*', authMiddleware);
 
 // Block viewer-role keys from ingesting events
@@ -78,8 +95,8 @@ events.post('/', async (c) => {
   // Broadcast to SSE subscribers via KV pub channel
   await broadcastEvent(c.env.KV, orgId, body);
 
-  // Invalidate analytics summary cache for this org
-  try { await c.env.KV.delete(`analytics:summary:${orgId}`); } catch { /* best-effort */ }
+  // Invalidate all analytics caches (all scopes including team-scoped variants)
+  try { await invalidateOrgAnalyticsCache(c.env.KV, orgId); } catch { /* best-effort */ }
 
   return c.json({ ok: true, id: body.event_id }, 201);
 });
@@ -128,8 +145,8 @@ events.post('/batch', async (c) => {
     await broadcastEvent(c.env.KV, orgId, body.events[body.events.length - 1]);
   }
 
-  // Invalidate analytics summary cache for this org
-  try { await c.env.KV.delete(`analytics:summary:${orgId}`); } catch { /* best-effort */ }
+  // Invalidate all analytics caches (all scopes including team-scoped variants)
+  try { await invalidateOrgAnalyticsCache(c.env.KV, orgId); } catch { /* best-effort */ }
 
   return c.json({
     ok:       true,
