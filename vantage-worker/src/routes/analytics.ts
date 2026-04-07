@@ -260,6 +260,28 @@ analytics.get('/traces', async (c) => {
   return c.json({ traces: results });
 });
 
+// ── GET /v1/analytics/today — hourly spend for the current UTC day ───────────
+analytics.get('/today', async (c) => {
+  const orgId     = c.get('orgId');
+  const scopeTeam = c.get('scopeTeam');
+  const { clause, args } = teamScope(scopeTeam);
+  const todayStart = Math.floor(Date.now() / 86_400_000) * 86_400;
+
+  const { results } = await c.env.DB.prepare(`
+    SELECT
+      CAST(strftime('%H', datetime(created_at, 'unixepoch')) AS INTEGER) AS hour,
+      SUM(cost_usd)   AS cost_usd,
+      SUM(total_tokens) AS tokens,
+      COUNT(*)        AS requests
+    FROM events
+    WHERE org_id = ? AND created_at >= ?${clause}
+    GROUP BY hour
+    ORDER BY hour ASC
+  `).bind(orgId, todayStart, ...args).all();
+
+  return c.json({ date: new Date(todayStart * 1000).toISOString().slice(0, 10), hours: results });
+});
+
 // ── GET /v1/analytics/cost — CI cost gate ────────────────────────────────────
 analytics.get('/cost', async (c) => {
   const orgId     = c.get('orgId');

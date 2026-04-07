@@ -824,12 +824,23 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
           </div>
         </div>
 
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">Daily Spend Trend</div>
+        <div class="chart-row-equal">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Daily Spend Trend</div>
+            </div>
+            <div style="position:relative; height:240px;">
+              <canvas id="spendTrendChart"></canvas>
+            </div>
           </div>
-          <div style="position:relative; height:240px;">
-            <canvas id="spendTrendChart"></canvas>
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Today — Hourly Spend</div>
+              <div class="card-badge" id="todayDateBadge" style="background:var(--accent-green-dim); color:var(--accent-green);">TODAY</div>
+            </div>
+            <div style="position:relative; height:240px;">
+              <canvas id="todayHourlyChart"></canvas>
+            </div>
           </div>
         </div>
 
@@ -2035,6 +2046,7 @@ function prependLiveItem(ev) {
    ═══════════════════════════════════════════════════════════════════════════ */
 var _spendChart = null;
 var _teamPieChart = null;
+var _todayChart  = null;
 
 function loadSpend() {
   var gen = ++_renderGen;
@@ -2044,6 +2056,7 @@ function loadSpend() {
     apiFetch('/v1/analytics/models?period=' + period).catch(function() { return null; }),
     apiFetch('/v1/analytics/teams?period=' + period).catch(function() { return null; }),
     apiFetch('/v1/cross-platform/summary?days=' + period).catch(function() { return null; }),
+    apiFetch('/v1/analytics/today').catch(function() { return null; }),
   ]).then(function(results) {
     if (gen !== _renderGen) return; // stale render — a newer one is in flight
     _skelOff();
@@ -2051,6 +2064,7 @@ function loadSpend() {
     var models = results[1];
     var teams = results[2];
     var summary = results[3];
+    var todayData = results[4];
 
     if (summary) buildToolTabs(summary);
 
@@ -2082,6 +2096,7 @@ function loadSpend() {
     }
 
     renderSpendTrend(timeseries);
+    renderTodayHourly(todayData);
     renderSpendModels(modelList);
     renderTeamPie(teams);
 
@@ -2142,6 +2157,63 @@ function renderSpendTrend(timeseries) {
       scales: {
         x: { grid: { display: false }, ticks: { color: '#4a5568', font: { family: "'JetBrains Mono'", size: 9 } } },
         y: { grid: { color: '#1e2a3a' }, ticks: { color: '#4a5568', font: { family: "'JetBrains Mono'", size: 9 }, callback: function(v) { return '$' + v; } } },
+      },
+    }
+  });
+}
+
+function renderTodayHourly(todayData) {
+  var canvas = document.getElementById('todayHourlyChart');
+  if (!canvas) return;
+
+  var hours = (todayData && todayData.hours) || [];
+  var dateStr = todayData && todayData.date;
+  if (dateStr) {
+    var badge = document.getElementById('todayDateBadge');
+    if (badge) {
+      var dt = new Date(dateStr + 'T00:00:00Z');
+      badge.textContent = (dt.getUTCMonth() + 1) + '/' + dt.getUTCDate();
+    }
+  }
+
+  // Build a full 0-23 hour axis; fill gaps with 0
+  var byHour = {};
+  hours.forEach(function(h) { byHour[h.hour] = h.cost_usd || 0; });
+  // Only render hours up to the current UTC hour (no future empty bars)
+  var nowHour = new Date().getUTCHours();
+  var labels = [], values = [];
+  for (var h = 0; h <= nowHour; h++) {
+    labels.push(h + ':00');
+    values.push(byHour[h] || 0);
+  }
+
+  if (_todayChart) { _todayChart.destroy(); _todayChart = null; }
+  _todayChart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Spend',
+        data: values,
+        backgroundColor: values.map(function(v, i) {
+          return i === nowHour ? 'rgba(52, 211, 153, 0.9)' : 'rgba(52, 211, 153, 0.45)';
+        }),
+        borderColor: 'rgba(52, 211, 153, 0.8)',
+        borderWidth: 1,
+        borderRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: function(ctx) { return fmt(ctx.raw); } } },
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: '#4a5568', font: { family: "'JetBrains Mono'", size: 8 },
+          maxTicksLimit: 8 } },
+        y: { grid: { color: '#1e2a3a' }, ticks: { color: '#4a5568', font: { family: "'JetBrains Mono'", size: 9 },
+          callback: function(v) { return '$' + v; } } },
       },
     }
   });
