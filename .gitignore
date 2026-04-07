@@ -36,6 +36,19 @@ npm-debug.log*
 # Wrangler
 .wrangler/
 
-# Claude
+# Claude / AI tooling
 .claude/
 CLAUDE.md
+.claudeignore
+.clauderc
+.cursorrules
+.windsurfrules
+.opencode.json
+AGENTS.md
+GEMINI.md
+setup-claude.sh
+
+# Generated / temp
+GIT_MEMORY.md
+.cache/
+*.tmp
