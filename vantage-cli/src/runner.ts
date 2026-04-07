@@ -374,12 +374,17 @@ export function runAgentBuffered(
 
     let child: ReturnType<typeof spawn>;
     try {
+      const stdinMode = process.stdin.isTTY ? "inherit" : "pipe";
       child = spawn(spawnArgs.command, spawnArgs.args, {
-        stdio: ["pipe", "pipe", "pipe"],
+        stdio: [stdinMode, "pipe", "pipe"],
         env: buildSafeEnv(spawnArgs.env),
       });
-      // Pipe host stdin so buffered mode also supports stdin-based workflows
-      process.stdin.pipe(child.stdin!);
+      if (!process.stdin.isTTY) {
+        // Pipe available stdin data; don't close child stdin after so the agent
+        // can still receive interactive input if it asks for it.
+        process.stdin.pipe(child.stdin!, { end: false });
+        process.stdin.once("end", () => { child.stdin?.end(); });
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       reject(new Error(`Failed to start '${spawnArgs.command}': ${msg}`));
