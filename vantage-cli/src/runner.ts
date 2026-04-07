@@ -3,11 +3,20 @@ import type { SpawnArgs } from "./agents/types.js";
 import { bus } from "./event-bus.js";
 import { createSpinner } from "./ui.js";
 
+export interface PermissionDenial {
+  toolName: string;
+  toolInput: Record<string, unknown>;
+}
+
 export interface RunResult {
   exitCode: number;
   stdout: string;
   durationMs: number;
   sessionId?: string;
+  /** Real cost in USD from Claude's result event (if available) */
+  costUsd?: number;
+  /** Tools that Claude tried to use but were denied */
+  permissionDenials: PermissionDenial[];
 }
 
 const MAX_OUTPUT_BYTES = 5 * 1024 * 1024; // 5MB output cap
@@ -321,10 +330,30 @@ export function runAgent(
     const renderer = new ClaudeStreamRenderer();
     let firstChunk = true;
     let truncationWarned = false;
+    let capturedCostUsd: number | undefined;
+    const capturedDenials: PermissionDenial[] = [];
 
     function flushLine(line: string) {
       const { display, tokenText, sessionId } = renderer.process(line);
       if (sessionId) capturedSessionId = sessionId;
+
+      // Extract cost + permission denials from result events
+      try {
+        const obj = JSON.parse(line) as Record<string, unknown>;
+        if (obj["type"] === "result") {
+          if (typeof obj["total_cost_usd"] === "number") capturedCostUsd = obj["total_cost_usd"] as number;
+          const denials = obj["permission_denials"] as Array<Record<string, unknown>> | undefined;
+          if (Array.isArray(denials)) {
+            for (const d of denials) {
+              capturedDenials.push({
+                toolName: String(d["tool_name"] ?? "unknown"),
+                toolInput: (d["tool_input"] as Record<string, unknown>) ?? {},
+              });
+            }
+          }
+        }
+      } catch { /* not JSON */ }
+
       if (!display) return;
       if (firstChunk) {
         stopSpinner();
@@ -388,7 +417,7 @@ export function runAgent(
       if (timedOut) {
         reject(new Error(`Agent timed out after ${Math.round(timeoutMs / 1000)}s`));
       } else {
-        resolve({ exitCode, stdout, durationMs, sessionId: capturedSessionId });
+        resolve({ exitCode, stdout, durationMs, sessionId: capturedSessionId, costUsd: capturedCostUsd, permissionDenials: capturedDenials });
       }
     });
   });
@@ -515,7 +544,7 @@ export function runAgentBuffered(
       if (timedOut) {
         reject(new Error(`Agent timed out after ${Math.round(timeoutMs / 1000)}s`));
       } else {
-        resolve({ exitCode, stdout, durationMs, sessionId: capturedSessionId });
+        resolve({ exitCode, stdout, durationMs, sessionId: capturedSessionId, permissionDenials: [] });
       }
     });
   });

@@ -1,20 +1,20 @@
 #!/usr/bin/env node
 
 import { createInterface } from "node:readline";
+import type readline from "node:readline";
 import { VERSION } from "./_version.js";
 import { loadConfig, configExists, saveConfig, type VantageConfig } from "./config.js";
 import { runSetup } from "./setup.js";
 import { getAgent, detectAll, ALL_AGENTS } from "./agents/registry.js";
 import type { AgentAdapter } from "./agents/types.js";
-import { AgentSession, isAgentCommand } from "./session-mode.js";
 import { optimizePrompt } from "./optimizer.js";
-import { calculateCost, findCheapest, PRICES } from "./pricing.js";
+import { calculateCost, PRICES } from "./pricing.js";
 import { countTokens } from "./optimizer.js";
 import { bus } from "./event-bus.js";
 import { Tracker } from "./tracker.js";
 import { initSession, getSession } from "./session.js";
-import { runAgent, runAgentBuffered } from "./runner.js";
-import { saveSessionIds, loadSessionIds, clearSessionIds } from "./session-persist.js";
+import { runAgent, runAgentBuffered, type PermissionDenial } from "./runner.js";
+import { saveState, loadState, clearState, migrateOldSessions } from "./session-persist.js";
 import { readClaudeConfig } from "./agent-config.js";
 import { looksLikeStructuredData } from "./classify.js";
 import { checkCostAnomaly } from "./anomaly.js";
@@ -37,11 +37,6 @@ import {
 import { getInlineTip, getRecommendations, formatRecommendations, type SessionMetrics } from "./recommendations.js";
 
 const COST_TIMEOUT_MS = 5000;
-// How long the bus listener inside waitForCost stays alive before auto-cleanup.
-// Must be longer than the longest plausible agent run so the cost:calculated
-// event (which fires synchronously inside child.on("close")) is still heard
-// even for slow agents.  The user-facing wait is still COST_TIMEOUT_MS via the
-// outer Promise.race in each call site.
 const COST_LISTEN_MS = 600_000; // 10 minutes
 
 // ---------------------------------------------------------------------------
@@ -55,14 +50,11 @@ function safeNum(v: unknown, fallback = 0): number {
 
 function checkAnomaly(cost: import("./event-bus.js").VantageEvents["cost:calculated"]): void {
   const sess = getSession();
-  // Exclude the current prompt from the baseline (it's already added to totalCostUsd)
   const priorTotal = sess.totalCostUsd - cost.costUsd;
   const priorCount = sess.promptCount - 1;
   checkCostAnomaly(cost.costUsd, priorTotal, priorCount);
 }
 
-// Tracks the active agent so buildSessionMetrics can populate agent/model.
-// Updated whenever the REPL switches agents or main() resolves the active agent.
 let _activeAgentName = "";
 
 function buildSessionMetrics(): SessionMetrics {
@@ -97,7 +89,6 @@ async function showDashboardSummary(config: VantageConfig): Promise<void> {
       "Content-Type": "application/json",
     };
 
-    // Fetch summary + kpis in parallel
     const [summaryRes, kpisRes] = await Promise.all([
       fetch(`${base}/v1/analytics/summary`, { headers, signal: AbortSignal.timeout(10000) }),
       fetch(`${base}/v1/analytics/kpis?period=30`, { headers, signal: AbortSignal.timeout(10000) }),
@@ -140,7 +131,6 @@ async function showDashboardSummary(config: VantageConfig): Promise<void> {
       console.log(`  ${dim("Efficiency:")}     ${effScore}/100`);
     }
 
-    // Local session stats
     const session = getSession();
     if (session.promptCount > 0) {
       console.log(dim("  " + "-".repeat(45)));
@@ -193,7 +183,6 @@ async function showBudgetStatus(config: VantageConfig): Promise<void> {
       console.log(`  ${dim("Used:")}           ${color(budgetPct.toFixed(1) + "%")}`);
       console.log(`  ${dim("Remaining:")}      ${remaining > 0 ? green("$" + remaining.toFixed(2)) : red("OVER BUDGET")}`);
 
-      // Budget alerts
       if (budgetPct >= 100) {
         console.log(red("\n  ⚠ OVER BUDGET — spending exceeds monthly limit!"));
       } else if (budgetPct >= 80) {
@@ -215,10 +204,6 @@ async function showBudgetStatus(config: VantageConfig): Promise<void> {
 // Arg parser
 // ---------------------------------------------------------------------------
 
-/**
- * Known vantage flags consumed locally. All other --flags are forwarded to the agent.
- * Add to this list to prevent a flag from leaking into the agent command.
- */
 const VANTAGE_FLAGS = new Set([
   "agent", "no-optimize", "timeout", "model", "system",
   "debug", "paste-delay",
@@ -227,7 +212,7 @@ const VANTAGE_FLAGS = new Set([
 function parseArgs() {
   const args = process.argv.slice(2);
   const flags: Record<string, string> = {};
-  const agentFlags: string[] = []; // unknown flags forwarded verbatim to the agent
+  const agentFlags: string[] = [];
   const positional: string[] = [];
   for (let i = 0; i < args.length; i++) {
     if (args[i].startsWith("--")) {
@@ -237,7 +222,6 @@ function parseArgs() {
       if (VANTAGE_FLAGS.has(key)) {
         flags[key] = val;
       } else {
-        // Unknown flag — forward to agent (e.g. --web-search, --memory, --permissions)
         agentFlags.push(args[i]);
         if (val !== "true") agentFlags.push(val);
       }
@@ -253,7 +237,11 @@ function parseArgs() {
 // Core execution logic
 // ---------------------------------------------------------------------------
 
-// looksLikeStructuredData lives in classify.ts so test harnesses can import it directly
+interface ExecuteResult {
+  sessionId?: string;
+  costUsd?: number;
+  permissionDenials: PermissionDenial[];
+}
 
 async function executePrompt(
   prompt: string,
@@ -265,14 +253,13 @@ async function executePrompt(
   noOptimize: boolean = false,
   extraFlags: string[] = [],
   timeoutMs?: number,
-): Promise<string | undefined> {
+): Promise<ExecuteResult> {
   bus.emit("prompt:submitted", {
     prompt,
     agent: agent.name,
     timestamp: Date.now(),
   });
 
-  // Optimize prompt (skip for structured data, or when --no-optimize is set)
   let finalPrompt = prompt;
   if (!noOptimize && config.optimization.enabled && !looksLikeStructuredData(prompt)) {
     const result = optimizePrompt(prompt);
@@ -288,7 +275,7 @@ async function executePrompt(
     }
   }
 
-  // Inject agent-specific flags (permission mode, allowed tools) from config
+  // Inject agent-specific flags from config
   if (agent.name === "claude") {
     const agentCfg = config.agents?.["claude"] as Record<string, unknown> | undefined;
     const permMode = agentCfg?.["permissionMode"] as string | undefined;
@@ -297,7 +284,6 @@ async function executePrompt(
     if (allowedTools?.length) extraFlags.push("--allowedTools", allowedTools.join(","));
   }
 
-  // Build command — use continue if this is a follow-up prompt
   const agentConfig = extraFlags.length > 0 ? { extraFlags } as import("./agents/types.js").AgentConfig : undefined;
   const useContinue = continueConversation && agent.supportsContinue && agent.buildContinueCommand;
   const spawnArgs = useContinue
@@ -308,22 +294,90 @@ async function executePrompt(
     const result = stream
       ? await runAgent(spawnArgs, agent.name, timeoutMs)
       : await runAgentBuffered(spawnArgs, agent.name, timeoutMs);
-    return result.sessionId;
+    return {
+      sessionId: result.sessionId,
+      costUsd: result.costUsd,
+      permissionDenials: result.permissionDenials,
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(red(`  Error running ${agent.displayName}: ${message}`));
     console.error(dim(`  Make sure '${agent.binary}' is installed and in your PATH.`));
-    return undefined;
+    return { permissionDenials: [] };
   }
 }
 
-/** Persist the agentSessionIds map to disk (best-effort). */
-function persistSessions(ids: Map<string, string>): void {
-  try {
-    const obj: Record<string, string> = {};
-    for (const [k, v] of ids) obj[k] = v;
-    saveSessionIds(obj);
-  } catch { /* best-effort — don't crash the REPL */ }
+async function askToolPermission(
+  toolName: string,
+  toolInput: Record<string, unknown>,
+  rl: ReturnType<typeof createInterface>,
+): Promise<"yes" | "always" | "no"> {
+  const preview = Object.entries(toolInput)
+    .map(([k, v]) => `${k}=${typeof v === "string" ? v.slice(0, 50) : JSON.stringify(v)}`)
+    .join(", ");
+  return new Promise((resolve) => {
+    process.stdout.write(yellow(`\n  ⚠ Claude wants to use ${toolName}(${preview})\n`));
+    process.stdout.write(`    ${dim("[y]es once  [a]lways  [n]o")}: `);
+    rl.once("line", (line: string) => {
+      const answer = line.trim().toLowerCase();
+      if (answer === "a" || answer === "always") resolve("always");
+      else if (answer === "n" || answer === "no") resolve("no");
+      else resolve("yes");
+    });
+  });
+}
+
+async function executeWithPermissions(
+  prompt: string,
+  agent: AgentAdapter,
+  config: VantageConfig,
+  stream: boolean,
+  continueConversation: boolean,
+  sessionId: string | undefined,
+  noOptimize: boolean,
+  extraFlags: string[],
+  timeoutMs: number | undefined,
+  allowedTools: Set<string>,
+  rl: ReturnType<typeof createInterface>,
+): Promise<{ sessionId?: string; costUsd?: number }> {
+  const oneTimeTools: string[] = [];
+  let currentFlags = [...extraFlags];
+
+  // Merge persistent allowed tools into flags
+  const allAllowed = [...allowedTools, ...oneTimeTools];
+  if (allAllowed.length > 0) {
+    currentFlags = [...currentFlags, "--allowedTools", allAllowed.join(",")];
+  }
+
+  const result = await executePrompt(
+    prompt, agent, config, stream, continueConversation,
+    sessionId, noOptimize, currentFlags, timeoutMs,
+  );
+
+  if (result.permissionDenials.length > 0) {
+    const retryTools: string[] = [...allowedTools];
+    for (const denial of result.permissionDenials) {
+      const answer = await askToolPermission(denial.toolName, denial.toolInput, rl);
+      if (answer === "always") {
+        allowedTools.add(denial.toolName);
+        retryTools.push(denial.toolName);
+      } else if (answer === "yes") {
+        retryTools.push(denial.toolName);
+      }
+      // "no" — don't add
+    }
+
+    if (retryTools.length > 0) {
+      const retryFlags = [...extraFlags, "--allowedTools", retryTools.join(",")];
+      const retryResult = await executePrompt(
+        prompt, agent, config, stream, continueConversation,
+        sessionId, noOptimize, retryFlags, timeoutMs,
+      );
+      return { sessionId: retryResult.sessionId, costUsd: retryResult.costUsd };
+    }
+  }
+
+  return { sessionId: result.sessionId, costUsd: result.costUsd };
 }
 
 function waitForCost(): Promise<import("./event-bus.js").VantageEvents["cost:calculated"] | null> {
@@ -336,9 +390,6 @@ function waitForCost(): Promise<import("./event-bus.js").VantageEvents["cost:cal
       }
     };
     bus.once("cost:calculated", handler);
-    // Auto-remove the listener after a generous window so it never leaks.
-    // This must exceed the longest plausible agent run; the user-facing wait
-    // is controlled by the COST_TIMEOUT_MS race at each call site.
     setTimeout(() => {
       if (!settled) {
         settled = true;
@@ -369,7 +420,6 @@ async function runCompare(
 
   const results: CompareResult[] = [];
 
-  // Run agents sequentially to avoid terminal interleaving
   for (const { agent } of available) {
     console.log(dim(`  Running ${agent.displayName}...`));
     const spawnArgs = agent.buildCommand(prompt);
@@ -405,16 +455,23 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
 
   let currentAgent = getAgent(config.defaultAgent) ?? ALL_AGENTS[0];
   _activeAgentName = currentAgent.name;
-  let activeSession: AgentSession | null = null;
 
-  // Track per-agent prompt count and session ID for --resume support
-  // Restore persisted session IDs so context carries across CLI restarts
+  // Load persisted state
+  migrateOldSessions();
+  const state = loadState();
+  const agentSessionIds = new Map(Object.entries(state.sessionIds));
   const agentPromptCount = new Map<string, number>();
-  const agentSessionIds = new Map<string, string>();
-  const restored = loadSessionIds();
-  for (const [agent, sid] of Object.entries(restored)) {
-    agentSessionIds.set(agent, sid);
-    agentPromptCount.set(agent, 1); // mark as having prior context
+  const allowedTools = new Set(state.allowedTools);
+
+  // Mark agents with persisted sessions as having prior context
+  for (const agent of agentSessionIds.keys()) {
+    agentPromptCount.set(agent, 1);
+  }
+
+  function persistState() {
+    const ids: Record<string, string> = {};
+    for (const [k, v] of agentSessionIds) ids[k] = v;
+    saveState({ sessionIds: ids, allowedTools: [...allowedTools] });
   }
 
   const rl = createInterface({
@@ -423,13 +480,11 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
   });
 
   rl.on("error", (err) => {
-    // Ignore EPIPE and EIO — these happen when terminal closes
     if ((err as NodeJS.ErrnoException).code === "EPIPE" || (err as NodeJS.ErrnoException).code === "EIO") return;
     console.error(red(`  Terminal error: ${err.message}`));
   });
 
-  // Multi-line paste detection: buffer lines that arrive rapidly, then join on pause.
-  // Configurable via --paste-delay <ms> flag or VANTAGE_PASTE_DELAY env var (default 80ms).
+  // Multi-line paste detection
   const PASTE_DELAY_MS = replFlags["paste-delay"]
     ? Number(replFlags["paste-delay"])
     : Number(process.env.VANTAGE_PASTE_DELAY) || 80;
@@ -459,7 +514,6 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
       }
 
       try {
-        // Special commands
         if (line === "/quit" || line === "/exit" || line === "/q") {
           await shutdown();
           return;
@@ -491,45 +545,11 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
         }
 
         if (line === "/reset") {
-          clearSessionIds();
           agentSessionIds.clear();
           agentPromptCount.clear();
-          console.log(green("  Session state cleared. All agent contexts reset."));
-          prompt();
-          return;
-        }
-
-        if (line === "/resume") {
-          const saved = loadSessionIds();
-          const entries = Object.entries(saved);
-          if (entries.length === 0) {
-            console.log(dim("  No saved sessions. Start prompting to create one."));
-          } else {
-            console.log(dim("  Saved sessions (will auto-resume on next prompt):"));
-            for (const [agent, sid] of entries) {
-              console.log(`  ${dim(agent.padEnd(12))} ${sid.slice(0, 8)}...`);
-              agentSessionIds.set(agent, sid);
-              agentPromptCount.set(agent, 1);
-            }
-            console.log(green("  Sessions restored. Next prompt will use --resume."));
-          }
-          prompt();
-          return;
-        }
-
-        if (line === "/history") {
-          const session = getSession();
-          if (session.history.length === 0) {
-            console.log(dim("  No prompts in this session yet."));
-          } else {
-            console.log(dim(`  Last ${Math.min(session.history.length, 20)} prompts:`));
-            const recent = session.history.slice(-20);
-            for (const h of recent) {
-              const preview = (h.promptPreview ?? "").slice(0, 60);
-              const cost = h.costUsd != null ? `$${h.costUsd.toFixed(6)}` : "";
-              console.log(`  ${dim(preview.padEnd(62))} ${cost}`);
-            }
-          }
+          allowedTools.clear();
+          clearState();
+          console.log(dim("  Session reset. All allowed tools cleared."));
           prompt();
           return;
         }
@@ -546,14 +566,21 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
           return;
         }
 
+        if (line === "/agents") {
+          const detected = await detectAll();
+          for (const { agent, detected: found } of detected) {
+            const status = found ? green("✓") : dim("✗");
+            console.log(`  ${status} ${agent.displayName.padEnd(16)} ${dim(agent.name)}`);
+          }
+          prompt();
+          return;
+        }
+
         if (line === "/setup") {
-          // Close REPL readline to avoid stdin conflict with setup's readline
           rl.close();
           try {
             const newConfig = await runSetup();
-            // Update config in-place so all references see new values
             Object.assign(config, newConfig);
-            // Reinitialize tracker with new config
             if (tracker) tracker.stop();
             tracker = new Tracker({
               apiKey: config.vantageApiKey,
@@ -564,7 +591,6 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
               debug: false,
             });
             if (config.tracking.enabled) tracker.start();
-            // Update current agent if changed
             const newAgent = getAgent(config.defaultAgent);
             if (newAgent) currentAgent = newAgent;
             console.log(green("  Config reloaded. REPL restarting...\n"));
@@ -572,91 +598,21 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
             const msg = err instanceof Error ? err.message : String(err);
             console.error(red(`  Setup failed: ${msg}`));
           }
-          // Restart REPL with fresh readline
           await startRepl(config);
           return;
         }
 
-        if (line === "/session" || line.startsWith("/session ")) {
-          const sessionAgent = line.includes(" ")
-            ? getAgent(line.split(" ")[1]) ?? currentAgent
-            : currentAgent;
-
-          activeSession = new AgentSession(sessionAgent);
-          const started = await activeSession.start();
-
-          if (!started || !activeSession.isActive()) {
-            activeSession = null;
-            prompt();
-            return;
+        if (line === "/status") {
+          const session = getSession();
+          console.log("");
+          console.log(`  ${dim("Agent:")}    ${currentAgent.displayName}`);
+          console.log(`  ${dim("Prompts:")} ${session.promptCount}`);
+          console.log(`  ${dim("Cost:")}     $${session.totalCostUsd.toFixed(4)}`);
+          if (allowedTools.size > 0) {
+            console.log(`  ${dim("Allowed tools:")} ${[...allowedTools].join(", ")}`);
           }
-
-          // Enter session sub-REPL with proper termination guard
-          let sessionExiting = false;
-          const sessionPrompt = () => {
-            if (sessionExiting || !activeSession?.isActive()) {
-              // Session ended (agent crashed or exited) — return to main REPL
-              if (!sessionExiting) {
-                sessionExiting = true;
-                activeSession = null;
-                console.log(dim("  Session ended. Returned to VantageAI REPL."));
-              }
-              prompt();
-              return;
-            }
-            // Print newline before prompt — ensures we're on a fresh line even if
-            // the agent's last output didn't include a trailing newline
-            process.stdout.write("\n" + cyan(`  ${sessionAgent.name}> `));
-            handleLine = async (sessionInput: string) => {
-              try {
-                const sLine = sessionInput.trim();
-                if (!sLine) { sessionPrompt(); return; }
-
-                if (sLine === "/exit-session" || sLine === "/exit") {
-                  sessionExiting = true;
-                  await activeSession?.end();
-                  activeSession = null;
-                  console.log(dim("  Returned to VantageAI REPL."));
-                  prompt();
-                  return;
-                }
-
-                if (activeSession?.isActive()) {
-                  const processed = await activeSession.sendLine(sLine);
-                  if (processed?.type === "vantage-command") {
-                    // Handle vantage commands internally
-                    const cmd = sLine.trim().toLowerCase();
-                    if (cmd === "/cost" || cmd === "/summary" || cmd === "/stats") {
-                      await showDashboardSummary(config);
-                    } else if (cmd === "/budget") {
-                      await showBudgetStatus(config);
-                    } else if (cmd === "/help") {
-                      printSessionHelp();
-                    }
-                  }
-                  // Use setImmediate to let stdout drain before re-prompting
-                  setImmediate(sessionPrompt);
-                } else {
-                  sessionExiting = true;
-                  activeSession = null;
-                  console.log(dim("  Session ended unexpectedly. Returned to VantageAI REPL."));
-                  prompt();
-                }
-              } catch (err) {
-                const msg = err instanceof Error ? err.message : String(err);
-                console.error(red(`  Session error: ${msg}`));
-                if (activeSession?.isActive()) {
-                  sessionPrompt();
-                } else {
-                  sessionExiting = true;
-                  activeSession = null;
-                  prompt();
-                }
-              }
-            };
-          };
-
-          sessionPrompt();
+          console.log("");
+          prompt();
           return;
         }
 
@@ -686,7 +642,7 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
           return;
         }
 
-        // Agent prefix commands: /claude, /gemini, /codex, /aider, /chatgpt, etc.
+        // Agent prefix commands: /claude <prompt>, /gemini <prompt>, etc.
         const agentPrefixMatch = line.match(/^\/(\w+)\s+([\s\S]+)$/);
         if (agentPrefixMatch) {
           const [, agentName, rawAgentPrompt] = agentPrefixMatch;
@@ -695,10 +651,14 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
           if (agent && agentPrompt) {
             const costPromise = waitForCost();
             const count = agentPromptCount.get(agent.name) ?? 0;
-            const sid = await executePrompt(agentPrompt, agent, config, true, count > 0, agentSessionIds.get(agent.name));
+            const { sessionId: sid } = await executeWithPermissions(
+              agentPrompt, agent, config, true, count > 0,
+              agentSessionIds.get(agent.name), false, [], undefined,
+              allowedTools, rl,
+            );
             agentPromptCount.set(agent.name, count + 1);
             if (sid) { agentSessionIds.set(agent.name, sid); } else { agentSessionIds.delete(agent.name); }
-            persistSessions(agentSessionIds);
+            persistState();
             try {
               const cost = await Promise.race([
                 costPromise,
@@ -709,9 +669,7 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
                 checkAnomaly(cost);
                 showInlineTip();
               }
-            } catch {
-              // Cost calculation may not fire for all agents
-            }
+            } catch { /* cost may not fire for all agents */ }
           } else if (!agent) {
             console.log(red(`  Unknown agent: ${agentName}`));
           }
@@ -725,36 +683,28 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
           const agent = getAgent(switchMatch[1]);
           if (agent) {
             currentAgent = agent;
+            _activeAgentName = agent.name;
             console.log(green(`  Switched to ${agent.displayName}`));
           }
           prompt();
           return;
         }
 
-        // Detect agent commands used outside session mode
-        if (line.startsWith("/") && !line.startsWith("/compare") && !line.startsWith("/default")) {
-          const cmd = line.split(/\s/)[0].toLowerCase();
-          if (isAgentCommand(currentAgent.name, line)) {
-            console.log(yellow(`  '${cmd}' is a ${currentAgent.displayName} command.`));
-            console.log(dim(`  Use /session to start an interactive session with agent commands.`));
-            prompt();
-            return;
-          }
-        }
-
         // Normal prompt — use current default agent
         const costPromise = waitForCost();
         const count = agentPromptCount.get(currentAgent.name) ?? 0;
-        const sid = await executePrompt(line, currentAgent, config, true, count > 0, agentSessionIds.get(currentAgent.name));
+        const { sessionId: sid } = await executeWithPermissions(
+          line, currentAgent, config, true, count > 0,
+          agentSessionIds.get(currentAgent.name), false, [], undefined,
+          allowedTools, rl,
+        );
         agentPromptCount.set(currentAgent.name, count + 1);
-        // Always update the session ID map — clear stale ID if sid is undefined so
-        // the next prompt doesn't try to resume a session that no longer applies
         if (sid) {
           agentSessionIds.set(currentAgent.name, sid);
         } else {
           agentSessionIds.delete(currentAgent.name);
         }
-        persistSessions(agentSessionIds);
+        persistState();
         try {
           const cost = await Promise.race([
             costPromise,
@@ -765,9 +715,7 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
             checkAnomaly(cost);
             showInlineTip();
           }
-        } catch {
-          // Cost calculation may not fire for all agents
-        }
+        } catch { /* cost may not fire for all agents */ }
 
         prompt();
       } catch (err) {
@@ -779,7 +727,6 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
   };
 
   const shutdown = async () => {
-    // Cancel any pending paste timer to prevent it firing after REPL closes
     if (pasteTimer) {
       clearTimeout(pasteTimer);
       pasteTimer = null;
@@ -788,21 +735,13 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
       console.warn(`[vantage] Discarded ${pasteBuffer.length} buffered lines on exit`);
       pasteBuffer = [];
     }
-    // Clean up active session first
-    if (activeSession?.isActive()) {
-      await activeSession.end().catch(() => {});
-      activeSession = null;
-    }
     rl.close();
     await tracker?.flush().catch(() => {});
     printSessionSummary(getSession());
     process.exit(0);
   };
 
-  // Wire readline 'line' events through paste-detection buffer
   rl.on("line", onLineReceived);
-
-  // Handle Ctrl+C, SIGTERM, and SIGHUP — clean up session + tracker before exit
   rl.on("SIGINT", () => { shutdown().catch(() => process.exit(1)); });
   process.on("SIGTERM", () => { shutdown().catch(() => process.exit(1)); });
   process.on("SIGHUP", () => { shutdown().catch(() => process.exit(1)); });
@@ -812,51 +751,27 @@ async function startRepl(config: VantageConfig, replFlags: Record<string, string
 
 function printHelp(): void {
   console.log("");
-  console.log(bold("  VantageAI CLI Commands"));
+  console.log(bold("  VantageAI Commands"));
   console.log(dim("  " + "-".repeat(50)));
-  console.log(`  ${cyan("/claude <prompt>")}    Run prompt with Claude Code`);
-  console.log(`  ${cyan("/gemini <prompt>")}    Run prompt with Gemini CLI`);
-  console.log(`  ${cyan("/codex <prompt>")}     Run prompt with Codex CLI`);
-  console.log(`  ${cyan("/aider <prompt>")}     Run prompt with Aider`);
-  console.log(`  ${cyan("/chatgpt <prompt>")}   Run prompt with ChatGPT CLI`);
-  console.log(`  ${cyan("/compare <prompt>")}   Compare all agents side by side`);
-  console.log(`  ${cyan("/cost")}               Show session cost summary`);
-  console.log(`  ${cyan("/summary")}              Dashboard summary (spend, tokens, budget)`);
-  console.log(`  ${cyan("/budget")}               Check budget status and alerts`);
-  console.log(`  ${cyan("/tips")}                Show cost-saving recommendations`);
-  console.log(`  ${cyan("/session [agent]")}   Start interactive session (supports /compact, /clear, @file, !shell)`);
-  console.log(`  ${cyan("/exit-session")}      Return to VantageAI REPL from session`);
+  console.log(`  ${cyan("/cost")}               Show cost summary`);
+  console.log(`  ${cyan("/agents")}             List available agents`);
   console.log(`  ${cyan("/default <agent>")}    Set default agent`);
-  console.log(`  ${cyan("/setup")}              Run setup wizard (API key, agent, privacy)`);
+  console.log(`  ${cyan("/compare <prompt>")}   Compare agents side by side`);
+  console.log(`  ${cyan("/summary")}            Dashboard summary (spend, tokens, budget)`);
+  console.log(`  ${cyan("/budget")}             Check budget status and alerts`);
+  console.log(`  ${cyan("/tips")}               Show cost-saving recommendations`);
+  console.log(`  ${cyan("/status")}             Show current agent, cost, allowed tools`);
+  console.log(`  ${cyan("/reset")}              Clear session & allowed tools`);
+  console.log(`  ${cyan("/setup")}              Run setup wizard`);
   console.log(`  ${cyan("/help")}               Show this help`);
-  console.log(`  ${cyan("/quit")}               Exit VantageAI CLI`);
+  console.log(`  ${cyan("/quit")}               Exit`);
   console.log("");
-  console.log(dim("  Or just type a prompt to use the current default agent."));
+  console.log(dim("  Agent shorthand:"));
+  console.log(dim("    /claude <prompt>   Send to specific agent"));
   console.log("");
-}
-
-function printSessionHelp(): void {
-  console.log("");
-  console.log(bold("  Session Commands"));
-  console.log(dim("  " + "-".repeat(55)));
-  console.log(bold("  Optimization:"));
-  console.log(`  ${cyan("/opt-auto")}          Optimize prompts ≥5 words (default)`);
-  console.log(`  ${cyan("/opt-off")}           Disable optimization entirely`);
-  console.log(`  ${cyan("/opt-ask")}           Ask before each optimization`);
-  console.log(`  ${cyan("/opt-always")}        Optimize everything`);
-  console.log(bold("  Dashboard:"));
-  console.log(`  ${cyan("/cost")}              Show session cost & savings`);
-  console.log(`  ${cyan("/summary")}           Dashboard stats from API`);
-  console.log(`  ${cyan("/budget")}            Budget status & alerts`);
-  console.log(bold("  Session:"));
-  console.log(`  ${cyan("/exit-session")}      Return to VantageAI REPL`);
-  console.log(`  ${cyan("/help")}              Show this help`);
-  console.log("");
-  console.log(dim("  Agent commands pass through directly:"));
-  console.log(dim("    /compact, /clear, /diff, /mcp, @file, !shell, y, n, 1, 2, paths"));
-  console.log("");
-  console.log(dim("  The agent's stderr is inherited — file approval prompts,"));
-  console.log(dim("  git confirmations, and MCP dialogs show directly to you."));
+  console.log(dim("  Tips:"));
+  console.log(dim("    Prompts are auto-optimized to save tokens."));
+  console.log(dim("    Tool permissions are asked on first use."));
   console.log("");
 }
 
@@ -865,11 +780,10 @@ function printSessionHelp(): void {
 // ---------------------------------------------------------------------------
 
 async function readStdin(): Promise<string> {
-  const MAX_STDIN_BYTES = 1024 * 1024; // 1MB max prompt from pipe
+  const MAX_STDIN_BYTES = 1024 * 1024;
   const chunks: Buffer[] = [];
   let totalBytes = 0;
 
-  // Timeout: configurable via VANTAGE_STDIN_TIMEOUT (ms), default 30s
   const stdinTimeoutMs = Number(process.env.VANTAGE_STDIN_TIMEOUT) || 30_000;
   const timeout = setTimeout(() => {
     process.stdin.destroy();
@@ -904,32 +818,27 @@ let tracker: Tracker | null = null;
 async function main(): Promise<void> {
   const { flags, agentFlags, prompt: cliPrompt } = parseArgs();
 
-  // Load or create config
   let config: VantageConfig;
   if (configExists()) {
     config = loadConfig();
   } else {
-    // Check if we're in a pipe — skip setup wizard
     if (!process.stdin.isTTY) {
-      config = loadConfig(); // Returns defaults
+      config = loadConfig();
     } else {
       config = await runSetup();
     }
   }
 
-  // Override agent from flag
   const agentName = flags.agent ?? config.defaultAgent;
   const agent = getAgent(agentName) ?? ALL_AGENTS[0];
   _activeAgentName = agent.name;
 
-  // Build extra flags for the agent from named flags + unknown passthrough flags
   const extraAgentFlags: string[] = [...agentFlags];
   if (flags.model) extraAgentFlags.push("--model", flags.model);
   if (flags.system) extraAgentFlags.push("--system", flags.system);
   const noOptimize = flags["no-optimize"] === "true";
   const timeoutMs = flags.timeout ? Number(flags.timeout) : undefined;
 
-  // Initialize session and tracker
   initSession();
 
   tracker = new Tracker({
@@ -945,7 +854,7 @@ async function main(): Promise<void> {
     tracker.start();
   }
 
-  // Mode 1: One-shot with CLI prompt
+  // One-shot with CLI prompt
   if (cliPrompt) {
     const costPromise = waitForCost();
     await executePrompt(cliPrompt, agent, config, true, false, undefined, noOptimize, extraAgentFlags, timeoutMs);
@@ -959,42 +868,35 @@ async function main(): Promise<void> {
         checkAnomaly(cost);
         showInlineTip();
       }
-    } catch {
-      // Cost may not be available
-    }
-    // Wait for tracker to drain before exit to avoid dropped events
+    } catch { /* cost may not be available */ }
     await tracker.flush().catch(() => {});
     process.exit(0);
   }
 
-  // Mode 2: Pipe mode
+  // Pipe mode
   if (!process.stdin.isTTY) {
     const stdinPrompt = await readStdin();
     if (!stdinPrompt || stdinPrompt.trim() === "") {
       process.exit(0);
     }
-    if (stdinPrompt) {
-      const costPromise = waitForCost();
-      await executePrompt(stdinPrompt, agent, config, true, false, undefined, noOptimize, extraAgentFlags, timeoutMs);
-      try {
-        const cost = await Promise.race([
-          costPromise,
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), COST_TIMEOUT_MS)),
-        ]);
-        if (cost) {
-          printCostSummary(cost, getSession());
-          checkAnomaly(cost);
-          showInlineTip();
-        }
-      } catch {
-        // Cost may not be available
+    const costPromise = waitForCost();
+    await executePrompt(stdinPrompt, agent, config, true, false, undefined, noOptimize, extraAgentFlags, timeoutMs);
+    try {
+      const cost = await Promise.race([
+        costPromise,
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), COST_TIMEOUT_MS)),
+      ]);
+      if (cost) {
+        printCostSummary(cost, getSession());
+        checkAnomaly(cost);
+        showInlineTip();
       }
-    }
+    } catch { /* cost may not be available */ }
     await tracker.flush().catch(() => {});
     process.exit(0);
   }
 
-  // Mode 3: REPL
+  // REPL mode
   await startRepl(config, flags);
 }
 
@@ -1029,13 +931,11 @@ main().catch((err) => {
   process.exit(1);
 });
 
-// Fire-and-forget — does not block startup
 checkForUpdate();
 
 process.on("unhandledRejection", (reason) => {
   const msg = reason instanceof Error ? reason.message : String(reason);
   console.error(red(`  Unhandled error: ${msg}`));
-  // In non-interactive mode, exit — can't recover without a REPL
   if (!process.stdin.isTTY) {
     process.exit(1);
   }
