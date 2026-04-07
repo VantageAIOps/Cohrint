@@ -3,18 +3,18 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Docs — VantageAI AI Coding Tool Cost Intelligence SDK & API</title>
-<meta name="description" content="Integration guides, SDK reference and API docs for VantageAI. Track AI coding tool costs across Claude Code, Copilot, Cursor, Gemini CLI and 13+ tools. Python, TypeScript, OTel and CLI setup in 2 minutes.">
-<meta name="keywords" content="AI coding tool cost SDK, Claude Code cost tracking, Copilot spend monitoring, Cursor cost API, VantageAI SDK, AI developer tools FinOps, OTel AI tools, coding assistant cost tracking">
+<meta name="description" content="Integration guides, SDK reference and API docs for VantageAI. Track AI coding agent costs across Claude Code, Codex CLI, and Gemini CLI. Python, TypeScript, OTel and CLI setup in 2 minutes.">
+<meta name="keywords" content="AI coding agent cost SDK, Claude Code cost tracking, Codex CLI spend monitoring, Gemini CLI cost tracking, VantageAI SDK, AI developer tools FinOps, OTel AI tools, coding agent cost tracking">
 <meta name="robots" content="index, follow">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="VantageAI">
 <meta property="og:title" content="VantageAI Docs — AI Coding Tool Cost Intelligence SDK & API">
-<meta property="og:description" content="Track AI coding tool costs across Claude Code, Copilot, Cursor, Gemini CLI and 13+ tools. Python, TypeScript, OTel and CLI setup in 2 minutes.">
+<meta property="og:description" content="Track AI coding agent costs across Claude Code, Codex CLI, and Gemini CLI. Python, TypeScript, OTel and CLI setup in 2 minutes.">
 <meta property="og:url" content="https://vantageaiops.com/docs.html">
 <meta property="og:image" content="https://vantageaiops.com/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="VantageAI Docs — AI Coding Tool Cost Intelligence SDK & API">
-<meta name="twitter:description" content="Track AI coding tool costs across Claude Code, Copilot, Cursor, Gemini CLI and 13+ tools.">
+<meta name="twitter:description" content="Track AI coding agent costs across Claude Code, Codex CLI, and Gemini CLI.">
 <meta name="twitter:image" content="https://vantageaiops.com/og-image.png">
 <link rel="canonical" href="https://vantageaiops.com/docs.html">
 <link rel="manifest" href="/manifest.json">
@@ -24,7 +24,7 @@
   "@context": "https://schema.org",
   "@type": "TechArticle",
   "headline": "VantageAI SDK & API Documentation",
-  "description": "Integration guides and API reference for VantageAI LLM cost tracking. Supports Python, JavaScript, OpenAI, Anthropic, Google and Mistral.",
+  "description": "Integration guides and API reference for VantageAI LLM cost tracking. Supports Claude Code, Codex CLI (OpenAI), and Gemini CLI.",
   "url": "https://vantageaiops.com/docs.html",
   "publisher": { "@type": "Organization", "name": "VantageAI", "url": "https://vantageaiops.com" },
   "breadcrumb": {
@@ -205,8 +205,6 @@ pre{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;pad
     <div class="docs-nav-group">
       <div class="docs-nav-sec" onclick="toggleNavGroup(this)">Editor integrations</div>
       <a class="docs-nav-item" onclick="show('mcp',this)">MCP server</a>
-      <a class="docs-nav-item" onclick="show('cursor',this)">Cursor</a>
-      <a class="docs-nav-item" onclick="show('windsurf',this)">Windsurf</a>
       <a class="docs-nav-item" onclick="show('claudecode',this)">Claude Code</a>
       <a class="docs-nav-item" onclick="show('vscode',this)">VS Code</a>
       <a class="docs-nav-item" onclick="show('zed',this)">Zed / JetBrains</a>
@@ -216,10 +214,8 @@ pre{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;pad
       <div class="docs-nav-sec" style="color:var(--ac)" onclick="toggleNavGroup(this)">Cross-Platform (NEW)</div>
       <a class="docs-nav-item" onclick="show('otel-setup',this)">OTel Setup (all tools)</a>
       <a class="docs-nav-item" onclick="show('otel-claude',this)">Claude Code</a>
-      <a class="docs-nav-item" onclick="show('otel-copilot',this)">GitHub Copilot</a>
       <a class="docs-nav-item" onclick="show('otel-gemini',this)">Gemini CLI</a>
       <a class="docs-nav-item" onclick="show('otel-codex',this)">Codex CLI</a>
-      <a class="docs-nav-item" onclick="show('otel-cline',this)">Cline</a>
       <a class="docs-nav-item" onclick="show('otel-pricing',this)">Pricing Engine</a>
       <a class="docs-nav-item" onclick="show('xp-api',this)">Cross-Platform API</a>
     </div>
@@ -297,14 +293,14 @@ response = client.chat.completions.<span class="c-fn">create</span>(
 <span class="c-cm">// Every call tracked — cost, tokens, latency, model</span></pre></div>
 
 <h2>Path 2 — OTel (zero code changes)</h2>
-<p>Best for: tracking AI coding tools (Claude Code, Copilot, Gemini CLI, Cursor, Codex) across your org.</p>
+<p>Best for: tracking AI coding agents (Claude Code, Codex CLI, Gemini CLI) across your org.</p>
 <pre><span class="c-cm"># Set 3 env vars on any developer machine</span>
 <span class="c-kw">export</span> CLAUDE_CODE_ENABLE_TELEMETRY=1
 <span class="c-kw">export</span> OTEL_EXPORTER_OTLP_ENDPOINT=<span class="c-str">https://api.vantageaiops.com/v1/otel</span>
 <span class="c-kw">export</span> OTEL_EXPORTER_OTLP_HEADERS=<span class="c-str">"Authorization=Bearer vnt_your_key"</span>
 
 <span class="c-cm"># Now all Claude Code usage is tracked automatically</span>
-<span class="c-cm"># Works with: Claude Code, Copilot, Gemini CLI, Codex, Cline, Aider + more</span></pre>
+<span class="c-cm"># Works with: Claude Code, Codex CLI, Gemini CLI</span></pre>
 
 <h2>Path 3 — CLI Wrapper (terminal users)</h2>
 <p>Best for: developers who use AI CLIs directly and want prompt optimization + cost tracking.</p>
@@ -335,7 +331,7 @@ install: `
 <tbody>
 <tr><td><code>vantageaiops</code></td><td><code>pip install vantageaiops</code></td><td>Python SDK — wrap OpenAI/Anthropic clients</td></tr>
 <tr><td><code>vantageaiops</code></td><td><code>npm install vantageaiops</code></td><td>TypeScript/JS SDK — wrap any LLM client</td></tr>
-<tr><td><code>vantageaiops-mcp</code></td><td><code>npx -y vantageaiops-mcp</code></td><td>MCP server for Cursor, Windsurf, Claude Code, VS Code</td></tr>
+<tr><td><code>vantageaiops-mcp</code></td><td><code>npx -y vantageaiops-mcp</code></td><td>MCP server for Claude Code, Codex CLI, Gemini CLI</td></tr>
 <tr><td><code>vantageai-cli</code></td><td><code>npx vantageai-cli</code></td><td>CLI wrapper — optimize + forward + track</td></tr>
 <tr><td><code>vantageai-local-proxy</code></td><td><code>npx vantageai-local-proxy</code></td><td>Local privacy proxy — zero-trust tracking</td></tr>
 </tbody>
@@ -348,11 +344,13 @@ CLAUDE_CODE_ENABLE_TELEMETRY=1
 OTEL_EXPORTER_OTLP_ENDPOINT=https://api.vantageaiops.com/v1/otel
 OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer vnt_your_key"
 
-<span class="c-cm"># GitHub Copilot (VS Code settings)</span>
-"github.copilot.chat.otel.enabled": true
-
 <span class="c-cm"># Gemini CLI (~/.gemini/settings.json)</span>
-{ "telemetry": { "enabled": true } }</pre>
+{ "telemetry": { "enabled": true, "otlpEndpoint": "https://api.vantageaiops.com/v1/otel" } }
+
+<span class="c-cm"># Codex CLI (~/.codex/config.toml)</span>
+[telemetry]
+enabled = true
+otlp_endpoint = "https://api.vantageaiops.com/v1/otel"</pre>
 
 <h2>Requirements</h2>
 <ul>
@@ -373,10 +371,10 @@ concepts: `
 <table class="api-table">
 <thead><tr><th>Layer</th><th>How</th><th>Coverage</th><th>Latency</th></tr></thead>
 <tbody>
-<tr><td><strong>1. OTel Telemetry</strong></td><td>Native OpenTelemetry from 13+ AI tools</td><td>Claude Code, Copilot, Gemini CLI, Codex, Cline, Aider</td><td>Real-time</td></tr>
+<tr><td><strong>1. OTel Telemetry</strong></td><td>Native OpenTelemetry from AI coding agents</td><td>Claude Code, Codex CLI, Gemini CLI</td><td>Real-time</td></tr>
 <tr><td><strong>2. SDK Proxy</strong></td><td>Drop-in wrapper for LLM API clients</td><td>OpenAI, Anthropic, Google SDKs</td><td>Zero added</td></tr>
-<tr><td><strong>3. CLI Wrapper</strong></td><td>Transparent terminal wrapper</td><td>Any AI CLI (claude, gemini, codex, aider)</td><td>Zero added</td></tr>
-<tr><td><strong>4. Billing APIs</strong></td><td>Hourly sync from provider admin APIs</td><td>Cursor, OpenAI, Anthropic billing</td><td>Hourly</td></tr>
+<tr><td><strong>3. CLI Wrapper</strong></td><td>Transparent terminal wrapper</td><td>Any AI CLI (claude, codex, gemini)</td><td>Zero added</td></tr>
+<tr><td><strong>4. Billing APIs</strong></td><td>Hourly sync from provider admin APIs</td><td>OpenAI, Anthropic billing</td><td>Hourly</td></tr>
 </tbody>
 </table>
 
@@ -384,7 +382,7 @@ concepts: `
 <pre>Developer machine                    VantageAI
 ┌──────────────┐                    ┌──────────────┐
 │ Claude Code  │──OTel──────────────▸│              │
-│ Copilot      │──OTel──────────────▸│  /v1/otel    │
+│ Codex CLI    │──OTel──────────────▸│  /v1/otel    │
 │ Gemini CLI   │──OTel──────────────▸│              │
 │ Your API app │──SDK───────────────▸│  /v1/events  │──▸ Dashboard
 │ vantage CLI  │──tracking──────────▸│              │
@@ -777,8 +775,8 @@ VANTAGE_API_KEY=<span class="c-string">vnt_your_key</span> npx vantageai-local-p
 </div>`,
 
 vscode: `
-<h1>VS Code (MCP via Copilot Chat)</h1>
-<p>VantageAI integrates with VS Code through the <strong>Model Context Protocol (MCP)</strong>, available in VS Code 1.99+ with GitHub Copilot Chat.</p>
+<h1>VS Code (MCP)</h1>
+<p>VantageAI integrates with VS Code through the <strong>Model Context Protocol (MCP)</strong>, available in VS Code 1.99+.</p>
 
 <h2>Setup</h2>
 <div class="step-row"><div class="step-num">1</div><div class="step-body">Create <code>.vscode/mcp.json</code> in your project root:</div></div>
@@ -793,8 +791,8 @@ vscode: `
   }
 }</pre>
 
-<div class="step-row"><div class="step-num">2</div><div class="step-body">Open Copilot Chat (<code>Ctrl+Shift+I</code>) and ask about your AI costs:</div></div>
-<pre><span class="c-comment"># Example prompts in Copilot Chat:</span>
+<div class="step-row"><div class="step-num">2</div><div class="step-body">Open MCP Chat and ask about your AI costs:</div></div>
+<pre><span class="c-comment"># Example prompts:</span>
 "How much have we spent on LLMs this month?"
 "Which model costs the most?"
 "Compare costs for this prompt across all models"
@@ -803,19 +801,8 @@ vscode: `
 <h2>Requirements</h2>
 <ul style="color:var(--muted);font-size:14px;line-height:2;padding-left:20px">
 <li>VS Code <strong>1.99+</strong></li>
-<li>GitHub Copilot extension (for Copilot Chat)</li>
 <li>Node.js 18+ (for <code>npx</code>)</li>
-</ul>
-
-<h2>Also works with Cline</h2>
-<p>If you use the <strong>Cline</strong> VS Code extension, open Cline → MCP Servers → Add Server and paste:</p>
-<pre>{
-  <span class="c-string">"vantage"</span>: {
-    <span class="c-string">"command"</span>: <span class="c-string">"npx"</span>,
-    <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"vantageaiops-mcp"</span>],
-    <span class="c-string">"env"</span>: { <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"vnt_your_key"</span> }
-  }
-}</pre>`,
+</ul>`,
 
 zed: `
 <h1>Zed & JetBrains</h1>
@@ -1546,17 +1533,15 @@ How much will it cost? Is there a cheaper option?"</span>
 <p>VantageAI receives <strong>live telemetry</strong> from your AI coding tools via <a href="https://opentelemetry.io/">OpenTelemetry</a>. No proxy. No SDK wrapper. Just point your tools at our collector endpoint.</p>
 
 <div class="callout callout-green">
-<strong>How it works:</strong> AI coding tools (Claude Code, Copilot, Gemini CLI, etc.) have built-in OpenTelemetry export. You set one environment variable to send telemetry to VantageAI. We receive tokens, cost, model, and developer identity — in real-time.
+<strong>How it works:</strong> AI coding agents (Claude Code, Codex CLI, Gemini CLI) have built-in OpenTelemetry export. You set one environment variable to send telemetry to VantageAI. We receive tokens, cost, model, and developer identity — in real-time.
 </div>
 
 <h2>Supported Tools (Native OTel)</h2>
 <table class="doc-table">
 <tr><th>Tool</th><th>Config</th><th>Metrics Received</th></tr>
 <tr><td><strong>Claude Code</strong></td><td>1 env var</td><td>Tokens, cost (USD), commits, PRs, lines-of-code, active time</td></tr>
-<tr><td><strong>GitHub Copilot</strong></td><td>1 VS Code setting</td><td>Tokens, TTFT, tool calls, agent turns, sessions</td></tr>
 <tr><td><strong>Gemini CLI</strong></td><td>1 JSON setting</td><td>Tokens (5 types), API calls, file ops, compression</td></tr>
 <tr><td><strong>OpenAI Codex CLI</strong></td><td>1 TOML setting</td><td>Tokens, cost, commits, lines modified</td></tr>
-<tr><td><strong>Cline</strong></td><td>1 env var</td><td>Token usage, tool calls</td></tr>
 <tr><td><strong>OpenAI/Anthropic SDK</strong></td><td>Auto-instrumentation</td><td>All API calls — tokens, model, latency</td></tr>
 </table>
 
@@ -1721,7 +1706,7 @@ export CLINE_OTEL_EXPORTER_OTLP_PROTOCOL=http/json</pre>
 
 "otel-pricing": `
 <h1>OTel Pricing Engine — Auto Cost Estimation</h1>
-<p>When AI tools send only token counts via OTel (no explicit cost metric), VantageAI <strong>automatically calculates cost in USD</strong> using its internal pricing table. This is critical for tools like GitHub Copilot and Gemini CLI that emit token counts but not dollar costs.</p>
+<p>When AI agents send only token counts via OTel (no explicit cost metric), VantageAI <strong>automatically calculates cost in USD</strong> using its internal pricing table. This is critical for tools like Gemini CLI that emit token counts but not dollar costs.</p>
 
 <h2>How It Works</h2>
 <div class="step-row"><div class="step-num">1</div><div class="step-body">Tool sends OTel metrics with token counts (e.g., <code>copilot_chat.token.usage</code>)</div></div>
@@ -1753,7 +1738,7 @@ export CLINE_OTEL_EXPORTER_OTLP_PROTOCOL=http/json</pre>
 <div class="info-box">💡 If a tool sends both token counts AND an explicit cost metric (e.g., <code>claude_code.cost.usage</code>), the <strong>explicit cost takes precedence</strong>. Auto-estimation only fills in when <code>cost_usd == 0</code>.</div>
 
 <h2>Dual-Write to Live Feed</h2>
-<p>OTel metrics with token/cost data are also inserted into the <code>otel_events</code> table, powering the <strong>/live</strong> feed in the dashboard. This ensures real-time visibility for metrics-only sources (Copilot, Gemini CLI) — not just tools that send log events.</p>
+<p>OTel metrics with token/cost data are also inserted into the <code>otel_events</code> table, powering the <strong>/live</strong> feed in the dashboard. This ensures real-time visibility for metrics-only sources (Gemini CLI, Codex CLI) — not just tools that send log events.</p>
 `,
 
 "xp-api": `
@@ -1802,7 +1787,7 @@ export CLINE_OTEL_EXPORTER_OTLP_PROTOCOL=http/json</pre>
 
 'vantage-cli': `
 <h1>VantageAI CLI — AI Agent Wrapper</h1>
-<p>A terminal tool that wraps any AI CLI (Claude Code, Codex, Gemini, Aider) with <strong>zero-latency prompt optimization</strong> and <strong>cost tracking</strong>.</p>
+<p>A terminal tool that wraps Claude Code, Codex CLI, or Gemini CLI with <strong>zero-latency prompt optimization</strong> and <strong>cost tracking</strong>.</p>
 
 <h2>Install & Run</h2>
 <pre>npx vantageai-cli</pre>

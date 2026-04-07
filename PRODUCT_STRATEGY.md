@@ -632,3 +632,48 @@ Claude `-p` mode auto-denies unpermitted tools silently. No JSON event emitted. 
 - `--permission-mode acceptEdits` — auto-approves file edits
 - `--allowedTools "Bash(git:*),Read,Edit,Write,Glob,Grep"` — pre-approve specific tools
 - `--permission-mode bypassPermissions` — skip all checks (power users only)
+
+---
+
+## Deferred Agent Support
+
+_Added: 2026-04-08_
+
+### Current v1 Focus
+
+Three CLI agents with native OTel support — all actively maintained and tested:
+
+| Agent | Provider | Integration |
+|-------|----------|-------------|
+| Claude Code | Anthropic | OTel (live) |
+| Codex CLI | OpenAI | OTel (live) |
+| Gemini CLI | Google | OTel (live) |
+
+### Deferred to Future Releases
+
+The following agents are deferred until the multi-agent session layer ships:
+
+- **Cursor** — IDE-based, Billing API + OTel
+- **Windsurf** — IDE-based, OTel
+- **Aider** — CLI, OTel
+- **Cline** — VS Code extension, OTel
+- **Roo Code** — VS Code fork of Cline
+- **OpenCode** — terminal agent (OTel via Dash0 integration)
+- **Kiro** — AWS agent (OTel via Dash0 integration)
+- **GitHub Copilot** — IDE extension, OTel + Billing API
+
+### Deferred Provider Support (UI / Marketing)
+
+The following AI providers are not featured in v1 frontend copy or dashboard UI:
+
+- Meta (Llama) — open-weight, no direct billing API
+- Mistral — API available but low CLI adoption
+- Cohere — enterprise API, no major CLI agent
+- xAI (Grok) — emerging, API in beta
+- DeepSeek — API available, CLI tooling nascent
+
+### Codebase Note
+
+Backend integration code (local-proxy passthrough, OTel parsing, SDK wrappers) for all deferred agents is **preserved in the codebase and not deleted**. Frontend UI and marketing copy is scoped to the three core agents until the multi-agent session layer ships.
+
+See CLI design spec: `docs/superpowers/specs/2026-04-08-cli-multi-backend-cost-intelligence-design.md`
