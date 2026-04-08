@@ -44,7 +44,7 @@ alerts.post('/slack/:orgId', async (c) => {
 
   logAudit(c, {
     event_type:    'admin_action',
-    event_name:    'alert.slack_configured',
+    event_name:    'admin_action.alert_config_changed',
     resource_type: 'alert_config',
   });
 
