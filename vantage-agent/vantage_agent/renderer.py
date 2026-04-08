@@ -100,3 +100,47 @@ def render_permission_denied(tool_name: str) -> None:
 def render_error(msg: str) -> None:
     """Show an error message."""
     console.print(f"  [red bold]Error:[/red bold] {msg}")
+
+
+def render_cost_summary_v2(
+    model: str,
+    input_tokens: int,
+    output_tokens: int,
+    cost_usd: float,
+    prompt_count: int,
+    session_cost: float,
+    token_count_confidence: str = "exact",   # "exact" | "estimated" | "free_tier"
+    is_subscription: bool = False,
+) -> None:
+    """Print cost summary with confidence labels.
+
+    - exact: no prefix, no label
+    - estimated: ~ prefix + (estimated) label
+    - free_tier: ~ prefix + (free tier) label
+    - is_subscription: appends (subscription) regardless of confidence
+    """
+    prefix = "~" if token_count_confidence in ("estimated", "free_tier") else ""
+
+    if token_count_confidence == "free_tier":
+        cost_label = f"{prefix}$0.00 (free tier)"
+        session_label = f"{prefix}$0.00 (free tier)"
+    elif is_subscription:
+        cost_label = f"{prefix}${cost_usd:.4f} (subscription)"
+        session_label = f"{prefix}${session_cost:.4f} (subscription)"
+    elif token_count_confidence == "estimated":
+        cost_label = f"{prefix}${cost_usd:.4f} (estimated)"
+        session_label = f"{prefix}${session_cost:.4f} (estimated)"
+    else:
+        cost_label = f"${cost_usd:.4f}"
+        session_label = f"${session_cost:.4f}"
+
+    console.print()
+    console.print("  [dim]+----- Cost Summary -----+[/dim]")
+    console.print(f"  [dim]Model:[/dim]             {model}")
+    console.print(f"  [dim]Input tokens:[/dim]      {input_tokens:,}")
+    console.print(f"  [dim]Output tokens:[/dim]     {output_tokens:,}")
+    console.print(f"  [dim]Cost:[/dim]              [green]{cost_label}[/green]")
+    console.print(f"  [dim]Session total:[/dim]     [green]{session_label}[/green]")
+    console.print(f"  [dim]Prompts:[/dim]           {prompt_count}")
+    console.print("  [dim]+-------------------------+[/dim]")
+    console.print()

@@ -7,6 +7,7 @@ Ported from vantage-cli/src/tracker.ts.
 """
 from __future__ import annotations
 
+import hashlib
 import threading
 import time
 import uuid
@@ -85,19 +86,39 @@ class Tracker:
         cost_usd: float,
         latency_ms: int,
         agent_name: str = "vantage-agent",
+        session_id: str = "",
     ) -> None:
         """Queue a usage event."""
-        event = DashboardEvent(
-            event_id=str(uuid.uuid4()),
-            provider=PROVIDER_MAP.get(agent_name, "anthropic"),
-            model=model,
-            prompt_tokens=input_tokens,
-            completion_tokens=output_tokens,
-            total_tokens=input_tokens + output_tokens,
-            total_cost_usd=cost_usd,
-            latency_ms=latency_ms,
-            agent_name=agent_name,
-        )
+        raw_event_id = str(uuid.uuid4())
+
+        if self.config.privacy == "anonymized":
+            hashed_id = hashlib.sha256(raw_event_id.encode()).hexdigest()
+            event = DashboardEvent(
+                event_id=hashed_id,
+                provider=PROVIDER_MAP.get(agent_name, "unknown"),
+                model=model,
+                prompt_tokens=input_tokens,
+                completion_tokens=output_tokens,
+                total_tokens=input_tokens + output_tokens,
+                total_cost_usd=cost_usd,
+                latency_ms=latency_ms,
+                agent_name="",
+                team="",
+                session_id=session_id,
+            )
+        else:
+            event = DashboardEvent(
+                event_id=raw_event_id,
+                provider=PROVIDER_MAP.get(agent_name, "unknown"),
+                model=model,
+                prompt_tokens=input_tokens,
+                completion_tokens=output_tokens,
+                total_tokens=input_tokens + output_tokens,
+                total_cost_usd=cost_usd,
+                latency_ms=latency_ms,
+                agent_name=agent_name,
+                session_id=session_id,
+            )
         with self._lock:
             self._queue.append(event)
             if len(self._queue) >= self.config.batch_size:
@@ -110,8 +131,7 @@ class Tracker:
     def _do_flush(self) -> None:
         if not self._queue or not self.config.api_key:
             return
-        batch = self._queue[:]
-        self._queue.clear()
+        batch = self._queue[:]  # snapshot — do NOT clear yet
 
         events = []
         for e in batch:
@@ -134,7 +154,7 @@ class Tracker:
 
         try:
             url = f"{self.config.api_base}/v1/events/batch"
-            httpx.post(
+            resp = httpx.post(
                 url,
                 json={"events": events},
                 headers={
@@ -144,11 +164,18 @@ class Tracker:
                 },
                 timeout=10,
             )
-            if self.config.debug:
-                print(f"  [tracker] flushed {len(events)} events")
+            if resp.status_code < 400:
+                # Only clear on success (2xx/3xx)
+                self._queue = [e for e in self._queue if e not in batch]
+                if self.config.debug:
+                    print(f"  [tracker] flushed {len(events)} events")
+            else:
+                if self.config.debug:
+                    print(f"  [tracker] flush failed: HTTP {resp.status_code} — events retained")
         except Exception as exc:
             if self.config.debug:
-                print(f"  [tracker] flush error: {exc}")
+                print(f"  [tracker] flush error: {exc} — events retained")
+            # Do NOT clear queue — events will retry on next flush
 
     def _schedule_flush(self) -> None:
         if not self._running:

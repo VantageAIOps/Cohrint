@@ -2,9 +2,9 @@
 cli.py — Vantage Agent CLI with interactive REPL.
 
 Usage:
-  vantage-agent                          # Start interactive REPL
-  vantage-agent "fix the bug in main.py" # One-shot prompt
-  vantage-agent --model claude-opus-4-6  # Use a specific model
+  vantageai-agent                          # Start interactive REPL
+  vantageai-agent "fix the bug in main.py" # One-shot prompt
+  vantageai-agent --model claude-opus-4-6  # Use a specific model
 """
 from __future__ import annotations
 
@@ -56,6 +56,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--api-key", default=None, help="Anthropic API key (or set ANTHROPIC_API_KEY)")
     parser.add_argument("--vantage-key", default=None, help="VantageAI dashboard API key for telemetry")
     parser.add_argument("--debug", action="store_true", help="Enable debug output")
+    parser.add_argument(
+        "--backend",
+        choices=["api", "claude", "codex", "gemini"],
+        default=None,
+        help="Backend to use. Auto-detected if not set.",
+    )
+    parser.add_argument(
+        "--resume",
+        metavar="SESSION_ID",
+        default=None,
+        help="Resume a previous session by ID.",
+    )
     return parser.parse_args()
 
 
@@ -270,8 +282,39 @@ def run_oneshot(client: AgentClient, prompt: str, tracker: Tracker | None = None
         sys.exit(1)
 
 
+def _print_summary() -> None:
+    """Print aggregated cost summary across all sessions."""
+    from .session_store import SessionStore
+    store = SessionStore()
+    sessions = store.list_all()
+    if not sessions:
+        console.print("  [dim]No sessions found.[/dim]")
+        return
+    total = store.total_cost_usd()
+    console.print(f"\n  [bold]Sessions:[/bold] {len(sessions)}  |  [bold]Total cost:[/bold] ${total:.4f}\n")
+    for s in sessions[:10]:
+        sid = s.get("id", "?")[:8]
+        backend = s.get("backend", "?")
+        cost = s.get("cost_summary", {}).get("total_cost_usd", 0.0)
+        msgs = len(s.get("messages", []))
+        ts = s.get("last_active_at", "")[:16]
+        console.print(f"  {sid}  [dim]{backend:8s}[/dim]  {msgs // 2:3d} turns  [green]${cost:.4f}[/green]  {ts}")
+    console.print()
+
+
 def main() -> None:
+    # Handle `vantageai-agent summary` before argparse (avoids positional arg conflict)
+    if len(sys.argv) > 1 and sys.argv[1] == "summary":
+        _print_summary()
+        return
+
     args = parse_args()
+
+    # Show backend in banner
+    if args.backend:
+        console.print(f"  [dim]backend:[/dim] {args.backend}")
+    elif args.resume:
+        console.print(f"  [dim]resuming session:[/dim] {args.resume[:8]}...")
 
     try:
         client, tracker = _build_client(args)
