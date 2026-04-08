@@ -1,6 +1,7 @@
 """Token-bucket rate limiter with persistent state in ~/.vantage/rate_state.json."""
 from __future__ import annotations
 
+import fcntl
 import json
 import time
 import threading
@@ -8,7 +9,7 @@ from pathlib import Path
 from dataclasses import dataclass, asdict
 
 _STATE_FILE = Path.home() / ".vantage" / "rate_state.json"
-_LOCK = threading.Lock()
+_LOCK = threading.Lock()  # in-process guard; file lock (below) covers cross-process
 
 
 @dataclass
@@ -18,21 +19,6 @@ class RateBucket:
     refill_rate: float     # tokens per second (default: 1.0 = 60/min)
     last_refill: float     # unix timestamp of last refill
 
-
-def _load_state() -> RateBucket:
-    try:
-        data = json.loads(_STATE_FILE.read_text())
-        return RateBucket(**data)
-    except Exception:
-        return RateBucket(tokens=60.0, capacity=60.0, refill_rate=1.0, last_refill=time.time())
-
-
-def _save_state(bucket: RateBucket) -> None:
-    try:
-        _STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        _STATE_FILE.write_text(json.dumps(asdict(bucket)))
-    except Exception:
-        pass  # best-effort
 
 
 def _refill(bucket: RateBucket) -> RateBucket:
@@ -45,15 +31,30 @@ def _refill(bucket: RateBucket) -> RateBucket:
 
 def acquire(cost: float = 1.0) -> bool:
     """Try to consume `cost` tokens. Returns True if allowed, False if rate limited.
-    Thread-safe via file lock + in-process lock."""
+    Thread-safe via in-process lock + fcntl file lock (cross-process safe)."""
+    _STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
     with _LOCK:
-        bucket = _refill(_load_state())
-        if bucket.tokens >= cost:
-            bucket.tokens -= cost
-            _save_state(bucket)
-            return True
-        _save_state(bucket)
-        return False
+        with open(_STATE_FILE, "a+") as fh:
+            fcntl.flock(fh, fcntl.LOCK_EX)
+            try:
+                fh.seek(0)
+                raw = fh.read()
+                try:
+                    bucket = RateBucket(**json.loads(raw)) if raw.strip() else None
+                except Exception:
+                    bucket = None
+                if bucket is None:
+                    bucket = RateBucket(tokens=60.0, capacity=60.0, refill_rate=1.0, last_refill=time.time())
+                bucket = _refill(bucket)
+                allowed = bucket.tokens >= cost
+                if allowed:
+                    bucket.tokens -= cost
+                fh.seek(0)
+                fh.truncate()
+                fh.write(json.dumps(asdict(bucket)))
+            finally:
+                fcntl.flock(fh, fcntl.LOCK_UN)
+        return allowed
 
 
 def wait_for_token(cost: float = 1.0, max_wait: float = 60.0) -> bool:
