@@ -110,15 +110,7 @@ jobs:
         with:
           node-version: '24'
           cache: 'npm'
-          cache-dependency-path: vantage-cli/package-lock.json
-
-      - name: Install CLI dependencies
-        working-directory: vantage-cli
-        run: npm ci
-
-      - name: Build CLI (required for dist/index.js + tsx harnesses)
-        working-directory: vantage-cli
-        run: npx tsup src/index.ts --format esm --dts --clean
+          cache-dependency-path: vantage-mcp/package-lock.json
 
       - name: Install MCP dependencies
         working-directory: vantage-mcp

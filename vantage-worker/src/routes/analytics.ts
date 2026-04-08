@@ -1,11 +1,10 @@
 import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
 import { authMiddleware } from '../middleware/auth';
+import { logAudit } from '../lib/audit';
 const analytics = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 analytics.use('*', authMiddleware);
-
-// Only log CSV exports — routine dashboard reads are too noisy to audit individually
 
 // ── Scope helper — appends "AND e.team = ?" when member has a team scope ──────
 // Always qualify with table alias "e" to avoid ambiguity when other joined
@@ -95,6 +94,7 @@ analytics.get('/summary', async (c) => {
     scope_team:       scopeTeam ?? null,
   };
   try { await c.env.KV.put(cacheKey, JSON.stringify(result), { expirationTtl: 300 }); } catch { /* best-effort */ }
+  logAudit(c, { event_type: 'data_access', event_name: 'data_access.analytics', resource_type: 'analytics', metadata: { endpoint: '/v1/analytics/summary' } });
   return c.json(result);
 });
 
@@ -126,6 +126,7 @@ analytics.get('/kpis', async (c) => {
 
   const kpisResult = row ?? {};
   try { await c.env.KV.put(kpisCacheKey, JSON.stringify(kpisResult), { expirationTtl: 300 }); } catch { /* best-effort */ }
+  logAudit(c, { event_type: 'data_access', event_name: 'data_access.analytics', resource_type: 'analytics', metadata: { endpoint: '/v1/analytics/kpis' } });
   return c.json(kpisResult);
 });
 
@@ -161,6 +162,7 @@ analytics.get('/timeseries', async (c) => {
 
   const tsResult = { period, series: results };
   try { await c.env.KV.put(tsCacheKey, JSON.stringify(tsResult), { expirationTtl: 300 }); } catch { /* best-effort */ }
+  logAudit(c, { event_type: 'data_access', event_name: 'data_access.analytics', resource_type: 'analytics', metadata: { endpoint: '/v1/analytics/timeseries' } });
   return c.json(tsResult);
 });
 
@@ -187,6 +189,7 @@ analytics.get('/models', async (c) => {
     LIMIT 25
   `).bind(orgId, since, ...args).all();
 
+  logAudit(c, { event_type: 'data_access', event_name: 'data_access.analytics', resource_type: 'analytics', metadata: { endpoint: '/v1/analytics/models' } });
   return c.json({ models: results });
 });
 

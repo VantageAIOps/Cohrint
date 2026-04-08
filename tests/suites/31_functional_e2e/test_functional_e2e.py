@@ -29,11 +29,13 @@ from helpers.api import fresh_account, get_headers, signup_api, session_get
 from helpers.data import rand_email, make_event, rand_tag
 from helpers.output import section, chk, ok, fail, info, get_results, reset_results
 
-CLI_DIR = Path(__file__).parent.parent.parent.parent / "vantage-cli"
+AGENT_DIR = Path(__file__).parent.parent.parent.parent / "vantage-agent"
 MCP_DIR = Path(__file__).parent.parent.parent.parent / "vantage-mcp"
 PROXY_DIR = Path(__file__).parent.parent.parent.parent / "vantage-local-proxy"
-TSX = CLI_DIR / "node_modules" / ".bin" / "tsx"
-HARNESS = CLI_DIR / "test-helpers.ts"
+
+import sys as _sys
+_sys.path.insert(0, str(AGENT_DIR))
+from vantage_agent.pricing import MODEL_PRICES, calculate_cost, find_cheapest
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -43,11 +45,30 @@ def ts_nano():
 
 
 def js(cmd: str, *args: str, timeout: int = 10) -> dict:
-    """Run CLI test harness."""
+    """Compatibility shim — routes CLI test harness calls to Python pricing."""
+    a = list(args)
+    if cmd == "cost":
+        model = a[0] if len(a) > 0 else ""
+        prompt = int(a[1]) if len(a) > 1 else 0
+        completion = int(a[2]) if len(a) > 2 else 0
+        cached = int(a[3]) if len(a) > 3 else 0
+        cost = calculate_cost(model, prompt, completion, cached_tokens=cached)
+        return {"totalCostUsd": cost, "model": model}
+    if cmd == "cheapest":
+        model = a[0] if len(a) > 0 else ""
+        prompt = int(a[1]) if len(a) > 1 else 0
+        completion = int(a[2]) if len(a) > 2 else 0
+        result = find_cheapest(model, prompt, completion)
+        if result is None:
+            return {}
+        return {"model": result.model, "savingsUsd": result.savings}
+    if cmd == "models":
+        return {"count": len(MODEL_PRICES)}
+    # Fallback — should not be reached
     result = subprocess.run(
-        [str(TSX), str(HARNESS), cmd, *[str(a) for a in args]],
+        ["echo", f"unsupported cmd: {cmd}"],
         capture_output=True, text=True, timeout=timeout,
-        cwd=str(CLI_DIR),
+        cwd=str(AGENT_DIR),
     )
     try:
         return json.loads(result.stdout.strip())
@@ -399,13 +420,14 @@ class TestCLIToolIntegration:
         assert r.get("totalCostUsd") == 0
 
     def test_fn34_cli_builds_clean(self):
-        chk("FN.34 CLI dist exists", (CLI_DIR / "dist" / "index.js").exists())
-        assert (CLI_DIR / "dist" / "index.js").exists()
+        chk("FN.34 vantage-agent pyproject.toml exists", (AGENT_DIR / "pyproject.toml").exists())
+        assert (AGENT_DIR / "pyproject.toml").exists()
 
     def test_fn35_all_agent_adapters_present(self):
-        agents = ["claude.ts", "gemini.ts", "codex.ts", "aider.ts", "chatgpt.ts"]
-        all_exist = all((CLI_DIR / "src" / "agents" / a).exists() for a in agents)
-        chk("FN.35 all 5 agent adapters present", all_exist)
+        backends = AGENT_DIR / "vantage_agent" / "backends"
+        agents = ["claude_backend.py", "gemini_backend.py", "codex_backend.py", "api_backend.py"]
+        all_exist = all((backends / a).exists() for a in agents)
+        chk("FN.35 all 4 Python backend adapters present", all_exist)
         assert all_exist
 
 

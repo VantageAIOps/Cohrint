@@ -295,7 +295,7 @@ auth.post('/members', authMiddleware, adminOnly, async (c) => {
 
   logAudit(c, {
     event_type:    'admin_action',
-    event_name:    'member.invited',
+    event_name:    'admin_action.member_added',
     resource_type: 'member',
     resource_id:   email,
     metadata:      { role, scope_team: scopeTeam ?? null, key_hint: keyHint },
@@ -367,7 +367,7 @@ auth.delete('/members/:id', authMiddleware, adminOnly, async (c) => {
 
   logAudit(c, {
     event_type:    'admin_action',
-    event_name:    'member.removed',
+    event_name:    'admin_action.member_removed',
     resource_type: 'member',
     resource_id:   removed?.email ?? memberId,
     metadata:      { role: removed?.role ?? 'unknown' },

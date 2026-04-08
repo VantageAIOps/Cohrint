@@ -239,7 +239,7 @@ admin.put('/team-budgets/:team', async (c) => {
 
   logAudit(c, {
     event_type:    'admin_action',
-    event_name:    'budget.updated',
+    event_name:    'admin_action.budget_policy_changed',
     resource_type: 'budget_policy',
     resource_id:   team,
     metadata:      { budget_usd: body.budget_usd },
