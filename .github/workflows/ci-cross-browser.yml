@@ -22,20 +22,11 @@ on:
       - 'tests/helpers/browser.py'
       - '.github/workflows/ci-cross-browser.yml'
 
-  push:
-    branches:
-      - main
-      - 'v[0-9]*'
-    paths:
-      - 'vantage-final-v4/**'
-      - 'vantage-worker/**'
-      - 'tests/suites/15_cross_browser/**'
-      - 'tests/helpers/browser.py'
-      - '.github/workflows/ci-cross-browser.yml'
+  # push to main/v* removed — too expensive on free tier; weekly schedule covers regression detection
 
   schedule:
-    # Nightly at 02:00 UTC (catches CDN / third-party drift)
-    - cron: '0 2 * * *'
+    # Weekly on Sunday 02:00 UTC — was nightly; saves ~2,100 CI min/month
+    - cron: '0 2 * * 0'
 
   workflow_dispatch:
     inputs:

@@ -21,7 +21,7 @@ on:
     branches:
       - main           # backup after every production push
   schedule:
-    - cron: '0 3 * * *'    # daily at 03:00 UTC
+    - cron: '0 3 * * 0'    # weekly on Sunday 03:00 UTC (was daily; saves ~120 min/month)
   workflow_dispatch:        # manual trigger anytime
 
 jobs:

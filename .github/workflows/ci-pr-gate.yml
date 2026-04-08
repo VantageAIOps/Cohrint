@@ -195,33 +195,47 @@ jobs:
         working-directory: vantage-agent
         run: python -m pytest tests/ -q --tb=short -x --ignore=tests/test_integration.py
 
-  # ── 4. Preview Deploy ────────────────────────────────────────────────────────
+  # ── 4. Preview Deploy (frontend PRs only) ───────────────────────────────────
   preview-deploy:
     name: Preview Deploy
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Only deploy preview when vantage-final-v4/** files actually changed
+    # Avoids burning 5-10 CI min on backend/test-only PRs
+    if: |
+      contains(github.event.pull_request.title, 'frontend') ||
+      startsWith(github.head_ref, 'feat/frontend') ||
+      startsWith(github.head_ref, 'fix/frontend') ||
+      startsWith(github.head_ref, 'feat/ui') ||
+      startsWith(github.head_ref, 'fix/ui')
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check for frontend file changes
+        id: frontend-check
+        run: |
+          CHANGED=$(git diff --name-only origin/main...HEAD -- 'vantage-final-v4/' 2>/dev/null | wc -l)
+          echo "frontend_changed=${CHANGED}" >> $GITHUB_OUTPUT
+          echo "Frontend files changed: $CHANGED"
+
       - uses: actions/setup-node@v4
+        if: steps.frontend-check.outputs.frontend_changed != '0'
         with:
           node-version: '24'
 
       - name: Deploy preview to Cloudflare Pages
         id: deploy
+        if: steps.frontend-check.outputs.frontend_changed != '0'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BRANCH: ${{ github.head_ref }}
         run: |
-          BRANCH="${{ github.head_ref }}"
-          # Deploy using the root wrangler.toml (has pages_build_output_dir)
-          # --config flag ensures we don't pick up vantage-worker/wrangler.toml
           npx wrangler@latest pages deploy ./vantage-final-v4 \
             --project-name=vantageai \
             --branch="$BRANCH" \
             --config=wrangler.toml \
             --commit-dirty=true 2>&1 | tee /tmp/deploy-output.txt || true
-          # Extract preview URL from output
           PREVIEW_URL=$(grep -oE 'https://[a-z0-9-]+\.vantageai\.pages\.dev' /tmp/deploy-output.txt | head -1 || true)
           if [ -z "$PREVIEW_URL" ]; then
             SLUG=$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | head -c 28)
@@ -232,6 +246,7 @@ jobs:
 
       - name: Post preview URL as PR comment
         uses: actions/github-script@v7
+        if: steps.frontend-check.outputs.frontend_changed != '0'
         with:
           script: |
             const url = '${{ steps.deploy.outputs.preview_url }}';
@@ -239,8 +254,6 @@ jobs:
               `**URL:** ${url}\n\n` +
               `Verify the changes visually before merging.\n\n` +
               `---\n_Deployed by PR Gate workflow_`;
-
-            // Check if we already commented (avoid spam on re-pushes)
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -249,7 +262,6 @@ jobs:
             const existing = comments.find(c =>
               c.body?.includes('Preview Deployed') && c.user?.login === 'github-actions[bot]'
             );
-
             if (existing) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
@@ -319,6 +331,7 @@ jobs:
           echo "**Commit:** \`${COMMIT}\`" >> $GITHUB_STEP_SUMMARY
 
       - name: Fail if critical checks failed
+        # preview-deploy is non-critical (skipped on non-frontend PRs)
         if: |
           needs.typecheck.result == 'failure' ||
           needs.cli-build.result == 'failure' ||
