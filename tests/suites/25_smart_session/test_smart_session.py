@@ -4,38 +4,36 @@ Tests input classifier, selective optimization, and auto-recovery logic.
 40 checks across 5 sections (SS.1–SS.40).
 """
 import sys
-import os
-import json
-import subprocess
+import math
 from pathlib import Path
 
 # ── Paths ──────────────────────────────────────────────────────────────────
 ROOT = Path(__file__).parent.parent.parent.parent
-CLI_DIR = ROOT / "vantage-cli"
-HARNESS = CLI_DIR / "test-classifier.mjs"
-
+sys.path.insert(0, str(ROOT / "vantage-agent"))
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
 from helpers.output import section, chk
+from vantage_agent.classifier import classify_input, process_input as _process_input
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
-def classify(input_text, agent="claude"):
-    """Call the Node.js classifier harness and return the parsed result."""
-    result = subprocess.run(
-        ["node", str(HARNESS), "classify", input_text, agent],
-        capture_output=True, text=True, timeout=5, cwd=str(CLI_DIR),
-    )
-    return json.loads(result.stdout.strip())
+def classify(input_text: str, agent: str = "claude") -> dict:
+    """Classify input_text and return a dict with 'type' key."""
+    return {"type": classify_input(input_text, agent)}
 
 
-def process_input(input_text, agent="claude", opt_mode="auto"):
-    """Call the Node.js process harness and return the parsed result."""
-    result = subprocess.run(
-        ["node", str(HARNESS), "process", input_text, agent, opt_mode],
-        capture_output=True, text=True, timeout=5, cwd=str(CLI_DIR),
-    )
-    return json.loads(result.stdout.strip())
+def process_input(input_text: str, agent: str = "claude", opt_mode: str = "auto") -> dict:
+    """Classify and optionally optimize input_text. Returns JS-compatible dict."""
+    r = _process_input(input_text, agent, opt_mode)
+    return {
+        "type": r["type"],
+        "optimized": r["optimized"],
+        "forwarded": r["forwarded"],
+        "savedTokens": r["saved_tokens"],
+        "original": r["input"],
+        "reverted": r["reverted"],
+    }
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -205,13 +203,12 @@ def test_ss23_optimization_preserves_meaning():
 
 
 def test_ss24_saved_tokens_accuracy():
-    """SS.24: savedTokens matches estimated before-after delta."""
+    """SS.24: savedTokens matches the Python count_tokens before-after delta."""
+    from vantage_agent.optimizer import count_tokens
     r = process_input(VERBOSE_PROMPT)
-    # Rough token estimate: words * 1.3
-    orig_words = len(VERBOSE_PROMPT.strip().split())
-    fwd_words = len(r["forwarded"].strip().split())
-    import math
-    expected_saved = math.ceil(orig_words * 1.3) - math.ceil(fwd_words * 1.3)
+    orig_tokens = count_tokens(VERBOSE_PROMPT)
+    fwd_tokens = count_tokens(r["forwarded"])
+    expected_saved = orig_tokens - fwd_tokens
     chk(
         "SS.24 savedTokens matches delta",
         r["savedTokens"] == expected_saved,

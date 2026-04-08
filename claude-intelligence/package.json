@@ -1,0 +1,12 @@
+{
+  "name": "claude-intelligence",
+  "version": "0.1.0",
+  "description": "Plug-and-play Claude Code setup: hooks, agents, settings",
+  "bin": { "claude-intelligence": "./bin/cli.js" },
+  "scripts": {
+    "install-setup": "bash install.sh"
+  },
+  "keywords": ["claude", "claude-code", "ai", "developer-tools", "hooks", "agents"],
+  "license": "MIT",
+  "engines": { "node": ">=18" }
+}

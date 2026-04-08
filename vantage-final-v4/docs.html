@@ -228,7 +228,7 @@ pre{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;pad
 
     <div class="docs-nav-group">
       <div class="docs-nav-sec" onclick="toggleNavGroup(this)">CLI</div>
-      <a class="docs-nav-item" onclick="show('vantage-cli',this)">VantageAI CLI</a>
+      <a class="docs-nav-item" onclick="show('vantage-cli',this)">VantageAI Agent</a>
     </div>
 
     <div class="docs-nav-group">
@@ -332,7 +332,7 @@ install: `
 <tr><td><code>vantageaiops</code></td><td><code>pip install vantageaiops</code></td><td>Python SDK — wrap OpenAI/Anthropic clients</td></tr>
 <tr><td><code>vantageaiops</code></td><td><code>npm install vantageaiops</code></td><td>TypeScript/JS SDK — wrap any LLM client</td></tr>
 <tr><td><code>vantageaiops-mcp</code></td><td><code>npx -y vantageaiops-mcp</code></td><td>MCP server for Claude Code, Codex CLI, Gemini CLI</td></tr>
-<tr><td><code>vantageai-cli</code></td><td><code>npx vantageai-cli</code></td><td>CLI wrapper — optimize + forward + track</td></tr>
+<tr><td><code>vantageai-agent</code></td><td><code>pip install vantageai-agent</code></td><td>Python CLI agent — interactive REPL with cost tracking + optimization</td></tr>
 <tr><td><code>vantageai-local-proxy</code></td><td><code>npx vantageai-local-proxy</code></td><td>Local privacy proxy — zero-trust tracking</td></tr>
 </tbody>
 </table>
@@ -702,7 +702,7 @@ claudecode: `
 <h2>Automatic tracking via Stop hook</h2>
 <p>Reads Claude Code's local session files and uploads token usage after every response. <strong>Zero code changes required.</strong></p>
 
-<div class="step-row"><div class="step-num">1</div><div class="step-body">Create <code>~/.claude/hooks/vantage-track.js</code> — <a href="https://github.com/Amanjain98/VantageAI/blob/main/vantage-local-proxy/src/cli.ts" style="color:var(--accent)">get the script from GitHub</a> or copy from ADMIN_GUIDE §23.4</div></div>
+<div class="step-row"><div class="step-num">1</div><div class="step-body">Create <code>~/.claude/hooks/vantage-track.js</code> — <a href="https://github.com/Amanjain98/VantageAI/blob/main/vantage-local-proxy/" style="color:var(--accent)">get the script from GitHub</a> or copy from ADMIN_GUIDE §23.4</div></div>
 
 <div class="step-row"><div class="step-num">2</div><div class="step-body">Register it as a Stop hook in <code>~/.claude/settings.json</code></div></div>
 <pre>{
@@ -1786,49 +1786,47 @@ export CLINE_OTEL_EXPORTER_OTLP_PROTOCOL=http/json</pre>
 `,
 
 'vantage-cli': `
-<h1>VantageAI CLI — AI Agent Wrapper</h1>
-<p>A terminal tool that wraps Claude Code, Codex CLI, or Gemini CLI with <strong>zero-latency prompt optimization</strong> and <strong>cost tracking</strong>.</p>
+<h1>VantageAI Agent — Python CLI</h1>
+<p>A Python-based interactive REPL and one-shot CLI with <strong>zero-latency prompt optimization</strong>, <strong>cost tracking</strong>, and dashboard integration.</p>
 
 <h2>Install & Run</h2>
-<pre>npx vantageai-cli</pre>
+<pre>pip install vantageai-agent
+vantageai-agent</pre>
 
-<h2>3 Modes</h2>
-<div class="step-row"><div class="step-num">1</div><div class="step-body"><strong>REPL</strong> — <code>vantage</code> — interactive mode, type prompts, switch agents</div></div>
-<div class="step-row"><div class="step-num">2</div><div class="step-body"><strong>One-shot</strong> — <code>vantage "explain kubernetes"</code> — run and exit</div></div>
-<div class="step-row"><div class="step-num">3</div><div class="step-body"><strong>Pipe</strong> — <code>echo "prompt" | vantage</code> — scriptable</div></div>
+<h2>CLI Flags</h2>
+<table class="api-table">
+<thead><tr><th>Flag</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>--backend &lt;name&gt;</code></td><td>Backend to use (e.g. <code>claude</code>, <code>openai</code>)</td></tr>
+<tr><td><code>--model &lt;name&gt;</code></td><td>Model to use (e.g. <code>claude-opus-4-5</code>)</td></tr>
+<tr><td><code>--resume &lt;session_id&gt;</code></td><td>Resume a previous session by ID</td></tr>
+<tr><td><code>--no-optimize</code></td><td>Disable prompt optimization</td></tr>
+</tbody></table>
 
-<h2>Agent Switching</h2>
+<h2>REPL Commands</h2>
 <table class="api-table">
 <thead><tr><th>Command</th><th>Action</th></tr></thead>
 <tbody>
-<tr><td><code>/claude prompt</code></td><td>Run with Claude Code</td></tr>
-<tr><td><code>/gemini prompt</code></td><td>Run with Gemini CLI</td></tr>
-<tr><td><code>/codex prompt</code></td><td>Run with OpenAI Codex</td></tr>
-<tr><td><code>/compare prompt</code></td><td>Run on all agents, show cost comparison</td></tr>
-<tr><td><code>/cost</code></td><td>Show session totals</td></tr>
+<tr><td><code>/quit</code> or <code>/exit</code></td><td>Exit the REPL</td></tr>
+<tr><td><code>/reset</code></td><td>Clear conversation context</td></tr>
+<tr><td><code>/optimize</code></td><td>Toggle prompt optimization on/off</td></tr>
+<tr><td><code>/model &lt;name&gt;</code></td><td>Switch model mid-session</td></tr>
+<tr><td><code>/allow &lt;tool&gt;</code></td><td>Allow a tool/permission for this session</td></tr>
 <tr><td><code>/summary</code></td><td>Show dashboard spend, tokens, budget from API</td></tr>
-<tr><td><code>/budget</code></td><td>Check budget status with alerts</td></tr>
-<tr><td><code>/stats</code></td><td>Alias for /summary</td></tr>
-<tr><td><code>/help</code></td><td>Show all commands</td></tr>
+<tr><td><code>/sessions</code></td><td>List recent sessions with cost breakdown</td></tr>
 </tbody></table>
 
 <h2>How It Works</h2>
-<p>1. You type a prompt → 2. CLI optimizes it (&lt;1ms, local) → 3. Forwards to your AI tool → 4. Streams output in real-time → 5. Calculates cost + savings</p>
+<p>1. You type a prompt → 2. Agent optimizes it locally (&lt;1ms) → 3. Sends to backend → 4. Streams output in real-time → 5. Calculates cost + savings</p>
 
 <div class="info-box">Zero added latency: optimization is synchronous, tracking is async fire-and-forget.</div>
 
-<h2>Context Continuation (Claude Code)</h2>
-<p>The CLI maintains reliable conversation context across prompts in the same REPL session:</p>
-<div class="step-row"><div class="step-num">1</div><div class="step-body">Claude is invoked with <code>--output-format stream-json</code>. The CLI parses each JSON line, displays response text, and captures the <code>session_id</code> from the result.</div></div>
-<div class="step-row"><div class="step-num">2</div><div class="step-body">On the next prompt, uses <code>--resume &lt;sessionId&gt;</code> instead of <code>--continue</code> — pins to the exact conversation even if Claude was used outside vantage between prompts.</div></div>
-<div class="step-row"><div class="step-num">3</div><div class="step-body">Falls back to <code>--continue</code> automatically when no session ID is available (first prompt or non-Claude agents).</div></div>
-
 <h2>Dashboard Integration</h2>
-<p>When configured with a VantageAI API key, the CLI automatically pushes cost data to your dashboard. Events include: model, provider, tokens, cost, latency, and agent name.</p>
+<p>When configured with a VantageAI API key, the agent automatically pushes cost data to your dashboard. Events include: model, provider, tokens, cost, latency, and session ID.</p>
 <div class="info-box">Set your API key in <code>~/.vantage/config.json</code> or via <code>VANTAGE_API_KEY</code> environment variable.</div>
 
 <h2>Anomaly Detection</h2>
-<p>The CLI warns when a prompt's cost exceeds 3x the session average, helping catch runaway token usage before it impacts your budget.</p>
+<p>The agent warns when a prompt's cost exceeds 3x the session average, helping catch runaway token usage before it impacts your budget.</p>
 `
 
 };

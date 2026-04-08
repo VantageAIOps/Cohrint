@@ -16,11 +16,13 @@
  */
 
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
+import { randomUUID } from "node:crypto";
 import { VERSION } from "./_version.js";
 import { sanitizeEvent, PrivacyConfig, DEFAULT_PRIVACY } from "./privacy.js";
 import { calculateCost, findCheapest } from "./pricing.js";
 import { scanAll } from "./scanners/index.js";
 import type { ToolName } from "./scanners/types.js";
+import { SessionStore, ProxySessionRecord, PersistedEvent } from "./session-store.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -75,6 +77,8 @@ const PROVIDER_ENDPOINTS: Record<string, string> = {
 class StatsQueue {
   private queue: PendingStat[] = [];
   private timer: ReturnType<typeof setInterval> | null = null;
+  readonly sessionStore: SessionStore;
+  private currentSession: ProxySessionRecord;
 
   constructor(
     private readonly vantageApiKey: string,
@@ -83,7 +87,29 @@ class StatsQueue {
     private readonly flushInterval: number,
     private readonly privacy: PrivacyConfig,
     private readonly debug: boolean,
-  ) {}
+    orgId: string,
+    team: string,
+    environment: string,
+  ) {
+    this.sessionStore = new SessionStore();
+    const now = new Date().toISOString();
+    this.currentSession = {
+      id: randomUUID(),
+      source: "local-proxy",
+      created_at: now,
+      last_active_at: now,
+      org_id: orgId,
+      team,
+      environment,
+      events: [],
+      cost_summary: {
+        total_cost_usd: 0,
+        total_input_tokens: 0,
+        total_completion_tokens: 0,
+        event_count: 0,
+      },
+    };
+  }
 
   start(): void {
     if (this.timer) return;
@@ -91,9 +117,10 @@ class StatsQueue {
     process.on("beforeExit", () => this.flush());
   }
 
-  stop(): void {
+  async stop(): Promise<void> {
     if (this.timer) { clearInterval(this.timer); this.timer = null; }
     this.flush();
+    await this.sessionStore.save(this.currentSession);
   }
 
   enqueue(raw: Record<string, unknown>): void {
@@ -102,6 +129,31 @@ class StatsQueue {
     if (this.debug) {
       process.stderr.write(`[vantage-proxy] Queued: ${sanitized.model} ${sanitized.prompt_tokens}→${sanitized.completion_tokens} tokens $${sanitized.cost_total_usd.toFixed(4)}\n`);
     }
+
+    // Persist to session
+    const persistedEvent: PersistedEvent = {
+      event_id: randomUUID(),
+      timestamp: Date.now(),
+      provider: String(sanitized.provider ?? ""),
+      model: String(sanitized.model ?? ""),
+      endpoint: String(sanitized.endpoint ?? ""),
+      team: String(sanitized.team ?? ""),
+      prompt_tokens: Number(sanitized.prompt_tokens ?? 0),
+      completion_tokens: Number(sanitized.completion_tokens ?? 0),
+      total_tokens: Number(sanitized.total_tokens ?? 0),
+      cost_total_usd: Number(sanitized.cost_total_usd ?? 0),
+      latency_ms: Number(sanitized.latency_ms ?? 0),
+      status_code: Number(sanitized.status_code ?? 0),
+      error: sanitized.error !== undefined ? String(sanitized.error) : undefined,
+      source: "local-proxy",
+    };
+    this.currentSession.events.push(persistedEvent);
+    this.currentSession.cost_summary.total_cost_usd += persistedEvent.cost_total_usd;
+    this.currentSession.cost_summary.total_input_tokens += persistedEvent.prompt_tokens;
+    this.currentSession.cost_summary.total_completion_tokens += persistedEvent.completion_tokens;
+    this.currentSession.cost_summary.event_count += 1;
+    this.sessionStore.save(this.currentSession).catch(() => {});
+
     if (this.queue.length >= this.batchSize) this.flush();
   }
 
@@ -234,6 +286,7 @@ export function startProxyServer(config: LocalProxyConfig): void {
 
   const statsQueue = new StatsQueue(
     vantageApiKey, vantageApiBase, batchSize, flushInterval, privacy, debug,
+    orgId, team, environment,
   );
   statsQueue.start();
 
@@ -315,6 +368,22 @@ export function startProxyServer(config: LocalProxyConfig): void {
           "PII, user data, or business logic from your prompts",
         ],
       });
+    }
+
+    // ── Session history ─────────────────────────────────────────────────
+    if (url === "/sessions" && method === "GET") {
+      const sessions = await statsQueue.sessionStore.listAll();
+      return sendJson(res, 200, { sessions });
+    }
+
+    if (url.startsWith("/sessions/") && method === "GET") {
+      const id = url.slice("/sessions/".length);
+      try {
+        const session = await statsQueue.sessionStore.load(id);
+        return sendJson(res, 200, session);
+      } catch {
+        return sendJson(res, 404, { error: `Session not found: ${id}` });
+      }
     }
 
     // ── Determine provider from path ────────────────────────────────────

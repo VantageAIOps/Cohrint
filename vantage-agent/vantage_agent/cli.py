@@ -16,6 +16,7 @@ from rich.console import Console
 
 from .anomaly import check_cost_anomaly
 from .api_client import AgentClient, DEFAULT_MODEL
+from .rate_limiter import wait_for_token, get_global_budget_used
 from .cost_tracker import SessionCost
 from .optimizer import optimize_prompt, OptimizationResult
 from .permissions import PermissionManager
@@ -228,6 +229,14 @@ def run_repl(client: AgentClient, tracker: Tracker | None = None) -> None:
 
         # Send prompt to API
         try:
+            # Rate-limit check
+            if not wait_for_token():
+                console.print("[yellow]Rate limit reached — waiting...[/yellow]")
+            # Global budget guard
+            budget = float(os.environ.get("VANTAGE_BUDGET_USD", "0"))
+            if budget > 0 and get_global_budget_used() >= budget:
+                console.print(f"[red]Global budget of ${budget:.2f} reached across all sessions.[/red]")
+                continue
             prior_total = client.cost.total_cost_usd
             prior_count = client.cost.prompt_count - 1  # before this prompt
             client.send(line)
@@ -255,6 +264,14 @@ def run_repl(client: AgentClient, tracker: Tracker | None = None) -> None:
 def run_oneshot(client: AgentClient, prompt: str, tracker: Tracker | None = None) -> None:
     """One-shot mode: send prompt, print result, exit."""
     try:
+        # Rate-limit check
+        if not wait_for_token():
+            console.print("[yellow]Rate limit reached — waiting...[/yellow]")
+        # Global budget guard
+        budget = float(os.environ.get("VANTAGE_BUDGET_USD", "0"))
+        if budget > 0 and get_global_budget_used() >= budget:
+            console.print(f"[red]Global budget of ${budget:.2f} reached across all sessions.[/red]")
+            return
         client.send(prompt)
         c = client.cost
         render_cost_summary(

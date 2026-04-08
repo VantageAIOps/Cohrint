@@ -3,7 +3,7 @@ tracker.py — Dashboard telemetry client.
 
 Batches cost/usage events and sends them to the VantageAI backend API.
 Respects privacy modes: full, strict, anonymized, local-only.
-Ported from vantage-cli/src/tracker.ts.
+Cost tracking module for vantage-agent.
 """
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from typing import Any
 import httpx
 
 from .cost_tracker import SessionCost
+from .telemetry import OTelExporter
 
 __version__ = "0.1.0"
 
@@ -169,6 +170,18 @@ class Tracker:
                 self._queue = [e for e in self._queue if e not in batch]
                 if self.config.debug:
                     print(f"  [tracker] flushed {len(events)} events")
+                # Fire-and-forget OTel export for each event in the batch
+                _otel = OTelExporter()
+                for e in batch:
+                    _otel.export_async({
+                        "model": e.model,
+                        "prompt_tokens": e.prompt_tokens,
+                        "completion_tokens": e.completion_tokens,
+                        "total_cost_usd": e.total_cost_usd,
+                        "cost_usd": e.total_cost_usd,
+                        "latency_ms": e.latency_ms,
+                        "session_id": e.session_id,
+                    })
             else:
                 if self.config.debug:
                     print(f"  [tracker] flush failed: HTTP {resp.status_code} — events retained")

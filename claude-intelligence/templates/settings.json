@@ -1,0 +1,78 @@
+{
+  "model": "claude-sonnet-4-6",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash(git commit*)",
+        "hooks": [{ "type": "command", "command": "bash .claude/hooks/pre-commit.sh" }]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "bash .claude/hooks/lint-on-save.sh $CLAUDE_FILE_PATH" },
+          { "type": "command", "command": "bash .claude/hooks/claude-md-enforcer.sh" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [{ "type": "command", "command": "node .claude/hooks/vantage-track.js" }]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Read(*)",
+      "Glob",
+      "Grep",
+      "LS",
+      "MultiEdit",
+      "Write(src/*)",
+      "Write(app/*)",
+      "Write(components/*)",
+      "Write(tests/*)",
+      "Write(test/*)",
+      "Edit(src/*)",
+      "Edit(app/*)",
+      "Edit(components/*)",
+      "Edit(tests/*)",
+      "Edit(test/*)",
+      "Bash(git:*)",
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(node:*)",
+      "Bash(python:*)",
+      "Bash(python3:*)",
+      "Bash(pip:*)",
+      "Bash(pip3:*)",
+      "Bash(pytest:*)",
+      "Bash(gh:*)",
+      "Bash(ls:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(echo:*)",
+      "Bash(pwd)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)",
+      "Bash(mv:*)",
+      "Bash(chmod:*)",
+      "Bash(ruff:*)"
+    ],
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(git commit:*)",
+      "Bash(git reset:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf /*)",
+      "Bash(git push --force *)",
+      "Bash(terraform destroy *)",
+      "Read(.env)",
+      "Read(.env.*)",
+      "Write(.env*)"
+    ]
+  }
+}

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import time as _time
 from typing import Any
 
 import anthropic
@@ -141,7 +142,7 @@ class AgentClient:
         current_tool_input_json = ""
         stop_reason = "end_turn"
 
-        with self.client.messages.stream(
+        with self._send_with_retry(
             model=self.model,
             max_tokens=self.max_tokens,
             system=self.system_prompt,
@@ -261,6 +262,22 @@ class AgentClient:
                 "input": tc["input"],
             })
         return content
+
+    def _send_with_retry(self, *args, max_retries: int = 3, **kwargs):
+        """Send with exponential backoff on RateLimitError."""
+        for attempt in range(max_retries + 1):
+            try:
+                return self.client.messages.stream(*args, **kwargs)
+            except anthropic.RateLimitError:
+                if attempt == max_retries:
+                    raise
+                wait = (2 ** attempt) + 0.5  # 0.5, 1.5, 4.5 seconds
+                _time.sleep(wait)
+            except anthropic.APIStatusError as e:
+                if e.status_code == 529 and attempt < max_retries:  # overloaded
+                    _time.sleep(2 ** attempt)
+                    continue
+                raise
 
     def clear_history(self) -> None:
         """Reset conversation history."""
