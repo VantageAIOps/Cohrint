@@ -4,7 +4,10 @@ compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
 # ── Custom domain — api.vantageaiops.com → this Worker ───────────────────────
-routes = [{ pattern = "api.vantageaiops.com/*", zone_name = "vantageaiops.com" }]
+# Uses [[custom_domains]] instead of routes[] — no Zone:Workers Routes permission needed
+[[routes]]
+pattern = "api.vantageaiops.com"
+custom_domain = true
 
 # ── D1 Database (events, orgs, config) ───────────────────────────────────────
 # After running `npm run db:create`, replace the placeholder IDs below.
