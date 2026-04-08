@@ -2,6 +2,7 @@
 Suite 34 — OTel session rollup
 Tests that OTel ingest creates/accumulates otel_sessions rows
 and that GET /v1/sessions returns correct data.
+Covers: claude-code, gemini-cli, codex-cli service.name variants.
 Hits live API at https://api.vantageaiops.com.
 """
 import os
@@ -19,8 +20,14 @@ if not API_KEY:
     pytest.skip("VANTAGE_API_KEY not set", allow_module_level=True)
 
 
+# ── Payload builders ──────────────────────────────────────────────────────────
+
+def ts_nano() -> str:
+    return str(int(time.time() * 1e9))
+
+
 def otel_payload(session_id: str, tokens_in: int = 100, tokens_out: int = 20) -> dict:
-    """Build a minimal OTLP metrics payload with session.id set."""
+    """Claude Code OTLP metrics payload (gen_ai.client.token.usage)."""
     now_ns = str(int(time.time() * 1e9))
     return {
         "resourceMetrics": [{
@@ -195,3 +202,345 @@ class TestOtelSessionRollup:
         data = sessions_res.json()
         assert len(data["sessions"]) <= 2
         assert "total" in data
+
+
+# ── Gemini CLI payload builder ────────────────────────────────────────────────
+
+def gemini_otel_payload(session_id: str, tokens_in: int = 9000, tokens_out: int = 2200,
+                        thought: int = 800, cache: int = 1500) -> dict:
+    """
+    Gemini CLI OTLP metrics payload — uses gemini_cli.token.usage metric name
+    with type attribute (input/output/thought/cache).
+    Matches real gemini-cli telemetry format verified in suite 17.
+    """
+    now = ts_nano()
+    def dp(tok_type: str, val: int) -> dict:
+        return {
+            "asDouble": val,
+            "startTimeUnixNano": now,
+            "timeUnixNano": now,
+            "attributes": [
+                {"key": "type",  "value": {"stringValue": tok_type}},
+                {"key": "model", "value": {"stringValue": "gemini-2.0-flash"}},
+            ],
+        }
+    return {
+        "resourceMetrics": [{
+            "resource": {
+                "attributes": [
+                    {"key": "service.name", "value": {"stringValue": "gemini-cli"}},
+                    {"key": "user.email",   "value": {"stringValue": "test@vantageaiops.com"}},
+                    {"key": "session.id",   "value": {"stringValue": session_id}},
+                    {"key": "terminal.type","value": {"stringValue": "iTerm.app"}},
+                ]
+            },
+            "scopeMetrics": [{
+                "scope": {"name": "gemini-cli", "version": "1.0.0"},
+                "metrics": [
+                    {
+                        "name": "gemini_cli.token.usage",
+                        "sum": {"dataPoints": [
+                            dp("input",   tokens_in),
+                            dp("output",  tokens_out),
+                            dp("thought", thought),
+                            dp("cache",   cache),
+                        ], "isMonotonic": True},
+                    },
+                    {
+                        "name": "gemini_cli.api.request.count",
+                        "sum": {"dataPoints": [{
+                            "asDouble": 3,
+                            "startTimeUnixNano": now, "timeUnixNano": now,
+                            "attributes": [
+                                {"key": "model",       "value": {"stringValue": "gemini-2.0-flash"}},
+                                {"key": "status_code", "value": {"stringValue": "200"}},
+                            ],
+                        }], "isMonotonic": True},
+                    },
+                ],
+            }],
+        }]
+    }
+
+
+# ── Codex CLI payload builder ─────────────────────────────────────────────────
+
+def codex_otel_payload(session_id: str, tokens_in: int = 5000, tokens_out: int = 1200,
+                       cost_usd: float = 0.032) -> dict:
+    """
+    Codex CLI OTLP metrics payload — uses gen_ai.client.token.usage (GenAI conventions)
+    plus codex.cost.usage for explicit cost.
+    Matches real codex-cli telemetry format verified in suite 17.
+    """
+    now = ts_nano()
+    def dp(tok_type: str, val: int) -> dict:
+        return {
+            "asDouble": val,
+            "startTimeUnixNano": now,
+            "timeUnixNano": now,
+            "attributes": [
+                {"key": "gen_ai.token.type",    "value": {"stringValue": tok_type}},
+                {"key": "gen_ai.request.model", "value": {"stringValue": "o3-mini"}},
+            ],
+        }
+    return {
+        "resourceMetrics": [{
+            "resource": {
+                "attributes": [
+                    {"key": "service.name", "value": {"stringValue": "codex-cli"}},
+                    {"key": "user.email",   "value": {"stringValue": "test@vantageaiops.com"}},
+                    {"key": "session.id",   "value": {"stringValue": session_id}},
+                    {"key": "terminal.type","value": {"stringValue": "tmux"}},
+                ]
+            },
+            "scopeMetrics": [{
+                "scope": {"name": "codex-cli", "version": "1.0.0"},
+                "metrics": [
+                    {
+                        "name": "gen_ai.client.token.usage",
+                        "sum": {"dataPoints": [
+                            dp("input",  tokens_in),
+                            dp("output", tokens_out),
+                        ], "isMonotonic": True},
+                    },
+                    {
+                        "name": "codex.cost.usage",
+                        "sum": {"dataPoints": [{
+                            "asDouble": cost_usd,
+                            "startTimeUnixNano": now, "timeUnixNano": now,
+                            "attributes": [
+                                {"key": "model", "value": {"stringValue": "o3-mini"}},
+                            ],
+                        }], "isMonotonic": True},
+                    },
+                    {
+                        "name": "codex.session.count",
+                        "sum": {"dataPoints": [{
+                            "asDouble": 1,
+                            "startTimeUnixNano": now, "timeUnixNano": now,
+                            "attributes": [],
+                        }], "isMonotonic": True},
+                    },
+                ],
+            }],
+        }]
+    }
+
+
+# ── Gemini session rollup tests ───────────────────────────────────────────────
+
+class TestGeminiSessionRollup:
+
+    def test_gemini_ingest_creates_session_row(self):
+        """Gemini CLI OTel ingest with session_id creates a row in otel_sessions."""
+        session_id = f"gemini-test-{uuid.uuid4()}"
+        res = requests.post(
+            f"{API_BASE}/v1/otel/v1/metrics",
+            json=gemini_otel_payload(session_id),
+            headers=HEADERS, timeout=10,
+        )
+        assert res.status_code == 200, f"Gemini OTel ingest failed: {res.text}"
+
+        time.sleep(1)
+
+        sessions_res = requests.get(
+            f"{API_BASE}/v1/sessions",
+            headers=HEADERS, timeout=10,
+        )
+        assert sessions_res.status_code == 200, f"GET /v1/sessions failed: {sessions_res.text}"
+        session_ids = [s["session_id"] for s in sessions_res.json()["sessions"]]
+        assert session_id in session_ids, f"Gemini session {session_id} not found in {session_ids}"
+
+    def test_gemini_session_provider_is_gemini(self):
+        """otel_sessions row for Gemini CLI has provider = gemini_cli."""
+        session_id = f"gemini-test-{uuid.uuid4()}"
+        requests.post(
+            f"{API_BASE}/v1/otel/v1/metrics",
+            json=gemini_otel_payload(session_id),
+            headers=HEADERS, timeout=10,
+        )
+        time.sleep(1)
+
+        sessions_res = requests.get(
+            f"{API_BASE}/v1/sessions",
+            headers=HEADERS, timeout=10,
+        )
+        assert sessions_res.status_code == 200
+        row = next((s for s in sessions_res.json()["sessions"] if s["session_id"] == session_id), None)
+        assert row is not None, f"Gemini session {session_id} not found"
+        assert row["provider"] in ("gemini_cli", "gemini-cli"), \
+            f"Expected gemini provider, got: {row['provider']}"
+
+    def test_gemini_tokens_accumulate_across_ingests(self):
+        """Two Gemini ingests with same session_id accumulate tokens."""
+        session_id = f"gemini-test-{uuid.uuid4()}"
+
+        res1 = requests.post(
+            f"{API_BASE}/v1/otel/v1/metrics",
+            json=gemini_otel_payload(session_id, tokens_in=1000, tokens_out=200),
+            headers=HEADERS, timeout=10,
+        )
+        assert res1.status_code == 200
+
+        res2 = requests.post(
+            f"{API_BASE}/v1/otel/v1/metrics",
+            json=gemini_otel_payload(session_id, tokens_in=2000, tokens_out=400),
+            headers=HEADERS, timeout=10,
+        )
+        assert res2.status_code == 200
+
+        time.sleep(1)
+
+        sessions_res = requests.get(f"{API_BASE}/v1/sessions", headers=HEADERS, timeout=10)
+        assert sessions_res.status_code == 200
+        row = next((s for s in sessions_res.json()["sessions"] if s["session_id"] == session_id), None)
+        assert row is not None, f"session {session_id} not found"
+        assert row["input_tokens"]  >= 3000, f"expected >=3000 input, got {row['input_tokens']}"
+        assert row["output_tokens"] >= 600,  f"expected >=600 output, got {row['output_tokens']}"
+        assert row["event_count"]   >= 2,    f"expected >=2 events, got {row['event_count']}"
+
+    def test_gemini_session_model_recorded(self):
+        """otel_sessions row for Gemini CLI records gemini-2.0-flash as model."""
+        session_id = f"gemini-test-{uuid.uuid4()}"
+        requests.post(
+            f"{API_BASE}/v1/otel/v1/metrics",
+            json=gemini_otel_payload(session_id),
+            headers=HEADERS, timeout=10,
+        )
+        time.sleep(1)
+
+        sessions_res = requests.get(f"{API_BASE}/v1/sessions", headers=HEADERS, timeout=10)
+        assert sessions_res.status_code == 200
+        row = next((s for s in sessions_res.json()["sessions"] if s["session_id"] == session_id), None)
+        assert row is not None
+        assert row["model"] == "gemini-2.0-flash", f"Expected gemini-2.0-flash, got: {row['model']}"
+
+
+# ── Codex CLI session rollup tests ────────────────────────────────────────────
+
+class TestCodexSessionRollup:
+
+    def test_codex_ingest_creates_session_row(self):
+        """Codex CLI OTel ingest with session_id creates a row in otel_sessions."""
+        session_id = f"codex-test-{uuid.uuid4()}"
+        res = requests.post(
+            f"{API_BASE}/v1/otel/v1/metrics",
+            json=codex_otel_payload(session_id),
+            headers=HEADERS, timeout=10,
+        )
+        assert res.status_code == 200, f"Codex OTel ingest failed: {res.text}"
+
+        time.sleep(1)
+
+        sessions_res = requests.get(
+            f"{API_BASE}/v1/sessions",
+            headers=HEADERS, timeout=10,
+        )
+        assert sessions_res.status_code == 200, f"GET /v1/sessions failed: {sessions_res.text}"
+        session_ids = [s["session_id"] for s in sessions_res.json()["sessions"]]
+        assert session_id in session_ids, f"Codex session {session_id} not found in {session_ids}"
+
+    def test_codex_session_provider_is_codex(self):
+        """otel_sessions row for Codex CLI has provider = codex_cli."""
+        session_id = f"codex-test-{uuid.uuid4()}"
+        requests.post(
+            f"{API_BASE}/v1/otel/v1/metrics",
+            json=codex_otel_payload(session_id),
+            headers=HEADERS, timeout=10,
+        )
+        time.sleep(1)
+
+        sessions_res = requests.get(f"{API_BASE}/v1/sessions", headers=HEADERS, timeout=10)
+        assert sessions_res.status_code == 200
+        row = next((s for s in sessions_res.json()["sessions"] if s["session_id"] == session_id), None)
+        assert row is not None, f"Codex session {session_id} not found"
+        assert row["provider"] in ("codex_cli", "codex-cli"), \
+            f"Expected codex provider, got: {row['provider']}"
+
+    def test_codex_tokens_accumulate_across_ingests(self):
+        """Two Codex ingests with same session_id accumulate tokens."""
+        session_id = f"codex-test-{uuid.uuid4()}"
+
+        res1 = requests.post(
+            f"{API_BASE}/v1/otel/v1/metrics",
+            json=codex_otel_payload(session_id, tokens_in=500, tokens_out=100),
+            headers=HEADERS, timeout=10,
+        )
+        assert res1.status_code == 200
+
+        res2 = requests.post(
+            f"{API_BASE}/v1/otel/v1/metrics",
+            json=codex_otel_payload(session_id, tokens_in=1000, tokens_out=200),
+            headers=HEADERS, timeout=10,
+        )
+        assert res2.status_code == 200
+
+        time.sleep(1)
+
+        sessions_res = requests.get(f"{API_BASE}/v1/sessions", headers=HEADERS, timeout=10)
+        assert sessions_res.status_code == 200
+        row = next((s for s in sessions_res.json()["sessions"] if s["session_id"] == session_id), None)
+        assert row is not None, f"session {session_id} not found"
+        assert row["input_tokens"]  >= 1500, f"expected >=1500 input, got {row['input_tokens']}"
+        assert row["output_tokens"] >= 300,  f"expected >=300 output, got {row['output_tokens']}"
+        assert row["event_count"]   >= 2,    f"expected >=2 events, got {row['event_count']}"
+
+    def test_codex_session_model_recorded(self):
+        """otel_sessions row for Codex CLI records o3-mini as model."""
+        session_id = f"codex-test-{uuid.uuid4()}"
+        requests.post(
+            f"{API_BASE}/v1/otel/v1/metrics",
+            json=codex_otel_payload(session_id),
+            headers=HEADERS, timeout=10,
+        )
+        time.sleep(1)
+
+        sessions_res = requests.get(f"{API_BASE}/v1/sessions", headers=HEADERS, timeout=10)
+        assert sessions_res.status_code == 200
+        row = next((s for s in sessions_res.json()["sessions"] if s["session_id"] == session_id), None)
+        assert row is not None
+        assert row["model"] == "o3-mini", f"Expected o3-mini, got: {row['model']}"
+
+
+# ── Cross-tool session isolation test ────────────────────────────────────────
+
+class TestCrossToolSessionIsolation:
+
+    def test_gemini_and_codex_sessions_are_independent(self):
+        """Gemini and Codex sessions with different IDs are stored as separate rows."""
+        gemini_sid = f"gemini-test-{uuid.uuid4()}"
+        codex_sid  = f"codex-test-{uuid.uuid4()}"
+
+        requests.post(f"{API_BASE}/v1/otel/v1/metrics",
+                      json=gemini_otel_payload(gemini_sid), headers=HEADERS, timeout=10)
+        requests.post(f"{API_BASE}/v1/otel/v1/metrics",
+                      json=codex_otel_payload(codex_sid),  headers=HEADERS, timeout=10)
+
+        time.sleep(1)
+
+        sessions_res = requests.get(f"{API_BASE}/v1/sessions", headers=HEADERS, timeout=10)
+        assert sessions_res.status_code == 200
+        all_ids = [s["session_id"] for s in sessions_res.json()["sessions"]]
+        assert gemini_sid in all_ids, f"Gemini session not found in {all_ids}"
+        assert codex_sid  in all_ids, f"Codex session not found in {all_ids}"
+
+    def test_same_session_id_different_tools_accumulates(self):
+        """If Gemini and Codex share a session_id, tokens accumulate in one row."""
+        shared_sid = f"shared-test-{uuid.uuid4()}"
+
+        requests.post(f"{API_BASE}/v1/otel/v1/metrics",
+                      json=gemini_otel_payload(shared_sid, tokens_in=1000, tokens_out=200),
+                      headers=HEADERS, timeout=10)
+        requests.post(f"{API_BASE}/v1/otel/v1/metrics",
+                      json=codex_otel_payload(shared_sid, tokens_in=500, tokens_out=100),
+                      headers=HEADERS, timeout=10)
+
+        time.sleep(1)
+
+        sessions_res = requests.get(f"{API_BASE}/v1/sessions", headers=HEADERS, timeout=10)
+        assert sessions_res.status_code == 200
+        rows = [s for s in sessions_res.json()["sessions"] if s["session_id"] == shared_sid]
+        assert len(rows) == 1, f"Expected 1 row for shared session, got {len(rows)}"
+        row = rows[0]
+        assert row["input_tokens"]  >= 1500, f"expected >=1500 accumulated input, got {row['input_tokens']}"
+        assert row["output_tokens"] >= 300,  f"expected >=300 accumulated output, got {row['output_tokens']}"
