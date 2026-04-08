@@ -6,14 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-# Pricing per million tokens (USD) — updated April 2025
-MODEL_PRICING: dict[str, dict[str, float]] = {
-    "claude-sonnet-4-6": {"input": 3.0, "output": 15.0, "cache_read": 0.30, "cache_write": 3.75},
-    "claude-opus-4-6": {"input": 15.0, "output": 75.0, "cache_read": 1.50, "cache_write": 18.75},
-    "claude-haiku-4-5-20251001": {"input": 0.80, "output": 4.0, "cache_read": 0.08, "cache_write": 1.0},
-    # Fallback
-    "default": {"input": 3.0, "output": 15.0, "cache_read": 0.30, "cache_write": 3.75},
-}
+from .pricing import MODEL_PRICES as MODEL_PRICING  # single source of truth
 
 
 @dataclass
@@ -38,7 +31,9 @@ class SessionCost:
 
     def record_usage(self, usage: Any) -> TurnUsage:
         """Record usage from an Anthropic API response message.usage object."""
-        pricing = MODEL_PRICING.get(self.model, MODEL_PRICING["default"])
+        pricing = MODEL_PRICING.get(self.model, MODEL_PRICING.get("claude-sonnet-4-6", {
+            "input": 3.0, "output": 15.0, "cache_read": 0.30, "cache_write": 3.75
+        }))
 
         inp = getattr(usage, "input_tokens", 0) or 0
         out = getattr(usage, "output_tokens", 0) or 0
@@ -48,8 +43,8 @@ class SessionCost:
         cost = (
             (inp / 1_000_000) * pricing["input"]
             + (out / 1_000_000) * pricing["output"]
-            + (cache_read / 1_000_000) * pricing["cache_read"]
-            + (cache_write / 1_000_000) * pricing["cache_write"]
+            + (cache_read / 1_000_000) * pricing.get("cache_read", pricing.get("cache", 0))
+            + (cache_write / 1_000_000) * pricing.get("cache_write", 0)
         )
 
         turn = TurnUsage(

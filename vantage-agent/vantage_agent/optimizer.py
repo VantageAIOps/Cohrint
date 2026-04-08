@@ -35,7 +35,7 @@ FILLER_PHRASES: list[str] = [
     "each and every", "first and foremost",
     "due to the fact that", "on account of the fact that",
     "in light of the fact that", "despite the fact that",
-    "the reason is because", "whether or not",
+    "the reason is because",
 ]
 
 # ---------------------------------------------------------------------------
