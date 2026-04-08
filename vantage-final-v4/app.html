@@ -1278,16 +1278,17 @@ var _isOnline = navigator.onLine;
 var _API_CACHE_TTL = 5 * 60 * 1000; // 5 min cache TTL
 
 var TOOL_NAMES = {
-  anthropic: 'Claude Code', openai: 'GitHub Copilot', google: 'Gemini CLI',
-  cursor: 'Cursor', windsurf: 'Windsurf', aider: 'Aider',
-  cline: 'Cline', codex: 'Codex CLI', kiro: 'Kiro',
-  'roo-code': 'Roo Code', opencode: 'OpenCode'
+  anthropic: 'Claude Code', openai: 'Codex CLI', google: 'Gemini CLI',
+  codex: 'Codex CLI',
+  // Future: Cursor, Windsurf, Aider, Cline, Roo Code, OpenCode, Kiro
+  // cursor: 'Cursor', windsurf: 'Windsurf', aider: 'Aider',
+  // cline: 'Cline', kiro: 'Kiro', 'roo-code': 'Roo Code', opencode: 'OpenCode'
 };
 
 var TOOL_COLORS = {
   anthropic: '#34d399', openai: '#60a5fa', google: '#fbbf24',
-  cursor: '#f472b6', windsurf: '#fb923c', aider: '#a78bfa',
   codex: '#22d3ee', default: '#94a3b8'
+  // cursor: '#f472b6', windsurf: '#fb923c', aider: '#a78bfa',
 };
 
 // ── Offline detection ──
@@ -2971,15 +2972,16 @@ function exportAuditCsv() {
 var INTEGRATION_STATUS = [
   { name: 'Claude Code',        method: 'OTel',        status: 'live' },
   { name: 'Gemini CLI',         method: 'OTel',        status: 'live' },
-  { name: 'GitHub Copilot',     method: 'OTel',        status: 'live' },
   { name: 'Codex CLI',          method: 'OTel',        status: 'live' },
-  { name: 'Cline',              method: 'OTel',        status: 'live' },
-  { name: 'Windsurf',           method: 'OTel',        status: 'live' },
-  { name: 'Aider',              method: 'OTel',        status: 'live' },
-  { name: 'GitHub Copilot',     method: 'Billing API', status: 'q2' },
-  { name: 'Cursor',             method: 'Billing API', status: 'q2' },
+  // Future (OTel): GitHub Copilot, Cline, Windsurf, Aider
+  // { name: 'GitHub Copilot',  method: 'OTel',        status: 'live' },
+  // { name: 'Cline',           method: 'OTel',        status: 'live' },
+  // { name: 'Windsurf',        method: 'OTel',        status: 'live' },
+  // { name: 'Aider',           method: 'OTel',        status: 'live' },
   { name: 'OpenAI',             method: 'Billing API', status: 'q2' },
   { name: 'Anthropic',          method: 'Billing API', status: 'q2' },
+  // { name: 'GitHub Copilot',  method: 'Billing API', status: 'q2' },
+  // { name: 'Cursor',          method: 'Billing API', status: 'q2' },
   { name: 'Local file scanner', method: 'CLI',         status: 'q3' },
   { name: 'ChatGPT web',        method: 'Browser ext', status: 'q3' },
   { name: 'Claude Console',     method: 'Browser ext', status: 'q3' },
