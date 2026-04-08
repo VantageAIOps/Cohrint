@@ -52,3 +52,6 @@ setup-claude.sh
 GIT_MEMORY.md
 .cache/
 *.tmp
+
+# Deleted packages (kept locally for reference)
+vantage-cli/

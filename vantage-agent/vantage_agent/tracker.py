@@ -3,7 +3,7 @@ tracker.py — Dashboard telemetry client.
 
 Batches cost/usage events and sends them to the VantageAI backend API.
 Respects privacy modes: full, strict, anonymized, local-only.
-Ported from vantage-cli/src/tracker.ts.
+Cost tracking module for vantage-agent.
 """
 from __future__ import annotations
 

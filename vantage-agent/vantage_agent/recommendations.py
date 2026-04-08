@@ -2,7 +2,7 @@
 Agent-Aware Live Recommendation Engine
 Provides specific, actionable tips tailored to the agent being used.
 
-Ported from vantage-cli/src/recommendations.ts
+Cost recommendations module for vantage-agent
 """
 
 from __future__ import annotations

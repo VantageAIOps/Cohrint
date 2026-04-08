@@ -9,7 +9,7 @@ optimizer.py — Prompt optimization engine.
 4. Collapse whitespace
 5. Trim
 
-Ported from vantage-cli/src/optimizer.ts.
+Prompt optimization module for vantage-agent.
 """
 from __future__ import annotations
 
