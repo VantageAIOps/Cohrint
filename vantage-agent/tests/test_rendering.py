@@ -506,3 +506,57 @@ class TestCLICommandRendering:
         mock_client = MagicMock()
         result = _handle_command("/foobar", mock_client)
         assert result is True  # Handled (printed error)
+
+
+# ---------------------------------------------------------------------------
+# render_cost_summary_v2 tests
+# ---------------------------------------------------------------------------
+
+def _capture_v2(**kwargs) -> str:
+    buf = io.StringIO()
+    con = Console(file=buf, no_color=True)
+    import vantage_agent.renderer as r
+    original = r.console
+    r.console = con
+    try:
+        r.render_cost_summary_v2(**kwargs)
+    finally:
+        r.console = original
+    return buf.getvalue()
+
+
+def test_estimated_cost_shows_tilde_prefix():
+    out = _capture_v2(
+        model="claude-sonnet-4-6", input_tokens=1000, output_tokens=300,
+        cost_usd=0.015, prompt_count=1, session_cost=0.015,
+        token_count_confidence="estimated", is_subscription=False,
+    )
+    assert "~$" in out, f"Expected tilde prefix for estimated cost, got: {out}"
+
+
+def test_subscription_shows_zero_cost_label():
+    out = _capture_v2(
+        model="claude-sonnet-4-6", input_tokens=1000, output_tokens=300,
+        cost_usd=0.015, prompt_count=1, session_cost=0.015,
+        token_count_confidence="estimated", is_subscription=True,
+    )
+    assert "subscription" in out.lower(), f"Expected (subscription) label, got: {out}"
+
+
+def test_free_tier_shows_free_tier_label():
+    out = _capture_v2(
+        model="gemini-2.0-flash", input_tokens=500, output_tokens=200,
+        cost_usd=0.0, prompt_count=1, session_cost=0.0,
+        token_count_confidence="free_tier", is_subscription=False,
+    )
+    assert "free tier" in out.lower(), f"Expected 'free tier' label, got: {out}"
+
+
+def test_exact_cost_no_tilde():
+    out = _capture_v2(
+        model="claude-sonnet-4-6", input_tokens=1000, output_tokens=300,
+        cost_usd=0.0150, prompt_count=1, session_cost=0.0150,
+        token_count_confidence="exact", is_subscription=False,
+    )
+    assert "$0.0150" in out, f"Expected exact cost display, got: {out}"
+    assert "~$0.0150" not in out, f"Tilde should not appear for exact costs, got: {out}"
