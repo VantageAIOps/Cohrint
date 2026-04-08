@@ -1,8 +1,9 @@
 """
-Test Suite 21 — VantageAI CLI (vantage-cli)
-Tests the prompt optimizer, pricing engine, and CLI end-to-end pipe mode.
+Test Suite 21 — VantageAI Agent (Python)
+Tests the prompt optimizer, pricing engine, and CLI structure.
+Replaces the old TypeScript vantage-cli tests.
 """
-import sys, json, os, stat, shutil, subprocess, re, time, tempfile
+import sys, json, os, subprocess
 from pathlib import Path
 
 import pytest
@@ -10,127 +11,57 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from helpers.output import section, chk, ok, fail, get_results, reset_results
 
-CLI_DIR = Path(__file__).parent.parent.parent.parent / "vantage-cli"
-TSX = CLI_DIR / "node_modules" / ".bin" / "tsx"
-HARNESS = CLI_DIR / "test-helpers.ts"
-
-# ---------------------------------------------------------------------------
-# Mock claude binary
-# Outputs valid stream-json so cost tracking plumbing works without a real
-# API key.  Tests verify vantage-cli behaviour (optimization, cost summary,
-# token counting), not actual AI responses — a mock is the right tool here.
-# ---------------------------------------------------------------------------
-_MOCK_CLAUDE_STREAM = (
-    '{"type":"system","subtype":"init",'
-    '"session_id":"00000000-0000-0000-0000-000000000001",'
-    '"model":"claude-sonnet-4-6","tools":[],"mcp_servers":[],'
-    '"permissionMode":"default"}\n'
-    '{"type":"assistant","message":{'
-    '"id":"msg_mock01","type":"message","role":"assistant",'
-    '"content":[{"type":"text","text":"Two"}],'
-    '"model":"claude-sonnet-4-6","stop_reason":"end_turn"}}\n'
-    '{"type":"result","subtype":"success","is_error":false,'
-    '"duration_ms":100,'
-    '"session_id":"00000000-0000-0000-0000-000000000001"}\n'
-)
-
-_mock_claude_dir: str = ""  # populated once by _ensure_mock_claude()
-
-
-def _ensure_mock_claude() -> str:
-    """Create (once) a temp dir containing a mock `claude` binary and return its path."""
-    global _mock_claude_dir
-    if _mock_claude_dir and Path(_mock_claude_dir, "claude").exists():
-        return _mock_claude_dir
-    tmpdir = tempfile.mkdtemp(prefix="vantage_mock_claude_")
-    script = Path(tmpdir) / "claude"
-    # Use printf so the output is written in one syscall (avoids partial-write races)
-    lines = _MOCK_CLAUDE_STREAM.replace("'", "'\\''")  # escape single-quotes
-    script.write_text(f"#!/bin/sh\nprintf '%s' '{lines}'\n")
-    script.chmod(script.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
-    _mock_claude_dir = tmpdir
-    return tmpdir
-
-
-def _cli_env() -> dict:
-    """Return an environment that has a working `claude` on PATH.
-
-    If a real claude with ANTHROPIC_API_KEY is available, use it as-is.
-    Otherwise prepend the mock claude dir so the plumbing tests still run.
-    """
-    real_available = (
-        shutil.which("claude") is not None
-        and bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("CLAUDE_API_KEY"))
-    )
-    if real_available:
-        return dict(os.environ)
-    mock_dir = _ensure_mock_claude()
-    env = dict(os.environ)
-    env["PATH"] = mock_dir + os.pathsep + env.get("PATH", "")
-    return env
-
-
-def js(cmd: str, *args: str, timeout: int = 10) -> dict:
-    """Run test-helpers.ts via tsx and return parsed JSON."""
-    result = subprocess.run(
-        [str(TSX), str(HARNESS), cmd, *[str(a) for a in args]],
-        capture_output=True, text=True, timeout=timeout,
-        cwd=str(CLI_DIR),
-    )
-    try:
-        return json.loads(result.stdout.strip())
-    except json.JSONDecodeError:
-        return {"error": result.stderr, "stdout": result.stdout}
-
-
-def run_cli(prompt: str, timeout: int = 45) -> tuple:
-    """Run vantage CLI in pipe mode, using mock claude when no real API key is set."""
-    result = subprocess.run(
-        ["node", "dist/index.js"],
-        input=prompt,
-        capture_output=True, text=True, timeout=timeout,
-        cwd=str(CLI_DIR),
-        env=_cli_env(),
-    )
-    return result.stdout, result.stderr, result.returncode
+AGENT_DIR = Path(__file__).parent.parent.parent.parent / "vantage-agent"
+PKG_DIR   = AGENT_DIR / "vantage_agent"
+BACKENDS  = PKG_DIR / "backends"
 
 
 # ── Section A: Optimizer Engine ────────────────────────────────────────────
 
 class TestOptimizerEngine:
+    def setup_method(self):
+        sys.path.insert(0, str(AGENT_DIR))
+
     def test_cl01_empty_prompt(self):
         section("A — Optimizer Engine")
-        r = js("optimize", "")
-        chk("CL.1 empty prompt returns empty", r.get("optimized", "") == "")
-        assert r.get("optimized", "") == ""
+        from vantage_agent.optimizer import optimize_prompt
+        r = optimize_prompt("")
+        chk("CL.1 empty prompt returns empty", r.optimized == "")
+        assert r.optimized == ""
 
     def test_cl02_clean_prompt(self):
-        r = js("optimize", "Explain kubernetes pods")
-        chk("CL.2 clean prompt unchanged or minimal change", r["savedTokens"] <= 1)
-        assert r["savedTokens"] <= 1
+        from vantage_agent.optimizer import optimize_prompt
+        r = optimize_prompt("Explain kubernetes pods")
+        chk("CL.2 clean prompt unchanged or minimal change", r.saved_tokens <= 1)
+        assert r.saved_tokens <= 1
 
     def test_cl03_filler_could_you_please(self):
-        r = js("optimize", "Could you please explain what kubernetes is")
-        chk("CL.3 'could you please' removed", "could you please" not in r["optimized"].lower())
-        chk("CL.3 tokens saved > 0", r["savedTokens"] > 0)
-        assert r["savedTokens"] > 0
+        from vantage_agent.optimizer import optimize_prompt
+        r = optimize_prompt("Could you please explain what kubernetes is")
+        chk("CL.3 'could you please' removed", "could you please" not in r.optimized.lower())
+        chk("CL.3 tokens saved > 0", r.saved_tokens > 0)
+        assert r.saved_tokens > 0
 
     def test_cl04_verbose_in_order_to(self):
-        r = js("optimize", "In order to deploy, we need to configure the cluster")
-        chk("CL.4 'in order to' → 'to'", "in order to" not in r["optimized"].lower())
-        assert "in order to" not in r["optimized"].lower()
+        from vantage_agent.optimizer import optimize_prompt
+        r = optimize_prompt("In order to deploy, we need to configure the cluster")
+        chk("CL.4 'in order to' → 'to'", "in order to" not in r.optimized.lower())
+        assert "in order to" not in r.optimized.lower()
 
     def test_cl05_verbose_due_to_fact(self):
-        r = js("optimize", "Due to the fact that the system is slow we need to fix it")
-        chk("CL.5 'due to the fact that' → 'because'", "due to the fact that" not in r["optimized"].lower())
-        assert "due to the fact that" not in r["optimized"].lower()
+        from vantage_agent.optimizer import optimize_prompt
+        r = optimize_prompt("Due to the fact that the system is slow we need to fix it")
+        chk("CL.5 'due to the fact that' → 'because'", "due to the fact that" not in r.optimized.lower())
+        assert "due to the fact that" not in r.optimized.lower()
 
     def test_cl06_dedup_sentences(self):
-        r = js("optimize", "The system is fast. The code is clean. The system is fast.")
-        chk("CL.6 duplicate sentence removed", r["optimized"].lower().count("the system is fast") == 1)
-        assert r["optimized"].lower().count("the system is fast") == 1
+        from vantage_agent.optimizer import optimize_prompt
+        r = optimize_prompt("The system is fast. The code is clean. The system is fast.")
+        chk("CL.6 duplicate sentence removed", r.optimized.lower().count("the system is fast") == 1)
+        assert r.optimized.lower().count("the system is fast") == 1
 
     def test_cl07_verbose_prompt_savings(self):
+        from vantage_agent.optimizer import optimize_prompt
         verbose = (
             "I would like you to please analyze the quarterly revenue data. "
             "It is important to note that we need year-over-year growth. "
@@ -138,204 +69,220 @@ class TestOptimizerEngine:
             "In order to make a decision about our strategy we need patterns. "
             "Due to the fact that we are competitive it is important that we optimize."
         )
-        r = js("optimize", verbose)
-        chk("CL.7 verbose prompt saves 20%+", r["savedPercent"] >= 20)
-        assert r["savedPercent"] >= 20
+        r = optimize_prompt(verbose)
+        chk("CL.7 verbose prompt saves 20%+", r.saved_percent >= 20)
+        assert r.saved_percent >= 20
 
     def test_cl08_filler_words_removed(self):
-        r = js("optimize", "I basically just really want to simply explain this very important concept")
-        chk("CL.8 filler words reduced tokens", r["savedTokens"] >= 3)
-        assert r["savedTokens"] >= 3
+        from vantage_agent.optimizer import optimize_prompt
+        r = optimize_prompt("I basically just really want to simply explain this very important concept")
+        chk("CL.8 filler words reduced tokens", r.saved_tokens >= 3)
+        assert r.saved_tokens >= 3
 
     def test_cl09_token_counter_short(self):
-        r = js("tokens", "hello world")
-        chk("CL.9 'hello world' = 2-3 tokens", 1 <= r["tokens"] <= 4)
-        assert 1 <= r["tokens"] <= 4
+        from vantage_agent.optimizer import count_tokens
+        tokens = count_tokens("hello world")
+        chk("CL.9 'hello world' = 2-3 tokens", 1 <= tokens <= 4)
+        assert 1 <= tokens <= 4
 
     def test_cl10_token_counter_paragraph(self):
+        from vantage_agent.optimizer import count_tokens
         text = " ".join(["word"] * 100)
-        r = js("tokens", text)
-        chk("CL.10 100 words ≈ 100 tokens", 90 <= r["tokens"] <= 130)
-        assert 90 <= r["tokens"] <= 130
+        tokens = count_tokens(text)
+        chk("CL.10 100 words ≈ 100 tokens", 90 <= tokens <= 130)
+        assert 90 <= tokens <= 130
 
 
-# ── Section B: CLI Pipe Mode ──────────────────────────────────────────────
-# run_cli() uses a mock claude when ANTHROPIC_API_KEY is absent, so these
-# tests always execute — they verify vantage-cli plumbing, not AI responses.
+# ── Section B: CLI Structure ──────────────────────────────────────────────
 
-
-class TestCLIPipeMode:
-    def test_cl11_pipe_exit_code(self):
-        section("B — CLI Pipe Mode")
-        stdout, stderr, rc = run_cli("What is 2+2? Answer in one word.")
-        chk("CL.11 pipe mode exit code 0", rc == 0)
-        assert rc == 0
-
-    def test_cl12_output_has_optimized(self):
-        stdout, _, _ = run_cli("Could you please tell me what 2+2 is in one word")
-        chk("CL.12 output contains 'Optimized'", "ptimized" in stdout)
-        assert "ptimized" in stdout
-
-    def test_cl13_output_has_cost(self):
-        stdout, _, _ = run_cli("What is 1+1? One word answer.")
-        chk("CL.13 output contains cost summary", "ost" in stdout)
-        assert "ost" in stdout
-
-    def test_cl14_verbose_shows_savings(self):
-        stdout, _, _ = run_cli(
-            "Could you please kindly explain what is basically the concept of addition in simple terms"
+class TestCLIStructure:
+    def test_cl11_help_flag(self):
+        section("B — CLI Structure")
+        r = subprocess.run(
+            ["python", "-m", "vantage_agent.cli", "--help"],
+            capture_output=True, text=True, timeout=10,
+            cwd=str(AGENT_DIR),
         )
-        chk("CL.14 verbose prompt shows savings", "saved" in stdout.lower() or "Optimized" in stdout)
-        assert "saved" in stdout.lower() or "Optimized" in stdout
+        chk("CL.11 --help exits 0", r.returncode == 0)
+        assert r.returncode == 0
 
-    def test_cl15_empty_prompt_no_crash(self):
-        stdout, stderr, rc = run_cli("")
-        chk(
-            "CL.15 empty prompt no crash",
-            rc == 0 or "no prompt" in (stdout + stderr).lower() or rc == 1,
+    def test_cl12_backend_flag_in_help(self):
+        r = subprocess.run(
+            ["python", "-m", "vantage_agent.cli", "--help"],
+            capture_output=True, text=True, timeout=10,
+            cwd=str(AGENT_DIR),
         )
-        # It's ok to exit with code 1 for empty prompt, as long as no crash
+        out = r.stdout + r.stderr
+        chk("CL.12 --backend flag present in help", "--backend" in out)
+        assert "--backend" in out
 
-    def test_cl16_output_has_model(self):
-        stdout, _, _ = run_cli("Say hi")
-        chk("CL.16 output contains model name", "claude" in stdout.lower() or "sonnet" in stdout.lower())
-        assert "claude" in stdout.lower() or "sonnet" in stdout.lower()
+    def test_cl13_resume_flag_in_help(self):
+        r = subprocess.run(
+            ["python", "-m", "vantage_agent.cli", "--help"],
+            capture_output=True, text=True, timeout=10,
+            cwd=str(AGENT_DIR),
+        )
+        out = r.stdout + r.stderr
+        chk("CL.13 --resume flag present in help", "--resume" in out)
+        assert "--resume" in out
 
-    def test_cl17_cost_is_positive(self):
-        stdout, _, _ = run_cli("What is 3+3? One word.")
-        cost_match = re.search(r'\$(\d+\.\d+)', stdout)
-        cost = float(cost_match.group(1)) if cost_match else 0
-        chk("CL.17 cost value > 0", cost > 0)
-        assert cost > 0
+    def test_cl14_model_flag_in_help(self):
+        r = subprocess.run(
+            ["python", "-m", "vantage_agent.cli", "--help"],
+            capture_output=True, text=True, timeout=10,
+            cwd=str(AGENT_DIR),
+        )
+        out = r.stdout + r.stderr
+        chk("CL.14 --model flag present in help", "--model" in out)
+        assert "--model" in out
 
-    def test_cl18_token_counts_positive(self):
-        stdout, _, _ = run_cli("What is 4+4? One word.")
-        input_match = re.search(r'Input tokens:\s*(\d+)', stdout)
-        output_match = re.search(r'Output tokens:\s*(\d+)', stdout)
-        input_tok = int(input_match.group(1)) if input_match else 0
-        output_tok = int(output_match.group(1)) if output_match else 0
-        chk("CL.18 input tokens > 0", input_tok > 0)
-        chk("CL.18 output tokens > 0", output_tok > 0)
-        assert input_tok > 0 and output_tok > 0
+    def test_cl15_no_optimize_flag_in_help(self):
+        r = subprocess.run(
+            ["python", "-m", "vantage_agent.cli", "--help"],
+            capture_output=True, text=True, timeout=10,
+            cwd=str(AGENT_DIR),
+        )
+        out = r.stdout + r.stderr
+        chk("CL.15 --no-optimize flag present in help", "--no-optimize" in out)
+        assert "--no-optimize" in out
 
 
 # ── Section C: Pricing Engine ─────────────────────────────────────────────
 
 class TestPricingEngine:
-    def test_cl19_claude_cost(self):
+    def setup_method(self):
+        sys.path.insert(0, str(AGENT_DIR))
+
+    def test_cl16_model_prices_exists(self):
         section("C — Pricing Engine")
-        r = js("cost", "claude-sonnet-4-6", "1000", "500")
-        chk("CL.19 claude-sonnet-4-6 cost > 0", r["totalCostUsd"] > 0)
-        assert r["totalCostUsd"] > 0
+        from vantage_agent.pricing import MODEL_PRICES
+        chk("CL.16 MODEL_PRICES dict exists", isinstance(MODEL_PRICES, dict))
+        assert isinstance(MODEL_PRICES, dict)
 
-    def test_cl20_gpt4o_cost(self):
-        r = js("cost", "gpt-4o", "1000", "500")
-        chk("CL.20 gpt-4o cost > 0", r["totalCostUsd"] > 0)
-        assert r["totalCostUsd"] > 0
+    def test_cl17_model_count(self):
+        from vantage_agent.pricing import MODEL_PRICES
+        chk("CL.17 pricing table has 15+ models", len(MODEL_PRICES) >= 15)
+        assert len(MODEL_PRICES) >= 15
 
-    def test_cl21_unknown_model_zero(self):
-        r = js("cost", "totally-unknown-model-xyz", "1000", "500")
-        chk("CL.21 unknown model cost = 0", r["totalCostUsd"] == 0)
-        assert r["totalCostUsd"] == 0
+    def test_cl18_claude_cost(self):
+        from vantage_agent.pricing import calculate_cost
+        cost = calculate_cost("claude-sonnet-4-6", 1000, 500)
+        chk("CL.18 claude-sonnet-4-6 cost > 0", cost > 0)
+        assert cost > 0
 
-    def test_cl22_find_cheapest(self):
-        r = js("cheapest", "claude-opus-4-6", "1000", "500")
-        chk("CL.22 cheaper model exists for opus", r is not None and r.get("model"))
-        assert r is not None and r.get("model")
+    def test_cl19_gpt4o_cost(self):
+        from vantage_agent.pricing import calculate_cost
+        cost = calculate_cost("gpt-4o", 1000, 500)
+        chk("CL.19 gpt-4o cost > 0", cost > 0)
+        assert cost > 0
+
+    def test_cl20_unknown_model_zero(self):
+        from vantage_agent.pricing import calculate_cost
+        cost = calculate_cost("totally-unknown-model-xyz", 1000, 500)
+        chk("CL.20 unknown model cost = 0", cost == 0)
+        assert cost == 0
+
+    def test_cl21_zero_tokens_zero_cost(self):
+        from vantage_agent.pricing import calculate_cost
+        cost = calculate_cost("gpt-4o", 0, 0)
+        chk("CL.21 zero tokens = zero cost", cost == 0)
+        assert cost == 0
+
+    def test_cl22_opus_more_expensive_than_sonnet(self):
+        from vantage_agent.pricing import calculate_cost
+        opus   = calculate_cost("claude-opus-4-6", 1000, 500)
+        sonnet = calculate_cost("claude-sonnet-4-6", 1000, 500)
+        chk("CL.22 opus more expensive than sonnet", opus > sonnet)
+        assert opus > sonnet
 
     def test_cl23_cache_reduces_cost(self):
-        no_cache = js("cost", "claude-sonnet-4-6", "1000", "500", "0")
-        with_cache = js("cost", "claude-sonnet-4-6", "1000", "500", "500")
-        chk("CL.23 cached tokens reduce cost", with_cache["totalCostUsd"] < no_cache["totalCostUsd"])
-        assert with_cache["totalCostUsd"] < no_cache["totalCostUsd"]
-
-    def test_cl24_zero_tokens_zero_cost(self):
-        r = js("cost", "gpt-4o", "0", "0")
-        chk("CL.24 zero tokens = zero cost", r["totalCostUsd"] == 0)
-        assert r["totalCostUsd"] == 0
-
-    def test_cl25_model_count(self):
-        r = js("models")
-        chk("CL.25 pricing table has 15+ models", r["count"] >= 15)
-        assert r["count"] >= 15
+        from vantage_agent.pricing import calculate_cost
+        no_cache   = calculate_cost("claude-sonnet-4-6", 1000, 500)
+        with_cache = calculate_cost("claude-sonnet-4-6", 1000, 500, cached_tokens=500)
+        chk("CL.23 cached tokens reduce cost", with_cache < no_cache)
+        assert with_cache < no_cache
 
 
 # ── Section D: Config & File Structure ────────────────────────────────────
 
 class TestConfigAndStructure:
-    def test_cl26_package_json_exists(self):
+    def test_cl24_pyproject_exists(self):
         section("D — Config & File Structure")
-        chk("CL.26 package.json exists", (CLI_DIR / "package.json").exists())
-        assert (CLI_DIR / "package.json").exists()
+        chk("CL.24 pyproject.toml exists", (AGENT_DIR / "pyproject.toml").exists())
+        assert (AGENT_DIR / "pyproject.toml").exists()
 
-    def test_cl27_dist_exists(self):
-        chk("CL.27 dist/index.js exists (built)", (CLI_DIR / "dist" / "index.js").exists())
-        assert (CLI_DIR / "dist" / "index.js").exists()
+    def test_cl25_package_name_correct(self):
+        import tomllib  # Python 3.11+
+        with open(AGENT_DIR / "pyproject.toml", "rb") as f:
+            data = tomllib.load(f)
+        name = data["project"]["name"]
+        chk("CL.25 package name is vantageai-agent", name == "vantageai-agent")
+        assert name == "vantageai-agent"
 
-    def test_cl28_test_harness_exists(self):
-        chk("CL.28 test-helpers.ts exists", HARNESS.exists())
-        assert HARNESS.exists()
+    def test_cl26_cli_entry_point(self):
+        try:
+            import tomllib
+        except ImportError:
+            import tomli as tomllib  # type: ignore
+        with open(AGENT_DIR / "pyproject.toml", "rb") as f:
+            data = tomllib.load(f)
+        scripts = data.get("project", {}).get("scripts", {})
+        chk("CL.26 vantageai-agent script entry point", "vantageai-agent" in scripts)
+        assert "vantageai-agent" in scripts
 
-    def test_cl29_source_files_present(self):
+    def test_cl27_source_files_present(self):
         expected = [
-            "index.ts", "config.ts", "optimizer.ts", "pricing.ts",
-            "event-bus.ts", "tracker.ts", "runner.ts", "session.ts",
-            "ui.ts", "setup.ts",
+            "cli.py", "optimizer.py", "pricing.py", "tracker.py",
+            "session.py", "session_store.py", "permissions.py",
+            "cost_tracker.py", "renderer.py",
         ]
-        all_present = True
         for f in expected:
-            if not (CLI_DIR / "src" / f).exists():
-                all_present = False
-                break
-        chk("CL.29 all 10 source files present", all_present)
+            assert (PKG_DIR / f).exists(), f"Missing {f}"
+        chk("CL.27 all core source files present", True)
+
+    def test_cl28_backends_present(self):
+        expected = ["base.py", "claude_backend.py", "codex_backend.py",
+                    "gemini_backend.py", "api_backend.py"]
         for f in expected:
-            assert (CLI_DIR / "src" / f).exists(), f"Missing {f}"
+            assert (BACKENDS / f).exists(), f"Missing backends/{f}"
+        chk("CL.28 all 4 backend files present", True)
 
-    def test_cl30_agent_adapters_present(self):
-        expected = [
-            "types.ts", "registry.ts", "claude.ts", "codex.ts",
-            "gemini.ts", "aider.ts", "chatgpt.ts",
-        ]
-        all_present = True
-        for f in expected:
-            if not (CLI_DIR / "src" / "agents" / f).exists():
-                all_present = False
-                break
-        chk("CL.30 all 7 agent adapter files present", all_present)
-        for f in expected:
-            assert (CLI_DIR / "src" / "agents" / f).exists(), f"Missing agents/{f}"
+    def test_cl29_no_runtime_deps_except_allowed(self):
+        try:
+            import tomllib
+        except ImportError:
+            import tomli as tomllib  # type: ignore
+        with open(AGENT_DIR / "pyproject.toml", "rb") as f:
+            data = tomllib.load(f)
+        deps = data.get("project", {}).get("dependencies", [])
+        # Only anthropic and rich are allowed runtime deps
+        for dep in deps:
+            pkg = dep.split(">=")[0].split("==")[0].strip()
+            assert pkg in ("anthropic", "rich"), f"Unexpected runtime dep: {pkg}"
+        chk("CL.29 only allowed runtime dependencies", True)
 
-    def test_cl31_zero_runtime_deps(self):
-        pkg = json.loads((CLI_DIR / "package.json").read_text())
-        deps = pkg.get("dependencies", {})
-        chk("CL.31 zero runtime dependencies", len(deps) == 0)
-        assert len(deps) == 0
-
-    def test_cl32_bin_configured(self):
-        pkg = json.loads((CLI_DIR / "package.json").read_text())
-        chk("CL.32 bin 'vantage' configured", "vantage" in pkg.get("bin", {}))
-        assert "vantage" in pkg.get("bin", {})
-
-    def test_cl33_typecheck_passes(self):
-        r = subprocess.run(
-            ["npx", "tsc", "--noEmit"],
-            capture_output=True, text=True, timeout=30,
-            cwd=str(CLI_DIR),
-        )
-        chk("CL.33 TypeScript typecheck passes", r.returncode == 0)
-        assert r.returncode == 0
+    def test_cl30_four_backends_registered(self):
+        sys.path.insert(0, str(AGENT_DIR))
+        from vantage_agent.backends import _REGISTRY as backend_map
+        backend_names = list(backend_map.keys()) if hasattr(backend_map, 'keys') else []
+        # At minimum api, claude, codex, gemini
+        expected = {"api", "claude", "codex", "gemini"}
+        registered = set(str(k) for k in backend_names)
+        chk("CL.30 all 4 backends registered", expected.issubset(registered))
+        assert expected.issubset(registered)
 
 
 # ── Runner ────────────────────────────────────────────────────────────────
 
 def run():
     reset_results()
-    # Run all test classes
-    for cls in [TestOptimizerEngine, TestCLIPipeMode, TestPricingEngine, TestConfigAndStructure]:
+    for cls in [TestOptimizerEngine, TestCLIStructure, TestPricingEngine, TestConfigAndStructure]:
         obj = cls()
         for name in sorted(dir(obj)):
             if name.startswith("test_"):
                 try:
+                    if hasattr(obj, "setup_method"):
+                        obj.setup_method()
                     getattr(obj, name)()
                 except Exception as e:
                     fail(name, str(e))
