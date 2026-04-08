@@ -302,22 +302,23 @@ response = client.chat.completions.<span class="c-fn">create</span>(
 <span class="c-cm"># Now all Claude Code usage is tracked automatically</span>
 <span class="c-cm"># Works with: Claude Code, Codex CLI, Gemini CLI</span></pre>
 
-<h2>Path 3 — CLI Wrapper (terminal users)</h2>
+<h2>Path 3 — Python Agent CLI (terminal users)</h2>
 <p>Best for: developers who use AI CLIs directly and want prompt optimization + cost tracking.</p>
 <pre><span class="c-cm"># Install and run</span>
-<span class="c-kw">$</span> npx vantageai-cli
+<span class="c-kw">$</span> pip install vantageai-agent
+<span class="c-kw">$</span> vantageai-agent
 
-<span class="c-cm"># Or pipe prompts</span>
-<span class="c-kw">$</span> echo <span class="c-str">"explain kubernetes"</span> | vantage
+<span class="c-cm"># Or one-shot usage</span>
+<span class="c-kw">$</span> echo <span class="c-str">"explain kubernetes"</span> | vantageai-agent --backend claude
 
 <span class="c-cm">  ⚡ Optimized: 8 → 6 tokens (saved 2, -25%)</span>
 <span class="c-cm">  [Claude responds...]</span>
 <span class="c-cm">  💰 Cost: $0.0065 | 💾 Saved: 2 tokens</span>
 
-<span class="c-cm"># Switch agents on the fly</span>
-vantage [claude] ▸ /gemini what is DNS
-vantage [claude] ▸ /compare explain caching
-vantage [claude] ▸ /session  <span class="c-cm"># interactive with /compact, /clear</span></pre>
+<span class="c-cm"># Switch backends with flags</span>
+vantageai-agent --backend gemini
+vantageai-agent --backend openai --model gpt-4o
+<span class="c-cm"># In the REPL: /model, /summary, /sessions, /optimize</span></pre>
 
 <div class="info-box">💡 All three paths send data to the same dashboard. Mix and match — use SDK for your API, OTel for your team's coding tools, CLI for your terminal.</div>
 `,
@@ -356,7 +357,7 @@ otlp_endpoint = "https://api.vantageaiops.com/v1/otel"</pre>
 <ul>
 <li><strong>Python SDK:</strong> Python 3.8+ (no native dependencies)</li>
 <li><strong>TypeScript SDK:</strong> Node.js 18+ (zero npm dependencies)</li>
-<li><strong>CLI:</strong> Node.js 18+ (zero npm dependencies)</li>
+<li><strong>CLI agent:</strong> Python 3.11+</li>
 <li><strong>OTel:</strong> No requirements — tools already emit telemetry</li>
 <li><strong>API key:</strong> Get one free at <a href="/signup.html">vantageaiops.com/signup</a></li>
 </ul>
@@ -702,7 +703,7 @@ claudecode: `
 <h2>Automatic tracking via Stop hook</h2>
 <p>Reads Claude Code's local session files and uploads token usage after every response. <strong>Zero code changes required.</strong></p>
 
-<div class="step-row"><div class="step-num">1</div><div class="step-body">Create <code>~/.claude/hooks/vantage-track.js</code> — <a href="https://github.com/Amanjain98/VantageAI/blob/main/vantage-local-proxy/" style="color:var(--accent)">get the script from GitHub</a> or copy from ADMIN_GUIDE §23.4</div></div>
+<div class="step-row"><div class="step-num">1</div><div class="step-body">Create <code>~/.claude/hooks/vantage-track.js</code> — <a href="https://github.com/Amanjain98/VantageAI/blob/main/.claude/hooks/vantage-track.js" style="color:var(--accent)">get the script from GitHub</a> or copy from ADMIN_GUIDE §23.4</div></div>
 
 <div class="step-row"><div class="step-num">2</div><div class="step-body">Register it as a Stop hook in <code>~/.claude/settings.json</code></div></div>
 <pre>{
@@ -1871,11 +1872,11 @@ document.getElementById("docs-content").innerHTML = DOCS.quickstart;
     const safeOrgId = String(sess.org_id || '').replace(/[^a-zA-Z0-9_-]/g, '');
     const orgHint = `vnt_${safeOrgId}_…`;
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-    const toReplace: Text[] = [];
-    let node = walker.nextNode() as Text | null;
+    const toReplace = [];
+    let node = walker.nextNode();
     while (node) {
       if (node.nodeValue && node.nodeValue.includes('vnt_your_key')) toReplace.push(node);
-      node = walker.nextNode() as Text | null;
+      node = walker.nextNode();
     }
     toReplace.forEach(tn => {
       const parts = tn.nodeValue!.split('vnt_your_key');
