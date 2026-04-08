@@ -53,6 +53,12 @@ export interface LocalProxyConfig {
 
   /** Flush interval in ms (default: 5000) */
   flushInterval?: number;
+
+  /** Resume an existing session by ID instead of creating a new one */
+  resumeSessionId?: string;
+
+  /** Use a specific session ID (e.g. to link to a vantage-agent session) */
+  sessionId?: string;
 }
 
 interface PendingStat {
@@ -90,11 +96,35 @@ class StatsQueue {
     orgId: string,
     team: string,
     environment: string,
+    resumeSessionId?: string,
+    fixedSessionId?: string,
   ) {
     this.sessionStore = new SessionStore();
     const now = new Date().toISOString();
-    this.currentSession = {
-      id: randomUUID(),
+
+    if (resumeSessionId) {
+      const existing = this.sessionStore.loadSync(resumeSessionId);
+      if (existing) {
+        if (this.debug) process.stderr.write(`[vantage-proxy] Resumed session ${resumeSessionId}\n`);
+        this.currentSession = existing;
+      } else {
+        process.stderr.write(`[vantage-proxy] WARN: session ${resumeSessionId} not found — starting new session\n`);
+        this.currentSession = this._newSession(fixedSessionId ?? randomUUID(), orgId, team, environment, now);
+      }
+    } else {
+      this.currentSession = this._newSession(fixedSessionId ?? randomUUID(), orgId, team, environment, now);
+    }
+  }
+
+  private _newSession(
+    id: string,
+    orgId: string,
+    team: string,
+    environment: string,
+    now: string,
+  ): ProxySessionRecord {
+    return {
+      id,
       source: "local-proxy",
       created_at: now,
       last_active_at: now,
@@ -280,13 +310,15 @@ export function startProxyServer(config: LocalProxyConfig): void {
     debug = false,
     batchSize = 20,
     flushInterval = 5000,
+    resumeSessionId,
+    sessionId,
   } = config;
 
   const orgId = vantageApiKey.split("_")[1] ?? "default";
 
   const statsQueue = new StatsQueue(
     vantageApiKey, vantageApiBase, batchSize, flushInterval, privacy, debug,
-    orgId, team, environment,
+    orgId, team, environment, resumeSessionId, sessionId,
   );
   statsQueue.start();
 

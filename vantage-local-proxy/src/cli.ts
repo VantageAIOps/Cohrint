@@ -4,6 +4,8 @@
  *
  * Usage:
  *   vantage-proxy                                # proxy mode (default)
+ *   vantage-proxy --resume <session_id>          # resume existing session
+ *   vantage-proxy --session-id <uuid>            # start with specific session ID
  *   vantage-proxy scan                           # scan all local AI tool sessions
  *   vantage-proxy scan --tool claude-code         # scan specific tool
  *   vantage-proxy scan --since 2026-03-01         # filter by date
@@ -106,6 +108,8 @@ TIP: Use "vantage-proxy scan" to scan local AI tool sessions (no API key needed)
     debug: args["debug"] === "true" || process.env.VANTAGE_DEBUG === "true",
     batchSize: parseInt(args["batch-size"] ?? "20", 10),
     flushInterval: parseInt(args["flush-interval"] ?? "5000", 10),
+    resumeSessionId: args["resume"] ?? undefined,
+    sessionId: args["session-id"] ?? undefined,
   });
 }
 

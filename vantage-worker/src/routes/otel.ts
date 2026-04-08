@@ -588,6 +588,63 @@ otel.post('/v1/metrics', async (c) => {
       return c.json({ error: 'Failed to store metrics' }, 500);
     }
 
+    // Upsert session rollup — one row per unique session_id in this batch
+    const sessionUpserts = new Map<string, {
+      provider: string; developer_email: string; team: string; model: string;
+      input_tokens: number; output_tokens: number; cached_tokens: number; cost_usd: number;
+      timestamp: string;
+    }>();
+    for (const r of tokenRecords) {
+      if (!r.session_id) continue;
+      const existing = sessionUpserts.get(r.session_id);
+      if (existing) {
+        existing.input_tokens  += r.input_tokens  ?? 0;
+        existing.output_tokens += r.output_tokens ?? 0;
+        existing.cached_tokens += r.cached_tokens ?? 0;
+        existing.cost_usd      += r.cost_usd      ?? 0;
+      } else {
+        sessionUpserts.set(r.session_id, {
+          provider:        r.provider        ?? '',
+          developer_email: r.developer_email ?? '',
+          team:            r.team            ?? '',
+          model:           r.model           ?? '',
+          input_tokens:    r.input_tokens    ?? 0,
+          output_tokens:   r.output_tokens   ?? 0,
+          cached_tokens:   r.cached_tokens   ?? 0,
+          cost_usd:        r.cost_usd        ?? 0,
+          timestamp:       r.timestamp,
+        });
+      }
+    }
+    if (sessionUpserts.size > 0) {
+      const sessionBatch = [...sessionUpserts.entries()].map(([sessionId, s]) =>
+        c.env.DB.prepare(`
+          INSERT INTO otel_sessions
+            (org_id, session_id, provider, developer_email, team, model,
+             input_tokens, output_tokens, cached_tokens, cost_usd, event_count,
+             first_seen_at, last_seen_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+          ON CONFLICT (org_id, session_id) DO UPDATE SET
+            input_tokens  = input_tokens  + excluded.input_tokens,
+            output_tokens = output_tokens + excluded.output_tokens,
+            cached_tokens = cached_tokens + excluded.cached_tokens,
+            cost_usd      = cost_usd      + excluded.cost_usd,
+            event_count   = event_count   + 1,
+            last_seen_at  = excluded.last_seen_at
+        `).bind(
+          orgId, sessionId, s.provider, s.developer_email, s.team, s.model,
+          s.input_tokens, s.output_tokens, s.cached_tokens, s.cost_usd,
+          s.timestamp, s.timestamp,
+        )
+      );
+      try {
+        await c.env.DB.batch(sessionBatch);
+      } catch (err) {
+        // Non-critical — log and continue
+        console.error('[otel] session upsert error:', err);
+      }
+    }
+
     // Invalidate analytics summary cache for this org
     try { await c.env.KV.delete(`analytics:summary:${orgId}`); } catch { /* best-effort */ }
 

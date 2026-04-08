@@ -1,4 +1,4 @@
-import { promises as fs } from "fs";
+import { promises as fs, readFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 
@@ -53,6 +53,14 @@ export class SessionStore {
 
   async load(id: string): Promise<ProxySessionRecord> {
     return JSON.parse(await fs.readFile(this.path(id), "utf-8"));
+  }
+
+  loadSync(id: string): ProxySessionRecord | null {
+    try {
+      return JSON.parse(readFileSync(this.path(id), "utf-8")) as ProxySessionRecord;
+    } catch {
+      return null;
+    }
   }
 
   async listAll(): Promise<ProxySessionRecord[]> {
