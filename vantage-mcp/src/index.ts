@@ -359,6 +359,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           trace_id:         { type: 'string', description: 'Trace ID for grouping multi-step agent calls' },
           span_depth:       { type: 'number', description: 'Depth in agent call tree (0 = root)' },
           tags:             { type: 'object', description: 'Arbitrary key-value tags for filtering' },
+          session_id:       { type: 'string', description: 'Session ID — links this event to a vantage-agent or local-proxy session' },
         },
         required: ['model', 'provider', 'prompt_tokens', 'completion_tokens', 'total_cost_usd'],
       },
@@ -556,6 +557,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           ...(args.trace_id ? { trace_id: String(args.trace_id).slice(0, 256) } : {}),
           ...(spanDepth > 0 ? { span_depth: spanDepth } : {}),
           ...(args.tags && typeof args.tags === 'object' ? { tags: args.tags } : {}),
+          ...(args.session_id ? { session_id: String(args.session_id).slice(0, 256) } : {}),
         };
         await api('/v1/events', { method: 'POST', body: JSON.stringify(event) });
         return {
