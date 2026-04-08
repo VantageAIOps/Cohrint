@@ -1,6 +1,6 @@
 name: Publish Packages
 
-# Auto-publish npm packages when version bumps land on main
+# Auto-publish npm + PyPI packages when version bumps land on main
 # Only publishes packages whose version differs from the registry
 
 on:
@@ -11,6 +11,7 @@ on:
       - 'vantage-mcp/**'
       - 'vantage-js-sdk/**'
       - 'vantage-local-proxy/**'
+      - 'vantage-agent/**'
   workflow_dispatch: # Manual trigger for force-publish
 
 env:
@@ -25,6 +26,7 @@ jobs:
       mcp: ${{ steps.check.outputs.mcp }}
       sdk: ${{ steps.check.outputs.sdk }}
       proxy: ${{ steps.check.outputs.proxy }}
+      agent: ${{ steps.check.outputs.agent }}
     steps:
       - uses: actions/checkout@v4
 
@@ -55,6 +57,18 @@ jobs:
           check_version "vantage-mcp" "vantageaiops-mcp" "mcp"
           check_version "vantage-js-sdk" "vantageaiops" "sdk"
           check_version "vantage-local-proxy" "vantageai-local-proxy" "proxy"
+
+          # Check Python package version against PyPI
+          local_py_ver=$(python3 -c "import tomllib; d=tomllib.load(open('vantage-agent/pyproject.toml','rb')); print(d['project']['version'])" 2>/dev/null || echo "0.0.0")
+          registry_py_ver=$(pip index versions vantage-agent 2>/dev/null | grep -oP '(?<=vantage-agent \()[\d.]+' | head -1 || echo "0.0.0")
+          echo "  vantage-agent: local=${local_py_ver} registry=${registry_py_ver}"
+          if [ "$local_py_ver" != "$registry_py_ver" ]; then
+            echo "agent=true" >> $GITHUB_OUTPUT
+            echo "  → WILL PUBLISH"
+          else
+            echo "agent=false" >> $GITHUB_OUTPUT
+            echo "  → up to date"
+          fi
 
   publish-cli:
     name: Publish vantageai-cli
@@ -142,9 +156,29 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           # NEW_VER is derived from package.json — not user input, no injection risk
 
+  publish-agent:
+    name: Publish vantage-agent (PyPI)
+    needs: detect-changes
+    if: needs.detect-changes.outputs.agent == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Build and publish to PyPI
+        working-directory: vantage-agent
+        run: |
+          pip install build twine
+          python -m build
+          twine upload dist/*
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+
   summary:
     name: Publish Summary
-    needs: [detect-changes, publish-cli, publish-mcp, publish-sdk, publish-proxy]
+    needs: [detect-changes, publish-cli, publish-mcp, publish-sdk, publish-proxy, publish-agent]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -158,3 +192,4 @@ jobs:
           echo "| vantageaiops-mcp | ${{ needs.detect-changes.outputs.mcp }} | ${{ needs.publish-mcp.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| vantageaiops | ${{ needs.detect-changes.outputs.sdk }} | ${{ needs.publish-sdk.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| vantageai-local-proxy | ${{ needs.detect-changes.outputs.proxy }} | ${{ needs.publish-proxy.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| vantage-agent (PyPI) | ${{ needs.detect-changes.outputs.agent }} | ${{ needs.publish-agent.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
