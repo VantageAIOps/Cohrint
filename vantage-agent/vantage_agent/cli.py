@@ -2,9 +2,9 @@
 cli.py — Vantage Agent CLI with interactive REPL.
 
 Usage:
-  vantage-agent                          # Start interactive REPL
-  vantage-agent "fix the bug in main.py" # One-shot prompt
-  vantage-agent --model claude-opus-4-6  # Use a specific model
+  vantageai-agent                          # Start interactive REPL
+  vantageai-agent "fix the bug in main.py" # One-shot prompt
+  vantageai-agent --model claude-opus-4-6  # Use a specific model
 """
 from __future__ import annotations
 
@@ -303,7 +303,7 @@ def _print_summary() -> None:
 
 
 def main() -> None:
-    # Handle `vantage-agent summary` before argparse (avoids positional arg conflict)
+    # Handle `vantageai-agent summary` before argparse (avoids positional arg conflict)
     if len(sys.argv) > 1 and sys.argv[1] == "summary":
         _print_summary()
         return

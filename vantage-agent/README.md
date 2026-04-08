@@ -5,7 +5,7 @@ AI coding agent with per-tool permissions, cost tracking, prompt optimization, a
 ## Install
 
 ```bash
-pip install vantage-agent
+pip install vantageai-agent
 ```
 
 Requires Python 3.9+.
@@ -17,19 +17,19 @@ Requires Python 3.9+.
 ```bash
 # Set your API key, then launch
 export ANTHROPIC_API_KEY=sk-...
-vantage-agent
+vantageai-agent
 ```
 
 ### One-shot prompt
 
 ```bash
-vantage-agent "explain the main function in cli.py"
+vantageai-agent "explain the main function in cli.py"
 ```
 
 ### Pipe mode
 
 ```bash
-echo "summarize this file" | vantage-agent
+echo "summarize this file" | vantageai-agent
 ```
 
 ## Backends
@@ -44,8 +44,8 @@ Vantage auto-detects the best backend. You can override with `--backend`:
 | `gemini` | Gemini CLI subprocess | `gemini` binary |
 
 ```bash
-vantage-agent --backend claude "refactor this function"
-vantage-agent --backend codex "write unit tests for auth.py"
+vantageai-agent --backend claude "refactor this function"
+vantageai-agent --backend codex "write unit tests for auth.py"
 ```
 
 Auto-detect priority: `VANTAGE_BACKEND` env → `ANTHROPIC_API_KEY` → `claude` binary → `codex` binary → `gemini` binary.
@@ -56,10 +56,10 @@ Sessions are persisted to `~/.vantage/sessions/`. Resume any previous session:
 
 ```bash
 # List sessions and costs
-vantage-agent summary
+vantageai-agent summary
 
 # Resume by session ID
-vantage-agent --resume abc12345
+vantageai-agent --resume abc12345
 ```
 
 ## REPL Commands
@@ -99,15 +99,15 @@ Send telemetry to your VantageAI dashboard for cross-session cost analysis:
 
 ```bash
 export VANTAGE_API_KEY=vnt_...
-vantage-agent
+vantageai-agent
 ```
 
-Or pass inline: `vantage-agent --vantage-key vnt_...`
+Or pass inline: `vantageai-agent --vantage-key vnt_...`
 
 ## All Flags
 
 ```
-vantage-agent [OPTIONS] [PROMPT]
+vantageai-agent [OPTIONS] [PROMPT]
 
   PROMPT              One-shot prompt (omit for interactive REPL)
 

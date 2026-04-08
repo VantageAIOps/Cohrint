@@ -2553,7 +2553,7 @@ The dashboard (`app.html`) has been restructured to use **only real API data**. 
 
 ## 26. Vantage Agent — Python AI Coding Agent
 
-The `vantage-agent` package (`vantage-agent/`) is a standalone Python AI coding agent that calls the Anthropic API directly. It provides per-tool permissions, cost tracking, prompt optimization, and dashboard telemetry — no external CLI dependency required.
+The `vantageai-agent` package (`vantageai-agent/`) is a standalone Python AI coding agent that calls the Anthropic API directly. It provides per-tool permissions, cost tracking, prompt optimization, and dashboard telemetry — no external CLI dependency required.
 
 > **Note:** This replaces the previous `vantage-cli` TypeScript wrapper (deleted). All unique features have been ported to Python with full test parity.
 
@@ -2567,9 +2567,9 @@ The `vantage-agent` package (`vantage-agent/`) is a standalone Python AI coding 
 7. Tracks cost from real API usage, sends telemetry to dashboard
 
 **3 Modes:**
-- **REPL**: `vantage-agent` — interactive with `/commands`
-- **One-shot**: `vantage-agent "prompt"` — run and exit
-- **Pipe**: `echo "prompt" | vantage-agent` — scriptable
+- **REPL**: `vantageai-agent` — interactive with `/commands`
+- **One-shot**: `vantageai-agent "prompt"` — run and exit
+- **Pipe**: `echo "prompt" | vantageai-agent` — scriptable
 
 **REPL commands:**
 - `/help` — show commands
@@ -2585,7 +2585,7 @@ The `vantage-agent` package (`vantage-agent/`) is a standalone Python AI coding 
 - Safe tools auto-approved: Read, Glob, Grep
 - Dangerous tools prompt user: Bash, Write, Edit
 - User responds: `[y]es once / [a]lways / [n]o`
-- Persisted to `~/.vantage-agent/permissions.json`
+- Persisted to `~/.vantageai-agent/permissions.json`
 
 **6 local tools:**
 | Tool | Description |
@@ -2743,14 +2743,14 @@ The Security & Governance view in `app.html` shows:
 - `tests/suites/18_sdk_privacy/test_sdk_privacy.py` — 50+ checks (privacy modes, pricing engine, date format, dual-write)
 - `tests/suites/19_local_proxy/test_local_proxy.py` — 42+ checks (privacy engine, pricing accuracy, proxy integration, scanner coverage)
 - `tests/suites/20_dashboard_real_data/test_dashboard_real_data.py` — 42+ checks (enterprise reporting, cost intelligence, no fake data, cross-platform integration)
-- `vantage-agent/tests/` — 273 checks across 11 files (optimizer, pricing, classifier, recommendations, permissions, tools, rendering, cost tracking, anomaly detection, telemetry, API tool loop)
+- `vantageai-agent/tests/` — 273 checks across 11 files (optimizer, pricing, classifier, recommendations, permissions, tools, rendering, cost tracking, anomaly detection, telemetry, API tool loop)
 - `tests/suites/22_landing_page/test_landing_page.py` — 41 checks (landing page content, v2 feature coverage, HTML structure)
 - `tests/suites/23_security_governance/` — audit logging, security overview API, RBAC, data retention
 - Total: **567+ checks** across suites covering OTel + cross-platform + privacy + pricing + dashboard + Python agent (273) + landing page + security & governance features
 
 ---
 
-*Last updated: 7 April 2026 — v2.4 consolidated Python agent (vantage-cli deleted, all features ported to vantage-agent). 273 agent tests + 294 backend tests = 567+ total checks.*
+*Last updated: 7 April 2026 — v2.4 consolidated Python agent (vantage-cli deleted, all features ported to vantageai-agent). 273 agent tests + 294 backend tests = 567+ total checks.*
 
 ## CLI Agent Configuration
 
@@ -2759,7 +2759,7 @@ The Security & Governance view in `app.html` shows:
 Vantage Agent persists per-tool approvals:
 
 ```
-~/.vantage-agent/
+~/.vantageai-agent/
 ├── permissions.json         # { "always_approved": ["Bash", "Write", "Edit"] }
 ```
 
@@ -2772,12 +2772,12 @@ Vantage Agent persists per-tool approvals:
 ### CLI Arguments
 
 ```
-vantage-agent                           # Start interactive REPL
-vantage-agent "fix the bug"             # One-shot mode
-echo "fix the bug" | vantage-agent      # Pipe mode
-vantage-agent --model claude-opus-4-6   # Use specific model
-vantage-agent --no-optimize             # Disable prompt optimization
-vantage-agent --api-key sk-ant-...      # Provide API key
-vantage-agent --vantage-key vnt_...     # Enable dashboard telemetry
-vantage-agent --debug                   # Enable debug output
+vantageai-agent                           # Start interactive REPL
+vantageai-agent "fix the bug"             # One-shot mode
+echo "fix the bug" | vantageai-agent      # Pipe mode
+vantageai-agent --model claude-opus-4-6   # Use specific model
+vantageai-agent --no-optimize             # Disable prompt optimization
+vantageai-agent --api-key sk-ant-...      # Provide API key
+vantageai-agent --vantage-key vnt_...     # Enable dashboard telemetry
+vantageai-agent --debug                   # Enable debug output
 ```
