@@ -102,6 +102,18 @@
     }
     .cta a { color: var(--accent-green); text-decoration: none; }
     .cta a:hover { text-decoration: underline; }
+    @media (max-width: 768px) {
+      header { padding: 10px 16px; }
+      main { padding: 24px 16px; }
+      .grid { grid-template-columns: 1fr; }
+      h1 { font-size: 1.4rem; }
+      h2 { font-size: 1.1rem; }
+    }
+    @media (max-width: 480px) {
+      header { padding: 8px 12px; }
+      main { padding: 16px 12px; }
+      .grid { grid-template-columns: 1fr; gap: 12px; }
+    }
   </style>
 </head>
 <body>
