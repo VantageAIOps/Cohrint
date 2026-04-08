@@ -553,7 +553,7 @@ The constructor uses `loadSync` synchronously (needed during class construction 
 
   ```bash
   cd vantage-worker
-  npx wrangler d1 execute vantageai-db --local --file=migrations/0006_otel_sessions.sql
+  npx wrangler d1 execute vantage-events --local --file=migrations/0006_otel_sessions.sql
   ```
   Expected: `Successfully applied migration`
 

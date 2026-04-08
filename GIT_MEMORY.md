@@ -73,7 +73,7 @@ c2b066b feat(local-proxy): add session persistence to ~/.vantage/sessions/
 
 ## Post-Merge Action Required (PR #41)
 ```bash
-npx wrangler d1 execute vantageai-db --remote --file=migrations/0006_otel_sessions.sql
+npx wrangler d1 execute vantage-events --remote --file=migrations/0006_otel_sessions.sql
 # Then verify:
 python -m pytest tests/suites/34_otel_sessions/ -v
 ```
