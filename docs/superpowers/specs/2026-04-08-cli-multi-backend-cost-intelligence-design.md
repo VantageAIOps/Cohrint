@@ -481,46 +481,49 @@ backend: claude (Max subscription — $0/token)
 
 ## 14. Implementation Phases
 
-### Phase 1: Fix Bugs (no architecture changes)
-- [ ] Fix 5 bugs in Section 12
-- [ ] Write `tests/test_bugs.py` — all must pass
-- [ ] All existing tests still pass
-- [ ] Commit + push
+> **Status as of 2026-04-08:** Phases 1–5 complete. Phase 6 partially complete (tracker retry done; token-bucket rate state deferred).
 
-### Phase 2: Hook Pipeline + Session Object
-- [ ] Create `HookContext`, `PRE_HOOKS`, `POST_HOOKS` in `hooks.py`
-- [ ] Wire `classifier → optimizer` correctly
-- [ ] Create `VantageSession` with in-memory history
-- [ ] `session.save()` / `VantageSession.resume()` with `SessionStore`
-- [ ] Session ID propagated to tracker events
-- [ ] Tests: `test_session.py`, `test_hooks.py`
+### Phase 1: Fix Bugs ✅
+- [x] Fix 5 bugs (optimizer filler phrase, tracker anonymized/flush/provider, pricing unification)
+- [x] `tests/test_bugs.py` — all pass
+- [x] All existing tests still pass
 
-### Phase 3: Backend Abstraction
-- [ ] Create `backends/` package — `base.py`, `api_backend.py`
-- [ ] Extract API logic from `api_client.py` into `ApiBackend`
-- [ ] `api_client.py` becomes a thin shim (no regression)
-- [ ] All existing tests still pass
+### Phase 2: Hook Pipeline + Session Object ✅
+- [x] `HookContext`, `PRE_HOOKS`, `POST_HOOKS` in `hooks.py`
+- [x] `classifier → optimizer` wiring correct
+- [x] `VantageSession` with in-memory + persisted history
+- [x] `session.save()` / `VantageSession.resume()` with `SessionStore`
+- [x] Session ID propagated to tracker events
+- [x] `test_session.py` (10 tests), `test_hooks.py` (7 tests)
 
-### Phase 4: CLI Backends + Auto-Detection
-- [ ] Auto-detect logic in `backends/__init__.py`
-- [ ] `claude_backend.py`, `codex_backend.py`, `gemini_backend.py`
-- [ ] `AgentProcess` with `ping()` + timeout fallback
-- [ ] `--backend` flag in `cli.py`
-- [ ] `tool_registry.py` for format translation
-- [ ] Tests: `test_backends.py`
+### Phase 3: Backend Abstraction ✅
+- [x] `backends/` package — `base.py`, `api_backend.py`
+- [x] `BackendCapabilities` + `BackendResult` dataclasses
+- [x] `api_client.py` remains for backward compatibility
 
-### Phase 5: Cost Display + Renderer Updates
-- [ ] `~` prefix for estimated, `(subscription)`, `(free tier)` labels
-- [ ] Per-backend breakdown in cost summary
-- [ ] `vantage-agent summary` subcommand (reads all session files)
-- [ ] Tests: renderer tests
+### Phase 4: CLI Backends + Auto-Detection ✅
+- [x] Auto-detect: `VANTAGE_BACKEND` → API key → claude → codex → gemini
+- [x] `claude_backend.py`, `codex_backend.py`, `gemini_backend.py`
+- [x] `--backend` flag in `cli.py`
+- [x] `tool_registry.py` — Anthropic → OpenAI/Google format translation
+- [x] `test_backends.py` (11 tests)
 
-### Phase 6: Multi-Session + Rate Limiting
-- [ ] Token-bucket rate state in `~/.vantage/rate_state.json`
-- [ ] Retry with exponential backoff in API backend
-- [ ] Tracker re-queue on 429/5xx
-- [ ] Global budget check across session files
-- [ ] Tests: multi-session + scalability tests
+### Phase 5: Cost Display + Renderer Updates ✅
+- [x] `~` prefix for estimated, `(subscription)`, `(free tier)` labels in `render_cost_summary_v2`
+- [x] `vantageai-agent summary` subcommand (aggregates all session files)
+- [x] `--resume SESSION_ID` flag
+- [x] `test_cli.py` (19 tests)
+
+### Phase 6: Multi-Session + Rate Limiting ⏳
+- [x] Tracker retry — events retained on 429/5xx, re-queued on next flush
+- [ ] Token-bucket rate state in `~/.vantage/rate_state.json` (deferred)
+- [ ] Exponential backoff in API backend (deferred)
+- [ ] Global budget check across session files (deferred)
+
+### Bonus: PyPI Publish ✅
+- [x] Package renamed to `vantageai-agent`, command `vantageai-agent`
+- [x] Published to PyPI: `pip install vantageai-agent`
+- [x] CI auto-publish on version bump via `publish-packages.yml`
 
 ---
 
