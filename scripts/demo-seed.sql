@@ -1,7 +1,8 @@
 -- VantageAI Demo Org Seed Data
--- Run once: wrangler d1 execute vantageai-db --file=vantage-final-v4/demo-seed.sql
+-- Run once: wrangler d1 execute vantageai-db --file=scripts/demo-seed.sql
 -- Creates a fixed, constant demo org with read-only viewer key.
 -- Demonstrates all major features: cost breakdown, teams, models, budget alert, semantic cache.
+-- IMPORTANT: Replace the api_key_hash placeholder below with the real SHA-256 hash before running.
 
 -- ── Org ──────────────────────────────────────────────────────────────────────
 -- Demo org (delete+recreate for clean reset)
@@ -13,7 +14,7 @@ DELETE FROM orgs WHERE id = 'demo';
 INSERT INTO orgs (id, api_key_hash, api_key_hint, name, email, plan, created_at)
 VALUES (
   'demo',
-  -- SHA-256 of 'vnt_demo_viewerkey2026' — placeholder, replace with real hash from: echo -n "vnt_demo_viewerkey2026" | openssl dgst -sha256
+  -- REPLACE: run `echo -n "<your_demo_api_key>" | openssl dgst -sha256` and paste the hash here
   '0000000000000000000000000000000000000000000000000000000000000000',
   'vnt_demo_vie...',
   'VantageAI Demo',

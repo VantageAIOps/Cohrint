@@ -301,7 +301,7 @@ def test_privacy_hashed_mode(headers):
     """LP.9: Hashed mode sends prompt_hash but no text."""
     ev = make_event(extra_fields={
         "privacy_level": "hashed",
-        "prompt_hash": "sha256:abc123def456",
+        "prompt_hash": "a" * 64,
         "prompt_text": "This text should be hashed, not stored",
     })
     r = requests.post(f"{API_URL}/v1/events", json=ev,

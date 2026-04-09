@@ -431,15 +431,15 @@ auth.post('/members/:id/rotate', authMiddleware, adminOnly, async (c) => {
 // Public — no authMiddleware. Caller sends { api_key }; we validate, create
 // a 30-day session row in D1, and set an HTTP-only cookie.
 auth.post('/session', async (c) => {
-  // Brute-force protection: 10 attempts per IP per 5-minute window
+  // Brute-force protection: 10 failed attempts per IP per 5-minute window
+  let rlKey: string | null = null;
   try {
     const ip = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For') ?? 'unknown';
-    const rlKey = `rl:session:${ip}`;
+    rlKey = `rl:session:${ip}`;
     const count = parseInt(await c.env.KV.get(rlKey) ?? '0', 10);
     if (count >= 10) {
       return c.json({ error: 'Too many attempts. Try again later.' }, 429, { 'Retry-After': '300' });
     }
-    await c.env.KV.put(rlKey, String(count + 1), { expirationTtl: 300 });
   } catch { /* KV unavailable — allow request to proceed */ }
 
   let body: { api_key?: string };
@@ -471,6 +471,13 @@ auth.post('/session', async (c) => {
     ).bind(hash).first<{ id: string; org_id: string; role: string }>();
 
     if (!member) {
+      // Increment failed-attempt counter only on auth failure
+      if (rlKey) {
+        try {
+          const cur = parseInt(await c.env.KV.get(rlKey) ?? '0', 10);
+          await c.env.KV.put(rlKey, String(cur + 1), { expirationTtl: 300 });
+        } catch { /* KV unavailable */ }
+      }
       return c.json({ error: 'Invalid API key' }, 401);
     }
     orgId    = member.org_id;

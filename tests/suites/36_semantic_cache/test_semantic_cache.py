@@ -84,7 +84,7 @@ def test_dedup_detection(headers):
     section("SC Phase 2 — Exact-Match Dedup Detection")
 
     prompt = "explain caching in distributed systems"
-    prompt_hash = hashlib.sha256(prompt.encode()).hexdigest()[:16]
+    prompt_hash = hashlib.sha256(prompt.encode()).hexdigest()[:32]
 
     # First call — should NOT trigger duplicate warning
     ev1 = make_event(
