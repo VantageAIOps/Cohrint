@@ -7,6 +7,9 @@
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-origin
 
 /app.html
   Cache-Control: no-cache, no-store, must-revalidate
@@ -14,7 +17,7 @@
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
-  Content-Security-Policy: default-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://static.cloudflareinsights.com; connect-src 'self' https://api.vantageaiops.com wss://api.vantageaiops.com https://cloudflareinsights.com https://*.workers.dev; img-src 'self' data:; worker-src 'self';
+  Content-Security-Policy: default-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://static.cloudflareinsights.com; connect-src 'self' https://api.vantageaiops.com wss://api.vantageaiops.com https://cloudflareinsights.com https://*.workers.dev; img-src 'self' data:; worker-src 'self'; frame-ancestors 'none';
 
 /app
   Cache-Control: no-cache, no-store, must-revalidate
@@ -22,7 +25,7 @@
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
-  Content-Security-Policy: default-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://static.cloudflareinsights.com; connect-src 'self' https://api.vantageaiops.com wss://api.vantageaiops.com https://cloudflareinsights.com https://*.workers.dev; img-src 'self' data:; worker-src 'self';
+  Content-Security-Policy: default-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://static.cloudflareinsights.com; connect-src 'self' https://api.vantageaiops.com wss://api.vantageaiops.com https://cloudflareinsights.com https://*.workers.dev; img-src 'self' data:; worker-src 'self'; frame-ancestors 'none';
 
 /superadmin.html
   Cache-Control: no-cache, no-store, must-revalidate

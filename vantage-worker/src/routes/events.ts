@@ -83,6 +83,11 @@ events.post('/', async (c) => {
     return c.json({ error: 'event_id is required' }, 400);
   }
 
+  // Validate prompt_hash format (hex string, 32–128 chars)
+  if (body.prompt_hash && !/^[0-9a-f]{32,128}$/i.test(body.prompt_hash)) {
+    return c.json({ error: 'prompt_hash must be a hex string between 32 and 128 characters' }, 400);
+  }
+
   // Duplicate detection via prompt_hash (24h rolling window)
   let cacheWarning: string | undefined;
   if (body.prompt_hash) {
@@ -147,6 +152,13 @@ events.post('/batch', async (c) => {
   }
   if (body.events.length > 500) {
     return c.json({ error: 'Batch size exceeds maximum of 500 events' }, 400);
+  }
+
+  // Validate prompt_hash format for each event
+  for (const ev of body.events) {
+    if (ev.prompt_hash && !/^[0-9a-f]{32,128}$/i.test(ev.prompt_hash)) {
+      return c.json({ error: `prompt_hash must be a hex string between 32 and 128 characters (event ${ev.event_id ?? '?'})` }, 400);
+    }
   }
 
   const { blocked, used } = await checkFreeTierLimit(c.env.DB, orgId, body.events.length);

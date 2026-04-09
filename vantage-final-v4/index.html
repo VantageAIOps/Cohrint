@@ -1090,6 +1090,43 @@ function toggleFaq(qEl) {
   } catch { /* offline, timed out, or not logged in — keep Sign in / Sign up defaults */ }
 })();
 
+// ── Live Demo button ──────────────────────────────────────────────────────────
+// POST /v1/auth/session with the hardcoded demo viewer key.
+// On success: redirect to /app.html (session cookie set by server).
+// On failure: show inline error.
+(function() {
+  var btn = document.getElementById('demo-btn');
+  if (!btn) return;
+  btn.addEventListener('click', function(e) {
+    e.preventDefault();
+    btn.textContent = 'Loading demo…';
+    btn.style.pointerEvents = 'none';
+    fetch('https://api.vantageaiops.com/v1/auth/session', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ api_key: 'vnt_demo_viewerkey2026' })
+    }).then(function(res) {
+      if (res.ok) {
+        window.location.href = '/app.html';
+      } else {
+        var span = document.createTextNode('Demo temporarily unavailable — ');
+        var link = document.createElement('a');
+        link.href = '/signup.html';
+        link.textContent = 'Sign up free instead';
+        link.style.color = 'var(--accent)';
+        btn.textContent = '';
+        btn.appendChild(span);
+        btn.appendChild(link);
+        btn.style.pointerEvents = 'auto';
+      }
+    }).catch(function() {
+      btn.textContent = '▶ View Live Demo';
+      btn.style.pointerEvents = 'auto';
+    });
+  });
+})();
+
 function toggleMobileNav(btn) {
   const nav = document.getElementById('navMobile');
   nav.classList.toggle('open');
