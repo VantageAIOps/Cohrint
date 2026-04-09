@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
 import { authMiddleware } from '../middleware/auth';
 import { logAudit } from '../lib/audit';
+import { estimateCacheSavings } from '../lib/pricing';
 const analytics = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 analytics.use('*', authMiddleware);
@@ -120,11 +121,33 @@ analytics.get('/kpis', async (c) => {
       COALESCE(COUNT(*), 0)                        AS total_requests,
       COALESCE(AVG(latency_ms), 0)                 AS avg_latency_ms,
       COALESCE(AVG(efficiency_score), 74)          AS efficiency_score,
-      COALESCE(SUM(CASE WHEN is_streaming=1 THEN 1 ELSE 0 END), 0) AS streaming_requests
+      COALESCE(SUM(CASE WHEN is_streaming=1 THEN 1 ELSE 0 END), 0) AS streaming_requests,
+      COALESCE(SUM(cache_tokens), 0)               AS total_cache_tokens,
+      COALESCE(SUM(CASE WHEN cache_hit=1 THEN 1 ELSE 0 END), 0)        AS duplicate_calls,
+      COALESCE(SUM(CASE WHEN cache_hit=1 THEN cost_usd ELSE 0 END), 0) AS wasted_cost_usd
     FROM events WHERE org_id = ? AND created_at >= ?${clause}
-  `).bind(orgId, since, ...args).first();
+  `).bind(orgId, since, ...args).first<Record<string, number>>();
 
-  const kpisResult = row ?? {};
+  // Compute cache savings per model (rate varies by model, can't be done in SQL alone)
+  const { results: cacheByModel } = await c.env.DB.prepare(`
+    SELECT model, COALESCE(SUM(cache_tokens), 0) AS cache_tokens, COALESCE(SUM(total_tokens), 0) AS tokens
+    FROM events WHERE org_id = ? AND created_at >= ?${clause}
+    GROUP BY model
+  `).bind(orgId, since, ...args).all<{ model: string; cache_tokens: number; tokens: number }>();
+
+  const totalCacheTokens = (row?.total_cache_tokens ?? 0) as number;
+  const totalTokens      = (row?.total_tokens ?? 0) as number;
+  const cacheSavingsUsd  = cacheByModel.reduce((sum, r) => sum + estimateCacheSavings(r.model, r.cache_tokens), 0);
+  const cacheHitRatePct  = totalTokens > 0 ? Math.round((totalCacheTokens / totalTokens) * 1000) / 10 : 0;
+
+  const kpisResult = {
+    ...(row ?? {}),
+    cache_tokens_total:  totalCacheTokens,
+    cache_savings_usd:   Math.round(cacheSavingsUsd * 1e6) / 1e6,
+    cache_hit_rate_pct:  cacheHitRatePct,
+    duplicate_calls:     (row?.duplicate_calls ?? 0) as number,
+    wasted_cost_usd:     Math.round(((row?.wasted_cost_usd ?? 0) as number) * 1e6) / 1e6,
+  };
   try { await c.env.KV.put(kpisCacheKey, JSON.stringify(kpisResult), { expirationTtl: 300 }); } catch { /* best-effort */ }
   logAudit(c, { event_type: 'data_access', event_name: 'data_access.analytics', resource_type: 'analytics', metadata: { endpoint: '/v1/analytics/kpis' } });
   return c.json(kpisResult);

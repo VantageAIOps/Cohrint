@@ -1619,15 +1619,14 @@ function loadOverview() {
         fmtTok(inputTok) + ' in \u00b7 ' + fmtTok(outputTok) + ' out';
     }
 
-    // Cache savings — cached tokens cost ~10% vs full price; savings ≈ 90% of what they would have cost
-    var cachedTok = summary.total_cached_tokens || 0;
-    if (cachedTok > 0 && totalCost > 0) {
-      // Estimate: cached tokens saved ~$2.70/MTok (Claude rate: $3 input - $0.30 cache)
-      var cacheSavingsUsd = (cachedTok / 1e6) * 2.70;
+    // Cache savings — sourced from /v1/analytics/kpis (computed per-model server-side)
+    var cacheSavingsUsd = (kpis && kpis.cache_savings_usd) || 0;
+    var cacheTokensTotal = (kpis && kpis.cache_tokens_total) || 0;
+    var cacheHitRatePct = (kpis && kpis.cache_hit_rate_pct) || 0;
+    if (cacheSavingsUsd > 0 || cacheTokensTotal > 0) {
       document.getElementById('kpiCacheSavings').textContent = fmt(cacheSavingsUsd);
-      var cacheHitPct = totalTok > 0 ? ((cachedTok / (totalTok + cachedTok)) * 100).toFixed(0) : 0;
       document.getElementById('kpiCacheSavingsSub').textContent =
-        fmtTok(cachedTok) + ' cached \u00b7 ' + cacheHitPct + '% hit rate';
+        fmtTok(cacheTokensTotal) + ' cached \u00b7 ' + cacheHitRatePct.toFixed(1) + '% hit rate';
     } else {
       document.getElementById('kpiCacheSavings').textContent = '$0.00';
       document.getElementById('kpiCacheSavingsSub').textContent = 'No cache hits yet';

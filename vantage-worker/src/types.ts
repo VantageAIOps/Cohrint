@@ -55,6 +55,8 @@ export interface EventIn {
   sdk_language?:      string;
   sdk_version?:       string;
   timestamp?:         string;
+  prompt_hash?:       string;
+  cache_hit?:         number;
 }
 
 export interface BatchIn {
