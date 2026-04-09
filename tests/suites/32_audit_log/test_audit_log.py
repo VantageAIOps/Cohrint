@@ -527,7 +527,7 @@ class TestPages:
         chk("AL.40 roadmap.html -> 200", r.status_code == 200, f"got {r.status_code}")
         assert r.status_code == 200
         chk("AL.40b roadmap contains 'Live'",    "Live"     in r.text)
-        chk("AL.40c roadmap contains 'Q2 2026'", "Q2 2026"  in r.text)
+        chk("AL.40c roadmap contains 'planned'", "planned"  in r.text)
         chk("AL.40d roadmap has no '100% coverage'",
             "100% coverage" not in r.text and "Zero gaps" not in r.text,
             "inaccurate claim found on roadmap page")

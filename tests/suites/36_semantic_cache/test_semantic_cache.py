@@ -132,10 +132,10 @@ def run():
     test_dedup_detection(headers)
 
     results = get_results()
-    passed = sum(1 for r in results if r["ok"])
-    total  = len(results)
+    passed = results["passed"]
+    total  = results["passed"] + results["failed"]
     print(f"\nSuite: SC  {passed}/{total} passed")
-    return passed == total
+    return results["failed"] == 0
 
 
 if __name__ == "__main__":
