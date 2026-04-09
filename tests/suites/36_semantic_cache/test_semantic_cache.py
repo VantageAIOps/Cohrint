@@ -26,7 +26,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from config.settings import API_URL
-from helpers.api import fresh_account
+from helpers.api import fresh_account, get_headers
 from helpers.output import section, chk, get_results
 
 
@@ -125,7 +125,8 @@ def test_dedup_detection(headers):
 
 
 def run():
-    _, headers = fresh_account()
+    api_key, _org_id, _cookies = fresh_account(prefix="sc")
+    headers = get_headers(api_key)
 
     test_cache_analytics(headers)
     test_dedup_detection(headers)
