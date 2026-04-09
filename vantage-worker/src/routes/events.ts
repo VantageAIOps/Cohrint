@@ -83,6 +83,21 @@ events.post('/', async (c) => {
     return c.json({ error: 'event_id is required' }, 400);
   }
 
+  // Duplicate detection via prompt_hash (24h rolling window)
+  let cacheWarning: string | undefined;
+  if (body.prompt_hash) {
+    const phashKey = `phash:${orgId}:${body.prompt_hash}`;
+    try {
+      const existing = await c.env.KV.get(phashKey);
+      if (existing) {
+        const prev = JSON.parse(existing) as { event_id: string; cost_usd: number; model: string; ts: number };
+        const agoMin = Math.round((Date.now() / 1000 - prev.ts) / 60);
+        body.cache_hit = 1;
+        cacheWarning = `Duplicate call detected — identical prompt sent ${agoMin}m ago. Wasted: $${prev.cost_usd.toFixed(4)}. Consider caching the response client-side.`;
+      }
+    } catch { /* KV unavailable — proceed without dedup */ }
+  }
+
   let result;
   try {
     result = await insertEvent(c.env.DB, orgId, body);
@@ -92,13 +107,29 @@ events.post('/', async (c) => {
   }
   if (!result.success) return c.json({ error: 'Failed to insert event' }, 500);
 
+  // Write prompt_hash to KV for future dedup (TTL: 24h)
+  if (body.prompt_hash) {
+    const phashKey = `phash:${orgId}:${body.prompt_hash}`;
+    const costUsd = body.total_cost_usd ?? body.cost_total_usd ?? 0;
+    try {
+      await c.env.KV.put(phashKey, JSON.stringify({
+        event_id: body.event_id,
+        cost_usd: costUsd,
+        model: body.model ?? '',
+        ts: Math.floor(Date.now() / 1000),
+      }), { expirationTtl: 86400 });
+    } catch { /* best-effort */ }
+  }
+
   // Broadcast to SSE subscribers via KV pub channel
   await broadcastEvent(c.env.KV, orgId, body);
 
   // Invalidate all analytics caches (all scopes including team-scoped variants)
   try { await invalidateOrgAnalyticsCache(c.env.KV, orgId); } catch { /* best-effort */ }
 
-  return c.json({ ok: true, id: body.event_id }, 201);
+  const response: Record<string, unknown> = { ok: true, id: body.event_id };
+  if (cacheWarning) response.cache_warning = cacheWarning;
+  return c.json(response, 201);
 });
 
 // ── POST /v1/events/batch — ingest a batch of events ─────────────────────────
@@ -228,8 +259,10 @@ function buildInsertStmt(
       team, project, user_id, feature, endpoint, environment,
       is_streaming, stream_chunks,
       trace_id, parent_event_id, agent_name, span_depth,
-      tags, sdk_language, sdk_version, created_at
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      tags, sdk_language, sdk_version,
+      prompt_hash, cache_hit,
+      created_at
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).bind(
     eventId, orgId, ev.provider ?? '', ev.model ?? '',
     promptTokens, completionTok,
@@ -244,6 +277,7 @@ function buildInsertStmt(
     tagsValue ? JSON.stringify(tagsValue) : null,
     ev.sdk_language ?? sdkLang ?? null,
     ev.sdk_version  ?? sdkVer  ?? null,
+    ev.prompt_hash ?? null, ev.cache_hit ?? 0,
     ts,
   );
 }

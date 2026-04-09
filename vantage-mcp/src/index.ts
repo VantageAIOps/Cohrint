@@ -354,6 +354,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           completion_tokens:{ type: 'number', description: 'Number of output/completion tokens' },
           total_cost_usd:   { type: 'number', description: 'Total cost in USD (e.g. 0.0025)' },
           latency_ms:       { type: 'number', description: 'End-to-end latency in milliseconds' },
+          cache_tokens:     { type: 'number', description: 'Tokens served from provider native cache (Anthropic/OpenAI prompt caching). Reduces billed cost.' },
+          prompt_hash:      { type: 'string', description: 'SHA-256 fingerprint of the prompt (first 16 hex chars). Compute: crypto.createHash("sha256").update(prompt).digest("hex").slice(0,16). Enables duplicate detection. Never send raw prompt text.' },
           team:             { type: 'string', description: 'Team or feature name for grouping (e.g. "backend", "search")' },
           environment:      { type: 'string', description: 'Environment: production | staging | development' },
           trace_id:         { type: 'string', description: 'Trace ID for grouping multi-step agent calls' },
@@ -558,12 +560,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           ...(spanDepth > 0 ? { span_depth: spanDepth } : {}),
           ...(args.tags && typeof args.tags === 'object' ? { tags: args.tags } : {}),
           ...(args.session_id ? { session_id: String(args.session_id).slice(0, 256) } : {}),
+          ...(safeNum(args.cache_tokens, 0) > 0 ? { cache_tokens: safeNum(args.cache_tokens, 0) } : {}),
+          ...(args.prompt_hash ? { prompt_hash: String(args.prompt_hash).slice(0, 64) } : {}),
         };
-        await api('/v1/events', { method: 'POST', body: JSON.stringify(event) });
+        const trackResp = await api('/v1/events', { method: 'POST', body: JSON.stringify(event) }) as Record<string, unknown>;
+        const cacheWarning = trackResp?.cache_warning ? String(trackResp.cache_warning) : null;
+        const baseText = `✅ Tracked: ${model} | ${promptTokens}→${completionTokens} tokens | $${totalCost.toFixed(4)} | ${latency > 0 ? `${latency}ms` : 'no latency recorded'}`;
         return {
           content: [{
             type: 'text',
-            text: `✅ Tracked: ${model} | ${promptTokens}→${completionTokens} tokens | $${totalCost.toFixed(4)} | ${latency > 0 ? `${latency}ms` : 'no latency recorded'}`,
+            text: cacheWarning ? `⚠️ ${cacheWarning}\n\n${baseText}` : baseText,
           }],
         };
       }
@@ -597,6 +603,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           `| Avg Latency | ${Number(data.avg_latency_ms ?? 0).toFixed(0)}ms |`,
           `| Efficiency Score | ${data.efficiency_score ?? 'N/A'} |`,
           `| Streaming Requests | ${Number(data.streaming_requests ?? 0).toLocaleString()} |`,
+          `| Cache Tokens Total | ${Number(data.cache_tokens_total ?? 0).toLocaleString()} |`,
+          `| Cache Savings | $${Number(data.cache_savings_usd ?? 0).toFixed(4)} |`,
+          `| Cache Hit Rate | ${Number(data.cache_hit_rate_pct ?? 0).toFixed(1)}% |`,
         ];
         const text = [
           `📈 **KPIs** (org: ${ORG})`,
