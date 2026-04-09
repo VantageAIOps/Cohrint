@@ -134,8 +134,8 @@ Why existing tools fail:
 | **Gemini web** | ❌ | ❌ | ✅ | ✅ | **2 sources** |
 | **Custom API code** | ✅ | — | ✅ | — | **2 sources** |
 
-**Current coverage:** OTel real-time tracking across 10+ tools (live).
-**Roadmap:** Billing API connectors (Q2 2026), local file scanner + browser extension (Q3 2026).
+**Current coverage:** OTel real-time tracking (L1) across 10+ tools live. Cross-platform endpoints, budget policies, MCP tools, CLI agent, and semantic cache analytics all shipped.
+**Roadmap:** Billing API connectors (L3), local file scanner (L2), browser extension (L4).
 
 ---
 
@@ -168,9 +168,9 @@ Why existing tools fail:
 | Capability | Helicone | AI Observer | Tokscale | QuotaMeter | **VantageAI v2** |
 |---|---|---|---|---|---|
 | **L1: OTel Collector** | ❌ proxy | ✅ (3 tools) | ❌ | ❌ | **✅ (10+ tools)** |
-| **L2: Local File Scanner** | ❌ | ✅ (import) | ✅ (16 tools) | ❌ | **✅ (planned)** |
-| **L3: Billing APIs** | ❌ | ❌ | ❌ | ❌ | **✅ (5 providers)** |
-| **L4: Browser Extension** | ❌ | ❌ | ❌ | ✅ (7 tools) | **✅ (planned)** |
+| **L2: Local File Scanner** | ❌ | ✅ (import) | ✅ (16 tools) | ❌ | **roadmap** |
+| **L3: Billing APIs** | ❌ | ❌ | ❌ | ❌ | **roadmap** |
+| **L4: Browser Extension** | ❌ | ❌ | ❌ | ✅ (7 tools) | **roadmap** |
 | **Multi-user / Org** | ✅ | ❌ | ❌ | ❌ | **✅** |
 | **Budget enforcement** | Basic rate limit | ❌ | ❌ | ❌ | **✅ (graduated)** |
 | **Per-developer profiles** | ❌ | ❌ | ❌ | ❌ | **✅** |
@@ -184,19 +184,28 @@ Why existing tools fail:
 
 ---
 
-## 5. v2 Sprint Plan (March 24 – April 6)
+## 5. v2 Delivery History (March 24 – April 2026)
 
-### Priority Order
+### Completed
 
-| Priority | Layer | What | Days |
+| Priority | Layer | What | Status |
 |---|---|---|---|
-| **P0** | L1: OTel Collector | OTLP endpoint accepting 10+ AI tools | Day 1 (**DONE** — `otel.ts` built) |
-| **P0** | Schema | `cross_platform_usage` + `otel_events` tables | Day 1 (**DONE** — migration built) |
-| **P1** | L3: Billing APIs | Copilot + Cursor + OpenAI + Anthropic connectors | Days 2–5 |
-| **P1** | API | `/v1/cross-platform/*` endpoints | Day 6 |
-| **P2** | Dashboard | "All AI Spend" view + developer profiles | Days 7–8 |
-| **P2** | Budget | Policy engine + alert cron | Day 9 |
-| **P2** | MCP + Landing | Update MCP tools + landing page messaging | Day 10 |
+| **P0** | L1: OTel Collector | OTLP endpoint accepting 10+ AI tools | ✅ DONE — `otel.ts` |
+| **P0** | Schema | `cross_platform_usage` + `otel_events` tables | ✅ DONE — migration live |
+| **P1** | API | `/v1/cross-platform/*` endpoints | ✅ DONE — summary, developers, models, live, budget |
+| **P2** | Dashboard | "All AI Spend" view + developer profiles | ✅ DONE — live on vantageaiops.com |
+| **P2** | Budget | Policy engine + alert cron | ✅ DONE — graduated budget policies |
+| **P2** | MCP + Landing | 12 MCP tools + landing page | ✅ DONE |
+| **P2** | VantageAI CLI | Terminal AI agent wrapper with cost tracking | ✅ DONE — on PyPI |
+| **P2** | Semantic Cache | Cache analytics KPIs + exact-match dedup detection | ✅ DONE |
+
+### Remaining Roadmap
+
+| Priority | Layer | What |
+|---|---|---|
+| **P1** | L3: Billing APIs | Copilot + Cursor + OpenAI + Anthropic connectors (hourly aggregate pull) |
+| **P3** | L2: Local Scanner | CLI agent for local file scanning (offline/backup source) |
+| **P3** | L4: Browser Ext | Chrome extension for ChatGPT/Claude/Gemini web |
 | **P2** | VantageAI CLI | Terminal wrapper for AI agents — prompt optimization, cost tracking, dashboard push, anomaly detection. Distribution channel that puts VantageAI in front of every developer using Claude Code, Codex, Gemini CLI, or Aider. | Days 10–11 |
 | **P3** | L2: Local Scanner | CLI agent for local file scanning (post-sprint) | Post-sprint |
 | **P3** | L4: Browser Ext | Chrome extension for ChatGPT/Claude/Gemini web | Post-sprint |
