@@ -497,13 +497,16 @@ auth.post('/session', async (c) => {
     VALUES (?, ?, ?, ?, ?)
   `).bind(token, orgId, role, memberId, expiresAt).run();
 
-  // Set HTTP-only cookie
+  // Set HTTP-only cookie.
+  // SameSite=None is required because the API (api.vantageaiops.com) and the
+  // frontend (vantageaiops.com) are different origins; Safari ITP drops
+  // SameSite=Lax cookies set cross-origin, breaking session persistence on reload.
   const isProd = (c.env.ENVIRONMENT ?? 'production') === 'production';
   const cookieParts = [
     `vantage_session=${token}`,
     `Path=/`,
     `HttpOnly`,
-    `SameSite=Lax`,
+    `SameSite=None`,
     `Max-Age=${30 * 86_400}`,
   ];
   if (isProd) cookieParts.push(`Secure`, `Domain=vantageaiops.com`);
