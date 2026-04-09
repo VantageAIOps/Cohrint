@@ -362,18 +362,18 @@ class TestPerformanceLatency:
             f"avg_latency_ms={latency}")
         assert r_post.status_code in (200, 201, 202)
 
-    def test_dr23_model_streaming_count(self, headers):
-        """DR.23: Model data includes streaming_count field."""
+    def test_dr23_model_core_fields(self, headers):
+        """DR.23: Model data includes model, provider, cost_usd, tokens, requests, avg_latency_ms."""
         r = requests.get(f"{API_URL}/v1/analytics/models", params={"period": 30},
                          headers=headers, timeout=15)
         body = r.json()
         models = body.get("models", [])
         if len(models) > 0:
             m0 = models[0]
-            chk("DR.23 model has streaming_count", "streaming_count" in m0,
-                f"keys: {list(m0.keys())}")
+            for field in ["model", "provider", "cost_usd", "tokens", "requests", "avg_latency_ms"]:
+                chk(f"DR.23 model has {field}", field in m0, f"keys: {list(m0.keys())}")
         else:
-            chk("DR.23 streaming_count (skip: no models)", True)
+            chk("DR.23 model core fields (skip: no models)", True)
         assert r.status_code == 200
 
     def test_dr24_latency_non_negative(self, headers):
@@ -625,3 +625,71 @@ class TestCrossPlatformIntegration:
         chk("DR.42c cross-platform summary reflects OTel data", has_data,
             f"by_source={len(by_source)}, total_cost={total_cost}")
         assert r_ingest.status_code in (200, 201, 202)
+
+    def test_dr43_timeseries_cost_matches_summary(self, headers):
+        """DR.43: Sum of timeseries daily costs is within 1% of cross-platform/summary total_cost_usd.
+
+        This catches bugs where timeseries queries a different table than summary
+        (e.g. querying `events` while summary reads `cross_platform_usage`).
+        """
+        # Ingest a known-cost OTel event so there's data to compare
+        unique_service = f"claude-code-dr43-{uuid.uuid4().hex[:8]}"
+        metrics = [
+            counter("llm.token.usage", 300, {"model": "claude-3-haiku", "token.type": "input"}),
+            counter("llm.token.usage", 100, {"model": "claude-3-haiku", "token.type": "output"}),
+            counter("llm.cost", 0.012, {"model": "claude-3-haiku", "currency": "USD"}),
+            counter("llm.request.count", 2, {"model": "claude-3-haiku"}),
+        ]
+        payload = make_otlp_metrics(unique_service, metrics, email="dr43@test.com")
+        r_ingest = requests.post(
+            f"{API_URL}/v1/otel/v1/metrics",
+            json=payload,
+            headers=headers,
+            timeout=15,
+        )
+        chk("DR.43a OTel ingest accepted", r_ingest.status_code in (200, 201, 202),
+            f"status={r_ingest.status_code}")
+
+        time.sleep(3)
+
+        # Fetch both endpoints with the same period
+        period = 30
+        r_ts = requests.get(f"{API_URL}/v1/analytics/timeseries", params={"period": period},
+                            headers=headers, timeout=15)
+        r_cp = requests.get(f"{API_URL}/v1/cross-platform/summary", params={"days": period},
+                            headers=headers, timeout=15)
+
+        chk("DR.43b timeseries → 200", r_ts.status_code == 200, f"status={r_ts.status_code}")
+        chk("DR.43c cross-platform/summary → 200", r_cp.status_code == 200, f"status={r_cp.status_code}")
+
+        ts_body = r_ts.json() if r_ts.ok else {}
+        cp_body = r_cp.json() if r_cp.ok else {}
+
+        series = ts_body.get("series", [])
+        ts_total = sum(s.get("cost_usd", 0) or 0 for s in series)
+        cp_total = cp_body.get("total_cost_usd", 0) or 0
+
+        chk("DR.43d timeseries series is non-empty after ingest", len(series) > 0,
+            f"series length={len(series)}")
+
+        # Both totals should be non-zero if the ingest succeeded
+        if cp_total > 0 and ts_total > 0:
+            ratio = abs(ts_total - cp_total) / cp_total
+            within_tolerance = ratio <= 0.01  # within 1%
+            chk(
+                f"DR.43e timeseries sum ≈ summary total (±1%)",
+                within_tolerance,
+                f"timeseries_sum={ts_total:.6f}, summary_total={cp_total:.6f}, diff={ratio*100:.2f}%",
+            )
+            assert within_tolerance, (
+                f"timeseries sum ({ts_total:.6f}) diverges from cross-platform summary "
+                f"({cp_total:.6f}) by {ratio*100:.2f}% — likely querying different tables"
+            )
+        else:
+            # Both zero means fresh account with no data yet — that's consistent
+            both_zero = ts_total == 0 and cp_total == 0
+            chk("DR.43e both totals zero (consistent empty state)", both_zero,
+                f"ts_total={ts_total}, cp_total={cp_total}")
+            assert both_zero or (ts_total > 0 and cp_total > 0), (
+                f"Inconsistent: timeseries={ts_total}, summary={cp_total} — one is non-zero"
+            )
