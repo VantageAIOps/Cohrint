@@ -122,7 +122,8 @@ analytics.get('/kpis', async (c) => {
       COALESCE(AVG(latency_ms), 0)                 AS avg_latency_ms,
       COALESCE(AVG(efficiency_score), 74)          AS efficiency_score,
       COALESCE(SUM(CASE WHEN is_streaming=1 THEN 1 ELSE 0 END), 0) AS streaming_requests,
-      COALESCE(SUM(cache_tokens), 0)               AS total_cache_tokens,
+      COALESCE(SUM(prompt_tokens), 0)              AS total_prompt_tokens,
+      COALESCE(SUM(cache_tokens), 0)               AS cache_tokens_total,
       COALESCE(SUM(CASE WHEN cache_hit=1 THEN 1 ELSE 0 END), 0)        AS duplicate_calls,
       COALESCE(SUM(CASE WHEN cache_hit=1 THEN cost_usd ELSE 0 END), 0) AS wasted_cost_usd
     FROM events WHERE org_id = ? AND created_at >= ?${clause}
@@ -135,18 +136,24 @@ analytics.get('/kpis', async (c) => {
     GROUP BY model
   `).bind(orgId, since, ...args).all<{ model: string; cache_tokens: number; tokens: number }>();
 
-  const totalCacheTokens = (row?.total_cache_tokens ?? 0) as number;
-  const totalTokens      = (row?.total_tokens ?? 0) as number;
-  const cacheSavingsUsd  = cacheByModel.reduce((sum, r) => sum + estimateCacheSavings(r.model, r.cache_tokens), 0);
-  const cacheHitRatePct  = totalTokens > 0 ? Math.round((totalCacheTokens / totalTokens) * 1000) / 10 : 0;
+  const totalCacheTokens  = (row?.cache_tokens_total ?? 0) as number;
+  const totalPromptTokens = (row?.total_prompt_tokens ?? 0) as number;
+  const cacheSavingsUsd   = cacheByModel.reduce((sum, r) => sum + estimateCacheSavings(r.model, r.cache_tokens), 0);
+  // cache_hit_rate_pct: cached input tokens as a % of total input tokens (prompt tokens only, not output)
+  const cacheHitRatePct   = totalPromptTokens > 0 ? Math.round((totalCacheTokens / totalPromptTokens) * 1000) / 10 : 0;
 
   const kpisResult = {
-    ...(row ?? {}),
+    total_cost_usd:      (row?.total_cost_usd ?? 0) as number,
+    total_tokens:        (row?.total_tokens ?? 0) as number,
+    total_requests:      (row?.total_requests ?? 0) as number,
+    avg_latency_ms:      (row?.avg_latency_ms ?? 0) as number,
+    efficiency_score:    (row?.efficiency_score ?? 0) as number,
+    streaming_requests:  (row?.streaming_requests ?? 0) as number,
     cache_tokens_total:  totalCacheTokens,
-    cache_savings_usd:   Math.round(cacheSavingsUsd * 1e6) / 1e6,
-    cache_hit_rate_pct:  cacheHitRatePct,
     duplicate_calls:     (row?.duplicate_calls ?? 0) as number,
     wasted_cost_usd:     Math.round(((row?.wasted_cost_usd ?? 0) as number) * 1e6) / 1e6,
+    cache_savings_usd:   Math.round(cacheSavingsUsd * 1e6) / 1e6,
+    cache_hit_rate_pct:  cacheHitRatePct,
   };
   try { await c.env.KV.put(kpisCacheKey, JSON.stringify(kpisResult), { expirationTtl: 300 }); } catch { /* best-effort */ }
   logAudit(c, { event_type: 'data_access', event_name: 'data_access.analytics', resource_type: 'analytics', metadata: { endpoint: '/v1/analytics/kpis' } });
