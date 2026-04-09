@@ -11,6 +11,7 @@ Labels: DR.1 - DR.42
 import sys
 import time
 import uuid
+import pytest
 import requests
 from pathlib import Path
 

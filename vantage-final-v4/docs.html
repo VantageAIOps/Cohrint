@@ -207,7 +207,6 @@ pre{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;pad
       <a class="docs-nav-item" onclick="show('mcp',this)">MCP server</a>
       <a class="docs-nav-item" onclick="show('claudecode',this)">Claude Code</a>
       <a class="docs-nav-item" onclick="show('vscode',this)">VS Code</a>
-      <a class="docs-nav-item" onclick="show('zed',this)">Zed / JetBrains</a>
     </div>
 
     <div class="docs-nav-group">
@@ -652,6 +651,10 @@ mcp: `
 <div class="warn-box" style="margin-top:8px">
 <strong>Tools fail with auth error?</strong><br>
 Make sure your <code>VANTAGE_API_KEY</code> is correct and starts with <code>vnt_</code>. Get a new key at <a href="/signup.html">signup</a> if needed.
+</div>
+<div class="doc-section" style="margin-top:24px;padding:16px;background:var(--bg2);border:1px solid var(--border);border-radius:8px">
+  <strong>Other MCP-compatible editors</strong>
+  <p style="margin-top:8px;color:var(--muted)">VantageAI MCP works with any editor that supports the Model Context Protocol. Refer to your editor's documentation for MCP server configuration instructions.</p>
 </div>`,
 
 cursor: `
@@ -676,19 +679,6 @@ Are we within our AI budget?
 Show me recent agent traces
 Track this call: gpt-4o, 500 prompt, 120 completion tokens, $0.003</pre>`,
 
-windsurf: `
-<h1>Windsurf</h1>
-<p>Edit <code>~/.codeium/windsurf/mcp_config.json</code>:</p>
-<pre>{
-  <span class="c-string">"mcpServers"</span>: {
-    <span class="c-string">"vantage"</span>: {
-      <span class="c-string">"command"</span>: <span class="c-string">"npx"</span>,
-      <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"vantageaiops-mcp"</span>],
-      <span class="c-string">"env"</span>: { <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"vnt_your_key"</span> }
-    }
-  }
-}</pre>
-<p>Restart Windsurf. Cascade will have access to all VantageAI tools.</p>`,
 
 claudecode: `
 <h1>Claude Code</h1>
@@ -805,24 +795,6 @@ vscode: `
 <li>Node.js 18+ (for <code>npx</code>)</li>
 </ul>`,
 
-zed: `
-<h1>Zed & JetBrains</h1>
-<h2>Zed</h2>
-<p>Add to <code>~/.config/zed/settings.json</code>:</p>
-<pre>{
-  <span class="c-string">"context_servers"</span>: {
-    <span class="c-string">"vantage"</span>: {
-      <span class="c-string">"command"</span>: {
-        <span class="c-string">"path"</span>: <span class="c-string">"npx"</span>,
-        <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"vantageaiops-mcp"</span>],
-        <span class="c-string">"env"</span>: { <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"vnt_your_key"</span> }
-      }
-    }
-  }
-}</pre>
-<h2>JetBrains</h2>
-<p>Settings → Tools → AI Assistant → Model Context Protocol → Add server:</p>
-<p>Command: <code>npx -y vantageaiops-mcp</code> · Env: <code>VANTAGE_API_KEY=vnt_your_key</code></p>`,
 
 tagging: `
 <h1>Cost attribution tags</h1>
@@ -1265,7 +1237,7 @@ curl http://localhost:<span class="c-num">4891</span>/health</pre></div>
 
 <h2>Three modes</h2>
 <table class="api-table"><thead><tr><th>Mode</th><th>Prompt text</th><th>Response text</th><th>Prompt hash</th><th>Best for</th></tr></thead><tbody>
-<tr><td><code>full</code> (default)</td><td>✅ First 600 chars</td><td>✅ First 600 chars</td><td>✅ MD5</td><td>Full observability, internal tools</td></tr>
+<tr><td><code>full</code> (default)</td><td>✅ First 600 chars</td><td>✅ First 600 chars</td><td>✅ hashed identifier</td><td>Full observability, internal tools</td></tr>
 <tr><td><code>stats-only</code></td><td>❌ Stripped</td><td>❌ Stripped</td><td>❌ Stripped</td><td>Maximum privacy, compliance</td></tr>
 <tr><td><code>hashed</code></td><td>❌ Stripped</td><td>❌ Stripped</td><td>✅ Kept</td><td>Privacy + dedup detection</td></tr>
 </tbody></table>
@@ -1733,7 +1705,7 @@ export CLINE_OTEL_EXPORTER_OTLP_PROTOCOL=http/json</pre>
 </table>
 
 <h2>Fuzzy Model Matching</h2>
-<p>If the exact model name isn't in the table, the engine tries substring matching. For example, <code>claude-sonnet-4-6-20260301</code> matches <code>claude-sonnet-4-6</code>. Unknown models return <code>cost_usd = 0</code>.</p>
+<p>Looks up model in the pricing table. Model variants are automatically resolved to their base pricing. Unknown models return <code>cost_usd = 0</code>.</p>
 
 <h2>Precedence Rules</h2>
 <div class="info-box">💡 If a tool sends both token counts AND an explicit cost metric (e.g., <code>claude_code.cost.usage</code>), the <strong>explicit cost takes precedence</strong>. Auto-estimation only fills in when <code>cost_usd == 0</code>.</div>
