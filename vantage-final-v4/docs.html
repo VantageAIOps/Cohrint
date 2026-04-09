@@ -1879,9 +1879,9 @@ document.getElementById("docs-content").innerHTML = DOCS.quickstart;
       node = walker.nextNode();
     }
     toReplace.forEach(tn => {
-      const parts = tn.nodeValue!.split('vnt_your_key');
+      const parts = (tn.nodeValue || '').split('vnt_your_key');
       const frag = document.createDocumentFragment();
-      parts.forEach((part, i) => {
+      parts.forEach(function(part, i) {
         frag.appendChild(document.createTextNode(part));
         if (i < parts.length - 1) {
           const span = document.createElement('span');
@@ -1890,7 +1890,7 @@ document.getElementById("docs-content").innerHTML = DOCS.quickstart;
           frag.appendChild(span);
         }
       });
-      tn.parentNode!.replaceChild(frag, tn);
+      if (tn.parentNode) tn.parentNode.replaceChild(frag, tn);
     });
   } catch {
     // Network error — docs still work without auth
