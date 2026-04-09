@@ -684,6 +684,8 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
 
   <!-- ══════════ Main ══════════ -->
   <div id="main" class="main">
+    <!-- Demo banner (shown only for demo org session) -->
+    <div id="demo-banner" style="display:none;background:#3b4ef8;color:#fff;font-size:12px;font-family:monospace;padding:8px 20px;text-align:center;letter-spacing:.02em;flex-shrink:0"></div>
     <!-- Top bar -->
     <div class="topbar">
       <div class="topbar-left">
@@ -699,6 +701,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
           <div class="live-dot"></div>
           LIVE
         </div>
+        <a href="/docs.html" target="_blank" rel="noopener" style="font-size:12px;color:var(--text-muted);text-decoration:none;padding:6px 12px;border:1px solid var(--border);border-radius:6px;transition:color .2s,border-color .2s" onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border)'">Docs ↗</a>
         <span class="topbar-user" id="topbarUser"></span>
         <button id="theme-toggle" data-theme-toggle onclick="vantageTheme.toggle()">&#9789;</button>
       </div>
@@ -1481,6 +1484,21 @@ function populateUserFromSession(s) {
   var badge = document.getElementById('accountPlanBadge');
   badge.textContent = plan.toUpperCase();
   badge.className = 'role-badge ' + (plan === 'free' ? 'role-member' : 'role-admin');
+
+  // Show demo banner for demo org
+  if (user.org_id === 'demo') {
+    var banner = document.getElementById('demo-banner');
+    if (banner) {
+      var msg = document.createTextNode('You\u2019re viewing a live demo \u2014 read only. ');
+      var link = document.createElement('a');
+      link.href = '/signup.html';
+      link.textContent = 'Create your free account \u2192';
+      link.style.cssText = 'color:#fff;font-weight:600;text-decoration:underline';
+      banner.appendChild(msg);
+      banner.appendChild(link);
+      banner.style.display = 'block';
+    }
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
