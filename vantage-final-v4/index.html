@@ -148,7 +148,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
 .nav-links{display:flex;align-items:center;gap:32px}
 .nav-links a{font-size:13px;color:var(--muted);text-decoration:none;letter-spacing:.02em;transition:color .2s}
 .nav-links a:hover{color:var(--text)}
-.nav-cta{background:var(--accent)!important;color:#000!important;padding:8px 20px;border-radius:6px;font-weight:500!important;transition:opacity .2s!important}
+.nav-cta{background:var(--accent)!important;color:#fff!important;padding:8px 20px;border-radius:6px;font-weight:500!important;transition:opacity .2s!important}
 .nav-cta:hover{opacity:.85}
 
 /* HERO */
@@ -161,7 +161,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
 .hero h1 em{font-style:italic;color:var(--accent)}
 .hero-sub{margin-top:28px;font-size:18px;color:var(--muted);max-width:540px;line-height:1.7;font-weight:300;animation:fadeUp .7s .2s ease both}
 .hero-actions{display:flex;align-items:center;gap:16px;margin-top:44px;animation:fadeUp .7s .3s ease both}
-.btn-primary{background:var(--accent);color:#000;padding:14px 32px;border-radius:8px;font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.04em;border:none;cursor:pointer;text-decoration:none;transition:opacity .2s,transform .2s;display:inline-block}
+.btn-primary{background:var(--accent);color:#fff;padding:14px 32px;border-radius:8px;font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.04em;border:none;cursor:pointer;text-decoration:none;transition:opacity .2s,transform .2s;display:inline-block}
 .btn-primary:hover{opacity:.85;transform:translateY(-1px)}
 .btn-ghost{color:var(--muted);padding:14px 24px;border-radius:8px;font-size:14px;border:1px solid var(--border2);cursor:pointer;text-decoration:none;transition:color .2s,border-color .2s;display:inline-flex;align-items:center;gap:8px}
 .btn-ghost:hover{color:var(--text);border-color:rgba(255,255,255,.25)}
@@ -374,10 +374,11 @@ footer a:hover{color:var(--text)}
 }
 
 [data-theme="light"]{
-  --bg:#f0f2f5;--bg2:#ffffff;--bg3:#f5f6f8;--bg4:#eceef1;
-  --border:rgba(0,0,0,.07);--border2:rgba(0,0,0,.12);
-  --text:#0d1318;--muted:#5a6878;--dim:#adb5bd;
-  --accent:#00b882;--blue:#0070d6;--amber:#c88200;--red:#dc5050;--purple:#8c64dc;
+  --bg:#ffffff;--bg2:#f8f9fb;--bg3:#f1f3f6;--bg4:#eceef1;
+  --border:#e2e8f0;--border2:#cbd5e1;
+  --text:#0f172a;--muted:#475569;--dim:#94a3b8;
+  --accent:#3b4ef8;--blue:#0070d6;--amber:#c88200;--red:#dc5050;--purple:#8c64dc;
+  --surface:#ffffff;
 }
 [data-theme="light"] body{background:var(--bg);color:var(--text)}
 [data-theme="light"] nav{background:rgba(255,255,255,.9);border-bottom-color:rgba(0,0,0,.08)}
@@ -412,10 +413,10 @@ footer a:hover{color:var(--text)}
     <a href="/calculator.html">Calculator</a>
     <a href="/docs.html">Docs</a>
     <a href="#pricing">Pricing</a>
-    <a href="#faq">FAQ</a>
+    <a href="#security">Security</a>
     <a href="/auth" id="nav-signin" style="font-size:13px;color:var(--muted);text-decoration:none;transition:color .2s">Sign in</a>
     <button data-theme-toggle onclick="vantageTheme.toggle()" style="background:none;border:1px solid var(--border2,rgba(255,255,255,.13));color:var(--muted,#6b7b8a);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .2s" title="Toggle theme">☀</button>
-    <a href="/signup" class="nav-cta" id="nav-cta">Sign up free →</a>
+    <a href="/signup.html" class="nav-cta" id="nav-cta">Request Access →</a>
   </div>
   <div class="nav-hamburger" onclick="toggleMobileNav(this)" aria-label="Menu">
     <span></span><span></span><span></span>
@@ -435,18 +436,21 @@ footer a:hover{color:var(--text)}
   <div class="hero-grid"></div>
   <div class="hero-glow"></div>
   <div class="hero-badge">AI Spend Intelligence for Engineering Teams</div>
-  <h1>Know exactly what your<br><em>AI coding tools</em> cost</h1>
-  <p class="hero-sub">Track spend across Claude Code, Codex CLI, and Gemini CLI. Per-developer. Per-model. Per-dollar.</p>
+  <h1>Real-time cost visibility<br>across every <em>AI coding tool</em></h1>
+  <p class="hero-sub">Per developer, per model, per team. Built for engineering leaders who need answers before the bill arrives.</p>
 
   <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:28px;animation:fadeUp .7s .25s ease both">
-    <span style="background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.2);color:#34d399;padding:5px 14px;border-radius:20px;font-family:var(--mono);font-size:11px">Claude Code</span>
-    <span style="background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);color:#a78bfa;padding:5px 14px;border-radius:20px;font-family:var(--mono);font-size:11px">Codex CLI</span>
-    <span style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.2);color:#fbbf24;padding:5px 14px;border-radius:20px;font-family:var(--mono);font-size:11px">Gemini CLI</span>
+    <span style="background:rgba(59,78,248,.08);border:1px solid rgba(59,78,248,.2);color:var(--accent);padding:5px 14px;border-radius:20px;font-family:var(--mono);font-size:11px">Claude Code</span>
+    <span style="background:rgba(59,78,248,.08);border:1px solid rgba(59,78,248,.2);color:var(--accent);padding:5px 14px;border-radius:20px;font-family:var(--mono);font-size:11px">OpenAI Codex CLI</span>
+    <span style="background:rgba(59,78,248,.08);border:1px solid rgba(59,78,248,.2);color:var(--accent);padding:5px 14px;border-radius:20px;font-family:var(--mono);font-size:11px">Gemini CLI</span>
+    <span style="background:rgba(59,78,248,.08);border:1px solid rgba(59,78,248,.2);color:var(--accent);padding:5px 14px;border-radius:20px;font-family:var(--mono);font-size:11px">Cursor</span>
+    <span style="background:rgba(59,78,248,.08);border:1px solid rgba(59,78,248,.2);color:var(--accent);padding:5px 14px;border-radius:20px;font-family:var(--mono);font-size:11px">Cline</span>
+    <span style="background:rgba(59,78,248,.08);border:1px solid rgba(59,78,248,.2);color:var(--accent);padding:5px 14px;border-radius:20px;font-family:var(--mono);font-size:11px">GitHub Copilot</span>
   </div>
 
   <div class="hero-actions">
-    <a href="/signup.html" class="btn-primary">Start for free →</a>
-    <a href="#demo" class="btn-ghost"><span>▶</span> Live demo</a>
+    <a href="/signup.html" class="btn-primary">Request Access →</a>
+    <a href="#" class="btn-ghost" id="demo-btn"><span>▶</span> View Live Demo</a>
   </div>
   <div class="install-box">
     <span>$</span> pip install vantageaiops
@@ -846,17 +850,17 @@ response = client.chat.completions.<span class="c-func">create</span>(
   </div>
 </section>
 
-<!-- TRUST -->
-<section style="padding-top:0;text-align:center">
-  <div class="sec-label" style="text-align:center">// security & compliance</div>
-  <div class="sec-title" style="max-width:none;text-align:center">Built to <em>enterprise standards</em></div>
-  <div class="trust-row reveal">
-    <div class="trust-badge"><span>🔑</span> API Keys SHA-256 Hashed</div>
-    <div class="trust-badge"><span>🍪</span> HTTP-only SameSite Sessions</div>
-    <div class="trust-badge"><span>📋</span> Full Audit Log</div>
-    <div class="trust-badge"><span>🌐</span> TLS Everywhere</div>
-    <div class="trust-badge"><span>🚦</span> Per-org Rate Limiting</div>
-    <div class="trust-badge"><span>🔒</span> Privacy-first Local Proxy</div>
+<!-- SECURITY -->
+<section id="security" style="padding-top:0">
+  <div class="sec-label">// security</div>
+  <div class="sec-title">Security controls <em>actually shipped</em></div>
+  <div class="trust-row reveal" style="justify-content:flex-start;margin-top:40px">
+    <div class="trust-badge"><span>🔑</span> API keys hashed with SHA-256 — raw key shown once, never stored</div>
+    <div class="trust-badge"><span>🍪</span> HTTP-only, SameSite sessions — XSS-resistant</div>
+    <div class="trust-badge"><span>📋</span> Full audit log — every admin action recorded with timestamp and IP</div>
+    <div class="trust-badge"><span>🌐</span> TLS everywhere — Cloudflare edge, no plaintext</div>
+    <div class="trust-badge"><span>🚦</span> Rate limiting — per-org, per-minute via Cloudflare KV</div>
+    <div class="trust-badge"><span>🔒</span> Privacy-first local proxy — prompts never leave your machine (opt-in)</div>
   </div>
 </section>
 
