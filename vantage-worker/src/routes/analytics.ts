@@ -122,7 +122,8 @@ analytics.get('/kpis', async (c) => {
       COALESCE(AVG(latency_ms), 0)                 AS avg_latency_ms,
       COALESCE(AVG(efficiency_score), 74)          AS efficiency_score,
       COALESCE(SUM(CASE WHEN is_streaming=1 THEN 1 ELSE 0 END), 0) AS streaming_requests,
-      COALESCE(SUM(cache_tokens), 0)               AS total_cache_tokens,
+      COALESCE(SUM(prompt_tokens), 0)              AS total_prompt_tokens,
+      COALESCE(SUM(cache_tokens), 0)               AS cache_tokens_total,
       COALESCE(SUM(CASE WHEN cache_hit=1 THEN 1 ELSE 0 END), 0)        AS duplicate_calls,
       COALESCE(SUM(CASE WHEN cache_hit=1 THEN cost_usd ELSE 0 END), 0) AS wasted_cost_usd
     FROM events WHERE org_id = ? AND created_at >= ?${clause}
@@ -135,18 +136,24 @@ analytics.get('/kpis', async (c) => {
     GROUP BY model
   `).bind(orgId, since, ...args).all<{ model: string; cache_tokens: number; tokens: number }>();
 
-  const totalCacheTokens = (row?.total_cache_tokens ?? 0) as number;
-  const totalTokens      = (row?.total_tokens ?? 0) as number;
-  const cacheSavingsUsd  = cacheByModel.reduce((sum, r) => sum + estimateCacheSavings(r.model, r.cache_tokens), 0);
-  const cacheHitRatePct  = totalTokens > 0 ? Math.round((totalCacheTokens / totalTokens) * 1000) / 10 : 0;
+  const totalCacheTokens  = (row?.cache_tokens_total ?? 0) as number;
+  const totalPromptTokens = (row?.total_prompt_tokens ?? 0) as number;
+  const cacheSavingsUsd   = cacheByModel.reduce((sum, r) => sum + estimateCacheSavings(r.model, r.cache_tokens), 0);
+  // cache_hit_rate_pct: cached input tokens as a % of total input tokens (prompt tokens only, not output)
+  const cacheHitRatePct   = totalPromptTokens > 0 ? Math.round((totalCacheTokens / totalPromptTokens) * 1000) / 10 : 0;
 
   const kpisResult = {
-    ...(row ?? {}),
+    total_cost_usd:      (row?.total_cost_usd ?? 0) as number,
+    total_tokens:        (row?.total_tokens ?? 0) as number,
+    total_requests:      (row?.total_requests ?? 0) as number,
+    avg_latency_ms:      (row?.avg_latency_ms ?? 0) as number,
+    efficiency_score:    (row?.efficiency_score ?? 0) as number,
+    streaming_requests:  (row?.streaming_requests ?? 0) as number,
     cache_tokens_total:  totalCacheTokens,
-    cache_savings_usd:   Math.round(cacheSavingsUsd * 1e6) / 1e6,
-    cache_hit_rate_pct:  cacheHitRatePct,
     duplicate_calls:     (row?.duplicate_calls ?? 0) as number,
     wasted_cost_usd:     Math.round(((row?.wasted_cost_usd ?? 0) as number) * 1e6) / 1e6,
+    cache_savings_usd:   Math.round(cacheSavingsUsd * 1e6) / 1e6,
+    cache_hit_rate_pct:  cacheHitRatePct,
   };
   try { await c.env.KV.put(kpisCacheKey, JSON.stringify(kpisResult), { expirationTtl: 300 }); } catch { /* best-effort */ }
   logAudit(c, { event_type: 'data_access', event_name: 'data_access.analytics', resource_type: 'analytics', metadata: { endpoint: '/v1/analytics/kpis' } });
@@ -157,10 +164,13 @@ analytics.get('/kpis', async (c) => {
 analytics.get('/timeseries', async (c) => {
   const orgId     = c.get('orgId');
   const scopeTeam = c.get('scopeTeam');
-  const { clause, args } = teamScope(scopeTeam);
   const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
   // Align to UTC midnight: show today + previous (period-1) days = exactly `period` calendar days
-  const since  = Math.floor(Date.now() / 86_400_000) * 86_400 - (period - 1) * 86_400;
+  const todayMidnightMs = Math.floor(Date.now() / 86_400_000) * 86_400_000;
+  const sinceMs = todayMidnightMs - (period - 1) * 86_400_000;
+  const since = new Date(sinceMs).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+  const teamClause = scopeTeam ? ' AND team = ?' : '';
+  const teamArgs   = scopeTeam ? [scopeTeam] : [];
 
   const tsCacheKey = `analytics:timeseries:${orgId}:${period}:${scopeTeam ?? 'all'}`;
   try {
@@ -168,20 +178,19 @@ analytics.get('/timeseries', async (c) => {
     if (cached) return c.json(JSON.parse(cached));
   } catch { /* KV unavailable */ }
 
-  // DATE(created_at, 'unixepoch') always produces UTC dates; the frontend
-  // must parse them as UTC (e.g. new Date(raw + 'T00:00:00Z')) so daily
-  // buckets line up correctly across timezones.
+  // cross_platform_usage.created_at is a TEXT datetime ('YYYY-MM-DD HH:MM:SS' UTC)
+  // DATE(created_at) extracts the UTC date string directly — no unixepoch needed.
   const { results } = await c.env.DB.prepare(`
     SELECT
-      DATE(created_at, 'unixepoch') AS date,
-      SUM(cost_usd)                 AS cost_usd,
-      SUM(total_tokens)             AS tokens,
-      COUNT(*)                      AS requests
-    FROM events
-    WHERE org_id = ? AND created_at >= ?${clause}
+      DATE(created_at)                          AS date,
+      SUM(cost_usd)                             AS cost_usd,
+      SUM(input_tokens + output_tokens)         AS tokens,
+      COUNT(*)                                  AS requests
+    FROM cross_platform_usage
+    WHERE org_id = ? AND created_at >= ?${teamClause}
     GROUP BY date
     ORDER BY date ASC
-  `).bind(orgId, since, ...args).all();
+  `).bind(orgId, since, ...teamArgs).all();
 
   const tsResult = { period, series: results };
   try { await c.env.KV.put(tsCacheKey, JSON.stringify(tsResult), { expirationTtl: 300 }); } catch { /* best-effort */ }
@@ -193,24 +202,26 @@ analytics.get('/timeseries', async (c) => {
 analytics.get('/models', async (c) => {
   const orgId     = c.get('orgId');
   const scopeTeam = c.get('scopeTeam');
-  const { clause, args } = teamScope(scopeTeam);
   const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
-  const since  = Math.floor(Date.now() / 86_400_000) * 86_400 - (period - 1) * 86_400;
+  const todayMidnightMs = Math.floor(Date.now() / 86_400_000) * 86_400_000;
+  const sinceMs = todayMidnightMs - (period - 1) * 86_400_000;
+  const since = new Date(sinceMs).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+  const teamClause = scopeTeam ? ' AND team = ?' : '';
+  const teamArgs   = scopeTeam ? [scopeTeam] : [];
 
   const { results } = await c.env.DB.prepare(`
     SELECT
       model, provider,
-      SUM(cost_usd)      AS cost_usd,
-      SUM(total_tokens)  AS tokens,
-      COUNT(*)           AS requests,
-      AVG(latency_ms)    AS avg_latency_ms,
-      SUM(CASE WHEN is_streaming=1 THEN 1 ELSE 0 END) AS streaming_count
-    FROM events
-    WHERE org_id = ? AND created_at >= ?${clause}
+      SUM(cost_usd)                     AS cost_usd,
+      SUM(input_tokens + output_tokens) AS tokens,
+      COUNT(*)                          AS requests,
+      AVG(latency_ms)                   AS avg_latency_ms
+    FROM cross_platform_usage
+    WHERE org_id = ? AND created_at >= ?${teamClause}
     GROUP BY model, provider
     ORDER BY cost_usd DESC
     LIMIT 25
-  `).bind(orgId, since, ...args).all();
+  `).bind(orgId, since, ...teamArgs).all();
 
   logAudit(c, { event_type: 'data_access', event_name: 'data_access.analytics', resource_type: 'analytics', metadata: { endpoint: '/v1/analytics/models' } });
   return c.json({ models: results });
@@ -279,22 +290,23 @@ analytics.get('/traces', async (c) => {
 analytics.get('/today', async (c) => {
   const orgId     = c.get('orgId');
   const scopeTeam = c.get('scopeTeam');
-  const { clause, args } = teamScope(scopeTeam);
-  const todayStart = Math.floor(Date.now() / 86_400_000) * 86_400;
+  const teamClause = scopeTeam ? ' AND team = ?' : '';
+  const teamArgs   = scopeTeam ? [scopeTeam] : [];
+  const todayStr = new Date().toISOString().split('T')[0] + ' 00:00:00';
 
   const { results } = await c.env.DB.prepare(`
     SELECT
-      CAST(strftime('%H', datetime(created_at, 'unixepoch')) AS INTEGER) AS hour,
-      SUM(cost_usd)   AS cost_usd,
-      SUM(total_tokens) AS tokens,
-      COUNT(*)        AS requests
-    FROM events
-    WHERE org_id = ? AND created_at >= ?${clause}
+      CAST(strftime('%H', created_at) AS INTEGER) AS hour,
+      SUM(cost_usd)                               AS cost_usd,
+      SUM(input_tokens + output_tokens)           AS tokens,
+      COUNT(*)                                    AS requests
+    FROM cross_platform_usage
+    WHERE org_id = ? AND created_at >= ?${teamClause}
     GROUP BY hour
     ORDER BY hour ASC
-  `).bind(orgId, todayStart, ...args).all();
+  `).bind(orgId, todayStr, ...teamArgs).all();
 
-  return c.json({ date: new Date(todayStart * 1000).toISOString().slice(0, 10), hours: results });
+  return c.json({ date: todayStr.slice(0, 10), hours: results });
 });
 
 // ── GET /v1/analytics/cost — CI cost gate ────────────────────────────────────

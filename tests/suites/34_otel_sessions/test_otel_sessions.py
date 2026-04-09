@@ -6,18 +6,20 @@ Covers: claude-code, gemini-cli, codex-cli service.name variants.
 Hits live API at https://api.vantageaiops.com.
 """
 import os
+import sys
 import time
 import uuid
+from pathlib import Path
 
 import pytest
 import requests
 
-API_BASE = os.environ.get("VANTAGE_API_BASE", "https://api.vantageaiops.com")
-API_KEY  = os.environ.get("VANTAGE_API_KEY", "")
-HEADERS  = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from config.settings import API_URL as API_BASE
+from helpers.api import fresh_account
 
-if not API_KEY:
-    pytest.skip("VANTAGE_API_KEY not set", allow_module_level=True)
+API_KEY, _ORG_ID, _COOKIES = fresh_account(prefix="os34")
+HEADERS  = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
 
 
 # ── Payload builders ──────────────────────────────────────────────────────────

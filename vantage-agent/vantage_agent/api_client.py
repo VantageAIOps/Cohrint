@@ -32,6 +32,32 @@ from .optimizer import optimize_prompt, count_tokens
 from .tools import TOOL_DEFINITIONS, TOOL_MAP, execute_tool
 
 DEFAULT_MODEL = "claude-sonnet-4-6"
+
+
+def _prompt_for_api_key() -> str:
+    """Interactively ask the user for their Anthropic API key and save it."""
+    import sys
+    if not sys.stdin.isatty():
+        return ""
+    print(
+        "\n"
+        "No Anthropic API key found.\n"
+        "Note: A Claude.ai subscription does NOT grant API access.\n"
+        "Get your API key at: https://console.anthropic.com/settings/keys\n"
+    )
+    try:
+        key = input("Paste your API key (or press Enter to skip): ").strip()
+    except (EOFError, KeyboardInterrupt):
+        return ""
+    if not key:
+        return ""
+    save_path = os.path.expanduser("~/.vantage-agent/api_key")
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    with open(save_path, "w") as f:
+        f.write(key)
+    os.chmod(save_path, 0o600)
+    print(f"Key saved to {save_path}\n")
+    return key
 DEFAULT_MAX_TOKENS = 16384
 MAX_TURNS = 50  # Safety limit for tool-use loops
 
@@ -61,8 +87,17 @@ class AgentClient:
                     api_key = open(path).read().strip()
                     break
         if not api_key:
+            api_key = _prompt_for_api_key()
+        if not api_key:
             raise ValueError(
-                "ANTHROPIC_API_KEY not set. Export it or save to ~/.vantage-agent/api_key"
+                "\n"
+                "ANTHROPIC_API_KEY not set.\n\n"
+                "Note: A Claude.ai subscription does NOT include API access.\n"
+                "You need a separate Anthropic API key from: https://console.anthropic.com/settings/keys\n\n"
+                "To fix this, either:\n"
+                "  1. export ANTHROPIC_API_KEY=sk-ant-...\n"
+                "  2. save your key to ~/.vantage-agent/api_key\n"
+                "  3. run: vantageai-agent --setup"
             )
         self.client = anthropic.Anthropic(api_key=api_key)
         self.model = model

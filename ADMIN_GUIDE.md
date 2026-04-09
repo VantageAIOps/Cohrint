@@ -135,11 +135,11 @@ Every authenticated request goes through this pipeline:
 name = "vantageai-api"
 routes = [{ pattern = "api.vantageaiops.com/*", zone_name = "vantageaiops.com" }]
 
-# D1 SQLite
-binding = "DB"   database_id = "a1301c2a-19bf-4fa3-8321-bba5e497de10"
+# D1 SQLite — binding name only; actual database_id in wrangler.toml (not committed)
+binding = "DB"
 
-# KV Namespace
-binding = "KV"   id = "65b5609ad5b747c9b416632a19529f24"
+# KV Namespace — binding name only; actual namespace id in wrangler.toml (not committed)
+binding = "KV"
 
 # Env vars (non-secret)
 ENVIRONMENT = "production"
@@ -149,6 +149,8 @@ RATE_LIMIT_RPM = "1000"
 # Secrets (set via: wrangler secret put)
 RESEND_API_KEY   — email sending
 ```
+
+> **Note:** `database_id` and KV `id` are in `wrangler.toml` which is gitignored. Retrieve them from the Cloudflare dashboard or via `wrangler d1 list` / `wrangler kv namespace list`.
 
 ---
 

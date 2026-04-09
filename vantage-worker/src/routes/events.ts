@@ -92,8 +92,11 @@ events.post('/', async (c) => {
       if (existing) {
         const prev = JSON.parse(existing) as { event_id: string; cost_usd: number; model: string; ts: number };
         const agoMin = Math.round((Date.now() / 1000 - prev.ts) / 60);
+        const currentCost = body.total_cost_usd ?? body.cost_total_usd ?? 0;
         body.cache_hit = 1;
-        cacheWarning = `Duplicate call detected — identical prompt sent ${agoMin}m ago. Wasted: $${prev.cost_usd.toFixed(4)}. Consider caching the response client-side.`;
+        // wasted_cost_usd in analytics sums cost_usd of cache_hit=1 rows (this duplicate call's cost)
+        // so the warning shows the same cost that will be aggregated in the KPI
+        cacheWarning = `Duplicate call detected — identical prompt sent ${agoMin}m ago. Wasted: $${currentCost.toFixed(4)}. Consider caching the response client-side.`;
       }
     } catch { /* KV unavailable — proceed without dedup */ }
   }
@@ -155,6 +158,26 @@ events.post('/batch', async (c) => {
       events_used: used,
       events_limit: FREE_TIER_LIMIT,
     }, 429);
+  }
+
+  // Prompt-hash dedup — check KV for each event that includes a prompt_hash
+  for (const ev of body.events) {
+    if (!ev.prompt_hash) continue;
+    const phashKey = `phash:${orgId}:${ev.prompt_hash}`;
+    try {
+      const existing = await c.env.KV.get(phashKey);
+      if (existing) {
+        ev.cache_hit = 1;
+      } else {
+        const costUsd = ev.total_cost_usd ?? ev.cost_total_usd ?? 0;
+        await c.env.KV.put(phashKey, JSON.stringify({
+          event_id: ev.event_id,
+          cost_usd: costUsd,
+          model: ev.model ?? '',
+          ts: Math.floor(Date.now() / 1000),
+        }), { expirationTtl: 86400 });
+      }
+    } catch { /* KV unavailable — proceed without dedup */ }
   }
 
   // Bulk insert using D1 batch API
