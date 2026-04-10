@@ -38,7 +38,7 @@ events.use('/batch', async (c, next) => {
 });
 
 // ── Free-tier event limit helper ──────────────────────────────────────────────
-const FREE_TIER_LIMIT = 10_000;
+const FREE_TIER_LIMIT = 50_000;
 
 async function checkFreeTierLimit(db: D1Database, orgId: string, adding = 1): Promise<{ blocked: boolean; used: number }> {
   const row = await db.prepare(`
