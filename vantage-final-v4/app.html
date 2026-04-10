@@ -1093,6 +1093,24 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
               Contact support to request data deletion.
             </p>
           </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Industry Benchmarks</div>
+            </div>
+            <p style="font-size:12px; color:var(--text-secondary); margin-bottom:14px;">
+              Contribute <strong>anonymized</strong> cost and usage data to power cross-company benchmarks.
+              No prompts, responses, or identifiers are ever shared &mdash; only aggregated metrics
+              (cost/token, cost/developer, model mix) bucketed by company size and industry.
+              You get access to benchmark comparisons showing where you stand vs peers.
+            </p>
+            <label style="display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none;">
+              <input type="checkbox" id="benchmarkOptIn" onchange="saveBenchmarkOptIn()"
+                style="width:16px; height:16px; accent-color:var(--accent-green); cursor:pointer;">
+              <span style="font-size:13px; font-weight:500;">Opt in to anonymized industry benchmarks</span>
+            </label>
+            <div id="benchmarkOptInStatus" style="margin-top:8px; font-size:11px; font-family:var(--font-mono); color:var(--text-muted);"></div>
+          </div>
         </div>
       </div>
 
@@ -2823,6 +2841,7 @@ function testSlack() {
 function loadSettings() {
   document.getElementById('settingsApiBase').value = localStorage.getItem('api_base') || 'https://api.vantageaiops.com';
   document.getElementById('privacyMode').value = localStorage.getItem('vantage_privacy') || 'strict';
+  loadBenchmarkOptIn();
 }
 
 function saveApiBase() {
@@ -2837,6 +2856,29 @@ function saveApiBase() {
 function savePrivacy() {
   var val = document.getElementById('privacyMode').value;
   localStorage.setItem('vantage_privacy', val);
+}
+
+function loadBenchmarkOptIn() {
+  apiFetch('/v1/admin/org').then(function(data) {
+    var cb = document.getElementById('benchmarkOptIn');
+    if (cb) cb.checked = !!(data && data.org && data.org.benchmark_opt_in);
+  }).catch(function() {});
+}
+
+function saveBenchmarkOptIn() {
+  var cb = document.getElementById('benchmarkOptIn');
+  var status = document.getElementById('benchmarkOptInStatus');
+  if (!cb) return;
+  apiFetch('/v1/admin/org', {
+    method: 'PATCH',
+    body: JSON.stringify({ benchmark_opt_in: cb.checked }),
+  }).then(function() {
+    status.textContent = cb.checked ? 'Opted in. Thank you for contributing!' : 'Opted out.';
+    setTimeout(function() { status.textContent = ''; }, 3000);
+  }).catch(function(e) {
+    cb.checked = !cb.checked; // revert on failure
+    status.textContent = 'Save failed: ' + e.message;
+  });
 }
 
 /* ═══════════════════════════════════════════════════════════════════

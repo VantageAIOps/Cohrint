@@ -13,13 +13,16 @@ Run the **BOOT SEQUENCE** before every task.
 
 ---
 
-## BOOT SEQUENCE (run at session start)
+## BOOT SEQUENCE (MANDATORY — run before ANY action, including clarifying questions)
+
+> **HARD GATE:** Do not write code, read source files, or answer questions about the codebase until ALL THREE steps below complete successfully. If any step fails, report the failure before proceeding.
 
 Use the Read tool (not `cat`) for all file reads:
 
 ```
 Step 1 — Load memory index:
-  Read: <project_root>/.claude/memory/MEMORY.md  (if it exists)
+  Bash: ls ~/.claude/projects/ 2>/dev/null | grep -i vantage   # find memory path
+  Read: <matched_path>/MEMORY.md   (skip if path not found — log the skip)
   Read: <project_root>/CLAUDE.md
 
 Step 2 — Orient to current work:
@@ -31,13 +34,12 @@ Step 3 — Check CI:
   Bash: gh run list --limit 3 --json status,conclusion,name,headBranch
 ```
 
-**Note:** Memory path is machine-specific. Locate it with:
-```bash
-ls ~/.claude/projects/ 2>/dev/null | grep vantageai
-```
-Then read `MEMORY.md` from the matched path using the Read tool.
+**If memory path grep returns no match:** Log "Memory not found — proceeding without it" and continue. Do NOT silently skip.
 
-After boot: if memory entries mention specific files, verify those files still exist and the content still matches before acting on the memory.
+**After boot — mandatory verification:**
+- For every file mentioned in memory: confirm it still exists with Glob before acting on it
+- For every function name mentioned in memory: Grep for it before assuming it exists
+- If this is a sub-agent spun mid-task: still run boot sequence — do not inherit assumptions from the parent agent's context
 
 ---
 
@@ -95,7 +97,18 @@ Only SHA-256 hash stored. Raw key shown once at signup. Never log or commit.
 
 ## DATABASE SCHEMA (8 tables)
 
-> **Before writing any migration or SQL:** Read `vantage-worker/src/` with Grep to find the actual CREATE TABLE statement. This snapshot may lag behind migrations.
+> **VERIFY BEFORE USE — this snapshot was accurate on 2026-04-09 and WILL drift.**
+>
+> Before writing ANY SQL, migration, or query, run these commands:
+> ```bash
+> # Verify table exists and get current column list:
+> grep -n "CREATE TABLE <tablename>" vantage-worker/src/ -r
+> # Check for recent migrations:
+> git log --oneline --all -- "vantage-worker/src/db*" "vantage-worker/migrations*" | head -10
+> ```
+> If the live schema contradicts this doc, trust the source file. Do not update the source file to match stale docs.
+>
+> **`otel_events` special case:** This table is created lazily. Before writing to it, check if it exists in the live D1 instance or accept that inserts are try/catch-wrapped and may silently fail on older deploys.
 
 ### `orgs`
 ```sql
@@ -177,14 +190,20 @@ raw_data TEXT  -- JSON
 
 ## API SURFACE
 
-> **To verify any route exists:** `Grep "app\.(get|post|patch|delete)" vantage-worker/src/routes/`
+> **To verify any route exists before calling or testing it:**
+> ```bash
+> grep -n "app\.\(get\|post\|patch\|delete\)" vantage-worker/src/routes/<file>.ts
+> ```
+> Route files by group: `events.ts`, `analytics.ts`, `cross-platform.ts`, `auth.ts`, `otel.ts`, `stream.ts`, `alerts.ts`
+>
+> If a route you expect is missing from grep output, it does not exist — do not assume this doc is correct.
 
-### Ingest
+### Ingest — `vantage-worker/src/routes/events.ts`
 - `POST /v1/events` — single, `INSERT OR IGNORE`, viewer → 403
 - `POST /v1/events/batch` — up to 500, D1 batch API, returns `{accepted, failed}`
 - `PATCH /v1/events/:id/scores` — async quality score writeback
 
-### Analytics
+### Analytics — `vantage-worker/src/routes/analytics.ts`
 - `GET /v1/analytics/summary` — today/MTD/session cost + budget%
 - `GET /v1/analytics/kpis?period=N` — totals + averages (max 365d)
 - `GET /v1/analytics/timeseries?period=N` — daily breakdown
@@ -193,10 +212,10 @@ raw_data TEXT  -- JSON
 - `GET /v1/analytics/traces?period=N` — agent traces top 100 (max 30d)
 - `GET /v1/analytics/cost?period=N` — CI gate: `{total_cost_usd, today_cost_usd, period_days}`
 
-### Cross-Platform (OTel rollup)
+### Cross-Platform (OTel rollup) — `vantage-worker/src/routes/cross-platform.ts`
 - `GET /v1/cross-platform/summary|developers|models|live|budget`
 
-### Auth
+### Auth — `vantage-worker/src/routes/auth.ts`
 - `POST /v1/auth/signup`
 - `POST /v1/auth/session` — returns session cookie + `sse_token`
 - `POST /v1/auth/recover` — always 200 (don't leak email existence)
@@ -204,15 +223,15 @@ raw_data TEXT  -- JSON
 - `POST /v1/auth/recover/redeem` — consumes KV token (single-use), rotates key
 - `POST /v1/auth/rotate` — owner-only
 
-### OTel OTLP
+### OTel OTLP — `vantage-worker/src/routes/otel.ts`
 - `POST /v1/otel/v1/metrics` — OTLP metrics (Claude Code, Copilot, Gemini CLI, Codex CLI, Cline, Cursor, Continue, OpenCode, Kiro, Windsurf)
 - `POST /v1/otel/v1/logs`
 
-### SSE
+### SSE — `vantage-worker/src/routes/stream.ts`
 - `GET /v1/stream/:orgId?sse_token=X` — polling-over-SSE, 25s max, 2s poll, KV-backed
 - `sse_token`: one-time 32-char hex, 120s TTL, generated at `/v1/auth/session`
 
-### Alerts
+### Alerts — `vantage-worker/src/routes/alerts.ts`
 - `POST /v1/alerts/slack/:orgId`
 - `GET /v1/alerts/config/:orgId`
 
@@ -237,9 +256,13 @@ Counter increments ONLY on auth failure — not on every request
 ### Free Tier
 ```
 10,000 events/month per org
-SELECT COUNT(*) FROM events WHERE org_id=? AND created_at >= strftime('%s','now','start of month')
 429 + {events_used, events_limit, upgrade_url} if exceeded
 ```
+> **CRITICAL — verify the actual query before writing any billing logic.** Two formulations exist and they produce different results:
+> - `strftime('%s','now','start of month')` — exact calendar month boundary (preferred)
+> - `CAST(strftime('%s','now') AS INTEGER) - 30*86400` — rolling 30-day window (deprecated approximation)
+>
+> Run `grep -n "start of month\|30\*86400\|events_limit" vantage-worker/src/routes/events.ts` to confirm which is live before writing any count query or test assertion.
 
 ---
 
@@ -274,7 +297,8 @@ All non-excluded suites run. Extended/security/browser suites are opt-in via wor
 
 ### Test Infrastructure
 ```python
-# helpers/api.py
+# helpers/api.py  — VERIFY SIGNATURE BEFORE USE:
+# grep -n "def fresh_account\|def signup_api\|def get_headers" tests/helpers/api.py
 def fresh_account(prefix="t") -> Tuple[str, str, dict]:
     """Returns (api_key: str, org_id: str, cookies: dict)"""
 
@@ -284,6 +308,11 @@ def signup_api(email=None, name=None, org=None, timeout=15) -> dict:
 def get_headers(api_key: str) -> dict:
     """Returns {"Authorization": "Bearer vnt_..."}"""
 ```
+> **Always destructure all three values from `fresh_account()`:**
+> ```python
+> api_key, org_id, cookies = fresh_account(prefix="xx")
+> ```
+> If this helper's signature ever changes (e.g., returns a dict), tests will throw at runtime. Run the grep above before writing any new test suite that calls it.
 
 ```python
 # conftest.py pattern (module scope)
@@ -315,7 +344,7 @@ Run: `python -m pytest tests/suites/XX_name/ -v`
 
 ## INTEGRATIONS
 
-### MCP Server (12 tools) — `vantage-mcp/`
+### MCP Server (13 tools) — `vantage-mcp/`
 ```
 analyze_tokens       estimate_costs       get_summary          get_traces
 get_model_breakdown  get_team_breakdown   get_kpis             get_recommendations
@@ -363,7 +392,7 @@ COST=$(curl -s -H "Authorization: Bearer $VANTAGE_KEY" \
 | Safari/WebKit session | ITP drops cross-origin cookie on reload | `SameSite=Lax` stripped by ITP | Fix: `SameSite=None;Secure` — needs Worker deploy |
 | D1 batch | No transactions — partial write possible | D1 batch API limitation | `INSERT OR IGNORE` makes retries safe |
 | Free tier count | 30-day window ≠ exact calendar month | `now - 30*86400` approximation | Known; strftime `start of month` is more exact |
-| Quality scores | Null at insert, async writeback | LLM judge runs offline | Dashboard defaults to 74 when null |
+| Quality scores | Null at insert, async writeback | LLM judge runs offline | Dashboard defaults to `74` when null — verify source: `grep -n "74\|defaultScore\|score.*null" vantage-final-v4/` before replicating this value |
 | prompt_hash | Must be 32–128 char lowercase hex | Validation in events.ts | Min: `hashlib.sha256().hexdigest()[:32]` |
 | Semantic cache | Exact-match dedup only | No embedding similarity yet | Fuzzy matching is roadmap Sprint 3 |
 | otel_events table | May not exist in older deploys | Created lazily | OTel inserts wrapped in try/catch |
@@ -378,8 +407,14 @@ COST=$(curl -s -H "Authorization: Bearer $VANTAGE_KEY" \
 - API keys: SHA-256 only in DB, never in logs, never committed
 - Sessions: `HttpOnly; SameSite=Lax; Secure`, 30-day TTL, 256-bit token
 - prompt_hash: validated as `/^[0-9a-f]{32,128}$/i`
-- Viewer role: 403 on `POST /events` (inline guard in handler)
+- Viewer role: 403 on `POST /events` — **inline guard in the handler, not middleware**
 - Rate limiting: per-org RPM + per-IP brute-force (fails only)
+
+> **RBAC GAP — known architectural risk:** Viewer enforcement is an inline guard inside the `POST /events` handler, not enforced at the middleware layer. This means **every new write route must manually add the viewer check**. If you add any route that writes data (POST, PATCH, DELETE), you MUST include:
+> ```typescript
+> if (auth.role === 'viewer') return c.json({ error: 'Forbidden' }, 403)
+> ```
+> Verify the guard exists in every new handler before creating a PR. Missing it = viewer-role accounts get write access.
 
 ### Never Do
 - `console.log` any `vnt_*` token

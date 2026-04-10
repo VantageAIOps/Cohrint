@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VantageAI — Task Dependency Graph</title>
+<style>
+  :root {
+    --bg:#0A0A0F; --surface:#1A1A2E; --border:rgba(255,255,255,0.07);
+    --text:#E8E8E8; --muted:#6B7280; --brand:#FF6B35; --accent:#00D4AA;
+    --warn:#FFB800; --danger:#FF4444; --blue:#6366F1; --purple:#A855F7;
+    --font:'Inter',-apple-system,sans-serif; --mono:'JetBrains Mono',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;overflow:hidden;}
+
+  header{
+    position:fixed;top:0;left:0;right:0;z-index:100;
+    background:rgba(10,10,15,0.94);backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--border);
+    padding:12px 24px;display:flex;align-items:center;justify-content:space-between;
+  }
+  .logo{display:flex;align-items:center;gap:10px;}
+  .logo-dot{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#FF6B35,#ff8c5a);
+    display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;}
+  .logo-text{font-size:14px;font-weight:700;letter-spacing:-0.02em;}
+  .logo-sub{font-size:11px;color:var(--muted);margin-left:4px;}
+
+  .legend{display:flex;gap:14px;align-items:center;}
+  .leg{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);}
+  .leg-dot{width:9px;height:9px;border-radius:50%;}
+
+  #canvas-wrap{position:fixed;top:53px;left:0;right:0;bottom:0;overflow:auto;}
+  svg{display:block;}
+
+  #panel{
+    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    background:var(--surface);border:1px solid var(--border);border-radius:12px;
+    padding:16px 20px;min-width:360px;max-width:520px;
+    box-shadow:0 8px 32px rgba(0,0,0,0.6);
+    transition:opacity 200ms;opacity:0;pointer-events:none;z-index:200;
+  }
+  #panel.visible{opacity:1;pointer-events:all;}
+  #panel-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px;}
+  #panel-id{font-size:11px;font-family:var(--mono);color:var(--brand);
+    background:rgba(255,107,53,0.12);padding:2px 8px;border-radius:4px;flex-shrink:0;}
+  #panel-title{font-size:14px;font-weight:700;color:var(--text);}
+  #panel-desc{font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:10px;}
+  #panel-meta{display:flex;gap:8px;flex-wrap:wrap;}
+  .meta-chip{font-size:11px;padding:3px 8px;border-radius:4px;}
+  .chip-phase{background:rgba(99,102,241,0.15);color:#a5b4fc;}
+  .chip-effort{background:rgba(0,212,170,0.1);color:var(--accent);}
+  .chip-unlocks{background:rgba(255,184,0,0.1);color:var(--warn);}
+  .chip-blocked{background:rgba(255,68,68,0.1);color:#ff8888;}
+  #panel-close{
+    width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,0.08);
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;font-size:12px;color:var(--muted);flex-shrink:0;border:none;
+  }
+  #panel-close:hover{background:rgba(255,255,255,0.14);color:var(--text);}
+
+  #hint{
+    position:fixed;top:62px;right:18px;font-size:11px;color:var(--muted);
+    background:rgba(10,10,15,0.85);backdrop-filter:blur(8px);
+    border:1px solid var(--border);border-radius:8px;
+    padding:8px 12px;line-height:1.8;z-index:100;
+  }
+
+  .wave-label{font-size:10px;fill:#4B5563;font-family:var(--font);font-weight:700;
+    letter-spacing:0.07em;text-transform:uppercase;}
+
+  .node-g{cursor:pointer;}
+  .node-rect{transition:all 180ms;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.45));}
+  .node-label{font-size:11px;font-family:var(--font);font-weight:600;fill:#E8E8E8;
+    text-anchor:middle;dominant-baseline:central;pointer-events:none;}
+  .node-id{font-size:9.5px;font-family:var(--mono);fill:rgba(255,255,255,0.3);
+    text-anchor:middle;pointer-events:none;}
+  .phase-pill{font-size:8px;fill:inherit;text-anchor:middle;font-family:var(--font);
+    font-weight:700;dominant-baseline:central;pointer-events:none;}
+
+  .edge{fill:none;stroke-linecap:round;transition:all 180ms;}
+  .edge-solid{stroke:rgba(255,255,255,0.13);stroke-width:1.5;marker-end:url(#arr);}
+  .edge-skip{stroke:rgba(255,255,255,0.07);stroke-width:1.5;stroke-dasharray:5,4;marker-end:url(#arr);}
+
+  .node-g.dim .node-rect{opacity:0.12;}
+  .node-g.dim .node-label{fill:rgba(255,255,255,0.18);}
+  .node-g.dim .node-id{fill:rgba(255,255,255,0.08);}
+  .node-g.ancestor .node-rect{stroke:#00D4AA !important;filter:drop-shadow(0 0 9px rgba(0,212,170,0.55));}
+  .node-g.descendant .node-rect{stroke:#FFB800 !important;filter:drop-shadow(0 0 9px rgba(255,184,0,0.55));}
+  .node-g.hovered .node-rect{stroke:#FF6B35 !important;filter:drop-shadow(0 0 14px rgba(255,107,53,0.65));}
+  .edge.dim{opacity:0.05;}
+  .edge.hi-anc{stroke:#00D4AA !important;opacity:1;stroke-width:2;marker-end:url(#arr-anc);}
+  .edge.hi-desc{stroke:#FFB800 !important;opacity:1;stroke-width:2;marker-end:url(#arr-desc);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot">V</div>
+    <span class="logo-text">VantageAI</span>
+    <span class="logo-sub">Task Dependency Graph · 20 tasks</span>
+  </div>
+  <div class="legend">
+    <div class="leg"><div class="leg-dot" style="background:#FF6B35"></div>Hovered</div>
+    <div class="leg"><div class="leg-dot" style="background:#00D4AA"></div>Ancestor (must do first)</div>
+    <div class="leg"><div class="leg-dot" style="background:#FFB800"></div>Descendant (unlocks after)</div>
+    <div class="leg"><div class="leg-dot" style="background:#6366F1"></div>Week 1–6</div>
+    <div class="leg"><div class="leg-dot" style="background:#A855F7"></div>Month 1–3</div>
+    <div class="leg"><div class="leg-dot" style="background:#FF4444"></div>Month 3–6</div>
+    <div class="leg"><div class="leg-dot" style="background:#00D4AA"></div>Month 7–18</div>
+  </div>
+</header>
+
+<div id="hint">
+  🖱 Hover node → see full dependency chain<br>
+  🖱 Click node → see task details
+</div>
+
+<div id="canvas-wrap"><svg id="svg"></svg></div>
+
+<div id="panel">
+  <div id="panel-header">
+    <div style="display:flex;flex-direction:column;gap:4px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span id="panel-id"></span>
+        <span id="panel-title"></span>
+      </div>
+    </div>
+    <button id="panel-close">✕</button>
+  </div>
+  <div id="panel-desc"></div>
+  <div id="panel-meta"></div>
+  <div id="panel-unlocks" style="margin-top:8px;font-size:12px;color:#FFB800;"></div>
+</div>
+
+<script>
+// ── Data ──────────────────────────────────────────────────────────────────────
+const TASKS = [
+  {id:1,  label:["Raise Free Tier","50K OTel"],     phase:"W1",  effort:"2h",      color:"#6366F1",col:0,row:0},
+  {id:2,  label:["Benchmark","Opt-in Toggle"],       phase:"W1",  effort:"4h",      color:"#6366F1",col:0,row:1},
+  {id:3,  label:["Replace Fake","Testimonials"],     phase:"W1",  effort:"1h",      color:"#6366F1",col:0,row:2},
+  {id:4,  label:["Commit to","Brand/Domain"],        phase:"W1",  effort:"2h",      color:"#6366F1",col:0,row:3},
+  {id:5,  label:["Email 20","CTOs Outreach"],        phase:"W1",  effort:"3h",      color:"#6366F1",col:0,row:4},
+  {id:6,  label:["Write+Post","Show HN"],            phase:"W2",  effort:"2.5h",    color:"#6366F1",col:0,row:5},
+  {id:7,  label:["Draft AI Spend","Console PRD"],    phase:"W2",  effort:"3h",      color:"#6366F1",col:0,row:6},
+  {id:9,  label:["Enterprise","Pricing Page"],       phase:"W5",  effort:"2h",      color:"#6366F1",col:0,row:7},
+  {id:10, label:["Benchmark","Data Schema"],         phase:"M2",  effort:"8h",      color:"#A855F7",col:1,row:2},
+  {id:12, label:["n8n 7","Workflows"],               phase:"W4",  effort:"6h",      color:"#6366F1",col:1,row:5},
+  {id:14, label:["SOC2 Type I","Prep+Vanta"],        phase:"M3",  effort:"ongoing", color:"#A855F7",col:1,row:7},
+  {id:8,  label:["AI Spend Console","MVP ⭐"],        phase:"W3-5",effort:"40h",     color:"#FF6B35",col:2,row:3},
+  {id:11, label:["Semantic Cache","CF Vectorize"],   phase:"M2",  effort:"2wk",     color:"#A855F7",col:3,row:1},
+  {id:13, label:["Benchmark","Report Q2 2026"],      phase:"M3",  effort:"1wk",     color:"#FF4444",col:3,row:4},
+  {id:18, label:["Prompt","Registry MVP"],           phase:"M4",  effort:"6wk",     color:"#FF4444",col:3,row:6},
+  {id:15, label:["Vendor","Negotiation Module"],     phase:"M5",  effort:"4wk",     color:"#FF4444",col:4,row:3},
+  {id:16, label:["Governance","Report PDF"],         phase:"M5",  effort:"4wk",     color:"#FF4444",col:4,row:6},
+  {id:17, label:["Series A","Narrative"],            phase:"M6",  effort:"1wk",     color:"#FFB800",col:5,row:1},
+  {id:19, label:["AI Procurement","API (Ramp)"],     phase:"M9",  effort:"4wk",     color:"#00D4AA",col:6,row:2},
+  {id:20, label:["Model Performance","Index ★"],     phase:"M12", effort:"ongoing", color:"#00D4AA",col:7,row:4},
+];
+
+const EDGES = [
+  {f:7, t:8, skip:false},{f:8, t:11,skip:false},{f:8, t:13,skip:false},
+  {f:8, t:18,skip:false},{f:8, t:16,skip:false},{f:2, t:13,skip:false},
+  {f:10,t:13,skip:false},{f:10,t:15,skip:true}, {f:13,t:15,skip:false},
+  {f:14,t:16,skip:false},{f:8, t:17,skip:false},{f:11,t:17,skip:false},
+  {f:13,t:17,skip:false},{f:15,t:17,skip:true}, {f:15,t:19,skip:false},
+  {f:17,t:19,skip:false},{f:15,t:20,skip:true}, {f:16,t:20,skip:false},
+  {f:19,t:20,skip:false},
+];
+
+const DETAILS = {
+  1: {desc:"Update free tier from 10K → 50K for OTel/AI coding tool events. Keep SDK at 10K. Fix in vantage-worker/src/routes/events.ts free tier count query. Separate OTel vs SDK track metrics.",unlocks:[]},
+  2: {desc:"Add opt-in checkbox in dashboard settings: 'Contribute anonymized data for industry benchmarks.' New benchmark_opt_in column in orgs table. Wire to VIE BENCHMARK stage flag.",unlocks:["#13 Benchmark Report"]},
+  3: {desc:"Remove fictional testimonials (Jordan Kim, Meera Patel) from landing page. Replace with real quotes from real GitHub handles from design partners, or remove entirely until secured.",unlocks:[]},
+  4: {desc:"Go/no-go on domain: vantageai.com vs spendlens.ai / ailedger.com / modelbench.io. Register chosen domain. Set up redirects from vantageaiops.com. Update all brand references.",unlocks:[]},
+  5: {desc:"Find 20 CTOs at AI-heavy startups (50–300 employees) paying for 3+ AI tools. LinkedIn search. Send 3 cold email variants from Prompt #02. Goal: 5 confirmed design partners.",unlocks:[]},
+  6: {desc:"'Show HN: We built the only tool that shows per-developer ROI across all AI coding tools.' Post 8–10am ET Tuesday/Wednesday. Reply every comment for 48 hours.",unlocks:[]},
+  7: {desc:"PRD for consolidated billing dashboard across Copilot, Claude Code, Cursor, Gemini CLI. User stories, core metrics, data model, prioritized 4-week MVP feature list. Use Prompt #01.",unlocks:["#8 AI Spend Console MVP"]},
+  8: {desc:"⭐ BOTTLENECK — directly unblocks 5 tasks. 4-week build: consolidated billing across all AI coding tools, per-developer cost breakdown, /app/console route, multi-tool analytics endpoints.",unlocks:["#11 Semantic Cache","#13 Benchmark Report","#17 Series A","#18 Prompt Registry","#16 Governance Report"]},
+  9: {desc:"Enterprise tier copy using Prompt #06. One-line value prop, 8–10 feature descriptions, ROI/compliance/security proof points, CTA to talk to sales. Must be live before CTO outreach.",unlocks:[]},
+  10:{desc:"PostgreSQL schema for anonymized benchmarks. Opt-in only, no org IDs, bucketed cohorts, p25/p50/p75/p90 percentiles, quarterly snapshots. SQL DDL + RLS + 3 aggregate queries.",unlocks:["#13 Benchmark Report","#15 Vendor Negotiation"]},
+  11:{desc:"Cloudflare Workers + Vectorize semantic cache. Embed with bge-small-en. Per-org namespace. Configurable threshold (default 0.92). Track hit rate + cost saved in D1. Core moat vs Helicone.",unlocks:["#17 Series A Narrative"]},
+  12:{desc:"Deploy n8n on Railway ($5/mo). Build 7 workflows: (1) User Onboarding, (2) Anomaly Alert, (3) Weekly Benchmark, (4) Monthly Executive Report, (5) Renewal Intelligence, (6) Content Pipeline, (7) Free→Paid Conversion.",unlocks:[]},
+  13:{desc:"'State of AI Coding Tool Spend Q2 2026' using real anonymized data. 1,500–2,000 words. Gate with email. PR pitch to TechCrunch, The Information, Bloomberg Technology after publish.",unlocks:["#15 Vendor Negotiation","#17 Series A Narrative"]},
+  14:{desc:"Sign up for Vanta or Drata. 5 Trust Service Criteria checklist for CF Workers + D1 + FastAPI stack. Write required policies. Target completion Month 7–8. Unlocks deals above $10K ACV.",unlocks:["#16 Governance Report"]},
+  15:{desc:"When CTO renews Copilot/Anthropic: show what similar companies paid at their last renewal. Requires 500+ opted-in orgs, procurement event tracking, ai_tool_contracts table, n8n Workflow 5.",unlocks:["#17 Series A","#19 Procurement API","#20 Model Performance Index"]},
+  16:{desc:"Auto-generate board-ready AI spend report: who spent what, on which model, for which outcome. PDF export. Claude Opus narrative (CFO-facing). Enterprise plan only.",unlocks:["#20 Model Performance Index"]},
+  17:{desc:"Series A investor narrative. Traction: $35K MRR, 15 enterprise customers, 500+ benchmark contributors. 'Bloomberg Terminal of AI spend' framing. Write at Month 6. Use Prompt #09.",unlocks:["#19 Procurement API"]},
+  18:{desc:"Prompt version control + cost comparison per version + MCP deploy. NOTE: no downstream dependencies in current roadmap — can safely slip without cascading delays.",unlocks:[]},
+  19:{desc:"Stable public REST API v1 for Ramp, Brex, Zip, Coupa to pull AI spend data. Each charge tagged with ROI breakdown by team + feature + outcome. Zero acquisition cost enterprise customers.",unlocks:["#20 Model Performance Index"]},
+  20:{desc:"Real-world quality + cost benchmark for every model across task categories (code gen, summarization, RAG, reasoning). Quarterly publication. Requires 1000+ opted-in orgs.",unlocks:[]},
+};
+
+// ── Layout ────────────────────────────────────────────────────────────────────
+const CW=195, RH=86, NW=158, NH=54, PX=36, PY=72;
+const COLS=8, ROWS=9;
+const SW = COLS*CW + PX*2 + 30;
+const SH = ROWS*RH + PY*2 + 30;
+
+const tMap={};
+TASKS.forEach(t=>{tMap[t.id]=t;});
+
+const childOf={}, parentOf={};
+TASKS.forEach(t=>{childOf[t.id]=[]; parentOf[t.id]=[];});
+EDGES.forEach(e=>{childOf[e.f].push(e.t); parentOf[e.t].push(e.f);});
+
+function cx(col){return PX+col*CW+NW/2;}
+function cy(row){return PY+row*RH+NH/2;}
+
+function ancestors(id){
+  const v=new Set(), q=[...parentOf[id]];
+  while(q.length){const n=q.shift();if(v.has(n))continue;v.add(n);parentOf[n].forEach(p=>q.push(p));}
+  return v;
+}
+function descendants(id){
+  const v=new Set(), q=[...childOf[id]];
+  while(q.length){const n=q.shift();if(v.has(n))continue;v.add(n);childOf[n].forEach(c=>q.push(c));}
+  return v;
+}
+
+// ── SVG build ─────────────────────────────────────────────────────────────────
+const NS='http://www.w3.org/2000/svg';
+function el(tag,attrs){
+  const e=document.createElementNS(NS,tag);
+  Object.entries(attrs||{}).forEach(([k,v])=>e.setAttribute(k,v));
+  return e;
+}
+function mkMarker(id,color){
+  const m=el('marker',{id,markerWidth:'8',markerHeight:'8',refX:'6',refY:'3',orient:'auto'});
+  const p=el('path',{d:'M0,0 L0,6 L8,3 z',fill:color});
+  m.appendChild(p); return m;
+}
+
+const svg=document.getElementById('svg');
+svg.setAttribute('width',SW); svg.setAttribute('height',SH);
+svg.setAttribute('viewBox',`0 0 ${SW} ${SH}`);
+
+const defs=el('defs');
+defs.appendChild(mkMarker('arr','rgba(255,255,255,0.18)'));
+defs.appendChild(mkMarker('arr-anc','#00D4AA'));
+defs.appendChild(mkMarker('arr-desc','#FFB800'));
+svg.appendChild(defs);
+
+// Column background + wave labels
+const waveLabels=[
+  {col:0,lbl:"WAVE 0 · W1–W6"},
+  {col:1,lbl:"WAVE 0 PARALLEL"},
+  {col:2,lbl:"WAVE 1 · M1–2"},
+  {col:3,lbl:"WAVE 2 · M2–4"},
+  {col:4,lbl:"WAVE 3 · M4–6"},
+  {col:5,lbl:"WAVE 4 · M6"},
+  {col:6,lbl:"WAVE 5 · M9"},
+  {col:7,lbl:"WAVE 6 · M12+"},
+];
+const bgG=el('g');
+waveLabels.forEach(w=>{
+  const x=PX+w.col*CW;
+  const r=el('rect',{x:x+3,y:8,width:CW-6,height:SH-16,rx:8,
+    fill:w.col%2===0?'rgba(255,255,255,0.018)':'rgba(255,255,255,0.008)'});
+  bgG.appendChild(r);
+  const t=el('text',{x:x+CW/2,y:28,class:'wave-label','text-anchor':'middle'});
+  t.textContent=w.lbl; bgG.appendChild(t);
+});
+svg.appendChild(bgG);
+
+// Edges
+const edgeG=el('g');
+svg.appendChild(edgeG);
+const edgeEls=[];
+EDGES.forEach(e=>{
+  const ft=tMap[e.f], tt=tMap[e.t];
+  const x1=cx(ft.col)+NW/2, y1=cy(ft.row);
+  const x2=cx(tt.col)-NW/2, y2=cy(tt.row);
+  const mx=(x1+x2)/2;
+  const path=el('path',{
+    d:`M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`,
+    class:`edge ${e.skip?'edge-skip':'edge-solid'}`,
+    'marker-end':'url(#arr)'
+  });
+  path.dataset.from=e.f; path.dataset.to=e.t;
+  edgeG.appendChild(path);
+  edgeEls.push({el:path,f:e.f,t:e.t});
+});
+
+// Nodes
+const nodeG=el('g');
+svg.appendChild(nodeG);
+const nodeEls={};
+
+TASKS.forEach(t=>{
+  const g=el('g',{class:'node-g'}); g.dataset.id=t.id;
+  const x=cx(t.col)-NW/2, y=cy(t.row)-NH/2;
+
+  // Main rect
+  const rect=el('rect',{x,y,width:NW,height:NH,rx:10,class:'node-rect',
+    fill:'rgba(18,18,31,0.97)',stroke:t.color,'stroke-width':'1.5'});
+  g.appendChild(rect);
+
+  // Color accent bar
+  const bar=el('rect',{x,y:y+10,width:3,height:NH-20,rx:2,fill:t.color,opacity:'0.75'});
+  g.appendChild(bar);
+
+  // ID
+  const idT=el('text',{x:cx(t.col),y:y+11,class:'node-id'}); idT.textContent=`#${t.id}`;
+  g.appendChild(idT);
+
+  // Label lines
+  t.label.forEach((line,i)=>{
+    const offset=(i-(t.label.length-1)/2)*14;
+    const lt=el('text',{x:cx(t.col),y:cy(t.row)+5+offset,class:'node-label'});
+    lt.textContent=line; g.appendChild(lt);
+  });
+
+  // Phase pill
+  const pillW=38, pillH=13;
+  const pill=el('rect',{x:x+NW-pillW-3,y:y+NH-pillH-3,width:pillW,height:pillH,rx:4,
+    fill:t.color,opacity:'0.18'});
+  g.appendChild(pill);
+  const pillT=el('text',{
+    x:x+NW-pillW/2-3,y:y+NH-pillH/2-3,
+    class:'phase-pill',fill:t.color,'font-size':'8','text-anchor':'middle','dominant-baseline':'central',
+    'font-family':'Inter,sans-serif','font-weight':'700'
+  });
+  pillT.textContent=t.phase; g.appendChild(pillT);
+
+  nodeEls[t.id]=g;
+  g.addEventListener('mouseenter',()=>onHover(t.id));
+  g.addEventListener('mouseleave',()=>onLeave());
+  g.addEventListener('click',()=>onSelect(t.id));
+  nodeG.appendChild(g);
+});
+
+// ── Interaction ────────────────────────────────────────────────────────────────
+let activeId=null;
+
+function applyHover(id){
+  const anc=ancestors(id), desc=descendants(id);
+  TASKS.forEach(t=>{
+    const g=nodeEls[t.id];
+    g.classList.remove('dim','ancestor','descendant','hovered');
+    if(t.id===id) g.classList.add('hovered');
+    else if(anc.has(t.id)) g.classList.add('ancestor');
+    else if(desc.has(t.id)) g.classList.add('descendant');
+    else g.classList.add('dim');
+  });
+  edgeEls.forEach(({el:e,f,t})=>{
+    e.classList.remove('dim','hi-anc','hi-desc');
+    e.setAttribute('marker-end','url(#arr)');
+    if(anc.has(f)&&(anc.has(t)||t===id)){
+      e.classList.add('hi-anc'); e.setAttribute('marker-end','url(#arr-anc)');
+    } else if(desc.has(t)&&(desc.has(f)||f===id)){
+      e.classList.add('hi-desc'); e.setAttribute('marker-end','url(#arr-desc)');
+    } else { e.classList.add('dim'); }
+  });
+}
+
+function clearHover(){
+  TASKS.forEach(t=>{ const g=nodeEls[t.id]; g.classList.remove('dim','ancestor','descendant','hovered'); });
+  edgeEls.forEach(({el:e})=>{ e.classList.remove('dim','hi-anc','hi-desc'); e.setAttribute('marker-end','url(#arr)'); });
+}
+
+function onHover(id){ applyHover(id); }
+function onLeave(){ if(activeId) applyHover(activeId); else clearHover(); }
+
+function onSelect(id){
+  if(activeId===id){ activeId=null; clearHover(); hidePanel(); return; }
+  activeId=id; applyHover(id); showPanel(id);
+}
+
+// ── Panel ──────────────────────────────────────────────────────────────────────
+function showPanel(id){
+  const t=tMap[id], d=DETAILS[id]||{};
+  const anc=ancestors(id), desc=descendants(id);
+  const panel=document.getElementById('panel');
+
+  document.getElementById('panel-id').textContent=`#${id}`;
+  document.getElementById('panel-title').textContent=t.label.join(' ');
+  document.getElementById('panel-desc').textContent=d.desc||'';
+
+  const meta=document.getElementById('panel-meta');
+  while(meta.firstChild) meta.removeChild(meta.firstChild);
+
+  const chips=[
+    {lbl:`Phase: ${t.phase}`, cls:'chip-phase'},
+    {lbl:`Effort: ${t.effort}`, cls:'chip-effort'},
+    anc.size ? {lbl:`Needs ${anc.size} task${anc.size>1?'s':''} first`, cls:'chip-blocked'} : null,
+    desc.size ? {lbl:`Unlocks ${desc.size} task${desc.size>1?'s':''}`, cls:'chip-unlocks'} : null,
+  ].filter(Boolean);
+
+  chips.forEach(c=>{
+    const span=document.createElement('span');
+    span.className=`meta-chip ${c.cls}`;
+    span.textContent=c.lbl;
+    meta.appendChild(span);
+  });
+
+  const unlockEl=document.getElementById('panel-unlocks');
+  while(unlockEl.firstChild) unlockEl.removeChild(unlockEl.firstChild);
+  if(d.unlocks && d.unlocks.length){
+    const txt=document.createElement('span');
+    txt.textContent=`→ Directly unlocks: ${d.unlocks.join(', ')}`;
+    unlockEl.appendChild(txt);
+  }
+
+  panel.classList.add('visible');
+}
+
+function hidePanel(){
+  document.getElementById('panel').classList.remove('visible');
+}
+
+document.getElementById('panel-close').addEventListener('click',()=>{
+  activeId=null; hidePanel(); clearHover();
+});
+</script>
+</body>
+</html>

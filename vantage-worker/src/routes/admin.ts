@@ -31,8 +31,8 @@ admin.get('/overview', async (c) => {
   `).bind(orgId).first<{ mtd_cost_usd: number; mtd_event_count: number }>();
 
   const org = await c.env.DB.prepare(
-    'SELECT budget_usd, plan, name, email FROM orgs WHERE id = ?'
-  ).bind(orgId).first<{ budget_usd: number; plan: string; name: string; email: string }>();
+    'SELECT budget_usd, plan, name, email, benchmark_opt_in FROM orgs WHERE id = ?'
+  ).bind(orgId).first<{ budget_usd: number; plan: string; name: string; email: string; benchmark_opt_in: number }>();
 
   // Per-team breakdown with budgets and member count
   const { results: teams } = await c.env.DB.prepare(`
@@ -72,7 +72,7 @@ admin.get('/overview', async (c) => {
     : 0;
 
   const eventsThisMonth = mtd?.mtd_event_count ?? 0;
-  const eventsLimit     = (org?.plan ?? 'free') === 'free' ? 10_000 : null;
+  const eventsLimit     = (org?.plan ?? 'free') === 'free' ? 50_000 : null;
 
   return c.json({
     org: {
@@ -85,6 +85,7 @@ admin.get('/overview', async (c) => {
       mtd_cost_usd:     mtd?.mtd_cost_usd ?? 0,
       events_this_month: eventsThisMonth,
       events_limit:     eventsLimit,
+      benchmark_opt_in: (org?.benchmark_opt_in ?? 0) === 1,
     },
     totals:  orgRow ?? {},
     teams,
@@ -260,10 +261,10 @@ admin.delete('/team-budgets/:team', async (c) => {
   return c.json({ ok: true });
 });
 
-// ── PATCH /v1/admin/org — update org-level budget or name ────────────────────
+// ── PATCH /v1/admin/org — update org-level budget, name, or benchmark opt-in ─
 admin.patch('/org', async (c) => {
   const orgId = c.get('orgId');
-  let body: { budget_usd?: number; name?: string };
+  let body: { budget_usd?: number; name?: string; benchmark_opt_in?: boolean };
   try { body = await c.req.json(); }
   catch { return c.json({ error: 'Invalid JSON body' }, 400); }
 
@@ -276,7 +277,10 @@ admin.patch('/org', async (c) => {
   if (typeof body.name === 'string' && body.name.trim()) {
     updates.push('name = ?'); params.push(body.name.trim());
   }
-  if (updates.length === 0) return c.json({ error: 'Provide budget_usd or name.' }, 400);
+  if (typeof body.benchmark_opt_in === 'boolean') {
+    updates.push('benchmark_opt_in = ?'); params.push(body.benchmark_opt_in ? 1 : 0);
+  }
+  if (updates.length === 0) return c.json({ error: 'Provide budget_usd, name, or benchmark_opt_in.' }, 400);
 
   params.push(orgId);
   await c.env.DB.prepare(
