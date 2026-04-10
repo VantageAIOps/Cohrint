@@ -1,0 +1,1320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VantageAI Agent — Command Reference</title>
+<style>
+  :root {
+    --brand: #FF6B35;
+    --bg: #0A0A0F;
+    --surface: #1A1A2E;
+    --surface2: #12121F;
+    --border: rgba(255,255,255,0.07);
+    --text: #E8E8E8;
+    --muted: #6B7280;
+    --accent: #00D4AA;
+    --warn: #FFB800;
+    --danger: #FF4444;
+    --code-bg: #0D0D1A;
+    --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── Layout ── */
+  .shell {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    min-height: 100vh;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    background: var(--surface2);
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .sidebar-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 20px 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+
+  .logo-dot {
+    width: 28px; height: 28px;
+    background: linear-gradient(135deg, var(--brand), #ff8c5a);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700; color: white;
+    flex-shrink: 0;
+  }
+
+  .logo-text { font-size: 13px; font-weight: 700; letter-spacing: -0.02em; }
+  .logo-sub  { font-size: 10px; color: var(--muted); }
+
+  .nav-group { margin-bottom: 4px; }
+
+  .nav-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 12px 20px 6px;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 20px;
+    font-size: 13px;
+    color: var(--muted);
+    text-decoration: none;
+    border-radius: 0;
+    transition: all 200ms;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+  }
+
+  .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+  .nav-item.active { color: var(--brand); border-left-color: var(--brand); background: rgba(255,107,53,0.06); }
+
+  .nav-icon { font-size: 13px; width: 16px; text-align: center; }
+
+  /* ── Main ── */
+  .main {
+    overflow-y: auto;
+    padding: 40px 48px 80px;
+    max-width: 960px;
+  }
+
+  /* ── Page Header ── */
+  .page-header {
+    margin-bottom: 40px;
+    padding-bottom: 32px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .page-header h1 {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    background: linear-gradient(135deg, var(--text) 60%, var(--muted));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 8px;
+  }
+
+  .page-header p { color: var(--muted); font-size: 15px; }
+
+  .badges { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge-orange { background: rgba(255,107,53,0.15); color: var(--brand); border: 1px solid rgba(255,107,53,0.25); }
+  .badge-teal   { background: rgba(0,212,170,0.12); color: var(--accent); border: 1px solid rgba(0,212,170,0.2); }
+  .badge-warn   { background: rgba(255,184,0,0.12); color: var(--warn); border: 1px solid rgba(255,184,0,0.2); }
+  .badge-danger { background: rgba(255,68,68,0.12); color: var(--danger); border: 1px solid rgba(255,68,68,0.2); }
+  .badge-muted  { background: rgba(255,255,255,0.05); color: var(--muted); border: 1px solid var(--border); }
+
+  /* ── Sections ── */
+  .section { margin-bottom: 48px; scroll-margin-top: 24px; }
+
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 20px;
+    color: var(--text);
+  }
+
+  .section-icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+
+  .icon-orange { background: rgba(255,107,53,0.15); }
+  .icon-teal   { background: rgba(0,212,170,0.12); }
+  .icon-warn   { background: rgba(255,184,0,0.12); }
+  .icon-danger { background: rgba(255,68,68,0.12); }
+  .icon-blue   { background: rgba(99,102,241,0.15); }
+  .icon-purple { background: rgba(168,85,247,0.15); }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 12px;
+    position: relative;
+    transition: border-color 200ms;
+  }
+
+  .card:hover { border-color: rgba(255,255,255,0.12); }
+
+  .card-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card-body { color: var(--muted); font-size: 13px; }
+
+  /* ── Alert banners ── */
+  .alert {
+    display: flex;
+    gap: 12px;
+    padding: 14px 18px;
+    border-radius: 10px;
+    margin-bottom: 16px;
+    font-size: 13px;
+  }
+
+  .alert-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+  .alert-danger  { background: rgba(255,68,68,0.08);  border: 1px solid rgba(255,68,68,0.2);  color: #ffaaaa; }
+  .alert-warn    { background: rgba(255,184,0,0.08);  border: 1px solid rgba(255,184,0,0.2);  color: #ffe080; }
+  .alert-success { background: rgba(0,212,170,0.08);  border: 1px solid rgba(0,212,170,0.2);  color: #80ffe8; }
+  .alert-info    { background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.2); color: #b4b8ff; }
+
+  .alert strong { font-weight: 600; }
+
+  /* ── Code blocks ── */
+  .code-block {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.7;
+    overflow-x: auto;
+    margin: 10px 0;
+    color: #c9d1d9;
+  }
+
+  .code-block .comment { color: #484f58; }
+  .code-block .cmd     { color: var(--accent); }
+  .code-block .flag    { color: #79c0ff; }
+  .code-block .str     { color: #a5d6ff; }
+  .code-block .step    { color: var(--brand); font-weight: 600; }
+  .code-block .ok      { color: var(--accent); }
+  .code-block .warn-t  { color: var(--warn); }
+
+  code {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: rgba(255,255,255,0.07);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--accent);
+  }
+
+  /* ── Timeline / Steps ── */
+  .steps { display: flex; flex-direction: column; gap: 0; }
+
+  .step {
+    display: flex;
+    gap: 16px;
+    position: relative;
+  }
+
+  .step:not(:last-child) .step-line {
+    position: absolute;
+    left: 15px;
+    top: 32px;
+    bottom: 0;
+    width: 2px;
+    background: var(--border);
+  }
+
+  .step-num {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700;
+    flex-shrink: 0;
+    color: var(--brand);
+    z-index: 1;
+  }
+
+  .step.hard .step-num {
+    border-color: var(--danger);
+    color: var(--danger);
+    background: rgba(255,68,68,0.1);
+  }
+
+  .step-content { padding: 4px 0 24px; flex: 1; }
+  .step-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .step-desc  { color: var(--muted); font-size: 13px; }
+
+  /* ── Command table ── */
+  .cmd-table { width: 100%; border-collapse: collapse; }
+
+  .cmd-table th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .cmd-table td {
+    padding: 11px 12px;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    vertical-align: top;
+  }
+
+  .cmd-table tr:last-child td { border-bottom: none; }
+
+  .cmd-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .cmd-cell {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+
+  .desc-cell { color: var(--muted); }
+
+  .tag {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    margin-left: 4px;
+  }
+  .tag-must { background: rgba(255,68,68,0.15); color: #ff8888; }
+  .tag-safe { background: rgba(0,212,170,0.12); color: var(--accent); }
+  .tag-warn { background: rgba(255,184,0,0.12); color: var(--warn); }
+
+  /* ── Timing grid ── */
+  .timing-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .timing-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+
+  .timing-card .when {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--brand);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+
+  .timing-card .action {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+
+  .timing-card ul {
+    list-style: none;
+    padding: 0;
+  }
+
+  .timing-card li {
+    color: var(--muted);
+    font-size: 12.5px;
+    padding: 3px 0;
+    display: flex;
+    gap: 6px;
+  }
+
+  .timing-card li::before { content: "→"; color: var(--border); flex-shrink: 0; }
+
+  /* ── Gotcha list ── */
+  .gotcha-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .gotcha {
+    display: flex;
+    gap: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    align-items: flex-start;
+  }
+
+  .gotcha-icon { font-size: 15px; flex-shrink: 0; }
+  .gotcha-text { font-size: 13px; }
+  .gotcha-text strong { color: var(--text); font-weight: 600; display: block; margin-bottom: 2px; }
+  .gotcha-text span { color: var(--muted); }
+
+  /* ── Never list ── */
+  .never-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .never-item {
+    display: flex;
+    gap: 10px;
+    background: rgba(255,68,68,0.05);
+    border: 1px solid rgba(255,68,68,0.15);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 12.5px;
+    color: #ffaaaa;
+    align-items: flex-start;
+  }
+
+  .never-icon { flex-shrink: 0; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+  /* ── Print ── */
+  @media print {
+    .sidebar { display: none; }
+    .shell { grid-template-columns: 1fr; }
+    .main { padding: 20px; }
+  }
+
+  @media (max-width: 768px) {
+    .shell { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+    .main { padding: 24px 20px 60px; }
+    .timing-grid, .never-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ── Sidebar ── -->
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-dot">V</div>
+      <div>
+        <div class="logo-text">VantageAI</div>
+        <div class="logo-sub">Agent Reference</div>
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Getting Started</div>
+      <a class="nav-item active" href="#boot"><span class="nav-icon">🚀</span> Boot Sequence</a>
+      <a class="nav-item" href="#golden"><span class="nav-icon">📖</span> Golden Rule</a>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Commands</div>
+      <a class="nav-item" href="#git-cmds"><span class="nav-icon">🌿</span> Git Commands</a>
+      <a class="nav-item" href="#ci-cmds"><span class="nav-icon">⚙️</span> CI / TypeCheck</a>
+      <a class="nav-item" href="#test-cmds"><span class="nav-icon">🧪</span> Test Commands</a>
+      <a class="nav-item" href="#deploy-cmds"><span class="nav-icon">🚢</span> Deploy Commands</a>
+      <a class="nav-item" href="#verify-cmds"><span class="nav-icon">🔍</span> Verify Commands</a>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Timing</div>
+      <a class="nav-item" href="#reset-timing"><span class="nav-icon">⏱️</span> Reset / Refresh</a>
+      <a class="nav-item" href="#workflow"><span class="nav-icon">🔁</span> Task Workflow</a>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Safety</div>
+      <a class="nav-item" href="#gotchas"><span class="nav-icon">⚠️</span> Common Gotchas</a>
+      <a class="nav-item" href="#rbac"><span class="nav-icon">🔐</span> RBAC Gap</a>
+      <a class="nav-item" href="#never"><span class="nav-icon">🚫</span> Never Do</a>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Reference</div>
+      <a class="nav-item" href="#routes"><span class="nav-icon">🛣️</span> API Routes</a>
+      <a class="nav-item" href="#schema"><span class="nav-icon">🗄️</span> Schema Rules</a>
+      <a class="nav-item" href="#suites"><span class="nav-icon">📋</span> Test Suites</a>
+    </div>
+  </nav>
+
+  <!-- ── Main ── -->
+  <main class="main">
+
+    <!-- Header -->
+    <div class="page-header">
+      <h1>VantageAI Agent — Command Reference</h1>
+      <p>Personal reference for running the vantage-agent. All commands, timing rules, and safety gates in one place.</p>
+      <div class="badges">
+        <span class="badge badge-orange">⚡ Cloudflare Workers</span>
+        <span class="badge badge-teal">🐍 Python pytest</span>
+        <span class="badge badge-muted">13 MCP tools</span>
+        <span class="badge badge-muted">38 test suites</span>
+        <span class="badge badge-warn">⚠️ Read before write</span>
+      </div>
+    </div>
+
+    <!-- ── BOOT SEQUENCE ── -->
+    <section class="section" id="boot">
+      <div class="section-title">
+        <div class="section-icon icon-orange">🚀</div>
+        Boot Sequence
+      </div>
+
+      <div class="alert alert-danger">
+        <span class="alert-icon">🔴</span>
+        <div><strong>HARD GATE:</strong> Do not write code, read source files, or answer codebase questions until all three steps below complete successfully. Sub-agents: run this too — never inherit parent context.</div>
+      </div>
+
+      <div class="steps">
+
+        <div class="step hard">
+          <div class="step-num">1</div>
+          <div class="step-line"></div>
+          <div class="step-content">
+            <div class="step-title">Load Memory + CLAUDE.md</div>
+            <div class="step-desc">Locate memory path, read index, read project rules.</div>
+            <div class="code-block">
+<span class="comment"># Find memory path</span>
+<span class="cmd">ls ~/.claude/projects/ 2>/dev/null | grep -i vantage</span>
+
+<span class="comment"># Read memory index (from matched path)</span>
+Read: ~/.claude/projects/&lt;matched&gt;/MEMORY.md
+
+<span class="comment"># Read project rules</span>
+Read: &lt;project_root&gt;/CLAUDE.md
+
+<span class="comment"># If path not found → log: "Memory not found — proceeding without it"</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="step hard">
+          <div class="step-num">2</div>
+          <div class="step-line"></div>
+          <div class="step-content">
+            <div class="step-title">Orient to Current Work</div>
+            <div class="step-desc">Check branch, recent commits, open PRs.</div>
+            <div class="code-block">
+<span class="cmd">git status --short</span>
+<span class="cmd">git log --oneline -5</span>
+<span class="cmd">gh pr list --state open --json number,title,headRefName</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="step hard">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <div class="step-title">Check CI Status</div>
+            <div class="step-desc">Always check CI before assuming anything is broken or working.</div>
+            <div class="code-block">
+<span class="cmd">gh run list --limit 3 --json status,conclusion,name,headBranch</span>
+
+<span class="comment"># For detailed failure output:</span>
+<span class="cmd">gh run view &lt;run-id&gt; --log-failed</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="alert alert-warn">
+        <span class="alert-icon">⚠️</span>
+        <div><strong>After boot:</strong> For every file/function name found in memory — verify it still exists with Glob/Grep before acting on it. Memory can be stale.</div>
+      </div>
+    </section>
+
+    <!-- ── GOLDEN RULE ── -->
+    <section class="section" id="golden">
+      <div class="section-title">
+        <div class="section-icon icon-teal">📖</div>
+        Golden Rule — Read Before Write
+      </div>
+
+      <div class="alert alert-success">
+        <span class="alert-icon">✅</span>
+        <div><strong>Always:</strong> Read the actual file with the Read tool → verify function signatures, field names, table names → then write code. If this doc contradicts the source file, <strong>trust the source file.</strong></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Before touching any file, run:</div>
+        <div class="code-block">
+<span class="comment"># Verify route exists</span>
+<span class="cmd">grep -n "app\.\(get\|post\|patch\|delete\)" vantage-worker/src/routes/&lt;file&gt;.ts</span>
+
+<span class="comment"># Verify table schema</span>
+<span class="cmd">grep -n "CREATE TABLE &lt;tablename&gt;" vantage-worker/src/ -r</span>
+
+<span class="comment"># Verify helper signature before writing tests</span>
+<span class="cmd">grep -n "def fresh_account\|def signup_api\|def get_headers" tests/helpers/api.py</span>
+
+<span class="comment"># Check for recent migrations</span>
+<span class="cmd">git log --oneline --all -- "vantage-worker/src/db*" "vantage-worker/migrations*" | head -10</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── GIT COMMANDS ── -->
+    <section class="section" id="git-cmds">
+      <div class="section-title">
+        <div class="section-icon icon-blue">🌿</div>
+        Git Commands
+      </div>
+
+      <div class="card">
+        <table class="cmd-table">
+          <thead>
+            <tr><th>Command</th><th>Purpose</th><th></th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="cmd-cell">git status --short</td>
+              <td class="desc-cell">Quick diff view — untracked + modified</td>
+              <td><span class="tag tag-must">boot</span></td>
+            </tr>
+            <tr>
+              <td class="cmd-cell">git log --oneline -5</td>
+              <td class="desc-cell">Recent commits — check for patterns</td>
+              <td><span class="tag tag-must">boot</span></td>
+            </tr>
+            <tr>
+              <td class="cmd-cell">git checkout -b feat/description</td>
+              <td class="desc-cell">Always branch from latest main before any change</td>
+              <td><span class="tag tag-safe">safe</span></td>
+            </tr>
+            <tr>
+              <td class="cmd-cell">git add &lt;specific-files&gt;</td>
+              <td class="desc-cell">Stage specific files — never <code>git add -A</code> or <code>git add .</code></td>
+              <td><span class="tag tag-warn">careful</span></td>
+            </tr>
+            <tr>
+              <td class="cmd-cell">git log --oneline --all -- "path*" | head -10</td>
+              <td class="desc-cell">Recent changes to specific file patterns (migrations, schema)</td>
+              <td><span class="tag tag-safe">verify</span></td>
+            </tr>
+            <tr>
+              <td class="cmd-cell">gh pr list --state open --json number,title,headRefName</td>
+              <td class="desc-cell">Check open PRs — confirm current branch has PR, not merged</td>
+              <td><span class="tag tag-must">boot</span></td>
+            </tr>
+            <tr>
+              <td class="cmd-cell">gh pr create --title "..." --body "..."</td>
+              <td class="desc-cell">Create PR after CI passes on branch</td>
+              <td><span class="tag tag-safe">final step</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── CI / TYPECHECK ── -->
+    <section class="section" id="ci-cmds">
+      <div class="section-title">
+        <div class="section-icon icon-purple">⚙️</div>
+        CI / TypeCheck Commands
+      </div>
+
+      <div class="card">
+        <table class="cmd-table">
+          <thead>
+            <tr><th>Command</th><th>When to Run</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="cmd-cell">cd vantage-worker && npm run typecheck</td>
+              <td class="desc-cell">Before <em>any</em> change (baseline must be clean) and after every edit to Worker code</td>
+            </tr>
+            <tr>
+              <td class="cmd-cell">cd vantage-cli && npm run build</td>
+              <td class="desc-cell">After any CLI change</td>
+            </tr>
+            <tr>
+              <td class="cmd-cell">cd vantage-mcp && npm run build</td>
+              <td class="desc-cell">After any MCP tool change</td>
+            </tr>
+            <tr>
+              <td class="cmd-cell">gh run list --limit 3 --json status,conclusion,name,headBranch</td>
+              <td class="desc-cell">Check CI status — always before guessing at fixes</td>
+            </tr>
+            <tr>
+              <td class="cmd-cell">gh run view &lt;run-id&gt; --log-failed</td>
+              <td class="desc-cell">Read actual failure output — don't guess root cause</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="alert alert-info">
+        <span class="alert-icon">ℹ️</span>
+        <div>Zero TypeScript errors is the bar. Any error = do not push. Analyze <code>gh run view</code> before proposing fixes.</div>
+      </div>
+    </section>
+
+    <!-- ── TEST COMMANDS ── -->
+    <section class="section" id="test-cmds">
+      <div class="section-title">
+        <div class="section-icon icon-teal">🧪</div>
+        Test Commands
+      </div>
+
+      <div class="card">
+        <div class="card-title">Full CI Gate (mirrors what GitHub Actions runs)</div>
+        <div class="code-block">
+<span class="cmd">python -m pytest tests/ -q --tb=short -x --ignore=tests/test_integration.py</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Run Specific Suite(s)</div>
+        <div class="code-block">
+<span class="comment"># Single suite verbose</span>
+<span class="cmd">python -m pytest tests/suites/01_api/ -v</span>
+
+<span class="comment"># Core active suites (fast, always-on)</span>
+<span class="cmd">python -m pytest tests/suites/17_otel/ tests/suites/18_sdk_privacy/ \
+  tests/suites/19_local_proxy/ tests/suites/20_dashboard_real_data/ \
+  tests/suites/21_vantage_cli/ tests/suites/32_audit_log/ \
+  tests/suites/33_frontend_contract/ -v</span>
+
+<span class="comment"># Stop on first failure</span>
+<span class="cmd">python -m pytest tests/suites/XX_name/ -x -v</span>
+
+<span class="comment"># Check if xfail markers still needed</span>
+<span class="cmd">python -m pytest tests/ --runxfail -q</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">List All Suites</div>
+        <div class="code-block">
+<span class="cmd">ls tests/suites/ | sort</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Opt-In / Extended Suites</div>
+        <div class="code-block">
+<span class="comment"># Stress / load / latency (schedule or explicit flag)</span>
+<span class="cmd">python -m pytest tests/suites/06_stress/ tests/suites/07_load/ tests/suites/08_latency/ -v</span>
+
+<span class="comment"># Cross-browser (needs playwright installed)</span>
+<span class="cmd">playwright install chromium firefox webkit</span>
+<span class="cmd">CB_ALL_DEVICES=1 python -m pytest tests/suites/15_cross_browser/ -v</span>
+        </div>
+      </div>
+
+      <div class="alert alert-warn">
+        <span class="alert-icon">⚠️</span>
+        <div><strong>No mocks — ever.</strong> All tests hit live APIs. OTel tests require an active tool session or pre-seeded events.</div>
+      </div>
+    </section>
+
+    <!-- ── DEPLOY COMMANDS ── -->
+    <section class="section" id="deploy-cmds">
+      <div class="section-title">
+        <div class="section-icon icon-orange">🚢</div>
+        Deploy Commands
+      </div>
+
+      <div class="alert alert-danger">
+        <span class="alert-icon">🔴</span>
+        <div><strong>Never deploy manually without PR merge.</strong> Deploy only happens after CI passes → merge to main → GitHub Actions auto-deploys.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Worker — api.vantageaiops.com</div>
+        <div class="code-block">
+<span class="cmd">cd vantage-worker</span>
+<span class="cmd">npm run typecheck</span>          <span class="comment"># must be zero errors first</span>
+<span class="cmd">npx wrangler deploy</span>         <span class="comment"># → api.vantageaiops.com</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Pages — vantageaiops.com</div>
+        <div class="code-block">
+<span class="cmd">npx wrangler pages deploy ./vantage-final-v4 --project-name=vantageai</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Secrets</div>
+        <div class="code-block">
+<span class="cmd">wrangler secret put RESEND_API_KEY</span>
+
+<span class="comment"># Locate DB and KV IDs (not committed)</span>
+<span class="cmd">wrangler d1 list</span>
+<span class="cmd">wrangler kv namespace list</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── VERIFY COMMANDS ── -->
+    <section class="section" id="verify-cmds">
+      <div class="section-title">
+        <div class="section-icon icon-blue">🔍</div>
+        Verify Commands (run before writing code)
+      </div>
+
+      <div class="card">
+        <table class="cmd-table">
+          <thead>
+            <tr><th>What to Verify</th><th>Command</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="desc-cell">Route exists</td>
+              <td class="cmd-cell">grep -n "app\.\(get\|post\|patch\|delete\)" vantage-worker/src/routes/&lt;file&gt;.ts</td>
+            </tr>
+            <tr>
+              <td class="desc-cell">Table schema (current)</td>
+              <td class="cmd-cell">grep -n "CREATE TABLE &lt;name&gt;" vantage-worker/src/ -r</td>
+            </tr>
+            <tr>
+              <td class="desc-cell">Free tier query formula</td>
+              <td class="cmd-cell">grep -n "start of month\|30\*86400\|events_limit" vantage-worker/src/routes/events.ts</td>
+            </tr>
+            <tr>
+              <td class="desc-cell">Helper signatures</td>
+              <td class="cmd-cell">grep -n "def fresh_account\|def signup_api\|def get_headers" tests/helpers/api.py</td>
+            </tr>
+            <tr>
+              <td class="desc-cell">Score null default (74)</td>
+              <td class="cmd-cell">grep -n "74\|defaultScore\|score.*null" vantage-final-v4/ -r</td>
+            </tr>
+            <tr>
+              <td class="desc-cell">Viewer RBAC guard exists</td>
+              <td class="cmd-cell">grep -n "role.*viewer\|viewer.*403\|Forbidden" vantage-worker/src/routes/&lt;file&gt;.ts</td>
+            </tr>
+            <tr>
+              <td class="desc-cell">Recent migrations</td>
+              <td class="cmd-cell">git log --oneline --all -- "vantage-worker/src/db*" "vantage-worker/migrations*" | head -10</td>
+            </tr>
+            <tr>
+              <td class="desc-cell">New test suites added</td>
+              <td class="cmd-cell">ls tests/suites/ | sort</td>
+            </tr>
+            <tr>
+              <td class="desc-cell">New routes added</td>
+              <td class="cmd-cell">grep -rn "app\.\(get\|post\|patch\|delete\)" vantage-worker/src/routes/</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── RESET / REFRESH TIMING ── -->
+    <section class="section" id="reset-timing">
+      <div class="section-title">
+        <div class="section-icon icon-warn">⏱️</div>
+        Reset / Refresh Timing
+      </div>
+
+      <div class="alert alert-info">
+        <span class="alert-icon">ℹ️</span>
+        <div>Use the <strong>Memory Reload Protocol</strong> when asked to "refresh context", "check what changed", or "reload". Run the full boot sequence in any new session — no exceptions.</div>
+      </div>
+
+      <div class="timing-grid">
+
+        <div class="timing-card">
+          <div class="when">🔄 Every New Session</div>
+          <div class="action">Full Boot Sequence</div>
+          <ul>
+            <li>Read MEMORY.md + CLAUDE.md</li>
+            <li>git status + log + PR list</li>
+            <li>gh run list (CI check)</li>
+            <li>Verify any file named in memory</li>
+          </ul>
+        </div>
+
+        <div class="timing-card">
+          <div class="when">⚡ Every New Sub-Agent</div>
+          <div class="action">Full Boot Sequence (no inheritance)</div>
+          <ul>
+            <li>Sub-agents never inherit parent context</li>
+            <li>Run all 3 boot steps independently</li>
+            <li>Log "Memory not found" if path missing</li>
+          </ul>
+        </div>
+
+        <div class="timing-card">
+          <div class="when">🔍 Before Writing SQL / Queries</div>
+          <div class="action">Schema Verification</div>
+          <ul>
+            <li>grep CREATE TABLE in source</li>
+            <li>Check recent migration commits</li>
+            <li>Verify otel_events table existence</li>
+            <li>Confirm free-tier formula in events.ts</li>
+          </ul>
+        </div>
+
+        <div class="timing-card">
+          <div class="when">🛣️ Before Writing Route Code/Tests</div>
+          <div class="action">Route Verification</div>
+          <ul>
+            <li>grep app.get/post in routes file</li>
+            <li>Confirm file path per route group</li>
+            <li>Check viewer guard on all write routes</li>
+          </ul>
+        </div>
+
+        <div class="timing-card">
+          <div class="when">🧪 Before Writing Test Suites</div>
+          <div class="action">Helper Verification</div>
+          <ul>
+            <li>grep fresh_account signature</li>
+            <li>ls tests/suites/ for new suites</li>
+            <li>Confirm destructure pattern (3-tuple)</li>
+          </ul>
+        </div>
+
+        <div class="timing-card">
+          <div class="when">📋 Context Reload / "Refresh"</div>
+          <div class="action">Memory Reload Protocol</div>
+          <ul>
+            <li>Read CLAUDE.md (new rules?)</li>
+            <li>Read MEMORY.md</li>
+            <li>git log --oneline -10</li>
+            <li>ls tests/suites/ | sort</li>
+            <li>grep routes + CREATE TABLE</li>
+          </ul>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ── TASK WORKFLOW ── -->
+    <section class="section" id="workflow">
+      <div class="section-title">
+        <div class="section-icon icon-teal">🔁</div>
+        Task Workflow — Every Change
+      </div>
+
+      <div class="steps">
+
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-line"></div>
+          <div class="step-content">
+            <div class="step-title">Baseline</div>
+            <div class="code-block">
+<span class="cmd">cd vantage-worker && npm run typecheck</span>   <span class="comment"># must be clean before you start</span>
+<span class="cmd">ls tests/suites/</span>                              <span class="comment"># which suite covers your area?</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-line"></div>
+          <div class="step-content">
+            <div class="step-title">Branch</div>
+            <div class="code-block">
+<span class="cmd">git checkout main && git pull</span>
+<span class="cmd">git checkout -b feat/your-description</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-line"></div>
+          <div class="step-content">
+            <div class="step-title">Write Failing Test First</div>
+            <div class="code-block">
+<span class="comment"># Create or edit in tests/suites/XX_name/</span>
+<span class="cmd">python -m pytest tests/suites/XX_name/ -v</span>  <span class="comment"># should fail</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-line"></div>
+          <div class="step-content">
+            <div class="step-title">Implement the Change</div>
+            <div class="card-body">Read the actual file first → implement → check for viewer RBAC guard on any write route.</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-num">5</div>
+          <div class="step-line"></div>
+          <div class="step-content">
+            <div class="step-title">Validate</div>
+            <div class="code-block">
+<span class="cmd">npm run typecheck</span>                            <span class="comment"># zero errors</span>
+<span class="cmd">python -m pytest tests/suites/XX_name/ -v</span>   <span class="comment"># green</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-num">6</div>
+          <div class="step-content">
+            <div class="step-title">Push → PR → CI → Merge</div>
+            <div class="code-block">
+<span class="cmd">git add &lt;specific-files&gt;</span>   <span class="comment"># never git add -A</span>
+<span class="cmd">git commit -m "feat: description"</span>
+<span class="cmd">git push origin feat/your-description</span>
+<span class="cmd">gh pr create --title "feat: description" --body "..."</span>
+<span class="comment"># Wait for CI to pass → then merge</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ── COMMON GOTCHAS ── -->
+    <section class="section" id="gotchas">
+      <div class="section-title">
+        <div class="section-icon icon-warn">⚠️</div>
+        Common Gotchas
+      </div>
+
+      <div class="gotcha-list">
+        <div class="gotcha">
+          <span class="gotcha-icon">🕐</span>
+          <div class="gotcha-text">
+            <strong>Timestamp formats differ by table</strong>
+            <span><code>events.created_at</code> = INTEGER unix epoch. <code>cross_platform_usage</code> timestamps = TEXT <code>'YYYY-MM-DD HH:MM:SS'</code>. Never apply unix epoch assumptions to cross_platform queries.</span>
+          </div>
+        </div>
+        <div class="gotcha">
+          <span class="gotcha-icon">🔢</span>
+          <div class="gotcha-text">
+            <strong>D1 batch response format</strong>
+            <span>Returns <code>{accepted: N, failed: M}</code> — not a single status code. Always check both fields.</span>
+          </div>
+        </div>
+        <div class="gotcha">
+          <span class="gotcha-icon">🏷️</span>
+          <div class="gotcha-text">
+            <strong>Team alias in JOINs</strong>
+            <span>Always alias <code>e.team</code> when joining with <code>team_budgets</code> to avoid ambiguity. <code>SELECT e.team AS event_team ...</code></span>
+          </div>
+        </div>
+        <div class="gotcha">
+          <span class="gotcha-icon">🔑</span>
+          <div class="gotcha-text">
+            <strong>SSE token is one-time-use</strong>
+            <span>32-char hex, 120s TTL, generated at <code>/v1/auth/session</code>. Never re-use across page loads.</span>
+          </div>
+        </div>
+        <div class="gotcha">
+          <span class="gotcha-icon">📦</span>
+          <div class="gotcha-text">
+            <strong>OTel field path is deeply nested</strong>
+            <span><code>resourceMetrics[].scopeMetrics[].metrics[]</code> — navigate the full path, not shortcuts.</span>
+          </div>
+        </div>
+        <div class="gotcha">
+          <span class="gotcha-icon">🍪</span>
+          <div class="gotcha-text">
+            <strong>Cookie domain must be root</strong>
+            <span>Set on <code>vantageaiops.com</code> (no subdomain) to share across <code>api.</code> and <code>app.</code></span>
+          </div>
+        </div>
+        <div class="gotcha">
+          <span class="gotcha-icon">🧪</span>
+          <div class="gotcha-text">
+            <strong>fresh_account() returns a 3-tuple</strong>
+            <span>Always: <code>api_key, org_id, cookies = fresh_account(prefix="xx")</code> — all three, every time.</span>
+          </div>
+        </div>
+        <div class="gotcha">
+          <span class="gotcha-icon">🛡️</span>
+          <div class="gotcha-text">
+            <strong>Brute-force counter increments on failure only</strong>
+            <span>Not on every request. 10 failed attempts / 5 min → lock. Don't write tests that assume per-request increment.</span>
+          </div>
+        </div>
+        <div class="gotcha">
+          <span class="gotcha-icon">🗄️</span>
+          <div class="gotcha-text">
+            <strong>otel_events table may not exist on older deploys</strong>
+            <span>Created lazily. OTel inserts are wrapped in try/catch — a silent failure on old deploys is expected.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── RBAC GAP ── -->
+    <section class="section" id="rbac">
+      <div class="section-title">
+        <div class="section-icon icon-danger">🔐</div>
+        RBAC Gap — Viewer Guard
+      </div>
+
+      <div class="alert alert-danger">
+        <span class="alert-icon">🔴</span>
+        <div><strong>Known architectural risk:</strong> Viewer enforcement is an inline guard inside each handler — NOT enforced at middleware. Every new write route MUST manually add the check.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Required on every POST / PATCH / DELETE handler:</div>
+        <div class="code-block">
+<span class="comment">// TypeScript — add at top of every write handler</span>
+if (auth.role === 'viewer') return c.json({ error: 'Forbidden' }, 403)
+
+<span class="comment">// Verify it exists before creating PR:</span>
+<span class="cmd">grep -n "role.*viewer\|viewer.*403\|Forbidden" vantage-worker/src/routes/&lt;file&gt;.ts</span>
+        </div>
+        <div class="card-body" style="margin-top:10px;">Missing this = viewer-role accounts silently get write access.</div>
+      </div>
+    </section>
+
+    <!-- ── NEVER DO ── -->
+    <section class="section" id="never">
+      <div class="section-title">
+        <div class="section-icon icon-danger">🚫</div>
+        Never Do
+      </div>
+
+      <div class="never-grid">
+        <div class="never-item"><span class="never-icon">✗</span><span>Push to <code>main</code> directly — always branch → PR → CI → merge</span></div>
+        <div class="never-item"><span class="never-icon">✗</span><span>Push to a merged branch — always create new branch from main</span></div>
+        <div class="never-item"><span class="never-icon">✗</span><span><code>git push --force origin main</code></span></div>
+        <div class="never-item"><span class="never-icon">✗</span><span><code>git reset --hard</code> without explicit approval</span></div>
+        <div class="never-item"><span class="never-icon">✗</span><span><code>git add -A</code> or <code>git add .</code> — always add specific files</span></div>
+        <div class="never-item"><span class="never-icon">✗</span><span><code>console.log</code> any <code>vnt_*</code> token</span></div>
+        <div class="never-item"><span class="never-icon">✗</span><span>Commit API keys, wrangler.toml IDs, or .env files</span></div>
+        <div class="never-item"><span class="never-icon">✗</span><span>Skip auth on any route — even health/ping endpoints</span></div>
+        <div class="never-item"><span class="never-icon">✗</span><span>Hard-delete user data — soft delete (<code>deleted_at</code>) only</span></div>
+        <div class="never-item"><span class="never-icon">✗</span><span>Concatenate user input into SQL — parameterized queries only</span></div>
+        <div class="never-item"><span class="never-icon">✗</span><span><code>wrangler delete</code> or <code>DROP TABLE</code> on production</span></div>
+        <div class="never-item"><span class="never-icon">✗</span><span>Re-use SSE tokens across page loads (one-time use, 120s TTL)</span></div>
+        <div class="never-item"><span class="never-icon">✗</span><span>Mock the database in tests — all tests hit live APIs</span></div>
+        <div class="never-item"><span class="never-icon">✗</span><span>Write code for roadmap items unless explicitly starting that sprint</span></div>
+      </div>
+    </section>
+
+    <!-- ── API ROUTES ── -->
+    <section class="section" id="routes">
+      <div class="section-title">
+        <div class="section-icon icon-blue">🛣️</div>
+        API Route Groups
+      </div>
+
+      <div class="card">
+        <table class="cmd-table">
+          <thead>
+            <tr><th>Group</th><th>File</th><th>Key Routes</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="desc-cell">Ingest</td>
+              <td class="cmd-cell">routes/events.ts</td>
+              <td class="desc-cell">POST /v1/events, POST /v1/events/batch, PATCH /v1/events/:id/scores</td>
+            </tr>
+            <tr>
+              <td class="desc-cell">Analytics</td>
+              <td class="cmd-cell">routes/analytics.ts</td>
+              <td class="desc-cell">GET /v1/analytics/summary|kpis|timeseries|models|teams|traces|cost</td>
+            </tr>
+            <tr>
+              <td class="desc-cell">Cross-Platform</td>
+              <td class="cmd-cell">routes/cross-platform.ts</td>
+              <td class="desc-cell">GET /v1/cross-platform/summary|developers|models|live|budget</td>
+            </tr>
+            <tr>
+              <td class="desc-cell">Auth</td>
+              <td class="cmd-cell">routes/auth.ts</td>
+              <td class="desc-cell">POST /v1/auth/signup|session|recover|rotate, GET+POST /v1/auth/recover/redeem</td>
+            </tr>
+            <tr>
+              <td class="desc-cell">OTel OTLP</td>
+              <td class="cmd-cell">routes/otel.ts</td>
+              <td class="desc-cell">POST /v1/otel/v1/metrics, POST /v1/otel/v1/logs</td>
+            </tr>
+            <tr>
+              <td class="desc-cell">SSE Stream</td>
+              <td class="cmd-cell">routes/stream.ts</td>
+              <td class="desc-cell">GET /v1/stream/:orgId?sse_token=X (25s max, 2s poll)</td>
+            </tr>
+            <tr>
+              <td class="desc-cell">Alerts</td>
+              <td class="cmd-cell">routes/alerts.ts</td>
+              <td class="desc-cell">POST /v1/alerts/slack/:orgId, GET /v1/alerts/config/:orgId</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── SCHEMA RULES ── -->
+    <section class="section" id="schema">
+      <div class="section-title">
+        <div class="section-icon icon-purple">🗄️</div>
+        Schema Rules (Quick Ref)
+      </div>
+
+      <div class="card">
+        <table class="cmd-table">
+          <thead>
+            <tr><th>Table</th><th>Timestamp Type</th><th>Note</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="cmd-cell">events</td>
+              <td class="desc-cell">INTEGER unix epoch</td>
+              <td class="desc-cell">Never ISO 8601. Composite PK (id, org_id) → INSERT OR IGNORE = idempotent</td>
+            </tr>
+            <tr>
+              <td class="desc-cell">cross_platform_usage</td>
+              <td class="desc-cell" style="color:var(--warn)">TEXT 'YYYY-MM-DD HH:MM:SS'</td>
+              <td class="desc-cell">Exception to the rule. period_start/period_end are TEXT not integer</td>
+            </tr>
+            <tr>
+              <td class="cmd-cell">sessions</td>
+              <td class="desc-cell">INTEGER (expires_at)</td>
+              <td class="desc-cell">64-char hex token, 30-day TTL</td>
+            </tr>
+            <tr>
+              <td class="cmd-cell">otel_events</td>
+              <td class="desc-cell">TEXT (timestamp)</td>
+              <td class="desc-cell">Created lazily — may not exist. Inserts wrapped in try/catch</td>
+            </tr>
+            <tr>
+              <td class="cmd-cell">orgs</td>
+              <td class="desc-cell">INTEGER (created_at)</td>
+              <td class="desc-cell">budget_usd=0 means no budget set (not zero budget)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── TEST SUITES ── -->
+    <section class="section" id="suites">
+      <div class="section-title">
+        <div class="section-icon icon-teal">📋</div>
+        Test Suites (38 total)
+      </div>
+
+      <div class="card">
+        <div class="card-title">Always-On (CI gate)</div>
+        <table class="cmd-table">
+          <thead><tr><th>Suite</th><th>Domain</th></tr></thead>
+          <tbody>
+            <tr><td class="cmd-cell">01_api</td><td class="desc-cell">Core CRUD, auth, RBAC</td></tr>
+            <tr><td class="cmd-cell">17_otel</td><td class="desc-cell">OTLP ingest for 10+ tools</td></tr>
+            <tr><td class="cmd-cell">18_sdk_privacy</td><td class="desc-cell">SDK privacy modes (strict/redact/full)</td></tr>
+            <tr><td class="cmd-cell">19_local_proxy</td><td class="desc-cell">Local proxy 3 privacy modes</td></tr>
+            <tr><td class="cmd-cell">20_dashboard_real_data</td><td class="desc-cell">Real D1 data, zero mocks</td></tr>
+            <tr><td class="cmd-cell">21_vantage_cli</td><td class="desc-cell">CLI agent integration</td></tr>
+            <tr><td class="cmd-cell">32_audit_log</td><td class="desc-cell">Every action logged</td></tr>
+            <tr><td class="cmd-cell">33_frontend_contract</td><td class="desc-cell">API contract for dashboard</td></tr>
+            <tr><td class="cmd-cell">36_semantic_cache</td><td class="desc-cell">Cache hit rate, wasted cost, dedup</td></tr>
+            <tr><td class="cmd-cell">37_all_dashboard_cards</td><td class="desc-cell">Every KPI card has real data</td></tr>
+            <tr><td class="cmd-cell">38_security_hardening</td><td class="desc-cell">prompt_hash validation, brute-force protection</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Opt-In Suites</div>
+        <table class="cmd-table">
+          <thead><tr><th>Suites</th><th>How to Trigger</th></tr></thead>
+          <tbody>
+            <tr><td class="cmd-cell">06_stress, 07_load, 08_latency</td><td class="desc-cell"><code>--extended</code> flag or scheduled workflow</td></tr>
+            <tr><td class="cmd-cell">09_rate_limiting, 10_security</td><td class="desc-cell"><code>--security</code> flag</td></tr>
+            <tr><td class="cmd-cell">11_integrations, 12_mcp</td><td class="desc-cell"><code>--integrations</code> flag (needs secrets)</td></tr>
+            <tr><td class="cmd-cell">15_cross_browser</td><td class="desc-cell">ci-cross-browser.yml workflow (needs Playwright)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="alert alert-warn">
+        <span class="alert-icon">⚠️</span>
+        <div><strong>Known skip:</strong> CA.D3.4 WebKit uses <code>warn</code> not <code>chk</code> — SameSite=None fix pending Worker deploy. DR.43 is xfail — run <code>--runxfail</code> periodically to check if still needed.</div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  // Active nav highlighting on scroll
+  const sections = document.querySelectorAll('.section[id]');
+  const navItems = document.querySelectorAll('.nav-item[href^="#"]');
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navItems.forEach(item => item.classList.remove('active'));
+        const active = document.querySelector(`.nav-item[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { threshold: 0.3, rootMargin: '-10% 0px -60% 0px' });
+
+  sections.forEach(s => observer.observe(s));
+
+  // Smooth scroll
+  navItems.forEach(item => {
+    item.addEventListener('click', e => {
+      e.preventDefault();
+      const target = document.querySelector(item.getAttribute('href'));
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+</script>
+
+</body>
+</html>
