@@ -2,67 +2,77 @@
 _Last updated: 2026-04-09_
 
 ## Current Branch
-`feat/semantic-cache-analytics`
+`fix/webkit-session-ci-warn`
 
 ## Open PRs
 | # | Title | Branch |
 |---|-------|--------|
-| #44 | feat: website enterprise overhaul + security hardening | feat/semantic-cache-analytics |
+| #46 | fix: WebKit ITP warn + feature grid tabbed panels + PRODUCT_STRATEGY v4.0 | fix/webkit-session-ci-warn |
 
 ## Latest 15 Commits
 ```
+80a2544 fix(agent): fix all 12 flaws in vantage-agent.md
+451e099 feat(agent): add vantage-agent.md — expert agent for VantageAI codebase
+e8ebab6 docs(strategy): rewrite PRODUCT_STRATEGY.md to enterprise v4.0
+5744c8f feat(landing): replace static feature grid with tabbed panel system
+8873cc8 fix(ci): downgrade WebKit session-reload check to warn until SameSite=None deploys
+f1cba2c Merge pull request #44 from VantageAIOps/feat/semantic-cache-analytics
+72e30e0 fix(auth): use SameSite=None for session cookie to fix Safari ITP
+4e80bab fix(security): address 6 code review issues from PR #44
+071b534 chore: update GIT_MEMORY.md — website overhaul PR #44 state
 22de6c4 fix(tests): add missing pytest import to test_dashboard_real_data.py
-500901c docs(security): internal security audit report 2026-04-09 — 9 findings, 3 high fixed
-03a344c feat(security): HSTS+COOP+CORP headers, brute-force on /session, prompt_hash validation, demo seed SQL
+500901c docs(security): internal security audit report 2026-04-09
+03a344c feat(security): HSTS+COOP+CORP headers, brute-force on /session, prompt_hash validation
 71407ce feat(app): add Docs nav link + XSS-safe demo banner for demo org session
-9d85fba feat(website): Phase 2 enterprise redesign — indigo palette, new hero copy, security section, nav
-a75c7e9 feat(website): Phase 1 content — remove fake reviews, tool names, false claims; fix pricing CTAs
-be7839b docs: remove Windsurf/Zed/JetBrains, redact pricing algorithm and MD5 from public docs
-343da10 docs: add website enterprise overhaul design spec
-85fb67b fix(cache-analytics): resolve 4 code review issues
-856969b chore: update GIT_MEMORY.md — semantic cache analytics + PR #43 state
-e8996c2 test(dr43): mark xfail pending analytics.ts timeseries production deploy
-7e7bcca docs+fix: redact infra IDs, update docs, improve agent API key UX
-2f6ef42 fix(ci): resolve 5 pre-existing test failures in CI
-e091262 feat(suite-37): cross-integration E2E dashboard cards test suite + analytics.ts fix
-90baabe refactor(otel): replace inline MODEL_PRICES with shared lib/pricing.ts import
+9d85fba feat(website): Phase 2 enterprise redesign
+a75c7e9 feat(website): Phase 1 content — remove fake reviews, fix pricing CTAs
 ```
 
 ## Recent Merged PRs
-| PR | Branch |
-|----|--------|
-| #41 | feat/session-centric-integration |
-| #40 | feat/cleanup-mobile-otel |
-| #39 | fix/audit-log-event-names |
-| #38 | feat/vantage-agent-python |
-| #37 | chore/cli-dead-code-cleanup |
+```
+f1cba2c PR #44 — feat/semantic-cache-analytics (cache analytics + security hardening)
+65d565e PR #43 — feat/semantic-cache-analytics
+b7b98e6 PR #42 — feat/semantic-cache-analytics
+a81313b PR #41 — feat/session-centric-integration
+f0981a1 PR #40 — feat/cleanup-mobile-otel
+```
 
 ## Package Versions
 | Package | Version | Registry |
-|---------|---------|---------|
-| vantage-worker | 1.0.0 | Cloudflare |
-| vantage-js-sdk | 1.0.1 | npm |
+|---------|---------|----------|
 | vantage-mcp | 1.1.1 | npm |
-| vantage-local-proxy | 1.0.2 | npm |
-| vantage-agent (Python) | 0.1.0 | PyPI |
-
-## Key Files Changed in PR #44 (vs main)
-- `vantage-final-v4/index.html` — enterprise redesign: indigo palette, hero copy, fake reviews removed, comparison table, security section, pricing mailto CTAs
-- `vantage-final-v4/docs.html` — Windsurf/Zed/JetBrains removed; pricing algo + MD5 redacted
-- `vantage-final-v4/app.html` — Docs nav link + XSS-safe demo banner
-- `vantage-final-v4/_headers` — HSTS, COOP, CORP, frame-ancestors added
-- `vantage-final-v4/demo-seed.sql` — new: fixed 54-event demo org seed data
-- `vantage-worker/src/routes/auth.ts` — brute-force rate limit on /v1/auth/session
-- `vantage-worker/src/routes/events.ts` — prompt_hash hex format validation
-- `docs/security-audit-2026-04-09.md` — new: internal security audit report
+| vantage-js-sdk | 1.0.1 | npm |
+| vantage-worker | 1.0.0 | internal |
+| vantage-agent | 0.1.0 | PyPI |
 
 ## Outstanding Items
-- **PR #44 pending merge** — website overhaul + security (open)
-- **Manual: demo seed** — generate SHA-256 of demo viewer key, run demo-seed.sql via wrangler d1 execute
-- **Deploy after merge** — `npx wrangler deploy` + `npx wrangler pages deploy ./vantage-final-v4`
-- **DR.43 xfail → pass** — timeseries test is now xpassing in prod; remove xfail marker after PR #44 merges
-- **Deferred security** — localStorage cache (DEFER-001), CSP unsafe-inline (DEFER-002); see security-audit-2026-04-09.md
-- **Pre-existing** — `test_sse_stream_after_otel_ingest` fixture error in suite 17 (api_key fixture missing)
-- **Billing API connectors** (L3) — roadmap
-- **Local file scanner** (L2) — roadmap
-- **Browser extension** (L4) — roadmap
+
+### Before/after merging PR #46
+- [ ] Merge PR #46 → CI auto-deploys Worker + Pages
+- [ ] After Worker deploys: restore CA.D3.4 `warn` → `chk` in `tests/suites/15_cross_browser/test_auth_cross_browser.py:121`
+- [ ] Verify tabbed feature grid (`switchFeatPanel`) works on live site
+- [ ] Demo seed: generate real SHA-256 for demo API key, replace placeholder in `scripts/demo-seed.sql`
+
+### Tech debt
+- [ ] DR.43 xfail marker — verify still needed (`pytest --runxfail`)
+- [ ] Untracked: `scripts/pkg.sh` — commit or discard
+- [ ] Untracked plan files in `docs/superpowers/plans/` — commit or discard
+
+### Roadmap (not started)
+- Sprint 1: L3 Billing API connectors (AWS Bedrock, Azure OpenAI, GCP Vertex)
+- Sprint 2: Browser Extension MVP + SSO/SAML
+- Sprint 3: Semantic cache fuzzy matching + sliding window rate limiter (Durable Objects)
+- Sprint 4: Self-hosted / on-prem deployment
+
+## Key Files
+| File | Purpose |
+|------|---------|
+| `vantage-worker/src/routes/auth.ts` | SameSite=None cookie fix lives here |
+| `vantage-final-v4/index.html` | Landing — tabbed feature grid (3×9 cards) |
+| `vantage-final-v4/_headers` | CSP, HSTS, security headers |
+| `tests/suites/15_cross_browser/` | CA.D3.4 downgraded to warn (WebKit ITP) |
+| `tests/suites/38_security_hardening/` | New suite SH.1–SH.8 |
+| `docs/agents/vantage-agent.md` | VantageAI expert agent skill |
+| `PRODUCT_STRATEGY.md` | v4.0 enterprise rewrite (2026-04-09) |
+| `scripts/demo-seed.sql` | Demo seed — placeholder key needs real SHA-256 |
+| `ADMIN_GUIDE.md` | Internal dev guide — §19 runbook, §20 research |
