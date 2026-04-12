@@ -199,7 +199,7 @@ def test_detect_backend_returns_requested_backend():
 def test_detect_backend_auto_detects_claude(monkeypatch):
     """When no API key and claude CLI found, auto-detects claude backend."""
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    with patch("vantage_agent.backends.auto_detect_backend", return_value="claude"):
+    with patch("vantage_agent.cli.auto_detect_backend", return_value="claude"):
         from vantage_agent.cli import _detect_backend
         backend = _detect_backend(api_key=None, requested_backend=None)
     assert backend == "claude"
