@@ -46,3 +46,34 @@ def test_sanitize_pattern_strips_ip():
     result = pattern.sub("[REDACTED]", text)
     assert "[REDACTED]" in result
     assert "192.168" not in result
+
+
+# ── Task 5: Chat + ticket endpoints ───────────────────────────────────────────
+
+AUTH = {"Authorization": "Bearer test-token-for-ci"}
+
+
+def test_chat_returns_reply():
+    r = requests.post(f"{BASE}/chat",
+        json={"message": "What is VantageAI?"},
+        headers={**AUTH, "X-Org-Id": "test-org", "X-Plan": "free"})
+    assert r.status_code == 200
+    data = r.json()
+    assert "reply" in data
+    assert len(data["reply"]) > 10
+    assert "session_id" in data
+
+
+def test_chat_rejects_missing_message():
+    r = requests.post(f"{BASE}/chat",
+        json={},
+        headers={**AUTH, "X-Org-Id": "test-org", "X-Plan": "free"})
+    assert r.status_code == 400
+
+
+def test_ticket_endpoint_reachable():
+    r = requests.post(f"{BASE}/ticket",
+        json={"subject": "Test", "body": "Help needed", "email": "user@example.com"},
+        headers={**AUTH, "X-Org-Id": "test-org"})
+    # 200 OK or 503 if Resend not configured in CI — both acceptable
+    assert r.status_code in (200, 503)
