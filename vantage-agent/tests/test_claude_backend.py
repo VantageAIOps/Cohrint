@@ -81,9 +81,10 @@ def test_build_command_includes_required_flags(tmp_path):
     assert "stream-json" in cmd
     assert "--permission-mode" in cmd
     assert "bypassPermissions" in cmd
-    assert "--no-session-persistence" in cmd
     assert "--model" in cmd
     assert "claude-opus-4-6" in cmd
+    # Sessions persist so --resume works across turns; --no-session-persistence is not used
+    assert "--no-session-persistence" not in cmd
 
 
 def test_capabilities():

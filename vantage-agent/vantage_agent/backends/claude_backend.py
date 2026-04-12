@@ -58,7 +58,6 @@ class ClaudeCliBackend(Backend):
             "--output-format", "stream-json",
             "--verbose",
             "--permission-mode", "bypassPermissions",
-            "--no-session-persistence",
             "--model", self._model,
         ]
         if self._claude_session_id:
