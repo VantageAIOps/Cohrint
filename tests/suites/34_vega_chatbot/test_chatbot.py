@@ -91,3 +91,23 @@ def test_build_chunks_produces_valid_json():
     data = json.loads(result.stdout)
     assert len(data) > 0
     assert "key" in data[0] and "value" in data[0]
+
+
+# ── Task 7: Frontend widget ───────────────────────────────────────────────────
+
+def test_widget_files_exist():
+    base = ROOT / "vantage-final-v4/widget"
+    assert (base / "chatbot.css").exists()
+    assert (base / "chatbot.js").exists()
+
+
+def test_widget_js_uses_safe_dom_only():
+    js = (ROOT / "vantage-final-v4/widget/chatbot.js").read_text()
+    assert ".innerHTML" not in js
+
+
+def test_widget_css_has_required_selectors():
+    css = (ROOT / "vantage-final-v4/widget/chatbot.css").read_text()
+    assert "#vega-launcher" in css
+    assert "#vega-panel" in css
+    assert ".vega-msg" in css
