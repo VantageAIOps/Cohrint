@@ -61,3 +61,9 @@ vantage-cli/
 
 # Local scripts (not for repo)
 scripts/pkg.sh
+
+# Submodules / local tools not for repo
+awesome-claude-plugins/
+
+# Internal task notes
+TODO.md
