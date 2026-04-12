@@ -159,3 +159,47 @@ def test_print_summary_with_sessions(capsys):
         _print_summary()
     out = capsys.readouterr().out
     assert "Sessions:" in out
+
+
+# ---------------------------------------------------------------------------
+# New tests for Task 5: _detect_backend, _handle_tier_command
+# ---------------------------------------------------------------------------
+
+from unittest.mock import patch, MagicMock
+import sys
+
+
+def test_tier_command_updates_config(tmp_path, capsys):
+    """REPL /tier command writes new tier to config.json."""
+    from vantage_agent.cli import _handle_tier_command
+    from vantage_agent.permissions import PermissionManager
+    pm = PermissionManager(config_dir=tmp_path)
+    with patch("vantage_agent.cli.Prompt.ask", return_value="1"):
+        _handle_tier_command(pm, config_dir=tmp_path)
+    from vantage_agent.setup_wizard import get_config
+    cfg = get_config(config_dir=tmp_path)
+    assert cfg["default_tier"] == 1
+
+
+def test_detect_backend_returns_api_when_key_present(monkeypatch):
+    """When ANTHROPIC_API_KEY is set, _detect_backend returns 'api'."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    from vantage_agent.cli import _detect_backend
+    result = _detect_backend(api_key=None, requested_backend=None)
+    assert result == "api"
+
+
+def test_detect_backend_returns_requested_backend():
+    """Explicit --backend flag is respected."""
+    from vantage_agent.cli import _detect_backend
+    result = _detect_backend(api_key=None, requested_backend="claude")
+    assert result == "claude"
+
+
+def test_detect_backend_auto_detects_claude(monkeypatch):
+    """When no API key and claude CLI found, auto-detects claude backend."""
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    with patch("vantage_agent.backends.auto_detect_backend", return_value="claude"):
+        from vantage_agent.cli import _detect_backend
+        backend = _detect_backend(api_key=None, requested_backend=None)
+    assert backend == "claude"

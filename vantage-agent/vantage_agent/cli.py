@@ -12,16 +12,22 @@ import argparse
 import os
 import sys
 
+from pathlib import Path
+
 from rich.console import Console
+from rich.prompt import Prompt
 
 from . import __version__
 from .anomaly import check_cost_anomaly
 from .api_client import AgentClient, DEFAULT_MODEL
+from .backends import auto_detect_backend
 from .rate_limiter import wait_for_token, get_global_budget_used
 from .cost_tracker import SessionCost
 from .optimizer import optimize_prompt, OptimizationResult
+from .permission_server import PermissionServer, install_hook_script
 from .permissions import PermissionManager
 from .renderer import render_cost_summary, render_error
+from .setup_wizard import needs_setup, run_setup_wizard, get_config, write_config
 from .tracker import Tracker, TrackerConfig
 from .tools import TOOL_MAP
 
@@ -39,6 +45,7 @@ BANNER = """
     [bold]/tools[/bold]             Show tool approval status
     [bold]/cost[/bold]              Show session cost
     [bold]/optimize[/bold] on|off   Toggle prompt optimization
+    [bold]/tier[/bold]              Change tool permission tier
     [bold]/reset[/bold]             Reset permissions & history
     [bold]/model[/bold] name        Switch model
     [bold]/quit[/bold]              Exit
@@ -74,26 +81,105 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _build_client(args: argparse.Namespace) -> tuple[AgentClient, Tracker | None]:
+def _detect_backend(api_key: str | None, requested_backend: str | None) -> str:
+    """Determine which backend to use. Returns 'api' or 'claude' (or other CLI)."""
+    if requested_backend:
+        return requested_backend
+    effective_key = api_key or os.environ.get("ANTHROPIC_API_KEY", "")
+    if effective_key:
+        return "api"
+    try:
+        detected = auto_detect_backend()
+        return detected
+    except RuntimeError:
+        return "api"  # will fail naturally in AgentClient with helpful message
+
+
+def _handle_tier_command(
+    permissions: PermissionManager,
+    config_dir: Path | None = None,
+) -> None:
+    """Handle /tier REPL command — show tier menu, apply selection."""
+    run_setup_wizard(permissions=permissions, config_dir=config_dir)
+
+
+class _ClaudeCliClient:
+    """Thin wrapper around ClaudeCliBackend with same interface as AgentClient."""
+
+    def __init__(self, backend, permissions, perm_server, model, cost, cwd):
+        from .backends.claude_backend import ClaudeCliBackend
+        self.backend: ClaudeCliBackend = backend
+        self.permissions = permissions
+        self.perm_server = perm_server
+        self.model = model
+        self.cost = cost
+        self.cwd = cwd
+        self.optimization = True
+
+    def send(self, prompt: str, no_optimize: bool = False) -> str:
+        result = self.backend.send(prompt=prompt, history=[], cwd=self.cwd)
+        self.cost.record_usage_raw(
+            input_tokens=result.input_tokens,
+            output_tokens=result.output_tokens,
+            cost_usd=result.cost_usd,
+        )
+        return result.output_text
+
+    def clear_history(self) -> None:
+        self.backend._claude_session_id = None
+
+    def stop(self) -> None:
+        self.perm_server.stop()
+        self.permissions.clear_session_approved()
+
+
+def _build_client(args: argparse.Namespace):
     model = args.model or os.environ.get("VANTAGE_MODEL", DEFAULT_MODEL)
     cwd = args.cwd or os.getcwd()
-    permissions = PermissionManager()
+    config_dir = Path(os.environ.get("VANTAGE_CONFIG_DIR", Path.home() / ".vantage-agent"))
+    permissions = PermissionManager(config_dir=config_dir)
     cost = SessionCost(model=model)
 
     if args.api_key:
         os.environ["ANTHROPIC_API_KEY"] = args.api_key
 
-    # Determine backend
-    from .backends import auto_detect_backend
-    backend_name = args.backend  # could be None
-    if backend_name is None and not os.environ.get("ANTHROPIC_API_KEY"):
-        # No API key — try to auto-detect a CLI backend
-        try:
-            backend_name = auto_detect_backend()
-            if backend_name != "api":
-                console.print(f"  [dim]No API key found. Auto-detected backend: {backend_name}[/dim]")
-        except RuntimeError:
-            pass  # will fail naturally in AgentClient init
+    backend_name = _detect_backend(
+        api_key=args.api_key,
+        requested_backend=getattr(args, "backend", None),
+    )
+
+    # Dashboard tracker
+    tracker = None
+    vantage_key = args.vantage_key or os.environ.get("VANTAGE_API_KEY", "")
+    if vantage_key:
+        tracker = Tracker(TrackerConfig(api_key=vantage_key, debug=args.debug))
+        tracker.start()
+
+    if backend_name == "claude":
+        # First-run wizard for Claude CLI backend
+        if needs_setup(config_dir=config_dir):
+            run_setup_wizard(permissions=permissions, config_dir=config_dir)
+        # Start permission server
+        sock_path = f"/tmp/vantage-perm-{os.getpid()}.sock"
+        perm_server = PermissionServer(socket_path=sock_path, permissions=permissions)
+        perm_server.start()
+        # Build ClaudeCliBackend
+        from .backends.claude_backend import ClaudeCliBackend
+        backend = ClaudeCliBackend(
+            model=model,
+            config_dir=config_dir,
+            permission_server=perm_server,
+        )
+        backend.prepare_session_settings(pid=os.getpid())
+        client = _ClaudeCliClient(
+            backend=backend,
+            permissions=permissions,
+            perm_server=perm_server,
+            model=model,
+            cost=cost,
+            cwd=cwd,
+        )
+        return client, tracker
 
     if backend_name not in (None, "api"):
         console.print(f"  [yellow]Backend '{backend_name}' selected. Note: this backend has limited tool-use support.[/yellow]")
@@ -107,13 +193,6 @@ def _build_client(args: argparse.Namespace) -> tuple[AgentClient, Tracker | None
         system_prompt=args.system,
         optimization=not args.no_optimize,
     )
-
-    # Dashboard tracker
-    tracker = None
-    vantage_key = args.vantage_key or os.environ.get("VANTAGE_API_KEY", "")
-    if vantage_key:
-        tracker = Tracker(TrackerConfig(api_key=vantage_key, debug=args.debug))
-        tracker.start()
 
     return client, tracker
 
@@ -200,6 +279,11 @@ def _handle_command(line: str, client: AgentClient) -> bool:
         client.cost = SessionCost(model=new_model)
         console.print(f"  [green]Switched to {new_model}[/green]")
         console.print("  [dim]Cost tracking reset for new model[/dim]")
+        return True
+
+    if stripped == "/tier":
+        config_dir = Path(os.environ.get("VANTAGE_CONFIG_DIR", Path.home() / ".vantage-agent"))
+        _handle_tier_command(client.permissions, config_dir=config_dir)
         return True
 
     if stripped.startswith("/"):
