@@ -1,11 +1,22 @@
 /**
  * cp-console.js — Cross-Platform AI Spend Console tab
- * Depends on: window.apiFetch (exposed by app.html), Chart.js (loaded in app.html head)
+ * Depends on: window.__cpRegister (one-time registration from app.html), Chart.js
  *
  * Security: all user-sourced values are set via textContent (never innerHTML).
  */
 (function () {
   'use strict';
+
+  // Claim apiFetch via the one-time registration handle. Once claimed the
+  // handle is nulled in app.html — no other script can acquire it afterwards.
+  var _fetch = null;
+  if (typeof window.__cpRegister === 'function') {
+    window.__cpRegister(function (fn) { _fetch = fn; });
+  }
+  function apiFetch(path, opts) {
+    if (!_fetch) throw new Error('[cp-console] apiFetch not registered');
+    return _fetch(path, opts);
+  }
 
   // Chart instances — destroyed before re-creating on each data refresh
   var cpTrendChart    = null;
@@ -149,19 +160,19 @@
     savePeriod(period);
     updatePeriodButtons(period);
 
-    window.apiFetch('/v1/cross-platform/summary?days=' + period)
+    apiFetch('/v1/cross-platform/summary?days=' + period)
       .then(function (d) { renderCpKpis(d); renderCpDonut(d); })
       .catch(function (e) { showCardError('cp-donut-error', 'Load failed: ' + String(e.message)); });
 
-    window.apiFetch('/v1/cross-platform/trend?days=' + period)
+    apiFetch('/v1/cross-platform/trend?days=' + period)
       .then(renderCpTrend)
       .catch(function (e) { showCardError('cp-trend-error', 'Load failed: ' + String(e.message)); });
 
-    window.apiFetch('/v1/cross-platform/developers?days=' + period)
+    apiFetch('/v1/cross-platform/developers?days=' + period)
       .then(function (d) { renderCpDevTable(d.developers || []); })
       .catch(function (e) { showCardError('cp-dev-error', 'Load failed: ' + String(e.message)); });
 
-    window.apiFetch('/v1/cross-platform/connections')
+    apiFetch('/v1/cross-platform/connections')
       .then(renderCpConnections)
       .catch(function () {
         var el = document.getElementById('cp-connections');
@@ -285,7 +296,7 @@
     body.textContent  = 'Loading\u2026';
     modal.classList.add('active');
 
-    window.apiFetch('/v1/cross-platform/developer/' + encodeURIComponent(devId))
+    apiFetch('/v1/cross-platform/developer/' + encodeURIComponent(devId))
       .then(function (data) { renderDevModalBody(body, data); })
       .catch(function (e) {
         body.textContent = '\u26A0 ' + (e.message || 'Failed to load');
@@ -440,7 +451,7 @@
     var jitter = Math.random() * 10000 - 5000;
 
     function tick() {
-      window.apiFetch('/v1/cross-platform/live?limit=15')
+      apiFetch('/v1/cross-platform/live?limit=15')
         .then(function (data) {
           cpLiveErrors = 0;
           renderCpLiveFeed(data);

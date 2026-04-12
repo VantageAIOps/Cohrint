@@ -453,6 +453,8 @@ crossplatform.get('/models', async (c) => {
 
 crossplatform.get('/connections', async (c) => {
   const orgId = c.get('orgId');
+  const role   = c.get('role');
+  const isAdmin = role === 'owner' || role === 'admin';
 
   const connections = await c.env.DB.prepare(`
     SELECT provider, status, last_sync_at, last_error, sync_interval_minutes, created_at
@@ -467,8 +469,17 @@ crossplatform.get('/connections', async (c) => {
     GROUP BY provider
   `).bind(orgId).all();
 
+  // Strip last_error from billing_connections for non-admin roles —
+  // internal error messages from billing API integrations are admin-only
+  const billingConnections = isAdmin
+    ? connections.results
+    : (connections.results ?? []).map((r: any) => {
+        const { last_error: _ignored, ...rest } = r;
+        return rest;
+      });
+
   return c.json({
-    billing_connections: connections.results,
+    billing_connections: billingConnections,
     otel_sources: otelFreshness.results,
   });
 });
@@ -480,7 +491,10 @@ crossplatform.get('/budget', async (c) => {
   const monthStart = sqliteMonthStart();
 
   const policies = await c.env.DB.prepare(`
-    SELECT * FROM budget_policies WHERE org_id = ?
+    SELECT id, scope, scope_target, monthly_limit_usd,
+           alert_threshold_50, alert_threshold_80, alert_threshold_100,
+           enforcement, created_at
+    FROM budget_policies WHERE org_id = ?
   `).bind(orgId).all();
 
   // Current spend per scope

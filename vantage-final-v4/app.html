@@ -25,7 +25,7 @@
 <meta name="twitter:image" content="https://vantageaiops.com/og-image.png">
 <script src="/theme.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
 <script src="/vantage-models.js"></script>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1383,12 +1383,20 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
 // ── Constants ──
 (function() {
   var _stored = localStorage.getItem('api_base');
-  // Only accept https:// URLs or relative paths (never http:// or protocol-relative)
-  if (_stored && (/^https:\/\//.test(_stored) || /^\/[^/]/.test(_stored))) {
-    window._API_BASE_VALIDATED = _stored;
-  } else {
-    window._API_BASE_VALIDATED = 'https://api.vantageaiops.com';
+  // Only accept the known API host or relative paths — rejects arbitrary https:// origins
+  var _ALLOWED_API_HOSTS = ['api.vantageaiops.com', 'localhost', '127.0.0.1'];
+  var _valid = false;
+  if (_stored) {
+    if (/^\/[^/]/.test(_stored)) {
+      _valid = true;
+    } else {
+      try {
+        var _u = new URL(_stored);
+        _valid = _u.protocol === 'https:' && _ALLOWED_API_HOSTS.indexOf(_u.hostname) !== -1;
+      } catch (_) { _valid = false; }
+    }
   }
+  window._API_BASE_VALIDATED = _valid ? _stored : 'https://api.vantageaiops.com';
 })();
 var API_BASE = window._API_BASE_VALIDATED;
 var _session = null;
@@ -1559,7 +1567,12 @@ function apiFetch(path, opts) {
       throw err;
     });
 }
-window.apiFetch = apiFetch;
+// One-time registration — cp-console.js claims apiFetch via this handle.
+// The function is nulled after first call so no subsequent script can acquire it.
+window.__cpRegister = function (cb) {
+  window.__cpRegister = null;
+  cb(apiFetch);
+};
 
 function initKeyAuth() {
   return fetch(API_BASE + '/v1/auth/session', { credentials: 'include' })
