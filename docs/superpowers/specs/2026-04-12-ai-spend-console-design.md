@@ -405,3 +405,96 @@ echo "Running: ${CMD[*]}"
 - Budget alert thresholds set from within the console tab
 - Team-level grouping in developer table
 - Backfilling `developer_id` on historical rows that only have `developer_email`
+
+---
+
+## 6. Implementation Decisions & Deviations
+
+_Recorded after PR #51 implementation + gap analysis (2026-04-12)._
+
+### 6a. Auth — Self-Service Path
+
+**Spec (§1b):** `member.developer_id !== id` — members can view their own data.
+**Problem:** `Variables` type has no `developer_id` field; the auth middleware does not load it from the session.
+**Decision:** Implemented without changing `Variables` or the middleware. The `/developer/:id` handler performs a DB lookup:
+```sql
+SELECT 1 FROM cross_platform_usage
+WHERE org_id = ? AND developer_id = ? AND developer_email = ? LIMIT 1
+```
+`developer_email` comes from `c.get('memberEmail')` (the auth token's identity, not user-supplied). This is safe — email is bound from the verified session, not the request. Admin/owner bypass the check entirely.
+
+### 6b. Legacy Rows (no `developer_id`)
+
+**Spec (§1b):** SQL filters `WHERE developer_id IS NOT NULL` — legacy rows excluded from API response. Frontend degrades gracefully (§2f).
+**Contradiction:** §2f describes grayed-out rows with a tooltip appearing _in the table_, but §1b filters them out before they reach the frontend.
+**Decision:** Removed `AND developer_id IS NOT NULL` from `/developers` SQL. Legacy rows with `developer_id: null` are included in the API response. Frontend already had the grayed-out/tooltip rendering for `hasId === false`. This matches the §2f UX intent.
+
+### 6c. Modal Open/Close Pattern
+
+**Spec (§2a):** Modal uses `style="display:none"` and opens via `modal.style.display = 'flex'`.
+**Problem:** The existing `closeModal()` utility does `classList.remove('active')`. Inline style overrides CSS classes — modal could not be closed.
+**Decision:** Modal element has no inline `style`. Open: `classList.add('active')`. Close: existing `closeModal()`. CSS handles visibility via `.modal-overlay.active { display: flex }`.
+
+### 6d. `apiFetch` Exposure
+
+**Spec (§2a):** `window.apiFetch = apiFetch` — exposes function globally.
+**Security issue:** Any page script (compromised CDN, extension) can call credential-bearing fetch.
+**Decision:** Replaced with one-time `window.__cpRegister` callback. `cp-console.js` claims it at IIFE startup; the handle self-nulls afterward. All calls inside `cp-console.js` use the closed-over `_fetch` reference via a local `apiFetch()` wrapper.
+
+### 6e. `api_base` localStorage Validation
+
+**Original:** Accepts any `https://` URL.
+**Security issue:** Attacker who sets `localStorage.api_base = 'https://attacker.com'` redirects all authenticated API traffic.
+**Decision:** Validate against explicit allowlist: `['api.vantageaiops.com', 'localhost', '127.0.0.1']` using `new URL()` hostname check.
+
+### 6f. Email Redaction Scope
+
+**Spec (§1c):** Redaction applied only to `/live`.
+**Gap:** `/developers` also returned raw `developer_email` to non-admin roles.
+**Decision:** `redactEmail()` applied to `/developers` response in `devList.map()` and documented in the endpoint auth table. `/developer/:id` returns the caller's own email (safe) for self-service; for admin callers the raw DB value is returned.
+
+### 6g. `limit` Parameter on `/live`
+
+**Spec:** No explicit guard documented.
+**Bug:** `parseInt('abc')` → `NaN`; `Math.min(NaN, 200)` → `NaN`; SQLite `LIMIT NaN` → `LIMIT 0` (no rows). `limit=-1` → SQLite removes row cap entirely.
+**Decision:** Guard: `Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 200) : 50`.
+
+### 6h. Test Count
+
+**Spec (§4):** 10 contract tests + 12 trend tests = 22 total.
+**Implemented:** 17 contract tests + 12 trend tests = **29 total**. Additional tests cover: 403 for cross-user access, email redaction for member role, `/connections` 401, `days=999` on `/developers`+`/trend`+`/models`.
+
+### 6i. Chart.js SRI
+
+**Spec:** Not mentioned.
+**Decision:** Added `integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"` to the CDN script tag in `app.html`.
+
+### 6j. `/budget` — Explicit Column List
+
+**Spec:** Not mentioned.
+**Decision:** Replaced `SELECT *` with explicit columns (`id`, `scope`, `scope_target`, `monthly_limit_usd`, `alert_threshold_50`, `alert_threshold_80`, `alert_threshold_100`, `enforcement`, `created_at`). Future schema columns do not auto-leak.
+
+### 6k. `/connections` — `last_error` Visibility
+
+**Spec:** Not mentioned.
+**Decision:** `last_error` field stripped from `billing_connections` for non-admin roles — internal integration error messages (e.g. billing API failures) are admin-only.
+
+### 6l. Live Poll Backoff Timeout Leak
+
+**Spec (§2e):** `setTimeout(startCpLivePoll, 120000)` on 3-error backoff.
+**Bug:** `cpConsoleDestroy` called `clearInterval` but not `clearTimeout` on the backoff handle — authenticated `/live` requests continued firing 2 minutes after tab was left.
+**Decision:** Store backoff handle in `cpLiveRestart`; `stopCpLivePoll()` clears both `cpLiveInterval` and `cpLiveRestart`.
+
+---
+
+## 7. Files Modified (PR #51)
+
+| File | Change |
+|---|---|
+| `vantage-worker/src/routes/crossplatform.ts` | New `/trend` endpoint; `validateDays` backfill; `/developer/:id` self-service; legacy rows; email redaction; `limit` guard; `SELECT *` fix; `last_error` stripping |
+| `vantage-final-v4/app.html` | Nav tab, section shell, modal, `__cpRegister`, SRI, `api_base` allowlist |
+| `vantage-final-v4/cp-console.js` | New file — full Cross-Platform tab JS |
+| `tests/suites/35_cross_platform_console/conftest.py` | `seeded_account`, `empty_headers`, `member_headers` fixtures |
+| `tests/suites/35_cross_platform_console/test_trend.py` | 12 trend tests |
+| `tests/suites/35_cross_platform_console/test_console_frontend.py` | 17 contract tests |
+| `scripts/run-tests.sh` | New file — suite discovery + partial match + safe arg passing |
