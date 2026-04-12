@@ -1,0 +1,470 @@
+[
+  {
+    "heading": "Path 1 — SDK (2 lines of code)",
+    "body": "Best for: API-based apps using OpenAI, Anthropic, or Google SDKs directly. Python TypeScript pip install vantageaiops import vantage from vantage.proxy.openai_proxy import OpenAI vantage. init (api_key= \"vnt_your_key\" ) client = OpenAI(api_key= \"sk-...\" ) # Every call is now tracked automatically response = client.chat.completions. create ( model= \"gpt-4o\" , messages=[{ \"role\" : \"user\" , \"content\" : \"Hello!\" }], ) # ✓ Cost: $0.000110 ✓ Tokens: 12+8 ✓ Latency: 423ms npm install vantageaiops impor"
+  },
+  {
+    "heading": "Path 2 — OTel (zero code changes)",
+    "body": "Best for: tracking AI coding agents (Claude Code, Codex CLI, Gemini CLI) across your org. # Set 3 env vars on any developer machine export CLAUDE_CODE_ENABLE_TELEMETRY=1 export OTEL_EXPORTER_OTLP_ENDPOINT= https://api.vantageaiops.com/v1/otel export OTEL_EXPORTER_OTLP_HEADERS= \"Authorization=Bearer vnt_your_key\" # Now all Claude Code usage is tracked automatically # Works with: Claude Code, Codex CLI, Gemini CLI"
+  },
+  {
+    "heading": "Path 3 — Python Agent CLI (terminal users)",
+    "body": "Best for: developers who use AI CLIs directly and want prompt optimization + cost tracking. # Install and run $ pip install vantageai-agent $ vantageai-agent # Or one-shot usage $ echo \"explain kubernetes\" | vantageai-agent --backend claude ⚡ Optimized: 8 → 6 tokens (saved 2, -25%) [Claude responds...] 💰 Cost: $0.0065 | 💾 Saved: 2 tokens # Switch backends with flags vantageai-agent --backend gemini vantageai-agent --backend openai --model gpt-4o # In the REPL: /model, /summary, /sessions, /opt"
+  },
+  {
+    "heading": "SDK Packages",
+    "body": "Package Install Use case vantageaiops pip install vantageaiops Python SDK — wrap OpenAI/Anthropic clients vantageaiops npm install vantageaiops TypeScript/JS SDK — wrap any LLM client vantageaiops-mcp npx -y vantageaiops-mcp MCP server for Claude Code, Codex CLI, Gemini CLI vantageai-agent pip install vantageai-agent Python CLI agent — interactive REPL with cost tracking + optimization vantageai-local-proxy npx vantageai-local-proxy Local privacy proxy — zero-trust tracking"
+  },
+  {
+    "heading": "OTel Integration (no packages needed)",
+    "body": "For AI coding tools, just set environment variables: # Claude Code CLAUDE_CODE_ENABLE_TELEMETRY=1 OTEL_EXPORTER_OTLP_ENDPOINT=https://api.vantageaiops.com/v1/otel OTEL_EXPORTER_OTLP_HEADERS=\"Authorization=Bearer vnt_your_key\" # Gemini CLI (~/.gemini/settings.json) { \"telemetry\": { \"enabled\": true, \"otlpEndpoint\": \"https://api.vantageaiops.com/v1/otel\" } } # Codex CLI (~/.codex/config.toml) [telemetry] enabled = true otlp_endpoint = \"https://api.vantageaiops.com/v1/otel\""
+  },
+  {
+    "heading": "Requirements",
+    "body": "Python SDK: Python 3.8+ (no native dependencies) TypeScript SDK: Node.js 18+ (zero npm dependencies) CLI agent: Python 3.11+ OTel: No requirements — tools already emit telemetry API key: Get one free at vantageaiops.com/signup `, concepts: ` Core Concepts"
+  },
+  {
+    "heading": "4-Layer Architecture",
+    "body": "VantageAI uses a 4-layer approach to capture 100% of AI spend across your organization: Layer How Coverage Latency 1. OTel Telemetry Native OpenTelemetry from AI coding agents Claude Code, Codex CLI, Gemini CLI Real-time 2. SDK Proxy Drop-in wrapper for LLM API clients OpenAI, Anthropic, Google SDKs Zero added 3. CLI Wrapper Transparent terminal wrapper Any AI CLI (claude, codex, gemini) Zero added 4. Billing APIs Hourly sync from provider admin APIs OpenAI, Anthropic billing Hourly"
+  },
+  {
+    "heading": "Data Flow",
+    "body": "Developer machine VantageAI ┌──────────────┐ ┌──────────────┐ │ Claude Code │──OTel──────────────▸│ │ │ Codex CLI │──OTel──────────────▸│ /v1/otel │ │ Gemini CLI │──OTel──────────────▸│ │ │ Your API app │──SDK───────────────▸│ /v1/events │──▸ Dashboard │ vantage CLI │──tracking──────────▸│ │ │ Local Proxy │──stats─────────────▸│ │ └──────────────┘ └──────────────┘ Billing APIs ──▸ /v1/connectors"
+  },
+  {
+    "heading": "Prompt Optimization (5-layer engine)",
+    "body": "Every prompt can be compressed before sending to the LLM: Filler phrases — removes \"could you please\", \"it is important to note that\" (32 patterns) Verbose rewrites — \"in order to\" → \"to\", \"due to the fact that\" → \"because\" (42 patterns) Filler words — strips \"basically\", \"essentially\", \"literally\" (17 words) Deduplication — removes repeated sentences Formatting — collapses whitespace, normalizes punctuation Result: 40-60% token savings on verbose prompts. Works offline,"
+  },
+  {
+    "heading": "Privacy Modes",
+    "body": "Mode What's sent Use case full Everything (tokens, cost, prompt preview) Internal teams, debugging stats-only Only numbers (tokens, cost, latency) Enterprise, compliance hashed Numbers + SHA-256 prompt hash Dedup detection without text"
+  },
+  {
+    "heading": "Cost Attribution",
+    "body": "Every event can be tagged with dimensions for chargeback: team — engineering, product, data developer_email — per-person tracking from OTel model — auto-detected from the request provider — auto-detected (anthropic, openai, google) cost_center — custom tag for billing"
+  },
+  {
+    "heading": "Budget & Anomaly Detection",
+    "body": "Budget policies — set monthly limits per org, team, or developer Alert thresholds — 50%, 80%, 100% notifications via Slack/email Anomaly detection — flags when cost exceeds 3x session average CI/CD cost gate — GET /v1/analytics/cost returns pass/fail for pipelines `, python: ` Python SDK"
+  },
+  {
+    "heading": "OpenAI proxy",
+    "body": "import vantageaiops as vantage from vantageaiops.proxy.openai_proxy import OpenAI vantage. init ( api_key = \"vnt_your_key\" , environment = \"production\" ) client = OpenAI ( api_key = \"sk-...\" ) # Non-streaming response = client.chat.completions. create ( model = \"gpt-4o\" , messages =[{ \"role\" : \"user\" , \"content\" : \"Hello\" }] ) # Streaming — works identically with client.chat.completions. create ( stream = True , ...) as stream: for chunk in stream: print (chunk.choices[ 0 ].delta.content, end= \""
+  },
+  {
+    "heading": "Anthropic proxy",
+    "body": "from vantageaiops.proxy.anthropic_proxy import Anthropic claude = Anthropic ( api_key = \"sk-ant-...\" ) message = claude.messages. create ( model = \"claude-sonnet-4-6\" , max_tokens = 1024 , messages =[{ \"role\" : \"user\" , \"content\" : \"Hello\" }] )"
+  },
+  {
+    "heading": "init() options",
+    "body": "Parameter Default Description api_key required Your Vantage API key (vnt_…) environment \"production\" Tag events: production | staging | development flush_interval 2.0 Seconds between background flushes batch_size 50 Max events per HTTP request async_mode True False = flush synchronously (for testing) debug False Print each event to stdout `, typescript: ` TypeScript / JavaScript SDK Full-featured SDK for Node.js 18+. Supports ESM and CommonJS. Zero required dependencies — provider packages are o"
+  },
+  {
+    "heading": "Install",
+    "body": "npm install vantageaiops # core SDK npm install openai # if using OpenAI proxy npm install @anthropic-ai/sdk # if using Anthropic proxy"
+  },
+  {
+    "heading": "Quickstart — OpenAI",
+    "body": "import * as vantage from \"vantageaiops\" ; import OpenAI from \"openai\" ; // 1. Initialise once at app startup vantage . init ({ apiKey : process.env. VANTAGE_API_KEY ! }); // 2. Wrap your existing client — no other changes const openai = vantage . createOpenAIProxy ( new OpenAI (), vantage . getClient ()); // 3. Use exactly as before const res = await openai.chat.completions. create ({ model : \"gpt-4o\" , messages : [{ role : \"user\" , content : \"Hello!\" }], }); // ✓ Cost: $0.000110 ✓ Tokens: 12 in"
+  },
+  {
+    "heading": "Quickstart — Anthropic",
+    "body": "import * as vantage from \"vantageaiops\" ; import Anthropic from \"@anthropic-ai/sdk\" ; vantage . init ({ apiKey : process.env. VANTAGE_API_KEY ! }); const claude = vantage . createAnthropicProxy ( new Anthropic (), vantage . getClient ()); const msg = await claude.messages. create ({ model : \"claude-sonnet-4-6\" , max_tokens : 1024 , system : \"You are a helpful assistant.\" , messages : [{ role : \"user\" , content : \"Summarise this report.\" }], });"
+  },
+  {
+    "heading": "Streaming support",
+    "body": "// Streaming works transparently — tokens and TTFT captured automatically const stream = await openai.chat.completions. create ({ model : \"gpt-4o\" , messages : [{ role : \"user\" , content : \"Write a haiku.\" }], stream : true , }); for await ( const chunk of stream) { process.stdout. write (chunk.choices[ 0 ]?.delta?.content ?? \"\" ); } // ✓ TTFT, total latency, and token cost all captured"
+  },
+  {
+    "heading": "Universal / manual tracking with trace()",
+    "body": "import { trace } from \"vantageaiops\" ; // Wrap any async LLM call — tracked even without a proxy const result = await trace (myLLMCall, { apiKey : \"vnt_yourorg_...\" }); // Or wrap an async block to tag all AI calls inside with context await trace ({ userId : \"user_123\" , feature : \"summariser\" , project : \"support-bot\" , team : \"product\" , }, async () => { const result = await openai.chat.completions. create ({ ... }); // Cost attributed to userId + feature + team in dashboard });"
+  },
+  {
+    "heading": "Full init options",
+    "body": "init ({ apiKey : \"vnt_your_key\" , // required org : \"your_org_id\" , // optional — parsed from key if omitted environment : \"production\" , // default: \"production\" team : \"platform\" , // default team tag project : \"my-app\" , // default project tag ingestUrl : \"https://api.vantageaiops.com\" , flushInterval : 2 , // seconds between auto-flush batchSize : 50 , // events per HTTP request debug : false , // log events to console });"
+  },
+  {
+    "heading": "Pricing utilities",
+    "body": "import { calculateCost , findCheapest , PRICES } from \"vantageaiops\" ; // Cost for a specific model + token count const cost = calculateCost ( \"gpt-4o\" , 10_000 , 2_000 ); console. log (cost.totalCostUsd); // → 0.045 // Find cheapest alternative for same token count const alt = findCheapest ( \"gpt-4o\" , 10_000 , 2_000 ); console. log ( \"Switch to \" + alt.model + \" → save \" + ((cost.totalCostUsd - alt.costUsd) / cost.totalCostUsd * 100).toFixed(0) + \"%\" ); // All 23 model prices console. log ( PR"
+  },
+  {
+    "heading": "Graceful shutdown",
+    "body": "import { shutdown } from \"vantageaiops\" ; // Flush remaining events before process exits process. on ( \"SIGTERM\" , async () => { shutdown (); // flushes queue and stops background timer process. exit ( 0 ); }); `, mcp: ` MCP Server The Vantage MCP server connects any MCP-compatible AI coding assistant to your live usage data. Once connected, you can ask your AI questions about costs directly in chat — no copy-pasting needed."
+  },
+  {
+    "heading": "No install required",
+    "body": "All editors use npx . The server runs on-demand from the npm registry: npx -y vantageaiops-mcp"
+  },
+  {
+    "heading": "Available tools",
+    "body": "Tool What it answers track_llm_call Log any LLM call — tokens, cost, latency, model, team get_summary \"How much have we spent on AI this month?\" get_kpis Full KPI table — cost, tokens, requests, latency, efficiency get_model_breakdown \"Which model is costing us the most?\" get_team_breakdown \"Which team drives the most spend?\" (chargeback) check_budget \"Are we within our AI budget?\" get_traces \"Show me recent agent traces and their cost\" get_cost_gate CI/CD gate — pass/fail vs monthly budget opti"
+  },
+  {
+    "heading": "Claude Desktop setup (step by step)",
+    "body": "1 Get your API key from vantageaiops.com/signup . It starts with vnt_ . 2 Open the config file: ~/Library/Application Support/Claude/claude_desktop_config.json (On Windows: %APPDATA%\\\\Claude\\\\claude_desktop_config.json ) 3 Add the VantageAI server (create the file if it doesn't exist): { \"mcpServers\" : { \"vantage\" : { \"command\" : \"npx\" , \"args\" : [ \"-y\" , \"vantageaiops-mcp\" ], \"env\" : { \"VANTAGE_API_KEY\" : \"vnt_your_key_here\" } } } } 4 Completely quit and reopen Claude Desktop (not just close th"
+  },
+  {
+    "heading": "Environment variables",
+    "body": "Variable Required Description VANTAGE_API_KEY Yes Your vnt_... API key from signup VANTAGE_ORG No Org ID override (auto-parsed from key) VANTAGE_API_BASE No Custom API base (default: https://api.vantageaiops.com )"
+  },
+  {
+    "heading": "Example prompts",
+    "body": "Once connected, try these in your AI assistant chat: # Cost tracking \"How much have we spent on LLMs this month?\" \"Which model is costing us the most?\" \"Are we within our AI budget?\" # Logging calls \"Track this call: gpt-4o, 500 prompt tokens, 120 completion tokens, $0.003\" # Optimization \"Compare costs for this prompt across all models\" \"Compress this prompt to reduce tokens\""
+  },
+  {
+    "heading": "Troubleshooting",
+    "body": "Server not showing up? 1. Make sure node (v18+) is installed: run node --version in terminal 2. Verify your config JSON is valid (no trailing commas, correct path) 3. Fully quit and restart the app (not just close the window) 4. Check if npx -y vantageaiops-mcp works in terminal (you should see no errors) 5. On macOS: Claude Desktop may need /usr/local/bin/npx as the full path instead of just npx Tools fail with auth error? Make sure your VANTAGE_API_KEY is correct and starts with vnt_ . Get a n"
+  },
+  {
+    "heading": "Setup (2 minutes)",
+    "body": "1 Edit ~/.cursor/mcp.json (Cursor → Settings → MCP): { \"mcpServers\" : { \"vantage\" : { \"command\" : \"npx\" , \"args\" : [ \"-y\" , \"vantageaiops-mcp\" ], \"env\" : { \"VANTAGE_API_KEY\" : \"vnt_your_key\" } } } } 2 Restart Cursor. VantageAI tools appear automatically in the tool list."
+  },
+  {
+    "heading": "Example prompts",
+    "body": "In Cursor chat: How much have we spent on AI this month? Which model is costing us the most? Are we within our AI budget? Show me recent agent traces Track this call: gpt-4o, 500 prompt, 120 completion tokens, $0.003 `, claudecode: ` Claude Code VantageAI tracks every Claude Code response automatically — tokens, cost, model — with no manual calls required. Auto-track (recommended) MCP server"
+  },
+  {
+    "heading": "Automatic tracking via Stop hook",
+    "body": "Reads Claude Code's local session files and uploads token usage after every response. Zero code changes required. 1 Create ~/.claude/hooks/vantage-track.js — get the script from GitHub or copy from ADMIN_GUIDE §23.4 2 Register it as a Stop hook in ~/.claude/settings.json { \"hooks\" : { \"Stop\" : [{ \"matcher\" : \"\" , \"hooks\" : [{ \"type\" : \"command\" , \"command\" : \"VANTAGE_API_KEY=vnt_your_key node ~/.claude/hooks/vantage-track.js\" }] }] } } 3 Backfill all historical sessions (one-time) # Upload all p"
+  },
+  {
+    "heading": "What gets tracked per turn",
+    "body": "Field Source Model JSONL message.model Input + cache-write tokens input_tokens + cache_creation_input_tokens Cache-read tokens cache_read_input_tokens Output tokens output_tokens Cost (USD) Calculated locally from pricing table"
+  },
+  {
+    "heading": "MCP server setup",
+    "body": "Add VantageAI as an MCP server to query costs and manually track calls from within Claude Code conversations."
+  },
+  {
+    "heading": "Project-level setup",
+    "body": "Create .mcp.json in your project root: { \"mcpServers\" : { \"vantage\" : { \"type\" : \"stdio\" , \"command\" : \"npx\" , \"args\" : [ \"-y\" , \"vantageaiops-mcp\" ], \"env\" : { \"VANTAGE_API_KEY\" : \"vnt_your_key\" } } } }"
+  },
+  {
+    "heading": "Global setup (all projects)",
+    "body": "Add to ~/.claude/mcp.json : { \"mcpServers\" : { \"vantage\" : { \"type\" : \"stdio\" , \"command\" : \"npx\" , \"args\" : [ \"-y\" , \"vantageaiops-mcp\" ], \"env\" : { \"VANTAGE_API_KEY\" : \"vnt_your_key\" } } } }"
+  },
+  {
+    "heading": "Verify it works",
+    "body": "Open Claude Code and type: /mcp — you should see \"vantage\" listed. Then try: # Ask Claude Code about your AI costs \"How much have we spent on LLMs this month?\" \"Which model is the most expensive?\" Tip: If you get \"server not found\", make sure npx is on your PATH. Run which npx to find it and use the full path. `, vscode: ` VS Code (MCP) VantageAI integrates with VS Code through the Model Context Protocol (MCP) , available in VS Code 1.99+."
+  },
+  {
+    "heading": "Setup",
+    "body": "1 Create .vscode/mcp.json in your project root: { \"servers\" : { \"vantage\" : { \"type\" : \"stdio\" , \"command\" : \"npx\" , \"args\" : [ \"-y\" , \"vantageaiops-mcp\" ], \"env\" : { \"VANTAGE_API_KEY\" : \"vnt_your_key\" } } } } 2 Open MCP Chat and ask about your AI costs: # Example prompts: \"How much have we spent on LLMs this month?\" \"Which model costs the most?\" \"Compare costs for this prompt across all models\" \"Compress this prompt to save tokens\""
+  },
+  {
+    "heading": "Requirements",
+    "body": "VS Code 1.99+ Node.js 18+ (for npx ) `, tagging: ` Cost attribution tags Tags let you break down AI costs by any dimension — feature, team, user, experiment, or anything meaningful to your org. Python TypeScript # Thread-scoped — applies to all subsequent calls on this thread vantage. tag ( \"feature\" , \"customer_support\" ) vantage. tag ( \"team\" , \"product\" ) vantage. tag ( \"user_id\" , user.id) # Context manager for scoped tagging from contextlib import contextmanager @contextmanager def vantage_"
+  },
+  {
+    "heading": "Dashboard configuration",
+    "body": "Configure alerts at vantageaiops.com/app.html — no code required. Set thresholds by team, feature, or total org spend."
+  },
+  {
+    "heading": "Alert types",
+    "body": "Type Triggers when Budget threshold MTD spend exceeds X% of set budget Anomaly spike Usage deviates 2σ from 7-day rolling baseline Efficiency drop Efficiency score falls below threshold Savings opportunity Detected saving above $X/month"
+  },
+  {
+    "heading": "Delivery",
+    "body": "Alerts deliver via Slack webhook, email, or PagerDuty. Configure in Settings → Notifications. `, clickhouse: ` ClickHouse Cloud setup Vantage uses ClickHouse for time-series storage. The free tier handles early production load. 1 Sign up at clickhouse.cloud → New service → Development tier (free) 2 Note hostname, username (default), password 3 Create the schema: from vantageaiops.storage.clickhouse import ClickHouseStorage storage = ClickHouseStorage ( host = \"your-service.clickhouse.cloud\" , pa"
+  },
+  {
+    "heading": "Docker Compose (fastest)",
+    "body": "git clone https://github.com/vantage-ai/vantage cd vantage cp .env.example .env # set CLICKHOUSE_HOST, CLICKHOUSE_PASSWORD docker-compose up -d"
+  },
+  {
+    "heading": "Point SDK at your server",
+    "body": "# Python vantage. init ( api_key = \"vnt_local\" ) # override INGEST_URL in vantage/client.py // TypeScript init ({ apiKey : \"vnt_local\" , ingestUrl : \"http://localhost:8000/v1/events\" }); `, api: ` REST API"
+  },
+  {
+    "heading": "Authentication",
+    "body": "Authorization: Bearer vnt_your_key All endpoints except POST /v1/auth/signup require a Bearer token. The org is inferred from your key — no separate org header needed."
+  },
+  {
+    "heading": "Ingest",
+    "body": "Method Path Description POST /v1/events Ingest a single LLM event POST /v1/events/batch Ingest up to 500 events in one request PATCH /v1/events/:id/scores Attach quality scores to an event async"
+  },
+  {
+    "heading": "Analytics",
+    "body": "All analytics endpoints accept an optional ?period=N query param (days, default 30, max 365). Member keys with a scope_team automatically see only their team's data. Method Path Returns GET /v1/analytics/summary Today spend, MTD spend, session cost, budget % GET /v1/analytics/kpis Total cost, tokens, requests, avg latency, efficiency GET /v1/analytics/timeseries Daily cost + token + request series GET /v1/analytics/models Cost + usage breakdown per model GET /v1/analytics/teams Cost + usage per "
+  },
+  {
+    "heading": "Account",
+    "body": "Method Path Description POST /v1/auth/signup Create account, returns vnt_… key (public) POST /v1/auth/members Invite member — generates scoped API key (admin) GET /v1/auth/members List all members (admin) PATCH /v1/auth/members/:id Update member role or scope_team (admin) DELETE /v1/auth/members/:id Revoke member key (admin)"
+  },
+  {
+    "heading": "Admin",
+    "body": "Method Path Description GET /v1/admin/overview Org totals + all teams + member list GET /v1/admin/members/:id/usage Usage stats for one member GET /v1/admin/team-budgets List all team budgets PUT /v1/admin/team-budgets/:team Set or update a team budget DELETE /v1/admin/team-budgets/:team Remove a team budget"
+  },
+  {
+    "heading": "Example: invite a member",
+    "body": "curl -X POST https://api.vantageaiops.com/v1/auth/members \\\\ -H \"Authorization: Bearer vnt_your_owner_key\" \\\\ -H \"Content-Type: application/json\" \\\\ -d '{ \"email\": \"alice@acme.com\", \"name\": \"Alice\", \"role\": \"member\", \"scope_team\": \"backend\" }' # Response — key shown once, store securely: { \"ok\": true, \"member_id\": \"abc123\", \"api_key\": \"vnt_acme_...\", // ← share this with Alice \"role\": \"member\", \"scope_team\": \"backend\" } `, \"mcp-tools\": ` MCP tools reference 13 tools total — 8 analytics (require "
+  },
+  {
+    "heading": "Analytics tools",
+    "body": "Tool Parameters Returns track_llm_call model , provider , prompt_tokens , completion_tokens , total_cost_usd , latency_ms , team , trace_id , tags Confirmation with cost summary get_summary none MTD spend, today cost, requests, tokens, session spend, budget %, plan get_kpis none Full KPI table — cost, tokens, requests, latency, efficiency, streaming count get_model_breakdown days (default 30) Cost + usage per model, sorted by cost descending get_team_breakdown days (default 30) Cost + usage per "
+  },
+  {
+    "heading": "Token &amp; prompt optimizer tools",
+    "body": "These work offline — no API key required. Useful for cost estimation and prompt optimization before sending to an LLM. Tool Parameters Returns optimize_prompt prompt (required), model (default gpt-4o) Optimized prompt with before/after token count, cost savings, cheapest model recommendation, and optimization tips analyze_tokens text (required), model , output_tokens Token count, input/output cost breakdown, cheapest alternative model, optimization tips estimate_costs prompt (required), completi"
+  },
+  {
+    "heading": "Anomaly detection (automatic)",
+    "body": "Anomaly detection is not an MCP tool — it runs automatically as a Cloudflare Cron Trigger every 10 minutes. No manual invocation needed. How it works: Z-score analysis on rolling 7-day hourly cost. If the last 10 minutes of spend is more than 3 standard deviations above the mean, an alert fires to your configured Slack webhook. Alerts are throttled to 1 per org per hour. To enable: configure a Slack webhook in Settings → Slack Integration and enable anomaly alerts. The system will automatically "
+  },
+  {
+    "heading": "Example prompts",
+    "body": "# Token optimization (works offline) \"Optimize this prompt to save tokens\" → optimize_prompt \"How many tokens is this text?\" → analyze_tokens \"Compare costs for this across all models\" → estimate_costs \"Find the cheapest frontier model for 5K in + 2K out tokens\" → find_cheapest_model # Analytics (requires API key) \"How much have we spent on LLMs this month?\" → get_summary \"Which model costs the most?\" → get_model_breakdown \"Are we within budget?\" → check_budget \"Show recent agent traces\" → get_t"
+  },
+  {
+    "heading": "track_llm_call — detailed example",
+    "body": "Use this when your LLM calls don't go through the SDK proxy (e.g., direct curl, third-party tools). // Tell your AI assistant: \"Track this LLM call: model: gpt-4o provider: openai prompt_tokens: 1500 completion_tokens: 800 total_cost_usd: 0.0118 latency_ms: 1230 team: backend environment: production\" // Response: ✅ Tracked: gpt-4o | 1500→800 tokens | $0.0118 | 1230ms"
+  },
+  {
+    "heading": "get_model_breakdown — real-world output",
+    "body": "// Ask: \"Show model costs for the last 7 days\" 🤖 Model Breakdown (last 7 days) | Model | Provider | Cost | Requests | Avg Latency | |--------------------|-----------|----------|----------|-------------| | gpt-4o | openai | $32.45 | 8,234 | 1,230ms | | claude-sonnet-4-6 | anthropic | $12.18 | 3,456 | 890ms | | gpt-4o-mini | openai | $0.87 | 15,678 | 340ms | | gemini-2.0-flash | google | $0.12 | 4,200 | 180ms |"
+  },
+  {
+    "heading": "optimize_prompt — before &amp; after",
+    "body": "// Ask: \"Optimize this prompt: I would like you to please carefully // analyze the following code and could you please provide detailed // suggestions for improvement. It is important to note that...\" 🔧 Prompt Optimizer (gpt-4o) | Metric | Before | After | Saved | |-----------|--------|-------|----------------| | Tokens | 52 | 18 | 34 (65%) | | Est. cost | $0.26 | $0.09 | $0.17 | Optimized prompt: \"Analyze the following code and provide improvement suggestions. The code should be maintainable a"
+  },
+  {
+    "heading": "estimate_costs — model comparison",
+    "body": "// Ask: \"Compare costs for a 2000-token prompt across all models\" 💰 Cost Comparison (2,000 input + 2,000 output tokens) | Model | Provider | Cost | vs Cheapest | |--------------------|-----------|----------|---------------| | gemini-1.5-flash | google | $0.0008 | baseline | | deepseek-v3 | deepseek | $0.0027 | +238% | | gpt-4o-mini | openai | $0.0015 | +88% | | claude-haiku-4-5 | anthropic | $0.0096 | +1100% | | gpt-4o | openai | $0.0250 | +3025% | | claude-sonnet-4-6 | anthropic | $0.0360 | +4"
+  },
+  {
+    "heading": "Roles",
+    "body": "Role Ingest events Read analytics Manage members owner ✅ All teams ✅ All teams ✅ admin ✅ All teams ✅ All teams ✅ member ✅ Scoped team ✅ Scoped team ❌ viewer ❌ Read-only ✅ Scoped team ❌"
+  },
+  {
+    "heading": "Invite a member (API)",
+    "body": "# POST /v1/auth/members — admin or owner key required curl -X POST https://api.vantageaiops.com/v1/auth/members \\\\ -H \"Authorization: Bearer vnt_your_owner_key\" \\\\ -H \"Content-Type: application/json\" \\\\ -d '{ \"email\": \"alice@acme.com\", \"name\": \"Alice\", \"role\": \"member\", \"scope_team\": \"backend\" # optional — omit to see all teams }' ⚠️ Key shown once only. Store the returned api_key securely and share it with the member. It cannot be retrieved again — only revoked and re-issued."
+  },
+  {
+    "heading": "List members",
+    "body": "GET /v1/auth/members Authorization: Bearer vnt_your_owner_key"
+  },
+  {
+    "heading": "Update role or scope",
+    "body": "PATCH /v1/auth/members/:id { \"role\": \"admin\" } # promote to admin { \"scope_team\": \"frontend\" } # change scope { \"scope_team\": null } # remove scope (see all)"
+  },
+  {
+    "heading": "Revoke a key",
+    "body": "DELETE /v1/auth/members/:id The key stops working immediately. Issue a new invite to replace it."
+  },
+  {
+    "heading": "Team budgets",
+    "body": "# Set a $50/month budget for the backend team curl -X PUT https://api.vantageaiops.com/v1/admin/team-budgets/backend \\\\ -H \"Authorization: Bearer vnt_your_owner_key\" \\\\ -H \"Content-Type: application/json\" \\\\ -d '{\"budget_usd\": 50}' # List all team budgets GET /v1/admin/team-budgets # Full org overview — all teams + budgets + members GET /v1/admin/overview `, \"local-proxy\": ` Local Proxy — Privacy-First LLM Tracking The VantageAI Local Proxy runs on your machine . Your API keys and prompts never "
+  },
+  {
+    "heading": "How it works",
+    "body": "Your App │ ▼ localhost:4891 ← Local Proxy (on YOUR machine) │ │ ▼ ▼ Real LLM API Extract stats locally (OpenAI/Anthropic) │ │ ▼ │ Strip ALL text & keys │ │ ▼ ▼ Full response Only numbers → api.vantageaiops.com back to your app (tokens, cost, latency)"
+  },
+  {
+    "heading": "What stays local vs what is sent",
+    "body": "🔒 Stays on your machine (NEVER sent) 📊 Sent to VantageAI dashboard Your LLM API keys (sk-..., sk-ant-...) Model name (e.g., gpt-4o) Full prompt text and content Provider (e.g., openai) Full response text and content Token counts (prompt, completion) System prompts Calculated cost in USD PII, user data, business logic Latency in milliseconds Any content from your conversations HTTP status code, team/env tags"
+  },
+  {
+    "heading": "Quick start (2 minutes)",
+    "body": "1 Start the local proxy # No install needed — runs via npx VANTAGE_API_KEY= vnt_your_key npx vantageai-local-proxy # Or with options npx vantageai-local-proxy --api-key vnt_your_key --privacy strict --team backend 2 Point your LLM client to localhost — one line change Python (OpenAI) TypeScript (OpenAI) Python (Anthropic) cURL from openai import OpenAI client = OpenAI ( api_key = \"sk-your-real-key\" , # stays local — never sent to Vantage base_url = \"http://localhost:4891/v1\" , # ← only change ne"
+  },
+  {
+    "heading": "Privacy levels",
+    "body": "Level Text sent? Prompt hash? Best for strict (default) ❌ None ❌ No Compliance, regulated industries, maximum security standard ❌ None ✅ SHA-256 (non-reversible) Dedup detection without exposing content relaxed ⚠️ First 100 chars ✅ Yes Internal debugging only — NOT for production"
+  },
+  {
+    "heading": "CLI options",
+    "body": "Flag Env var Default Description --api-key VANTAGE_API_KEY — Your Vantage key (required) --port VANTAGE_PROXY_PORT 4891 Local proxy port --privacy VANTAGE_PRIVACY strict Privacy level: strict | standard | relaxed --team VANTAGE_TEAM — Team tag for all events --env VANTAGE_ENV production Environment tag --debug VANTAGE_DEBUG false Log each tracked call to terminal --redact-models — false Replace model names with generic tiers"
+  },
+  {
+    "heading": "Security guarantees",
+    "body": "1. API keys are never forwarded — they route directly from proxy to LLM API 2. Text is stripped immediately in memory — never queued or persisted 3. The proxy self-validates — assertNoSensitiveData() checks for leaked key patterns 4. No external dependencies for privacy — sanitization runs entirely in-process 5. Fully open source — audit privacy.ts yourself ⚠️ When to use Local Proxy vs SDK: Use the Local Proxy when you want zero code changes and maximum isolation (just change base_url). Use the"
+  },
+  {
+    "heading": "Three modes",
+    "body": "Mode Prompt text Response text Prompt hash Best for full (default) ✅ First 600 chars ✅ First 600 chars ✅ hashed identifier Full observability, internal tools stats-only ❌ Stripped ❌ Stripped ❌ Stripped Maximum privacy, compliance hashed ❌ Stripped ❌ Stripped ✅ Kept Privacy + dedup detection"
+  },
+  {
+    "heading": "Usage — one line change",
+    "body": "TypeScript Python import * as vantage from \"vantageaiops\" ; import OpenAI from \"openai\" ; // Add privacy: \"stats-only\" — that's it vantage . init ({ apiKey : \"vnt_your_key\" , privacy : \"stats-only\" , // ← no prompt/response text sent }); const openai = vantage . createOpenAIProxy ( new OpenAI (), vantage . getClient ()); // All calls tracked with stats only — no text leaves your app const res = await openai.chat.completions. create ({ model : \"gpt-4o\" , messages : [{ role : \"user\" , content : \"S"
+  },
+  {
+    "heading": "What each mode sends",
+    "body": "// With privacy: \"full\" (default) — dashboard sees: { model: \"gpt-4o\" , prompt_tokens: 45 , completion_tokens: 120 , cost_total_usd: 0.0034 , latency_ms: 780 , request_preview: \"Classify this patient record for...\" , // ← visible response_preview: \"Based on the symptoms, the patient...\" , // ← visible prompt_hash: \"a3f2c1d9e8b7\" } // With privacy: \"stats-only\" — dashboard sees: { model: \"gpt-4o\" , prompt_tokens: 45 , completion_tokens: 120 , cost_total_usd: 0.0034 , latency_ms: 780 , request_pre"
+  },
+  {
+    "heading": "Local Proxy vs SDK privacy — when to use which",
+    "body": "Feature Local Proxy (strict) SDK (stats-only) Code changes needed Change base_url only Add privacy: \"stats-only\" Prompt text sent ❌ Never ❌ Never API key sent to Vantage ❌ Never ❌ Never (only vnt_ key) Streaming support Pass-through (basic stats) Full (accurate token counts) Works with all providers ✅ Any HTTP LLM API OpenAI + Anthropic proxies Runs as separate process Yes (localhost server) No (in-process) Best for Zero-trust, zero-code-change Teams already using SDK 💡 Recommendation: Use Loca"
+  },
+  {
+    "heading": "🌅 Morning cost check",
+    "body": "Start your day by understanding where your AI budget stands. You: \"Good morning. How's our AI spend looking?\" → MCP calls: get_summary 📊 VantageAI Summary | Metric | Value | |-------------------|-------------| | MTD Spend | $145.23 | | Today Spend | $3.87 | | Today Requests | 1,234 | | Budget Used | 58.1% | You: \"Which model is driving the most cost?\" → MCP calls: get_model_breakdown (days=7) | Model | Cost | Requests | |--------------------|---------|----------| | gpt-4o | $89.50 | 12,340 | | "
+  },
+  {
+    "heading": "🚀 Pre-merge CI gate",
+    "body": "Before merging a PR, check if your AI spend is within budget. You: \"I'm about to merge this PR. Are we within budget?\" → MCP calls: get_cost_gate (period=today) 🚦 CI Cost Gate — ✅ PASSED | Period | today | | Spend | $3.87 | | Budget | $50.00 | | Status | Within budget | You: \"What about for the week?\" → MCP calls: get_cost_gate (period=week) 🚦 CI Cost Gate — ⚠️ APPROACHING LIMIT | Period | week | | Spend | $42.30 | | Budget | $50.00 | | Status | 84.6% used |"
+  },
+  {
+    "heading": "✂️ Prompt optimization",
+    "body": "Reduce costs by optimizing your prompts before sending to expensive models. You: \"This prompt is too expensive. Optimize it: I would like you to please carefully analyze the following code and could you please provide detailed suggestions for improvement. It is important to note that the code should be maintainable. Please kindly review each function and provide your assessment.\" → MCP calls: optimize_prompt (prompt=..., model=gpt-4o) 🔧 Prompt Optimizer (gpt-4o) | Metric | Before | After | Save"
+  },
+  {
+    "heading": "🔍 Agent trace debugging",
+    "body": "Find out why an agent workflow was expensive. You: \"My research agent is too expensive. Show me recent traces.\" → MCP calls: get_traces (limit=5) 🔍 Recent Agent Traces | Trace ID | Spans | Total Cost | Agent | |------------------|-------|------------|----------------| | abc123def456... | 4 | $0.034 | code-review | | fed987cba654... | 7 | $0.121 | research-agent | | xyz789abc012... | 2 | $0.008 | summarizer | You: \"The research-agent with 7 spans at $0.12 is too much. Which team is using it?\" → "
+  },
+  {
+    "heading": "📊 Weekly team report",
+    "body": "Generate a cost report for your standup or weekly review. You: \"Give me a full cost report for our weekly standup\" → MCP calls: get_kpis + get_model_breakdown (days=7) + get_team_breakdown (days=7) 📈 Weekly AI Cost Report KPIs: | Total Cost (7d) | $32.45 | | Total Tokens | 4.2M | | Total Requests | 12,345 | | Avg Latency | 890ms | | Efficiency Score | 78/100 | Top models by cost: 1. gpt-4o — $18.50 (57%) — consider switching batch jobs to mini 2. claude-sonnet — $8.20 (25%) — good for complex t"
+  },
+  {
+    "heading": "🛡️ Token analysis before sending",
+    "body": "Estimate cost before making an expensive call. You: \"I'm about to send a 10,000-token prompt to GPT-4o. How much will it cost? Is there a cheaper option?\" → MCP calls: analyze_tokens (text=..., model=gpt-4o, output_tokens=2000) 📊 Token Analysis | Input tokens | 10,000 | | Output tokens | 2,000 | | Model | gpt-4o | | Input cost | $0.0250 | | Output cost | $0.0200 | | Total cost | $0.0450 | 💡 Cheapest alternative: gemini-2.0-flash at $0.0018 (save $0.0432 — 96% cheaper) You: \"Find me the cheapes"
+  },
+  {
+    "heading": "Supported Tools (Native OTel)",
+    "body": "Tool Config Metrics Received Claude Code 1 env var Tokens, cost (USD), commits, PRs, lines-of-code, active time Gemini CLI 1 JSON setting Tokens (5 types), API calls, file ops, compression OpenAI Codex CLI 1 TOML setting Tokens, cost, commits, lines modified OpenAI/Anthropic SDK Auto-instrumentation All API calls — tokens, model, latency"
+  },
+  {
+    "heading": "Endpoint",
+    "body": "OTLP HTTP/JSON: https://api.vantageaiops.com/v1/otel/v1/metrics OTLP HTTP/JSON: https://api.vantageaiops.com/v1/otel/v1/logs Auth header: Authorization: Bearer vnt_your_key"
+  },
+  {
+    "heading": "Quick Setup (All Tools)",
+    "body": "export OTEL_EXPORTER_OTLP_ENDPOINT=https://api.vantageaiops.com/v1/otel export OTEL_EXPORTER_OTLP_HEADERS=\"Authorization=Bearer vnt_your_key\" export OTEL_EXPORTER_OTLP_PROTOCOL=http/json Then enable telemetry per tool (see tool-specific pages). `, \"otel-claude\": ` Claude Code — OTel Setup Claude Code has the richest OTel telemetry of any AI coding tool: tokens, cost in USD, commits, PRs, lines of code, and active time — all per developer."
+  },
+  {
+    "heading": "Setup (3 env vars)",
+    "body": "# Add to your shell profile (~/.zshrc or ~/.bashrc) export CLAUDE_CODE_ENABLE_TELEMETRY=1 export OTEL_METRICS_EXPORTER=otlp export OTEL_LOGS_EXPORTER=otlp export OTEL_EXPORTER_OTLP_PROTOCOL=http/json export OTEL_EXPORTER_OTLP_ENDPOINT=https://api.vantageaiops.com/v1/otel export OTEL_EXPORTER_OTLP_HEADERS=\"Authorization=Bearer vnt_your_key\" # Optional: tag by team/department export OTEL_RESOURCE_ATTRIBUTES=\"team.id=backend,cost_center=eng-100\""
+  },
+  {
+    "heading": "Admin Setup (org-wide, via MDM)",
+    "body": "Admins can enforce telemetry for all developers via managed settings: { \"env\": { \"CLAUDE_CODE_ENABLE_TELEMETRY\": \"1\", \"OTEL_METRICS_EXPORTER\": \"otlp\", \"OTEL_LOGS_EXPORTER\": \"otlp\", \"OTEL_EXPORTER_OTLP_PROTOCOL\": \"http/json\", \"OTEL_EXPORTER_OTLP_ENDPOINT\": \"https://api.vantageaiops.com/v1/otel\", \"OTEL_EXPORTER_OTLP_HEADERS\": \"Authorization=Bearer vnt_your_key\" } }"
+  },
+  {
+    "heading": "Metrics Received",
+    "body": "Metric Type Data claude_code.token.usage Counter Input, output, cache read, cache creation tokens per model claude_code.cost.usage Counter Cost in USD per model claude_code.commit.count Counter Git commits created claude_code.pull_request.count Counter PRs created claude_code.lines_of_code.count Counter Lines added/removed claude_code.active_time.total Counter Active time in seconds claude_code.session.count Counter Sessions started"
+  },
+  {
+    "heading": "Events Received",
+    "body": "Event Data api_request Model, cost, tokens, duration, cache tokens tool_result Tool name, success/fail, duration user_prompt Prompt length (content opt-in) Privacy: User prompt content is NOT sent by default — only prompt length. Enable with OTEL_LOG_USER_PROMPTS=1 . `, \"otel-copilot\": ` GitHub Copilot — OTel Setup Copilot Chat exports tokens, latency, tool calls, and session data via OpenTelemetry."
+  },
+  {
+    "heading": "Setup (VS Code settings.json)",
+    "body": "{ \"github.copilot.chat.otel.enabled\": true, \"github.copilot.chat.otel.exporterType\": \"otlp-http\", \"github.copilot.chat.otel.otlpEndpoint\": \"https://api.vantageaiops.com/v1/otel\" } Set auth via environment variable: export OTEL_EXPORTER_OTLP_HEADERS=\"Authorization=Bearer vnt_your_key\""
+  },
+  {
+    "heading": "Alternative: Environment Variables",
+    "body": "export COPILOT_OTEL_ENABLED=true export COPILOT_OTEL_ENDPOINT=https://api.vantageaiops.com/v1/otel export OTEL_EXPORTER_OTLP_HEADERS=\"Authorization=Bearer vnt_your_key\""
+  },
+  {
+    "heading": "Metrics Received",
+    "body": "Metric Data gen_ai.client.token.usage Input/output tokens per model (histogram) gen_ai.client.operation.duration API call latency in seconds copilot_chat.time_to_first_token TTFT in seconds copilot_chat.tool.call.count Tool invocations by name copilot_chat.session.count Sessions started Note: Copilot does not emit cost in USD. VantageAI calculates cost from token counts + our pricing database. `, \"otel-gemini\": ` Gemini CLI — OTel Setup Gemini CLI exports tokens (5 types including thinking token"
+  },
+  {
+    "heading": "Setup (~/.gemini/settings.json)",
+    "body": "{ \"telemetry\": { \"enabled\": true, \"useCollector\": true, \"otlpEndpoint\": \"https://api.vantageaiops.com/v1/otel\", \"otlpProtocol\": \"http\" } } Set auth via environment variable: export OTEL_EXPORTER_OTLP_HEADERS=\"Authorization=Bearer vnt_your_key\""
+  },
+  {
+    "heading": "Metrics Received",
+    "body": "Metric Data gemini_cli.token.usage Input, output, thought, cache, tool tokens gemini_cli.api.request.count API calls by model and status gemini_cli.tool.call.count Tool invocations gemini_cli.file.operation.count File creates/reads/updates gemini_cli.session.count Sessions started `, \"otel-codex\": ` OpenAI Codex CLI — OTel Setup Codex CLI exports tokens, cost, commits, and lines of code modified."
+  },
+  {
+    "heading": "Setup (~/.codex/config.toml)",
+    "body": "[telemetry] enabled = true otlp_endpoint = \"https://api.vantageaiops.com/v1/otel\" Set auth via environment variable: export OTEL_EXPORTER_OTLP_HEADERS=\"Authorization=Bearer vnt_your_key\""
+  },
+  {
+    "heading": "Metrics Received",
+    "body": "Codex uses GenAI semantic conventions plus custom metrics for productivity: gen_ai.client.token.usage — Input/output tokens codex.cost.usage — Cost in USD codex.commit.count — Git commits codex.lines_of_code.count — Lines added/removed `, \"otel-cline\": ` Cline — OTel Setup Cline (VS Code extension) exports token usage and tool calls via OpenTelemetry."
+  },
+  {
+    "heading": "Setup (environment variables)",
+    "body": "export CLINE_OTEL_TELEMETRY_ENABLED=1 export CLINE_OTEL_EXPORTER_OTLP_ENDPOINT=https://api.vantageaiops.com/v1/otel export CLINE_OTEL_EXPORTER_OTLP_PROTOCOL=http/json Set auth: export OTEL_EXPORTER_OTLP_HEADERS=\"Authorization=Bearer vnt_your_key\" `, \"otel-pricing\": ` OTel Pricing Engine — Auto Cost Estimation When AI agents send only token counts via OTel (no explicit cost metric), VantageAI automatically calculates cost in USD using its internal pricing table. This is critical for tools like Ge"
+  },
+  {
+    "heading": "How It Works",
+    "body": "1 Tool sends OTel metrics with token counts (e.g., copilot_chat.token.usage ) 2 VantageAI checks if cost_usd == 0 for the record 3 Looks up model in the pricing table (exact match, then fuzzy substring match) 4 Calculates: cost = (uncached_input / 1M) × input_price + (cached / 1M) × cache_price + (output / 1M) × output_price"
+  },
+  {
+    "heading": "Supported Models &amp; Pricing",
+    "body": "Model Provider Input ($/1M) Output ($/1M) Cache ($/1M) claude-opus-4-6 Anthropic $15.00 $75.00 $1.50 claude-sonnet-4-6 Anthropic $3.00 $15.00 $0.30 claude-haiku-4-5 Anthropic $0.80 $4.00 $0.08 gpt-4o OpenAI $2.50 $10.00 $1.25 gpt-4o-mini OpenAI $0.15 $0.60 $0.075 o1 OpenAI $15.00 $60.00 $7.50 o3-mini OpenAI $1.10 $4.40 $0.55 gemini-2.0-flash Google $0.10 $0.40 $0.025 gemini-1.5-pro Google $1.25 $5.00 $0.31 gemini-1.5-flash Google $0.075 $0.30 $0.018"
+  },
+  {
+    "heading": "Fuzzy Model Matching",
+    "body": "Looks up model in the pricing table. Model variants are automatically resolved to their base pricing. Unknown models return cost_usd = 0 ."
+  },
+  {
+    "heading": "Precedence Rules",
+    "body": "💡 If a tool sends both token counts AND an explicit cost metric (e.g., claude_code.cost.usage ), the explicit cost takes precedence . Auto-estimation only fills in when cost_usd == 0 ."
+  },
+  {
+    "heading": "Dual-Write to Live Feed",
+    "body": "OTel metrics with token/cost data are also inserted into the otel_events table, powering the /live feed in the dashboard. This ensures real-time visibility for metrics-only sources (Gemini CLI, Codex CLI) — not just tools that send log events. `, \"xp-api\": ` Cross-Platform API Reference Query aggregated data from all connected AI tools. All endpoints require Authorization: Bearer vnt_your_key ."
+  },
+  {
+    "heading": "GET /v1/cross-platform/summary",
+    "body": "Total spend across all platforms with provider and source breakdown. curl -H \"Authorization: Bearer vnt_your_key\" \\\\ https://api.vantageaiops.com/v1/cross-platform/summary?days=30 Response: { total_cost_usd, total_input_tokens, total_output_tokens, by_provider: [...], budget: {...} }"
+  },
+  {
+    "heading": "GET /v1/cross-platform/developers",
+    "body": "Per-developer spend table with ROI metrics. curl -H \"Authorization: Bearer vnt_your_key\" \\\\ https://api.vantageaiops.com/v1/cross-platform/developers?days=30 Response: { developers: [{ developer_email, total_cost, commits, pull_requests, lines_added, cost_per_pr, providers, ... }] }"
+  },
+  {
+    "heading": "GET /v1/cross-platform/developer/:email",
+    "body": "Single developer drill-down: by provider, by model, daily trend, productivity."
+  },
+  {
+    "heading": "GET /v1/cross-platform/live",
+    "body": "Latest OTel events for real-time dashboard feed. curl -H \"Authorization: Bearer vnt_your_key\" \\\\ https://api.vantageaiops.com/v1/cross-platform/live?limit=50"
+  },
+  {
+    "heading": "GET /v1/cross-platform/connections",
+    "body": "OTel source freshness and billing API connection status."
+  },
+  {
+    "heading": "GET /v1/cross-platform/budget",
+    "body": "Budget policies and current spend per org/team/developer."
+  },
+  {
+    "heading": "POST /v1/otel/v1/metrics",
+    "body": "OTLP metrics ingestion endpoint. Accepts standard OTLP HTTP/JSON format. curl -X POST -H \"Authorization: Bearer vnt_your_key\" \\\\ -H \"Content-Type: application/json\" \\\\ -d '{\"resourceMetrics\": [...]}' \\\\ https://api.vantageaiops.com/v1/otel/v1/metrics"
+  },
+  {
+    "heading": "POST /v1/otel/v1/logs",
+    "body": "OTLP logs/events ingestion. Accepts api_request, tool_result, user_prompt events. `, 'vantage-cli': ` VantageAI Agent — Python CLI A Python-based interactive REPL and one-shot CLI with per-tool permissions , exact cost tracking , and support for both Anthropic API keys and Claude Max subscriptions (no API key required)."
+  },
+  {
+    "heading": "Install & Run",
+    "body": "pip install vantageai-agent # With Anthropic API key vantageai-agent # With Claude Max subscription (no API key needed) vantageai-agent --backend claude"
+  },
+  {
+    "heading": "Upgrade & Rollback",
+    "body": "# Upgrade to latest pip install --upgrade vantageai-agent # Install a specific version pip install vantageai-agent==0.2.3 # Rollback to a previous version pip install vantageai-agent==0.1.0 # Check current version vantageai-agent --version"
+  },
+  {
+    "heading": "CLI Flags",
+    "body": "Flag Description --backend &lt;name&gt; Backend: claude (Claude Max), api (Anthropic API), gemini , openai --model &lt;name&gt; Model override (e.g. claude-opus-4-6 ) --resume &lt;session_id&gt; Resume a previous session by ID --no-optimize Disable prompt optimization"
+  },
+  {
+    "heading": "REPL Commands",
+    "body": "Command Action /quit or /exit Exit and show session cost summary /reset Clear conversation context, permissions, and cost /optimize on|off Toggle prompt optimization /model &lt;name&gt; Switch model mid-session /allow &lt;tool&gt; Approve a tool for this session (e.g. /allow Bash,Write ) /allow all Approve all tools for this session /tools Show current tool permission status /tier Change tool permission tier (Read-only / Standard / Full / Custom) /cost Show session token usage and cost"
+  },
+  {
+    "heading": "Claude Max Backend",
+    "body": "Use your Claude Max subscription instead of API credits. The --backend claude flag routes prompts through the Claude Code CLI with full multi-turn session support via --resume . # First run shows tier selection wizard vantageai-agent --backend claude # Costs shown as API-equivalent (actual charge: $0.00) # ↳ 1,234 tokens · API-equivalent: $0.0199 [Max subscription: $0.00 actual]"
+  },
+  {
+    "heading": "Tool Permission Tiers",
+    "body": "On first run with --backend claude , a wizard lets you choose what Claude is allowed to do automatically: Tier Auto-approved tools Notes 1 — Read-only Read, Glob, Grep Safest 2 — Standard + Edit, Write Default 3 — Full + Bash (asks per-call) Bash always prompts 4 — Custom You choose Per-tool selection Bash is never auto-approved in any tier — it always requires explicit confirmation per command."
+  },
+  {
+    "heading": "How It Works",
+    "body": "1. You type a prompt → 2. Agent optimizes it locally (&lt;1ms) → 3. Sends to backend → 4. Streams output with tool use → 5. Exact token cost extracted from response"
+  },
+  {
+    "heading": "Dashboard Integration",
+    "body": "When configured with a VantageAI API key, the agent pushes cost data to your dashboard automatically. Set VANTAGE_API_KEY or save to ~/.vantage-agent/api_key ."
+  },
+  {
+    "heading": "Anomaly Detection",
+    "body": "The agent warns when a prompt's cost exceeds 3x the session average, helping catch runaway token usage before it impacts your budget. ` }; function switchTab(group, el, targetId) { document.querySelectorAll(`[id^=\"${group}-\"]`).forEach(t => { if(t.classList.contains(\"tab-content\")) t.classList.remove(\"active\"); }); document.querySelectorAll(\".tab-row .tab\").forEach(t => { if(t.getAttribute(\"onclick\")?.includes(`'${group}'`)) t.classList.remove(\"active\"); }); const target = document.getElementByI"
+  }
+]
