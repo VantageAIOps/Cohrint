@@ -55,3 +55,9 @@ GIT_MEMORY.md
 
 # Deleted packages (kept locally for reference)
 vantage-cli/
+
+# Python build artifacts
+*.egg-info/
+
+# Local scripts (not for repo)
+scripts/pkg.sh
