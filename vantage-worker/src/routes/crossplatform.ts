@@ -7,7 +7,8 @@
  * Endpoints:
  *   GET /v1/cross-platform/summary        — total spend, by provider, by tool type
  *   GET /v1/cross-platform/developers     — per-developer spend table
- *   GET /v1/cross-platform/developer/:email — single developer drill-down
+ *   GET /v1/cross-platform/trend          — daily cost per provider (stacked chart)
+ *   GET /v1/cross-platform/developer/:id  — single developer drill-down (admin/owner)
  *   GET /v1/cross-platform/live           — last 50 OTel events (SSE-ready)
  *   GET /v1/cross-platform/models         — cost by model across all providers
  *   GET /v1/cross-platform/connections    — provider connection status
@@ -107,7 +108,12 @@ crossplatform.get('/trend', async (c) => {
 
 crossplatform.get('/summary', async (c) => {
   const orgId = c.get('orgId');
-  const days = parseInt(c.req.query('days') ?? '30', 10) || 30;
+  let days: number;
+  try {
+    days = validateDays(c.req.query('days'));
+  } catch {
+    return c.json({ error: 'days must be 7, 30, or 90' }, 400);
+  }
   const since = sqliteDateSince(days);
 
   // Total spend
@@ -204,45 +210,54 @@ crossplatform.get('/summary', async (c) => {
 
 crossplatform.get('/developers', async (c) => {
   const orgId = c.get('orgId');
-  const days = parseInt(c.req.query('days') ?? '30', 10) || 30;
+  let days: number;
+  try {
+    days = validateDays(c.req.query('days'));
+  } catch {
+    return c.json({ error: 'days must be 7, 30, or 90' }, 400);
+  }
   const since = sqliteDateSince(days);
 
   const developers = await c.env.DB.prepare(`
     SELECT
+      developer_id,
       developer_email,
-      COALESCE(SUM(cost_usd), 0) as total_cost,
-      COALESCE(SUM(input_tokens), 0) as input_tokens,
-      COALESCE(SUM(output_tokens), 0) as output_tokens,
-      COALESCE(SUM(commits), 0) as commits,
-      COALESCE(SUM(pull_requests), 0) as pull_requests,
-      COALESCE(SUM(lines_added), 0) as lines_added,
-      COALESCE(SUM(lines_removed), 0) as lines_removed,
-      COALESCE(SUM(active_time_s), 0) as active_time_s,
-      COUNT(DISTINCT provider) as providers_used,
-      GROUP_CONCAT(DISTINCT provider) as providers,
-      COUNT(*) as records
+      COALESCE(SUM(cost_usd), 0)       AS total_cost,
+      COALESCE(SUM(input_tokens), 0)    AS input_tokens,
+      COALESCE(SUM(output_tokens), 0)   AS output_tokens,
+      COALESCE(SUM(commits), 0)         AS commits,
+      COALESCE(SUM(pull_requests), 0)   AS pull_requests,
+      COALESCE(SUM(lines_added), 0)     AS lines_added,
+      COALESCE(SUM(lines_removed), 0)   AS lines_removed,
+      COALESCE(SUM(active_time_s), 0)   AS active_time_s,
+      COUNT(DISTINCT provider)          AS providers_used,
+      GROUP_CONCAT(DISTINCT provider)   AS providers,
+      COUNT(*)                          AS records
     FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ? AND developer_email IS NOT NULL
-    GROUP BY developer_email
+    WHERE org_id = ? AND created_at >= ?
+      AND developer_email IS NOT NULL
+      AND developer_id IS NOT NULL
+    GROUP BY developer_id, developer_email
     ORDER BY total_cost DESC
   `).bind(orgId, since).all();
 
   // Per-developer per-provider cost breakdown (for bar chart segmentation)
   const byProviderRows = await c.env.DB.prepare(`
-    SELECT developer_email,
+    SELECT developer_id, developer_email,
            provider,
            COALESCE(SUM(cost_usd), 0) as cost,
            COUNT(*) as records
     FROM cross_platform_usage
     WHERE org_id = ? AND created_at >= ? AND developer_email IS NOT NULL
-    GROUP BY developer_email, provider
+      AND developer_id IS NOT NULL
+    GROUP BY developer_id, developer_email, provider
     ORDER BY developer_email, cost DESC
   `).bind(orgId, since).all();
 
   const byProviderMap: Record<string, { provider: string; cost: number; records: number }[]> = {};
   for (const row of (byProviderRows.results ?? []) as any[]) {
-    if (!byProviderMap[row.developer_email]) byProviderMap[row.developer_email] = [];
-    byProviderMap[row.developer_email].push({ provider: row.provider, cost: row.cost, records: row.records });
+    if (!byProviderMap[row.developer_id]) byProviderMap[row.developer_id] = [];
+    byProviderMap[row.developer_id].push({ provider: row.provider, cost: row.cost, records: row.records });
   }
 
   // Calculate ROI metrics per developer
@@ -253,7 +268,7 @@ crossplatform.get('/developers', async (c) => {
     return {
       ...d,
       providers: d.providers ? d.providers.split(',') : [],
-      by_provider: byProviderMap[d.developer_email] ?? [],
+      by_provider: byProviderMap[d.developer_id] ?? [],
       cost_per_pr: costPerPR ? Math.round(costPerPR * 100) / 100 : null,
       cost_per_commit: costPerCommit ? Math.round(costPerCommit * 100) / 100 : null,
       lines_per_dollar: linesPerDollar,
@@ -263,62 +278,82 @@ crossplatform.get('/developers', async (c) => {
   return c.json({ period_days: days, developers: devList });
 });
 
-// ── GET /developer/:email — single developer drill-down ─────────────────────
+// ── GET /developer/:id — single developer drill-down (admin/owner only) ──────
 
-crossplatform.get('/developer/:email', async (c) => {
+crossplatform.get('/developer/:id', async (c) => {
   const orgId = c.get('orgId');
-  const email = decodeURIComponent(c.req.param('email'));
-  const days = parseInt(c.req.query('days') ?? '30', 10) || 30;
+  const role   = c.get('role');
+
+  if (role !== 'owner' && role !== 'admin') {
+    return c.json({ error: 'Forbidden' }, 403);
+  }
+
+  const id = c.req.param('id');
+  // UUID v4 format: 8-4-4-4-12 hex chars
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) {
+    return c.json({ error: 'Invalid id' }, 400);
+  }
+
+  let days: number;
+  try {
+    days = validateDays(c.req.query('days'));
+  } catch {
+    return c.json({ error: 'days must be 7, 30, or 90' }, 400);
+  }
   const since = sqliteDateSince(days);
 
-  // By provider
   const byProvider = await c.env.DB.prepare(`
     SELECT provider,
-      COALESCE(SUM(cost_usd), 0) as cost,
-      COALESCE(SUM(input_tokens + output_tokens), 0) as tokens
+      COALESCE(SUM(cost_usd), 0)       AS cost,
+      COALESCE(SUM(input_tokens), 0)   AS input_tokens,
+      COALESCE(SUM(output_tokens), 0)  AS output_tokens
     FROM cross_platform_usage
-    WHERE org_id = ? AND developer_email = ? AND created_at >= ?
+    WHERE org_id = ? AND developer_id = ? AND created_at >= ?
     GROUP BY provider ORDER BY cost DESC
-  `).bind(orgId, email, since).all();
+  `).bind(orgId, id, since).all();
 
-  // By model
   const byModel = await c.env.DB.prepare(`
     SELECT model,
-      COALESCE(SUM(cost_usd), 0) as cost,
-      COALESCE(SUM(input_tokens + output_tokens), 0) as tokens
+      COALESCE(SUM(cost_usd), 0)                    AS cost,
+      COALESCE(SUM(input_tokens + output_tokens), 0) AS tokens
     FROM cross_platform_usage
-    WHERE org_id = ? AND developer_email = ? AND created_at >= ? AND model IS NOT NULL
+    WHERE org_id = ? AND developer_id = ? AND created_at >= ? AND model IS NOT NULL
     GROUP BY model ORDER BY cost DESC LIMIT 10
-  `).bind(orgId, email, since).all();
+  `).bind(orgId, id, since).all();
 
-  // Daily trend
   const daily = await c.env.DB.prepare(`
-    SELECT DATE(created_at) as day,
-      COALESCE(SUM(cost_usd), 0) as cost,
-      COALESCE(SUM(input_tokens + output_tokens), 0) as tokens
+    SELECT DATE(created_at) AS day,
+      COALESCE(SUM(cost_usd), 0)                    AS cost,
+      COALESCE(SUM(input_tokens + output_tokens), 0) AS tokens
     FROM cross_platform_usage
-    WHERE org_id = ? AND developer_email = ? AND created_at >= ?
+    WHERE org_id = ? AND developer_id = ? AND created_at >= ?
     GROUP BY DATE(created_at) ORDER BY day DESC LIMIT 30
-  `).bind(orgId, email, since).all();
+  `).bind(orgId, id, since).all();
 
-  // Productivity (from OTel data)
   const productivity = await c.env.DB.prepare(`
     SELECT
-      COALESCE(SUM(commits), 0) as commits,
-      COALESCE(SUM(pull_requests), 0) as pull_requests,
-      COALESCE(SUM(lines_added), 0) as lines_added,
-      COALESCE(SUM(lines_removed), 0) as lines_removed,
-      COALESCE(SUM(active_time_s), 0) as active_time_s
+      COALESCE(SUM(commits), 0)       AS commits,
+      COALESCE(SUM(pull_requests), 0) AS pull_requests,
+      COALESCE(SUM(lines_added), 0)   AS lines_added,
+      COALESCE(SUM(lines_removed), 0) AS lines_removed,
+      COALESCE(SUM(active_time_s), 0) AS active_time_s
     FROM cross_platform_usage
-    WHERE org_id = ? AND developer_email = ? AND created_at >= ?
-  `).bind(orgId, email, since).first();
+    WHERE org_id = ? AND developer_id = ? AND created_at >= ?
+  `).bind(orgId, id, since).first();
+
+  // Fetch email for display — not stored in the URL
+  const meta = await c.env.DB.prepare(`
+    SELECT developer_email FROM cross_platform_usage
+    WHERE org_id = ? AND developer_id = ? LIMIT 1
+  `).bind(orgId, id).first<{ developer_email: string }>();
 
   return c.json({
-    email,
-    period_days: days,
-    by_provider: byProvider.results,
-    by_model: byModel.results,
-    daily_trend: daily.results,
+    developer_id:    id,
+    developer_email: meta?.developer_email ?? null,
+    period_days:     days,
+    by_provider:     byProvider.results,
+    by_model:        byModel.results,
+    daily_trend:     daily.results,
     productivity,
   });
 });
@@ -366,7 +401,12 @@ crossplatform.get('/live', async (c) => {
 
 crossplatform.get('/models', async (c) => {
   const orgId = c.get('orgId');
-  const days = parseInt(c.req.query('days') ?? '30', 10) || 30;
+  let days: number;
+  try {
+    days = validateDays(c.req.query('days'));
+  } catch {
+    return c.json({ error: 'days must be 7, 30, or 90' }, 400);
+  }
   const since = sqliteDateSince(days);
 
   const models = await c.env.DB.prepare(`
