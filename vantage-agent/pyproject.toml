@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vantageai-agent"
-version = "0.1.0"
+version = "0.2.0"
 description = "AI coding agent with per-tool permissions, cost tracking, and token optimization"
 readme = "README.md"
 license = { text = "MIT" }
