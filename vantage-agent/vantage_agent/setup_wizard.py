@@ -38,7 +38,11 @@ def _config_dir(config_dir: Path | None) -> Path:
 
 def needs_setup(config_dir: Path | None = None) -> bool:
     """Return True if no tier has been configured yet."""
-    cfg_path = _config_dir(config_dir) / _CONFIG_FILE
+    cd = _config_dir(config_dir)
+    cfg_path = cd / _CONFIG_FILE
+    # If permissions.json already exists the user has run before — skip wizard
+    if (cd / "permissions.json").exists():
+        return False
     if not cfg_path.exists():
         return True
     try:
