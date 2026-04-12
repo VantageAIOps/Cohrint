@@ -210,6 +210,7 @@ crossplatform.get('/summary', async (c) => {
 
 crossplatform.get('/developers', async (c) => {
   const orgId = c.get('orgId');
+  const role   = c.get('role');
   let days: number;
   try {
     days = validateDays(c.req.query('days'));
@@ -259,12 +260,14 @@ crossplatform.get('/developers', async (c) => {
   }
 
   // Calculate ROI metrics per developer
+  const isAdmin = role === 'owner' || role === 'admin';
   const devList = (developers.results ?? []).map((d: any) => {
     const costPerPR = d.pull_requests > 0 ? (d.total_cost / d.pull_requests) : null;
     const costPerCommit = d.commits > 0 ? (d.total_cost / d.commits) : null;
     const linesPerDollar = d.total_cost > 0 ? Math.round((d.lines_added + d.lines_removed) / d.total_cost) : null;
     return {
       ...d,
+      developer_email: isAdmin ? d.developer_email : redactEmail(d.developer_email),
       providers: d.providers ? d.providers.split(',') : [],
       by_provider: byProviderMap[d.developer_id] ?? [],
       cost_per_pr: costPerPR ? Math.round(costPerPR * 100) / 100 : null,
@@ -376,7 +379,8 @@ crossplatform.get('/live', async (c) => {
   const orgId  = c.get('orgId');
   const role   = c.get('role');
   const isAdmin = role === 'owner' || role === 'admin';
-  const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10), 200);
+  const rawLimit = parseInt(c.req.query('limit') ?? '50', 10);
+  const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 200) : 50;
 
   // Primary: last 5 minutes only (truly live)
   const recent = await c.env.DB.prepare(`

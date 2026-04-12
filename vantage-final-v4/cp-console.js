@@ -13,8 +13,9 @@
   var cpDevChart      = null;
 
   // Live poll
-  var cpLiveInterval = null;
-  var cpLiveErrors   = 0;
+  var cpLiveInterval  = null;
+  var cpLiveRestart   = null; // backoff setTimeout handle — cleared on destroy
+  var cpLiveErrors    = 0;
 
   // Period persistence
   var PERIOD_KEY = 'vantage_cp_period';
@@ -448,7 +449,7 @@
           cpLiveErrors++;
           if (cpLiveErrors >= 3) {
             stopCpLivePoll();
-            setTimeout(startCpLivePoll, 120000);
+            cpLiveRestart = setTimeout(startCpLivePoll, 120000);
           }
         });
     }
@@ -459,6 +460,7 @@
 
   function stopCpLivePoll() {
     if (cpLiveInterval) { clearInterval(cpLiveInterval); cpLiveInterval = null; }
+    if (cpLiveRestart)  { clearTimeout(cpLiveRestart);  cpLiveRestart  = null; }
   }
 
   // ── Connections ───────────────────────────────────────────────────────────

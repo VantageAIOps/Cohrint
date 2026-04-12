@@ -71,7 +71,7 @@ def test_trend_non_today_entries_are_zero(headers):
     r = requests.get(BASE, headers=headers, params={"days": 30}, timeout=15)
     assert r.status_code == 200
     data = r.json()
-    today = datetime.date.today().isoformat()
+    today = datetime.datetime.utcnow().date().isoformat()
     today_idx = data["days"].index(today) if today in data["days"] else None
     for entry in data["series"]:
         for i, v in enumerate(entry["data"]):

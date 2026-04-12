@@ -69,7 +69,7 @@ def seeded_account():
                           json=payload, headers=hdrs, timeout=15)
         assert r.status_code in (200, 201), f"OTel seed failed: {r.status_code} {r.text}"
 
-    time.sleep(2)
+    time.sleep(5)
     return api_key, org_id, hdrs, dev_email, dev_id
 
 

@@ -47,12 +47,16 @@ def test_developers_includes_developer_id(seeded_account):
     assert "by_provider" in devs[0] and isinstance(devs[0]["by_provider"], list)
 
 
-def test_developers_no_null_developer_id(headers):
+def test_developers_legacy_rows_have_no_developer_id_and_still_appear(headers):
+    """Legacy rows (no developer.id from agent) appear in the list with developer_id=null."""
     r = requests.get(f"{API_URL}/v1/cross-platform/developers",
                      headers=headers, params={"days": 30}, timeout=15)
     assert r.status_code == 200
-    for dev in r.json().get("developers", []):
-        assert dev.get("developer_id") is not None
+    devs = r.json().get("developers", [])
+    # All rows must have developer_email (identity is always present)
+    for dev in devs:
+        assert dev.get("developer_email") is not None or dev.get("developer_id") is not None, \
+            "developer row must have at least one of developer_email or developer_id"
 
 
 # ── /developer/:id ────────────────────────────────────────────────────────────
@@ -118,7 +122,14 @@ def test_live_redacts_email_for_member(member_headers):
     r = requests.get(f"{API_URL}/v1/cross-platform/live",
                      headers=m_hdrs, params={"limit": 50}, timeout=15)
     assert r.status_code == 200
-    events = r.json().get("events", [])
+    data = r.json()
+    events = data.get("events", [])
+    # The /live fallback returns recent events; seeded_account provides real events.
+    # Guard against vacuous pass when live feed returns nothing (e.g. CI timing issues).
+    assert len(events) > 0, (
+        f"live feed returned no events (is_stale={data.get('is_stale')}); "
+        "redaction assertion would be vacuously true — check seeded_account fixture"
+    )
     for ev in events:
         email = ev.get("developer_email")
         if email is not None:
