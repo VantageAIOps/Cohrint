@@ -1,14 +1,16 @@
 """
-session_store.py — Persist/restore VantageSession state to ~/.vantage/sessions/.
+session_store.py — Persist/restore VantageSession state to ~/.vantage-agent/sessions/.
 """
 from __future__ import annotations
 
+import fcntl
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
 
-DEFAULT_SESSIONS_DIR = Path.home() / ".vantage" / "sessions"
+DEFAULT_SESSIONS_DIR = Path(os.environ.get("VANTAGE_CONFIG_DIR", Path.home() / ".vantage-agent")) / "sessions"
 
 
 class SessionNotFoundError(Exception):
@@ -24,14 +26,24 @@ class SessionStore:
         return self.sessions_dir / f"{session_id}.json"
 
     def save(self, data: dict) -> None:
+        data.setdefault("schema_version", 1)
         data["last_active_at"] = datetime.now(timezone.utc).isoformat()
-        self._path(data["id"]).write_text(json.dumps(data, indent=2))
+        path = self._path(data["id"])
+        with open(path, 'w') as f:
+            fcntl.flock(f, fcntl.LOCK_EX)
+            json.dump(data, f, indent=2)
+            fcntl.flock(f, fcntl.LOCK_UN)
 
     def load(self, session_id: str) -> dict:
         p = self._path(session_id)
         if not p.exists():
             raise SessionNotFoundError(f"Session {session_id!r} not found")
-        return json.loads(p.read_text())
+        with open(p, 'r') as f:
+            fcntl.flock(f, fcntl.LOCK_SH)
+            try:
+                return json.loads(f.read())
+            finally:
+                fcntl.flock(f, fcntl.LOCK_UN)
 
     def list_all(self) -> list[dict]:
         """Return all sessions sorted by last_active_at descending."""

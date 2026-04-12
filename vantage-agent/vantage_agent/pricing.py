@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import sys
 from dataclasses import dataclass
 
 # Bump this date when updating prices. A test fails if > 90 days old.
@@ -57,7 +58,11 @@ def calculate_cost(
     """
     key = _resolve_model(model)
     if key is None:
-        return 0.0
+        print(
+            f"Warning: unknown model '{model}', using claude-sonnet-4-6 pricing as estimate",
+            file=sys.stderr,
+        )
+        key = "default"
 
     prices = MODEL_PRICES[key]
     non_cached_input = max(prompt_tokens - cached_tokens, 0)

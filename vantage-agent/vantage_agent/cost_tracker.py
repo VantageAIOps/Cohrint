@@ -64,3 +64,17 @@ class SessionCost:
 
     def record_prompt(self) -> None:
         self.prompt_count += 1
+
+    def record_usage_raw(self, input_tokens: int, output_tokens: int, cost_usd: float) -> TurnUsage:
+        """Record pre-computed token counts (used by ClaudeCliBackend with exact counts)."""
+        turn = TurnUsage(
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cost_usd=cost_usd,
+        )
+        self.turns.append(turn)
+        self.total_input += input_tokens
+        self.total_output += output_tokens
+        self.total_cost_usd += cost_usd
+        self.prompt_count += 1
+        return turn

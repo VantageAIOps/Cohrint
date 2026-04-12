@@ -53,7 +53,12 @@ def test_api_backend_not_supports_process():
 
 
 def test_cli_backends_support_process():
-    for name in ("claude", "codex", "gemini"):
+    # claude backend was rewritten to stream-json: supports_process=False, token_count=exact
+    claude_backend = create_backend("claude")
+    assert claude_backend.capabilities.supports_process is False
+    assert claude_backend.capabilities.token_count == "exact"
+    # Other CLI backends still use process model
+    for name in ("codex", "gemini"):
         backend = create_backend(name)
         assert backend.capabilities.supports_process is True
         assert backend.capabilities.token_count == "estimated"

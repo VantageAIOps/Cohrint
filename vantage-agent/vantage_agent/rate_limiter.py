@@ -1,15 +1,20 @@
-"""Token-bucket rate limiter with persistent state in ~/.vantage/rate_state.json."""
+"""Token-bucket rate limiter with persistent state in ~/.vantage-agent/rate_state.json."""
 from __future__ import annotations
 
 import fcntl
 import json
+import os
 import time
 import threading
 from pathlib import Path
 from dataclasses import dataclass, asdict
 
-_STATE_FILE = Path.home() / ".vantage" / "rate_state.json"
+_STATE_FILE = Path(os.environ.get("VANTAGE_CONFIG_DIR", Path.home() / ".vantage-agent")) / "rate_state.json"
 _LOCK = threading.Lock()  # in-process guard; file lock (below) covers cross-process
+
+# TTL cache for get_global_budget_used
+_budget_cache: dict = {"value": None, "ts": 0.0}
+_BUDGET_CACHE_TTL = 10.0  # seconds
 
 
 @dataclass
@@ -18,7 +23,6 @@ class RateBucket:
     capacity: float        # max tokens (default: 60 requests/min = 60.0)
     refill_rate: float     # tokens per second (default: 1.0 = 60/min)
     last_refill: float     # unix timestamp of last refill
-
 
 
 def _refill(bucket: RateBucket) -> RateBucket:
@@ -31,14 +35,22 @@ def _refill(bucket: RateBucket) -> RateBucket:
 
 def acquire(cost: float = 1.0) -> bool:
     """Try to consume `cost` tokens. Returns True if allowed, False if rate limited.
-    Thread-safe via in-process lock + fcntl file lock (cross-process safe)."""
-    _STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    Thread-safe via in-process lock + fcntl file lock (cross-process safe).
+    Lock file is acquired BEFORE reading/writing state file."""
+    # Derive paths from _STATE_FILE so tests can patch just _STATE_FILE
+    state_file = _STATE_FILE
+    lock_file = state_file.parent / "rate_state.lock"
+    state_file.parent.mkdir(parents=True, exist_ok=True)
     with _LOCK:
-        with open(_STATE_FILE, "a+") as fh:
-            fcntl.flock(fh, fcntl.LOCK_EX)
+        # Acquire lock file first, then read/write state file
+        with open(lock_file, "w") as lf:
+            fcntl.flock(lf, fcntl.LOCK_EX)
             try:
-                fh.seek(0)
-                raw = fh.read()
+                # Now safely read/write state file
+                if state_file.exists():
+                    raw = state_file.read_text()
+                else:
+                    raw = ""
                 try:
                     bucket = RateBucket(**json.loads(raw)) if raw.strip() else None
                 except Exception:
@@ -49,11 +61,9 @@ def acquire(cost: float = 1.0) -> bool:
                 allowed = bucket.tokens >= cost
                 if allowed:
                     bucket.tokens -= cost
-                fh.seek(0)
-                fh.truncate()
-                fh.write(json.dumps(asdict(bucket)))
+                state_file.write_text(json.dumps(asdict(bucket)))
             finally:
-                fcntl.flock(fh, fcntl.LOCK_UN)
+                fcntl.flock(lf, fcntl.LOCK_UN)
         return allowed
 
 
@@ -68,18 +78,29 @@ def wait_for_token(cost: float = 1.0, max_wait: float = 60.0) -> bool:
 
 
 def get_global_budget_used() -> float:
-    """Sum total_cost_usd across all session files in ~/.vantage/sessions/."""
-    sessions_dir = Path.home() / ".vantage" / "sessions"
+    """Sum total_cost_usd across all session files in the sessions dir.
+    Results are cached for 10 seconds to avoid O(N) scan on every prompt."""
+    now = time.time()
+    # Derive sessions dir from _STATE_FILE so tests can patch just _STATE_FILE
+    sessions_dir = _STATE_FILE.parent / "sessions"
+    cache_key = str(sessions_dir)
+    if (
+        _budget_cache["value"] is not None
+        and _budget_cache.get("key") == cache_key
+        and (now - _budget_cache["ts"]) < _BUDGET_CACHE_TTL
+    ):
+        return _budget_cache["value"]
+
     total = 0.0
     if not sessions_dir.exists():
+        _budget_cache.update({"value": total, "ts": now, "key": cache_key})
         return total
     for f in sessions_dir.glob("*.json"):
         try:
             data = json.loads(f.read_text())
-            # Support both vantage-agent format (cost_summary.total_cost_usd)
-            # and local-proxy format (cost_summary.total_cost_usd)
             cs = data.get("cost_summary", {})
             total += cs.get("total_cost_usd", 0.0)
         except Exception:
             pass
+    _budget_cache.update({"value": total, "ts": now, "key": cache_key})
     return total

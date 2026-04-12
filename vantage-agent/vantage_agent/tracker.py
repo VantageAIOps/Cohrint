@@ -16,10 +16,9 @@ from typing import Any
 
 import httpx
 
+from . import __version__
 from .cost_tracker import SessionCost
 from .telemetry import OTelExporter
-
-__version__ = "0.1.0"
 
 
 @dataclass

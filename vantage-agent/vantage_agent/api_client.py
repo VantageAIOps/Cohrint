@@ -36,13 +36,19 @@ DEFAULT_MODEL = "claude-sonnet-4-6"
 
 def _prompt_for_api_key() -> str:
     """Interactively ask the user for their Anthropic API key and save it."""
+    import shutil
     import sys
     if not sys.stdin.isatty():
         return ""
+    has_claude_cli = shutil.which("claude") is not None
+    if has_claude_cli:
+        note = "Tip: you have the claude CLI installed. Use --backend claude to run without an API key (uses your Claude Max subscription)."
+    else:
+        note = "Note: A Claude.ai web subscription does NOT grant API access. You need a separate key from console.anthropic.com/settings/keys"
     print(
         "\n"
         "No Anthropic API key found.\n"
-        "Note: A Claude.ai subscription does NOT grant API access.\n"
+        f"{note}\n"
         "Get your API key at: https://console.anthropic.com/settings/keys\n"
     )
     try:
@@ -89,15 +95,21 @@ class AgentClient:
         if not api_key:
             api_key = _prompt_for_api_key()
         if not api_key:
+            import shutil
+            has_claude_cli = shutil.which("claude") is not None
+            if has_claude_cli:
+                cli_note = "Tip: you have the claude CLI installed. Use --backend claude to run without an API key (uses your Claude Max subscription)."
+            else:
+                cli_note = "Note: A Claude.ai web subscription does NOT grant API access. You need a separate key from console.anthropic.com/settings/keys"
             raise ValueError(
                 "\n"
                 "ANTHROPIC_API_KEY not set.\n\n"
-                "Note: A Claude.ai subscription does NOT include API access.\n"
-                "You need a separate Anthropic API key from: https://console.anthropic.com/settings/keys\n\n"
+                f"{cli_note}\n\n"
                 "To fix this, either:\n"
                 "  1. export ANTHROPIC_API_KEY=sk-ant-...\n"
                 "  2. save your key to ~/.vantage-agent/api_key\n"
-                "  3. run: vantageai-agent --setup"
+                "  3. run: vantageai-agent --setup\n"
+                "  4. use --backend claude if you have the claude CLI installed"
             )
         self.client = anthropic.Anthropic(api_key=api_key)
         self.model = model
@@ -258,7 +270,7 @@ class AgentClient:
                 results.append({
                     "type": "tool_result",
                     "tool_use_id": tool_id,
-                    "content": f"Tool {tool_name} was denied by the user.",
+                    "content": f"[Permission denied] The user did not approve use of {tool_name}. Please try a different approach or ask the user to approve this tool with /allow {tool_name}.",
                     "is_error": True,
                 })
                 continue

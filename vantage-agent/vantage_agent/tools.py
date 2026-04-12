@@ -148,11 +148,37 @@ SAFE_TOOLS = {"Read", "Glob", "Grep"}
 
 
 # ---------------------------------------------------------------------------
+# Input validation
+# ---------------------------------------------------------------------------
+
+_REQUIRED_FIELDS = {
+    "Bash": ["command"],
+    "Write": ["file_path", "content"],
+    "Edit": ["file_path", "old_string", "new_string"],
+    "Read": ["file_path"],
+    "Glob": ["pattern"],
+    "Grep": ["pattern"],
+}
+
+
+def _validate_tool_input(tool_name: str, tool_input: dict) -> str | None:
+    """Returns error message if invalid, None if valid."""
+    required = _REQUIRED_FIELDS.get(tool_name, [])
+    missing = [f for f in required if f not in tool_input]
+    if missing:
+        return f"Tool {tool_name} missing required fields: {missing}"
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Tool execution
 # ---------------------------------------------------------------------------
 
 def execute_tool(name: str, tool_input: dict[str, Any], cwd: str) -> str:
     """Execute a tool locally and return the result as a string."""
+    error = _validate_tool_input(name, tool_input)
+    if error:
+        return error
     if name == "Bash":
         return _exec_bash(tool_input, cwd)
     if name == "Read":
