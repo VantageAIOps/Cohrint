@@ -1,36 +1,36 @@
 # GIT_MEMORY.md — VantageAI
-_Last updated: 2026-04-09_
+_Last updated: 2026-04-12_
 
 ## Current Branch
-`fix/webkit-session-ci-warn`
+`feat/vega-chatbot`
 
 ## Open PRs
 | # | Title | Branch |
 |---|-------|--------|
-| #46 | fix: WebKit ITP warn + feature grid tabbed panels + PRODUCT_STRATEGY v4.0 | fix/webkit-session-ci-warn |
+| #50 | feat(chatbot): Vega AI assistant for dashboard | feat/vega-chatbot |
 
 ## Latest 15 Commits
 ```
-80a2544 fix(agent): fix all 12 flaws in vantage-agent.md
-451e099 feat(agent): add vantage-agent.md — expert agent for VantageAI codebase
-e8ebab6 docs(strategy): rewrite PRODUCT_STRATEGY.md to enterprise v4.0
-5744c8f feat(landing): replace static feature grid with tabbed panel system
-8873cc8 fix(ci): downgrade WebKit session-reload check to warn until SameSite=None deploys
-f1cba2c Merge pull request #44 from VantageAIOps/feat/semantic-cache-analytics
-72e30e0 fix(auth): use SameSite=None for session cookie to fix Safari ITP
-4e80bab fix(security): address 6 code review issues from PR #44
-071b534 chore: update GIT_MEMORY.md — website overhaul PR #44 state
-22de6c4 fix(tests): add missing pytest import to test_dashboard_real_data.py
-500901c docs(security): internal security audit report 2026-04-09
-03a344c feat(security): HSTS+COOP+CORP headers, brute-force on /session, prompt_hash validation
-71407ce feat(app): add Docs nav link + XSS-safe demo banner for demo org session
-9d85fba feat(website): Phase 2 enterprise redesign
-a75c7e9 feat(website): Phase 1 content — remove fake reviews, fix pricing CTAs
+219166b fix(chatbot): resolve 4 code-review issues
+1fbac63 feat(chatbot): deploy Vega to Cloudflare Workers
+6bd0086 docs: add Vega chatbot implementation plan
+5b5bc36 test(chatbot): 24 integration + unit tests for Vega
+52a7c12 feat(chatbot): Vega frontend widget — safe DOM, textContent only
+6dcdffa feat(chatbot): doc chunks builder from docs.html
+befdd39 feat(chatbot): chat + ticket handlers wired to Hono routes
+40cbe6c feat(chatbot): system prompt builder + KV rate limiter
+117c647 feat(chatbot): knowledge lookup + output sanitizer
+9acecd1 feat(chatbot): add 19-entry static knowledge base
+9158198 feat(chatbot): scaffold Vega Worker with health endpoint
+857a001 feat(dashboard): hold-to-reveal insight tooltips on all 31 cards
+c0813c7 feat(frontend): hold-to-reveal card insight tooltip (4.5s hover)
+bf16999 fix(tests): patch vantage_agent.cli.auto_detect_backend
+dd8006e fix(cli): remove duplicate --version argument causing argparse conflict
 ```
 
 ## Recent Merged PRs
 ```
-f1cba2c PR #44 — feat/semantic-cache-analytics (cache analytics + security hardening)
+f1cba2c PR #44 — feat/semantic-cache-analytics (cache analytics + security)
 65d565e PR #43 — feat/semantic-cache-analytics
 b7b98e6 PR #42 — feat/semantic-cache-analytics
 a81313b PR #41 — feat/session-centric-integration
@@ -40,39 +40,52 @@ f0981a1 PR #40 — feat/cleanup-mobile-otel
 ## Package Versions
 | Package | Version | Registry |
 |---------|---------|----------|
+| vantage-chatbot | 1.0.0 | Cloudflare Workers |
 | vantage-mcp | 1.1.1 | npm |
 | vantage-js-sdk | 1.0.1 | npm |
+| vantage-local-proxy | 1.0.2 | npm |
 | vantage-worker | 1.0.0 | internal |
-| vantage-agent | 0.1.0 | PyPI |
+| vantageai-agent | 0.2.4 | PyPI |
+| claude-intelligence | 0.1.0 | internal |
 
 ## Outstanding Items
 
-### Before/after merging PR #46
-- [ ] Merge PR #46 → CI auto-deploys Worker + Pages
-- [ ] After Worker deploys: restore CA.D3.4 `warn` → `chk` in `tests/suites/15_cross_browser/test_auth_cross_browser.py:121`
-- [ ] Verify tabbed feature grid (`switchFeatPanel`) works on live site
-- [ ] Demo seed: generate real SHA-256 for demo API key, replace placeholder in `scripts/demo-seed.sql`
+### PR #50 — before merge
+- [ ] **2026-04-13** Upload KV doc chunks (optimized to 1 write op, daily limit reset):
+  ```bash
+  cd vantage-chatbot && npx wrangler kv bulk put --namespace-id=3711f2ed67a04f7a981eb1ab33634313 knowledge/kv-upload.json
+  ```
+  Note: chunks.json already built — no need to re-run build-chunks.js
+- [ ] Set `VANTAGE_API_URL` secret: `cd vantage-chatbot && npx wrangler secret put VANTAGE_API_URL`
+- [ ] Merge PR #50 → CI auto-deploys Worker + Pages
 
-### Tech debt
+### Vega deployment details
+- Production URL: `https://vantage-chatbot.aman-lpucse.workers.dev`
+- KV namespace: `id=3711f2ed67a04f7a981eb1ab33634313`, `preview_id=8ad5c76d2e4b469096e2800dfa071948`
+- Secrets set: `RESEND_API_KEY` ✓ | `VANTAGE_API_URL` — still needed
+- Wrangler: v3.114.17 (v4 available — `npm install --save-dev wrangler@4` in vantage-chatbot/)
+
+### Tech debt (carried over)
 - [ ] DR.43 xfail marker — verify still needed (`pytest --runxfail`)
-- [ ] Untracked: `scripts/pkg.sh` — commit or discard
-- [ ] Untracked plan files in `docs/superpowers/plans/` — commit or discard
+- [ ] `scripts/pkg.sh` untracked — commit or discard
+- [ ] CA.D3.4 WebKit test: restore `warn` → `chk` after SameSite=None deploys
 
 ### Roadmap (not started)
 - Sprint 1: L3 Billing API connectors (AWS Bedrock, Azure OpenAI, GCP Vertex)
 - Sprint 2: Browser Extension MVP + SSO/SAML
-- Sprint 3: Semantic cache fuzzy matching + sliding window rate limiter (Durable Objects)
+- Sprint 3: Semantic cache fuzzy matching + Durable Objects rate limiter
 - Sprint 4: Self-hosted / on-prem deployment
 
 ## Key Files
 | File | Purpose |
 |------|---------|
-| `vantage-worker/src/routes/auth.ts` | SameSite=None cookie fix lives here |
+| `vantage-chatbot/src/chat.ts` | Chat handler — resolves plan server-side via session API |
+| `vantage-chatbot/src/ratelimit.ts` | Write-then-count KV rate limiter (20 msg/hr/org) |
+| `vantage-chatbot/knowledge/static.json` | 19 Q&A entries with plan_gate fields |
+| `vantage-final-v4/widget/chatbot.js` | Vega widget — inline DOM ticket form, no window.prompt |
+| `vantage-final-v4/app.html` | Dashboard — Vega widget injected, 31 hold-to-reveal cards |
+| `vantage-worker/src/routes/auth.ts` | SameSite=None cookie fix |
 | `vantage-final-v4/index.html` | Landing — tabbed feature grid (3×9 cards) |
-| `vantage-final-v4/_headers` | CSP, HSTS, security headers |
-| `tests/suites/15_cross_browser/` | CA.D3.4 downgraded to warn (WebKit ITP) |
-| `tests/suites/38_security_hardening/` | New suite SH.1–SH.8 |
-| `docs/agents/vantage-agent.md` | VantageAI expert agent skill |
-| `PRODUCT_STRATEGY.md` | v4.0 enterprise rewrite (2026-04-09) |
-| `scripts/demo-seed.sql` | Demo seed — placeholder key needs real SHA-256 |
+| `tests/suites/34_vega_chatbot/` | 24 chatbot tests (all passing) |
+| `PRODUCT_STRATEGY.md` | v4.0 enterprise rewrite |
 | `ADMIN_GUIDE.md` | Internal dev guide — §19 runbook, §20 research |
