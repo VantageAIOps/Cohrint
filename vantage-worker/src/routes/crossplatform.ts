@@ -358,10 +358,20 @@ crossplatform.get('/developer/:id', async (c) => {
   });
 });
 
+/** Redacts `user@domain.com` to `u***@domain.com` for non-admin roles. */
+function redactEmail(email: string | null): string | null {
+  if (!email) return null;
+  const at = email.indexOf('@');
+  if (at < 1) return '***';
+  return email[0] + '***' + email.slice(at);
+}
+
 // ── GET /live — latest OTel events for real-time feed ───────────────────────
 
 crossplatform.get('/live', async (c) => {
-  const orgId = c.get('orgId');
+  const orgId  = c.get('orgId');
+  const role   = c.get('role');
+  const isAdmin = role === 'owner' || role === 'admin';
   const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10), 200);
 
   // Primary: last 5 minutes only (truly live)
@@ -376,7 +386,11 @@ crossplatform.get('/live', async (c) => {
   `).bind(orgId, limit).all();
 
   if (recent.results && recent.results.length > 0) {
-    return c.json({ events: recent.results, is_stale: false });
+    const events = (recent.results as any[]).map(e => ({
+      ...e,
+      developer_email: isAdmin ? e.developer_email : redactEmail(e.developer_email),
+    }));
+    return c.json({ events, is_stale: false });
   }
 
   // Fallback: no recent activity — return last known events with staleness flag
@@ -390,8 +404,12 @@ crossplatform.get('/live', async (c) => {
     LIMIT ?
   `).bind(orgId, Math.min(limit, 20)).all();
 
+  const events = (fallback.results ?? [] as any[]).map((e: any) => ({
+    ...e,
+    developer_email: isAdmin ? e.developer_email : redactEmail(e.developer_email),
+  }));
   return c.json({
-    events: fallback.results ?? [],
+    events,
     is_stale: true,
     message: 'No activity in the last 5 minutes — showing most recent events',
   });
