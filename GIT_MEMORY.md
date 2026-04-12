@@ -51,12 +51,12 @@ f0981a1 PR #40 — feat/cleanup-mobile-otel
 ## Outstanding Items
 
 ### PR #50 — before merge
-- [ ] Upload KV doc chunks (hit free-tier limit 2026-04-12, retry tomorrow):
+- [ ] **2026-04-13** Upload KV doc chunks (optimized to 1 write op, daily limit reset):
   ```bash
-  cd vantage-chatbot
-  node knowledge/build-chunks.js > knowledge/kv-upload.json
-  npx wrangler kv bulk put --namespace-id=3711f2ed67a04f7a981eb1ab33634313 knowledge/kv-upload.json
+  cd vantage-chatbot && npx wrangler kv bulk put --namespace-id=3711f2ed67a04f7a981eb1ab33634313 knowledge/kv-upload.json
   ```
+  Note: chunks.json already built — no need to re-run build-chunks.js
+- [ ] Set `VANTAGE_API_URL` secret: `cd vantage-chatbot && npx wrangler secret put VANTAGE_API_URL`
 - [ ] Merge PR #50 → CI auto-deploys Worker + Pages
 
 ### Vega deployment details
