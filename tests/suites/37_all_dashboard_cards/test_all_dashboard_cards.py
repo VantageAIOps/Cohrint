@@ -767,27 +767,32 @@ class TestDeveloperCards:
             actual >= rec.cost * 0.99, f"actual={actual}, expected≥{rec.cost}")
         assert actual >= rec.cost * 0.99
 
-    def test_dc58_developer_drilldown_200(self, seeded):
-        """DC.58: GET /v1/cross-platform/developer/:email returns 200 for seeded developer."""
-        otel_devs = [r.developer for r in seeded.by_source("otel") if r.developer]
-        if not otel_devs:
-            pytest.skip("No OTel developers seeded")
-        import urllib.parse
-        email = otel_devs[0]
-        r = requests.get(f"{API_URL}/v1/cross-platform/developer/{urllib.parse.quote(email)}",
+    def _get_seeded_developer_id(self, seeded):
+        """Return first developer_id UUID from /developers for seeded org, or None."""
+        r = requests.get(f"{API_URL}/v1/cross-platform/developers",
                          params={"days": 30}, headers=seeded.headers, timeout=15)
-        chk(f"DC.58 developer/{email} → 200", r.status_code == 200,
+        if not r.ok:
+            return None
+        devs = [d for d in r.json().get("developers", []) if d.get("developer_id")]
+        return devs[0]["developer_id"] if devs else None
+
+    def test_dc58_developer_drilldown_200(self, seeded):
+        """DC.58: GET /v1/cross-platform/developer/:id returns 200 for seeded developer."""
+        dev_id = self._get_seeded_developer_id(seeded)
+        if not dev_id:
+            pytest.skip("No OTel developers with developer_id seeded")
+        r = requests.get(f"{API_URL}/v1/cross-platform/developer/{dev_id}",
+                         params={"days": 30}, headers=seeded.headers, timeout=15)
+        chk(f"DC.58 developer/{dev_id} → 200", r.status_code == 200,
             f"status={r.status_code}")
         assert r.status_code == 200
 
     def test_dc59_developer_drilldown_has_models(self, seeded):
         """DC.59: developer drill-down includes per-model breakdown."""
-        otel_devs = [r.developer for r in seeded.by_source("otel") if r.developer]
-        if not otel_devs:
-            pytest.skip("No OTel developers seeded")
-        import urllib.parse
-        email = otel_devs[0]
-        r = requests.get(f"{API_URL}/v1/cross-platform/developer/{urllib.parse.quote(email)}",
+        dev_id = self._get_seeded_developer_id(seeded)
+        if not dev_id:
+            pytest.skip("No OTel developers with developer_id seeded")
+        r = requests.get(f"{API_URL}/v1/cross-platform/developer/{dev_id}",
                          params={"days": 30}, headers=seeded.headers, timeout=15)
         body = r.json() if r.ok else {}
         chk("DC.59 developer drill-down has by_model",

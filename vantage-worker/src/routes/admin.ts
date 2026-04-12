@@ -31,8 +31,16 @@ admin.get('/overview', async (c) => {
   `).bind(orgId).first<{ mtd_cost_usd: number; mtd_event_count: number }>();
 
   const org = await c.env.DB.prepare(
-    'SELECT budget_usd, plan, name, email, benchmark_opt_in FROM orgs WHERE id = ?'
-  ).bind(orgId).first<{ budget_usd: number; plan: string; name: string; email: string; benchmark_opt_in: number }>();
+    'SELECT budget_usd, plan, name, email FROM orgs WHERE id = ?'
+  ).bind(orgId).first<{ budget_usd: number; plan: string; name: string; email: string }>();
+  // benchmark_opt_in added in migration 0008 — query separately so older DBs don't 500
+  let benchmark_opt_in = 0;
+  try {
+    const benchRow = await c.env.DB.prepare(
+      'SELECT benchmark_opt_in FROM orgs WHERE id = ?'
+    ).bind(orgId).first<{ benchmark_opt_in: number }>();
+    benchmark_opt_in = benchRow?.benchmark_opt_in ?? 0;
+  } catch { /* column may not exist on older deployments */ }
 
   // Per-team breakdown with budgets and member count
   const { results: teams } = await c.env.DB.prepare(`
@@ -85,7 +93,7 @@ admin.get('/overview', async (c) => {
       mtd_cost_usd:     mtd?.mtd_cost_usd ?? 0,
       events_this_month: eventsThisMonth,
       events_limit:     eventsLimit,
-      benchmark_opt_in: (org?.benchmark_opt_in ?? 0) === 1,
+      benchmark_opt_in: benchmark_opt_in === 1,
     },
     totals:  orgRow ?? {},
     teams,

@@ -25,7 +25,7 @@
 <meta name="twitter:image" content="https://vantageaiops.com/og-image.png">
 <script src="/theme.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
 <script src="/vantage-models.js"></script>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -659,6 +659,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
 }
 [data-theme="light"] #card-insight-tip strong{color:#4f46e5}
 [data-theme="light"] #card-insight-tip p{color:rgba(0,0,0,.7)}
+.card-error{color:#f87171;font-size:12px;padding:8px 0;display:none}
 </style>
 </head>
 <body>
@@ -683,6 +684,9 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
       </button>
       <button class="sb-item" onclick="nav('spend', this)">
         <span class="icon">&#9672;</span> Spend Analysis
+      </button>
+      <button class="sb-item" onclick="nav('cross-platform', this)">
+        <span class="icon">&#9654;</span> Cross-Platform
       </button>
       <button class="sb-item" onclick="nav('models', this)">
         <span class="icon">&#11041;</span> Model Pricing
@@ -1258,7 +1262,65 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
         </div>
       </div>
 
+      <!-- ── Cross-Platform tab ─────────────────────────────────────────────── -->
+      <div id="view-cross-platform" class="view">
+
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:16px">
+          <button class="period-btn cp-period active" data-days="7">7d</button>
+          <button class="period-btn cp-period" data-days="30">30d</button>
+          <button class="period-btn cp-period" data-days="90">90d</button>
+        </div>
+
+        <div id="cp-kpis" class="kpi-grid" style="margin-bottom:16px"></div>
+
+        <div class="grid-2" style="margin-bottom:16px">
+          <div class="card">
+            <div class="card-title">Daily Spend by Tool</div>
+            <canvas id="cp-trend-canvas" height="180"></canvas>
+            <div id="cp-trend-error" class="card-error"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Tool Cost Share</div>
+            <canvas id="cp-donut-canvas" height="180"></canvas>
+            <div id="cp-donut-error" class="card-error"></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-title">
+            Per-Developer Attribution
+            <span style="font-size:11px;opacity:.5;font-weight:400"> — click row for full detail</span>
+          </div>
+          <div id="cp-dev-table"></div>
+          <div id="cp-dev-error" class="card-error"></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title">
+              Live Feed
+              <span id="cp-live-dot" style="color:#4ade80;font-size:10px;margin-left:4px">&#9679;</span>
+            </div>
+            <div id="cp-live-feed"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Connected Tools</div>
+            <div id="cp-connections"></div>
+          </div>
+        </div>
+
+      </div>
+
     </div>
+  </div>
+</div>
+
+<!-- ── Developer detail modal ──────────────────────────────────────────── -->
+<div id="devDetailModal" class="modal-overlay" role="dialog" aria-modal="true">
+  <div class="modal-content" style="max-width:600px;width:100%">
+    <button class="modal-close" onclick="closeModal('devDetailModal')" aria-label="Close">&times;</button>
+    <h3 id="devDetailTitle" style="margin-bottom:16px"></h3>
+    <div id="devDetailBody"></div>
   </div>
 </div>
 
@@ -1321,12 +1383,20 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
 // ── Constants ──
 (function() {
   var _stored = localStorage.getItem('api_base');
-  // Only accept https:// URLs or relative paths (never http:// or protocol-relative)
-  if (_stored && (/^https:\/\//.test(_stored) || /^\/[^/]/.test(_stored))) {
-    window._API_BASE_VALIDATED = _stored;
-  } else {
-    window._API_BASE_VALIDATED = 'https://api.vantageaiops.com';
+  // Only accept the known API host or relative paths — rejects arbitrary https:// origins
+  var _ALLOWED_API_HOSTS = ['api.vantageaiops.com', 'localhost', '127.0.0.1'];
+  var _valid = false;
+  if (_stored) {
+    if (/^\/[^/]/.test(_stored)) {
+      _valid = true;
+    } else {
+      try {
+        var _u = new URL(_stored);
+        _valid = _u.protocol === 'https:' && _ALLOWED_API_HOSTS.indexOf(_u.hostname) !== -1;
+      } catch (_) { _valid = false; }
+    }
   }
+  window._API_BASE_VALIDATED = _valid ? _stored : 'https://api.vantageaiops.com';
 })();
 var API_BASE = window._API_BASE_VALIDATED;
 var _session = null;
@@ -1497,6 +1567,12 @@ function apiFetch(path, opts) {
       throw err;
     });
 }
+// One-time registration — cp-console.js claims apiFetch via this handle.
+// The function is nulled after first call so no subsequent script can acquire it.
+window.__cpRegister = function (cb) {
+  window.__cpRegister = null;
+  cb(apiFetch);
+};
 
 function initKeyAuth() {
   return fetch(API_BASE + '/v1/auth/session', { credentials: 'include' })
@@ -1571,6 +1647,11 @@ function nav(view, btn) {
   if (el) el.classList.add('active');
   var tabs = document.getElementById('toolTabs');
   tabs.style.display = (view === 'overview' || view === 'spend') ? 'flex' : 'none';
+  if (view === 'cross-platform') {
+    if (window.cpConsoleInit) window.cpConsoleInit();
+  } else {
+    if (window.cpConsoleDestroy) window.cpConsoleDestroy();
+  }
   loadViewData(view);
 }
 
@@ -3350,6 +3431,7 @@ document.querySelectorAll('.modal-overlay').forEach(function(overlay) {
 
   let holdTimer = null;
   let activeCard = null;
+  let curX = 0, curY = 0;
   const HOLD_MS = 4500;
 
   function showTip(card, x, y) {
@@ -3397,14 +3479,14 @@ document.querySelectorAll('.modal-overlay').forEach(function(overlay) {
     if (activeCard === card) return;
     hideTip();
     activeCard = card;
-    holdTimer = setTimeout(() => showTip(card, e.clientX, e.clientY), HOLD_MS);
+    curX = e.clientX;
+    curY = e.clientY;
+    holdTimer = setTimeout(() => showTip(card, curX, curY), HOLD_MS);
   }
 
   function onMove(e) {
-    if (!activeCard) return;
-    if (tip.classList.contains('visible')) return;
-    clearTimeout(holdTimer);
-    holdTimer = setTimeout(() => showTip(activeCard, e.clientX, e.clientY), HOLD_MS);
+    curX = e.clientX;
+    curY = e.clientY;
   }
 
   function onLeave() { hideTip(); }
@@ -3428,5 +3510,6 @@ document.querySelectorAll('.modal-overlay').forEach(function(overlay) {
   <link rel="stylesheet" href="/widget/chatbot.css">
   <script>window.VEGA_CHATBOT_URL = "https://vantage-chatbot.aman-lpucse.workers.dev";</script>
   <script src="/widget/chatbot.js"></script>
+  <script src="/cp-console.js" defer></script>
 </body>
 </html>

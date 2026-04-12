@@ -1,0 +1,38 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "words": [
+    "crossplatform",
+    "conftest",
+    "vantageai",
+    "vantageaiops",
+    "apiFetch",
+    "cpRegister",
+    "cpConsole",
+    "validateDays",
+    "redactEmail",
+    "sqliteDateSince",
+    "seeded",
+    "wrangler",
+    "hono",
+    "otlp",
+    "otel",
+    "orgId",
+    "memberId",
+    "memberEmail",
+    "devList",
+    "byProviderMap",
+    "cpLiveInterval",
+    "cpLiveRestart",
+    "cpDoughnutChart",
+    "cpTrendChart",
+    "cpDevChart"
+  ],
+  "ignorePaths": [
+    "node_modules",
+    "dist",
+    "*.lock",
+    "vantage-agent/vantageai_agent.egg-info",
+    "vantage-agent/vantage_agent.egg-info"
+  ]
+}

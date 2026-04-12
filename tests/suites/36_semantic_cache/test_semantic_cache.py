@@ -97,8 +97,8 @@ def test_dedup_detection(headers):
         r1.status_code == 201 and "cache_warning" not in r1.json(),
         f"got {r1.status_code}: {r1.text[:200]}")
 
-    # Brief pause so KV write completes
-    time.sleep(2)
+    # Wait for KV write to propagate (async after response)
+    time.sleep(5)
 
     # Second call with same hash — should detect duplicate
     ev2 = make_event(

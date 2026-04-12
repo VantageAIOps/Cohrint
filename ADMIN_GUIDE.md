@@ -1187,6 +1187,14 @@ The response always echoes the origin (not `*`) when credentials are involved, b
 
 For the SSE endpoint, `Access-Control-Allow-Origin: *` is used (no credentials in SSE).
 
+### Frontend Security Notes (app.html)
+
+- **Chart.js CDN:** SRI hash enforced (`integrity="sha384-..."` + `crossorigin="anonymous"`) — CDN compromise cannot execute unsigned JS
+- **`apiFetch` isolation:** The auth-bearing fetch function is not exposed on `window`. External scripts use a one-time `window.__cpRegister` callback that self-nulls after `cp-console.js` claims it
+- **`api_base` override:** `localStorage.api_base` is validated against an explicit allowlist (`api.vantageaiops.com`, `localhost`) — arbitrary `https://` hosts are rejected
+- **XSS prevention:** All dynamic DOM writes use `textContent` — no `innerHTML` anywhere in `app.html` or `cp-console.js`
+- **CSP:** `Content-Security-Policy` set in `_headers` for `/app.html`; `unsafe-inline` is present due to inline `<script>` blocks (known trade-off until scripts are fully externalised)
+
 ### 16.4 Content Security Policy
 
 `app.html` CSP (`_headers`):
@@ -2488,15 +2496,22 @@ VantageAI v2 introduces a **4-layer architecture** for tracking ALL AI spending 
 
 ### Cross-Platform API Endpoints
 
-| Endpoint | Purpose |
-|---|---|
-| `GET /v1/cross-platform/summary?days=N` | Total spend, by provider, budget status |
-| `GET /v1/cross-platform/developers?days=N` | Per-developer table with ROI metrics |
-| `GET /v1/cross-platform/developer/:email?days=N` | Drill-down: by provider, model, trend, productivity |
-| `GET /v1/cross-platform/live?limit=N` | Latest OTel events (real-time feed) |
-| `GET /v1/cross-platform/models?days=N` | Cost by model across all providers |
-| `GET /v1/cross-platform/connections` | OTel source freshness + billing API status |
-| `GET /v1/cross-platform/budget` | Budget policies + current spend |
+| Endpoint | Auth | Purpose |
+|---|---|---|
+| `GET /v1/cross-platform/trend?days=N` | All roles | Daily cost per provider — stacked area chart data with full calendar spine |
+| `GET /v1/cross-platform/summary?days=N` | All roles | Total spend, by provider, budget status |
+| `GET /v1/cross-platform/developers?days=N` | All roles | Per-developer table with ROI metrics; `developer_email` redacted for non-admin |
+| `GET /v1/cross-platform/developer/:id?days=N` | Admin/owner or self | Drill-down by UUID: by provider, model, daily trend, productivity |
+| `GET /v1/cross-platform/live?limit=N` | All roles | Latest OTel events; `developer_email` redacted for non-admin |
+| `GET /v1/cross-platform/models?days=N` | All roles | Cost by model across all providers |
+| `GET /v1/cross-platform/connections` | All roles | OTel freshness + billing API status; `last_error` stripped for non-admin |
+| `GET /v1/cross-platform/budget` | All roles | Budget policies + current spend |
+
+**Parameter validation:** All `?days=` routes accept only `7`, `30`, or `90` — any other value returns 400.
+
+**Email redaction:** Non-admin roles (`member`, `viewer`) receive `u***@domain.com` in `/developers`, `/live`, and `/developer/:id` responses. Admin and owner see full emails.
+
+**Self-service access:** `/developer/:id` — admin/owner see any developer; member/viewer may only query their own `developer_id` (verified by matching `developer_email` against their auth token). Returns 403 otherwise.
 
 ### Org-Wide OTel Deployment
 
@@ -2539,6 +2554,18 @@ The dashboard (`app.html`) has been restructured to use **only real API data**. 
 - Token efficiency: efficiency score, cache hit rate, token breakdown chart, optimization tips
 - Data source connection status
 - Dual-write to otel_events: OTel metrics with token/cost data are also inserted into the `otel_events` table, powering the `/live` feed
+
+**Cross-Platform tab** — added in PR #51:
+- Consolidated spend across Copilot, Claude Code, Cursor, Gemini CLI
+- Period selector: 7d / 30d / 90d (persisted to `localStorage`)
+- KPI cards: total spend, top tool, active devs, MTD budget %
+- Stacked area trend chart (Chart.js; full calendar spine — no gaps on zero-data days)
+- Cost-share doughnut chart
+- Developer table: clicking a row with a `developer_id` opens the detail modal; legacy rows (no SDK agent installed) appear grayed-out with tooltip
+- Developer detail modal: by-tool cost, daily mini-chart, productivity stats (commits, PRs, lines, active time)
+- Live feed: polls every 15s ±5s jitter; 3-error backoff → 2-min pause; backoff cleared on tab leave
+- Connections panel: billing API sync status + OTel source freshness
+- JS extracted to `vantage-final-v4/cp-console.js` (530 lines) — loaded via `<script defer>`
 
 **Enterprise Reporting** (team/org plans only):
 - Real data from `/v1/admin/overview`, `/v1/analytics/teams`, `/v1/cross-platform/developers`
