@@ -27,7 +27,7 @@ from .optimizer import optimize_prompt, OptimizationResult
 from .permission_server import PermissionServer, install_hook_script
 from .permissions import PermissionManager
 from .renderer import render_cost_summary, render_error
-from .setup_wizard import needs_setup, run_setup_wizard, get_config, write_config
+from .setup_wizard import needs_setup, run_setup_wizard, apply_tier, get_config, write_config
 from .tracker import Tracker, TrackerConfig
 from .tools import TOOL_MAP
 
@@ -156,9 +156,12 @@ def _build_client(args: argparse.Namespace):
         tracker.start()
 
     if backend_name == "claude":
-        # First-run wizard for Claude CLI backend
-        if needs_setup(config_dir=config_dir):
-            run_setup_wizard(permissions=permissions, config_dir=config_dir)
+        # First-run wizard for Claude CLI backend (only if stdin is a tty)
+        if needs_setup(config_dir=config_dir) and sys.stdin.isatty():
+            try:
+                run_setup_wizard(permissions=permissions, config_dir=config_dir)
+            except (EOFError, KeyboardInterrupt):
+                apply_tier(2, permissions)  # safe default: Read/Glob/Grep/Edit/Write
         # Start permission server
         sock_path = f"/tmp/vantage-perm-{os.getpid()}.sock"
         perm_server = PermissionServer(socket_path=sock_path, permissions=permissions)
