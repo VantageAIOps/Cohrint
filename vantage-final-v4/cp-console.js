@@ -282,7 +282,7 @@
 
     title.textContent = devEmail || devId;
     body.textContent  = 'Loading\u2026';
-    modal.style.display = 'flex';
+    modal.classList.add('active');
 
     window.apiFetch('/v1/cross-platform/developer/' + encodeURIComponent(devId))
       .then(function (data) { renderDevModalBody(body, data); })
