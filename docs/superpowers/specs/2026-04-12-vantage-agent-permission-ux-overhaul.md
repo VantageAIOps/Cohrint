@@ -1,7 +1,7 @@
 # Vantage Agent — Permission Granularity & UX Overhaul
 
 **Date:** 2026-04-12  
-**Status:** Design / Pre-implementation  
+**Status:** Implemented — see plan `docs/superpowers/plans/2026-04-12-vantage-agent-permission-ux-overhaul.md`  
 **Scope:** vantage-agent CLI — all dimensions: permissions, Claude CLI backend, installation, upgrade, config, sessions, stability
 
 ---

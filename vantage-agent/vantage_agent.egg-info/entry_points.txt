@@ -1,0 +1,2 @@
+[console_scripts]
+vantage-agent = vantage_agent.cli:main
