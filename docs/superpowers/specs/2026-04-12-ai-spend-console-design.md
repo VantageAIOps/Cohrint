@@ -74,16 +74,17 @@ const series = [...providerSet].sort().map(provider => ({
 
 ### 1b. `GET /v1/cross-platform/developer/:id`
 
-The existing `/developer/:email` endpoint is replaced by `/developer/:id` (internal `developer_id` UUID from `cross_platform_usage.developer_id`). This removes email from URL paths (browser history, logs, localStorage cache keys).
+The existing `/developer/:email` route is **replaced** by `/developer/:id`. Three changes required in `crossplatform.ts`:
 
-**Email validation removed** (no longer in path). Validate `id` is a UUID format:
+**Step 1 — Update `/developers` query** to `SELECT developer_id, developer_email, ...` and `GROUP BY developer_id, developer_email` (instead of `GROUP BY developer_email`). Rows where `developer_id IS NULL` are excluded from results (`WHERE developer_id IS NOT NULL`) — these are legacy OTel rows without an ID; the frontend degrades gracefully by showing them in the table without a clickable drill-down (see section 2f).
+
+**Step 2 — Replace the route handler** from `crossplatform.get('/developer/:email', ...)` to `crossplatform.get('/developer/:id', ...)`. Query by `developer_id` column, not `developer_email`.
+
+**Step 3 — Validate and auth-check:**
 ```ts
 const id = c.req.param('id');
 if (!/^[0-9a-f-]{36}$/.test(id)) return c.json({ error: 'Invalid id' }, 400);
-```
 
-**Role check** — restrict to `owner` or `admin` role only (or allow members to query their own `developer_id`):
-```ts
 const member = c.get('member');
 if (member.role !== 'owner' && member.role !== 'admin' && member.developer_id !== id) {
   return c.json({ error: 'Forbidden' }, 403);
@@ -162,6 +163,24 @@ Extracting to `cp-console.js` keeps `app.html` from growing past ~3400 lines and
 ```html
 <script src="/cp-console.js" defer></script>
 ```
+
+**`apiFetch` exposure** — `apiFetch` is defined inside a private IIFE in `app.html` and is not accessible from external scripts. Add one line inside that IIFE (after the function definition) to expose it:
+```js
+window.apiFetch = apiFetch;
+```
+`cp-console.js` then calls `window.apiFetch(...)` instead of `apiFetch(...)` directly. This is the minimal change; no refactor needed.
+
+**Developer detail modal element** — add to the section shell (at the end of `#section-cross-platform`):
+```html
+<div id="devDetailModal" class="modal-overlay" style="display:none" role="dialog" aria-modal="true">
+  <div class="modal-content">
+    <button class="modal-close" id="devDetailClose" aria-label="Close">&times;</button>
+    <h3 id="devDetailTitle"></h3>
+    <div id="devDetailBody"></div>
+  </div>
+</div>
+```
+`cp-console.js` opens it via `document.getElementById('devDetailModal').style.display = 'flex'` and closes via the existing `closeModal('devDetailModal')` pattern.
 
 ### 2b. cp-console.js structure
 
@@ -265,6 +284,7 @@ function startCpLivePoll() {
         }
       });
   }
+  tick(); // fire immediately; don't wait 15s for first refresh after initial load
   cpLiveInterval = setInterval(tick, 15000 + jitter);
 }
 
@@ -277,14 +297,15 @@ function stopCpLivePoll() {
 
 ### 2f. Developer detail modal
 
-Developer table rows store `data-dev-id` (from `developers[].developer_id`) and `data-dev-email` attributes. Click calls `/v1/cross-platform/developer/:id`.
+Developer table rows store `data-dev-id` (from `developers[].developer_id`) and `data-dev-email` attributes.
 
-Modal 3 sub-sections:
+- Rows **with** a `developer_id` → clicking calls `/v1/cross-platform/developer/:id` and opens the modal
+- Rows **without** a `developer_id` (legacy OTel-only rows) → clicking shows an inline tooltip: `"Drill-down unavailable — install vantage-agent to enable per-developer detail"`. These rows are not removed from the table.
+
+Modal opens `#devDetailModal` (defined in section 2a), renders 3 sub-sections:
 1. **By-tool cost table** — provider, cost, input tokens, output tokens
 2. **Daily trend mini-chart** — `type: 'line'` Chart.js, 200px height; destroys `cpDevChart` before re-creating
 3. **Productivity stats** — commits, PRs, lines added/removed, active time as stat grid
-
-Modal reuses existing overlay (`#modal-overlay`) and close pattern from `app.html`.
 
 ### 2g. Period selector
 
@@ -312,7 +333,7 @@ scripts/run-tests.sh --suite 35 -- -v -x                 # extra pytest flags
 
 - **Input validation** — `--suite`, `--file`, `--test` values validated against `^[a-zA-Z0-9_-]+$` before use; invalid values print error and exit 1
 - **Partial match** — `--suite 35` matches directories under `tests/suites/` whose name contains `35`; if >1 match found, script errors: `"Ambiguous --suite '35': matches 35_foo, 35_bar. Be more specific."`
-- **No `--suite`** — runs all active suites: 17, 18, 19, 20, 21, 32, 33, 34, 35
+- **No `--suite`** — discovers all suites automatically via `ls tests/suites/[0-9]*/` (filesystem, always current; no hardcoded list)
 - **`--file`** — appended as `tests/suites/<suite>/<file>.py`; `.py` suffix added automatically if absent
 - **`--test`** — passed as `pytest -k <test>`
 - **Extra args** — everything after `--` appended as a bash array (never bare string interpolation)
@@ -326,9 +347,8 @@ scripts/run-tests.sh --suite 35 -- -v -x                 # extra pytest flags
 set -euo pipefail
 
 SUITES=() FILES=() TEST_NAME="" EXTRA_ARGS=()
-ALL_ACTIVE_SUITES=(17_otel 18_sdk_privacy 19_local_proxy 20_dashboard_real_data
-                   21_vantage_cli 32_audit_log 33_frontend_contract 34_vega_chatbot
-                   35_cross_platform_console)
+# Discover all numbered suites dynamically — never hardcode this list
+mapfile -t ALL_SUITES < <(ls -d tests/suites/[0-9]*/ 2>/dev/null | xargs -n1 basename | sort)
 
 validate_arg() {
   [[ "$1" =~ ^[a-zA-Z0-9_-]+$ ]] || { echo "Invalid arg: $1"; exit 1; }
