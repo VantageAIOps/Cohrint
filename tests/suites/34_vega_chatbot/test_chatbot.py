@@ -77,3 +77,17 @@ def test_ticket_endpoint_reachable():
         headers={**AUTH, "X-Org-Id": "test-org"})
     # 200 OK or 503 if Resend not configured in CI — both acceptable
     assert r.status_code in (200, 503)
+
+
+# ── Task 6: Doc chunks builder ────────────────────────────────────────────────
+
+def test_build_chunks_produces_valid_json():
+    result = subprocess.run(
+        ["node", "knowledge/build-chunks.js"],
+        capture_output=True, text=True,
+        cwd=str(ROOT / "vantage-chatbot"),
+    )
+    assert result.returncode == 0
+    data = json.loads(result.stdout)
+    assert len(data) > 0
+    assert "key" in data[0] and "value" in data[0]
