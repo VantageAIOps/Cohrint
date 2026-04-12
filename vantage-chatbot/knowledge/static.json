@@ -1,0 +1,100 @@
+[
+  {
+    "q": "What is VantageAI?",
+    "a": "VantageAI is an AI cost analytics platform that tracks spending across all your AI providers — Anthropic, OpenAI, Google, and more — from a single dashboard.",
+    "tags": ["product", "overview"]
+  },
+  {
+    "q": "How do I add a new API key?",
+    "a": "Go to Settings → Provider Connections and click 'Add Provider'. Paste your API key — it's encrypted at rest and never leaves your organization's data boundary.",
+    "tags": ["setup", "api-key"]
+  },
+  {
+    "q": "What does the Overview tab show?",
+    "a": "The Overview tab shows total spend, API calls, average cost per call, active models, and a daily spend trend chart for your selected time range.",
+    "tags": ["dashboard", "overview"]
+  },
+  {
+    "q": "How are budgets enforced?",
+    "a": "You set a monthly budget cap per team or model in the Budgets tab. When spend hits 80% of the cap, you receive an alert. At 100%, new API calls are blocked until the next billing cycle.",
+    "tags": ["budgets", "alerts"]
+  },
+  {
+    "q": "What is the free tier limit?",
+    "a": "The free tier allows up to 50,000 tracked events per month. After that, you'll need to upgrade to Pro or Enterprise.",
+    "tags": ["pricing", "free-tier"]
+  },
+  {
+    "q": "How do I invite team members?",
+    "a": "Go to Settings → Members and click 'Invite'. Enter their email — they'll receive an invite link valid for 48 hours.",
+    "tags": ["team", "members"]
+  },
+  {
+    "q": "What providers does VantageAI support?",
+    "a": "VantageAI supports Anthropic, OpenAI, Google Gemini, AWS Bedrock, Azure OpenAI, Mistral, Cohere, and any OpenTelemetry-compatible provider.",
+    "tags": ["providers", "integrations"]
+  },
+  {
+    "q": "How do I use the vantageai-agent CLI?",
+    "a": "Install with `pip install vantageai-agent`, then run `vantageai-agent`. Use `--backend claude` for Claude Max, `--backend api` for direct API access. Type `/help` in the REPL for all commands.",
+    "tags": ["cli", "agent"]
+  },
+  {
+    "q": "What is OpenTelemetry (OTel) support?",
+    "a": "VantageAI accepts OTLP metrics and logs. Point your OTel exporter to `https://api.vantageaiops.com/v1/otel/v1/metrics` with your Bearer token. Cost is computed server-side from token counts.",
+    "tags": ["otel", "integration"]
+  },
+  {
+    "q": "How do I export my data?",
+    "a": "In any analytics tab, click the 'Export CSV' button in the top-right to download the current view as a CSV file.",
+    "tags": ["export", "data"],
+    "plan_gate": "pro"
+  },
+  {
+    "q": "What is cross-platform analytics?",
+    "a": "Cross-platform analytics lets you compare spend and usage across all your AI providers side-by-side, identify which team or model is driving cost, and spot anomalies.",
+    "tags": ["analytics", "cross-platform"]
+  },
+  {
+    "q": "How does VantageAI handle data privacy?",
+    "a": "Prompts and responses never leave your machine in strict mode. Only token counts and metadata are sent to VantageAI servers. You can verify this in the vantage-local-proxy source code.",
+    "tags": ["privacy", "security"]
+  },
+  {
+    "q": "What does the Models tab show?",
+    "a": "The Models tab breaks down cost and call volume by model — e.g., claude-sonnet-4-6 vs gpt-4o. Use it to find expensive models and consider cheaper alternatives.",
+    "tags": ["dashboard", "models"]
+  },
+  {
+    "q": "How do I set up a budget alert?",
+    "a": "In the Budgets tab, click 'New Budget', choose a team and model filter, set a monthly cap, and enter an alert email. Alerts fire at 80% and 100% of the cap.",
+    "tags": ["budgets", "setup"]
+  },
+  {
+    "q": "What is the Pro plan?",
+    "a": "Pro includes unlimited event tracking, CSV export, advanced filters, priority support, and API access. Billed monthly or annually.",
+    "tags": ["pricing", "pro"],
+    "plan_gate": "pro"
+  },
+  {
+    "q": "What is Enterprise?",
+    "a": "Enterprise adds SSO, custom data retention, SLA guarantees, dedicated support, and on-premise deployment options. Contact sales for pricing.",
+    "tags": ["pricing", "enterprise"],
+    "plan_gate": "enterprise"
+  },
+  {
+    "q": "How do I reset my password?",
+    "a": "Click 'Forgot Password' on the login page. A reset link will be emailed to your registered address and expires in 1 hour.",
+    "tags": ["account", "auth"]
+  },
+  {
+    "q": "What does P95 latency mean in the traces tab?",
+    "a": "P95 latency means 95% of your API calls completed within that time. A high P95 signals occasional slow calls — check the Traces tab to find the outliers.",
+    "tags": ["dashboard", "traces", "latency"]
+  },
+  {
+    "q": "Can I use VantageAI with self-hosted models?",
+    "a": "Yes — use the OTel integration or local proxy. Any model that reports token counts via OTLP or the VantageAI SDK can be tracked.",
+    "tags": ["integration", "self-hosted"]
+  }
+]
