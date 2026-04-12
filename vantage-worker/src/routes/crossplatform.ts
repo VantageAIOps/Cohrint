@@ -236,7 +236,6 @@ crossplatform.get('/developers', async (c) => {
     FROM cross_platform_usage
     WHERE org_id = ? AND created_at >= ?
       AND developer_email IS NOT NULL
-      AND developer_id IS NOT NULL
     GROUP BY developer_id, developer_email
     ORDER BY total_cost DESC
   `).bind(orgId, since).all();
@@ -249,7 +248,6 @@ crossplatform.get('/developers', async (c) => {
            COUNT(*) as records
     FROM cross_platform_usage
     WHERE org_id = ? AND created_at >= ? AND developer_email IS NOT NULL
-      AND developer_id IS NOT NULL
     GROUP BY developer_id, developer_email, provider
     ORDER BY developer_email, cost DESC
   `).bind(orgId, since).all();
@@ -284,14 +282,20 @@ crossplatform.get('/developer/:id', async (c) => {
   const orgId = c.get('orgId');
   const role   = c.get('role');
 
-  if (role !== 'owner' && role !== 'admin') {
-    return c.json({ error: 'Forbidden' }, 403);
-  }
-
   const id = c.req.param('id');
   // UUID v4 format: 8-4-4-4-12 hex chars
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) {
     return c.json({ error: 'Invalid id' }, 400);
+  }
+
+  // Access control: owner/admin see all; member/viewer may only view their own data
+  if (role !== 'owner' && role !== 'admin') {
+    const memberEmail = c.get('memberEmail');
+    const owns = await c.env.DB.prepare(`
+      SELECT 1 FROM cross_platform_usage
+      WHERE org_id = ? AND developer_id = ? AND developer_email = ? LIMIT 1
+    `).bind(orgId, id, memberEmail).first();
+    if (!owns) return c.json({ error: 'Forbidden' }, 403);
   }
 
   let days: number;

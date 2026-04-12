@@ -85,6 +85,16 @@ def test_developer_detail_no_auth_returns_401():
     assert r.status_code == 401
 
 
+def test_developer_detail_member_cannot_view_other_dev(seeded_account, member_headers):
+    """member role querying a dev_id that belongs to another user → 403."""
+    _, _, hdrs, _, dev_id = seeded_account
+    m_hdrs, _ = member_headers
+    # dev_id was seeded under a different email than the member's email
+    r = requests.get(f"{API_URL}/v1/cross-platform/developer/{dev_id}",
+                     headers=m_hdrs, params={"days": 30}, timeout=15)
+    assert r.status_code == 403
+
+
 # ── /live ─────────────────────────────────────────────────────────────────────
 
 def test_live_shape(headers):
@@ -102,6 +112,21 @@ def test_live_no_auth_returns_401():
     assert r.status_code == 401
 
 
+def test_live_redacts_email_for_member(member_headers):
+    """Non-admin roles must receive redacted developer_email (u***@domain)."""
+    m_hdrs, _ = member_headers
+    r = requests.get(f"{API_URL}/v1/cross-platform/live",
+                     headers=m_hdrs, params={"limit": 50}, timeout=15)
+    assert r.status_code == 200
+    events = r.json().get("events", [])
+    for ev in events:
+        email = ev.get("developer_email")
+        if email is not None:
+            assert "***" in email, f"expected redacted email, got: {email}"
+            at = email.index("@") if "@" in email else -1
+            assert at > 0, f"redacted email missing domain: {email}"
+
+
 # ── /connections ──────────────────────────────────────────────────────────────
 
 def test_connections_shape(headers):
@@ -111,3 +136,28 @@ def test_connections_shape(headers):
     data = r.json()
     assert "billing_connections" in data and isinstance(data["billing_connections"], list)
     assert "otel_sources" in data and isinstance(data["otel_sources"], list)
+
+
+def test_connections_no_auth_returns_401():
+    r = requests.get(f"{API_URL}/v1/cross-platform/connections", timeout=15)
+    assert r.status_code == 401
+
+
+# ── days=999 on all ?days= routes ─────────────────────────────────────────────
+
+def test_days_invalid_on_developers_returns_400(headers):
+    r = requests.get(f"{API_URL}/v1/cross-platform/developers",
+                     headers=headers, params={"days": 999}, timeout=15)
+    assert r.status_code == 400
+
+
+def test_days_invalid_on_trend_returns_400(headers):
+    r = requests.get(f"{API_URL}/v1/cross-platform/trend",
+                     headers=headers, params={"days": 999}, timeout=15)
+    assert r.status_code == 400
+
+
+def test_days_invalid_on_models_returns_400(headers):
+    r = requests.get(f"{API_URL}/v1/cross-platform/models",
+                     headers=headers, params={"days": 999}, timeout=15)
+    assert r.status_code == 400

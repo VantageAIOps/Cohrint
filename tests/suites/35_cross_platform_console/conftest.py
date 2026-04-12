@@ -84,3 +84,23 @@ def empty_headers():
     """Fresh org with absolutely no data — for testing full calendar spine."""
     api_key, _, _cookies = fresh_account(prefix="cp35e")
     return get_headers(api_key)
+
+
+@pytest.fixture(scope="module")
+def member_headers(seeded_account):
+    """
+    A 'member' role key in the same org as seeded_account.
+    Used for 403 and email-redaction tests.
+    Returns (member_headers, member_email).
+    """
+    api_key, org_id, hdrs, _, _ = seeded_account
+    member_email = f"cp35member_{uuid.uuid4().hex[:6]}@test.local"
+    r = requests.post(
+        f"{API_URL}/v1/auth/members",
+        json={"email": member_email, "name": "Test Member", "role": "member"},
+        headers=hdrs,
+        timeout=15,
+    )
+    assert r.status_code == 201, f"member invite failed: {r.status_code} {r.text}"
+    member_api_key = r.json()["api_key"]
+    return get_headers(member_api_key), member_email
