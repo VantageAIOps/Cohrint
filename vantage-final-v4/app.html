@@ -620,6 +620,45 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
   .tool-tabs { padding: 8px 12px; }
   .dashboard { padding: 12px; }
 }
+
+/* Card insight tooltip */
+#card-insight-tip{
+  position:fixed;
+  z-index:9999;
+  max-width:280px;
+  background:rgba(15,17,26,.96);
+  border:1px solid rgba(99,102,241,.35);
+  border-radius:10px;
+  padding:12px 16px;
+  box-shadow:0 8px 32px rgba(0,0,0,.45),0 0 0 1px rgba(99,102,241,.1);
+  pointer-events:none;
+  opacity:0;
+  transition:opacity .2s ease;
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+}
+#card-insight-tip.visible{display:block}
+#card-insight-tip strong{
+  display:block;
+  font-size:12px;
+  font-weight:600;
+  color:#a5b4fc;
+  margin-bottom:6px;
+  letter-spacing:.02em;
+}
+#card-insight-tip p{
+  font-size:12px;
+  color:rgba(255,255,255,.75);
+  line-height:1.55;
+  margin:0;
+}
+[data-theme="light"] #card-insight-tip{
+  background:rgba(255,255,255,.97);
+  border-color:rgba(99,102,241,.25);
+  box-shadow:0 8px 32px rgba(0,0,0,.12);
+}
+[data-theme="light"] #card-insight-tip strong{color:#4f46e5}
+[data-theme="light"] #card-insight-tip p{color:rgba(0,0,0,.7)}
 </style>
 </head>
 <body>
@@ -716,22 +755,22 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
       <!-- ─── Overview ─── -->
       <div id="view-overview" class="view active">
         <div class="kpi-grid" id="overviewKpis">
-          <div class="kpi-card animate-in delay-1">
+          <div class="kpi-card animate-in delay-1" data-insight="Total spend across all AI tools this period. Compare to last period to spot cost trends.">
             <div class="kpi-label">Total AI Tool Spend</div>
             <div class="kpi-value" id="kpiTotalSpend">&mdash;</div>
             <div class="kpi-sub neutral" id="kpiTotalSpendSub">&nbsp;</div>
           </div>
-          <div class="kpi-card animate-in delay-2">
+          <div class="kpi-card animate-in delay-2" data-insight="The AI tool consuming the most budget. Use this to focus optimization efforts.">
             <div class="kpi-label">Costliest Tool</div>
             <div class="kpi-value" id="kpiCostliestTool" style="font-size:22px;">&mdash;</div>
             <div class="kpi-sub neutral" id="kpiCostliestToolSub">&nbsp;</div>
           </div>
-          <div class="kpi-card animate-in delay-3">
+          <div class="kpi-card animate-in delay-3" data-insight="Number of developers using AI tools this period. Helps measure adoption and cost-per-seat.">
             <div class="kpi-label">Active Developers</div>
             <div class="kpi-value" id="kpiActiveDev">&mdash;</div>
             <div class="kpi-sub neutral" id="kpiActiveDevSub">&nbsp;</div>
           </div>
-          <div class="kpi-card animate-in delay-4">
+          <div class="kpi-card animate-in delay-4" data-insight="How much of your monthly budget has been used. Alerts fire at 50%, 75%, 85%, and 100%.">
             <div class="kpi-label">Budget Status</div>
             <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
               <div class="budget-track" style="flex:1;">
@@ -741,12 +780,12 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
             </div>
             <div class="kpi-sub neutral" id="kpiBudgetSub">&nbsp;</div>
           </div>
-          <div class="kpi-card animate-in delay-5">
+          <div class="kpi-card animate-in delay-5" data-insight="Total tokens consumed across all requests. High token counts often indicate prompt bloat.">
             <div class="kpi-label">Token Usage</div>
             <div class="kpi-value" id="kpiTokenUsage">&mdash;</div>
             <div class="kpi-sub neutral" id="kpiTokenUsageSub">&nbsp;</div>
           </div>
-          <div class="kpi-card animate-in delay-6">
+          <div class="kpi-card animate-in delay-6" data-insight="Money saved by serving cached responses instead of re-running identical prompts.">
             <div class="kpi-label">Cache Savings</div>
             <div class="kpi-value" id="kpiCacheSavings" style="color:var(--accent-green);">&mdash;</div>
             <div class="kpi-sub neutral" id="kpiCacheSavingsSub">&nbsp;</div>
@@ -754,7 +793,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
         </div>
 
         <div class="chart-row animate-in delay-5">
-          <div class="card">
+          <div class="card" data-insight="Day-by-day cost breakdown per AI tool. Spot weekday/weekend patterns and sudden spikes.">
             <div class="card-header">
               <div class="card-title">Daily Spend by Tool</div>
               <div class="card-badge" id="chartPeriodBadge" style="background:var(--accent-green-dim); color:var(--accent-green);">30 DAYS</div>
@@ -763,7 +802,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
               <canvas id="dailySpendChart"></canvas>
             </div>
           </div>
-          <div class="card">
+          <div class="card" data-insight="How much each developer is spending on AI. Identify your heaviest users and optimize their workflows.">
             <div class="card-header">
               <div class="card-title">Cost per Developer</div>
             </div>
@@ -773,7 +812,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
           </div>
         </div>
 
-        <div class="card animate-in delay-6">
+        <div class="card animate-in delay-6" data-insight="Side-by-side cost and usage comparison across all connected AI tools.">
           <div class="card-header">
             <div class="card-title">Tool Comparison</div>
           </div>
@@ -789,7 +828,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
           </table>
         </div>
 
-        <div class="card">
+        <div class="card" data-insight="Real-time stream of AI API calls as they happen. Each row shows model, tokens, cost, and latency.">
           <div class="card-header">
             <div class="card-title">Live Activity Feed</div>
             <div class="live-indicator" style="font-size:9px;padding:3px 8px;">
@@ -805,22 +844,22 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
       <!-- ─── Spend Analysis ─── -->
       <div id="view-spend" class="view">
         <div class="kpi-grid">
-          <div class="kpi-card">
+          <div class="kpi-card" data-insight="Total AI spend over the selected time window.">
             <div class="kpi-label">Period Spend</div>
             <div class="kpi-value" id="spendTotal">&mdash;</div>
             <div class="kpi-sub neutral" id="spendTotalSub">&nbsp;</div>
           </div>
-          <div class="kpi-card">
+          <div class="kpi-card" data-insight="The model with the highest spend in this period.">
             <div class="kpi-label">Top Model</div>
             <div class="kpi-value" id="spendTopModel" style="font-size:18px;">&mdash;</div>
             <div class="kpi-sub neutral" id="spendTopModelSub">&nbsp;</div>
           </div>
-          <div class="kpi-card">
+          <div class="kpi-card" data-insight="Number of API calls made in the selected period.">
             <div class="kpi-label">Total Requests</div>
             <div class="kpi-value" id="spendTotalReqs">&mdash;</div>
             <div class="kpi-sub neutral" id="spendTotalReqsSub">&nbsp;</div>
           </div>
-          <div class="kpi-card">
+          <div class="kpi-card" data-insight="Average spend per API call. High values indicate large prompts or expensive models.">
             <div class="kpi-label">Avg Cost / Request</div>
             <div class="kpi-value" id="spendAvgCost">&mdash;</div>
             <div class="kpi-sub neutral">&nbsp;</div>
@@ -828,7 +867,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
         </div>
 
         <div class="chart-row-equal">
-          <div class="card">
+          <div class="card" data-insight="Your daily spend over the selected period. Shows trajectory — flat, growing, or declining costs.">
             <div class="card-header">
               <div class="card-title">Daily Spend Trend</div>
             </div>
@@ -836,7 +875,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
               <canvas id="spendTrendChart"></canvas>
             </div>
           </div>
-          <div class="card">
+          <div class="card" data-insight="Today's spend broken down by hour. Reveals peak usage times and overnight runaway jobs.">
             <div class="card-header">
               <div class="card-title">Today — Hourly Spend</div>
               <div class="card-badge" id="todayDateBadge" style="background:var(--accent-green-dim); color:var(--accent-green);">TODAY</div>
@@ -848,7 +887,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
         </div>
 
         <div class="chart-row-equal">
-          <div class="card">
+          <div class="card" data-insight="Detailed breakdown of spend, tokens, and requests per model. Helps identify cheaper alternatives.">
             <div class="card-header">
               <div class="card-title">Cost by Model</div>
             </div>
@@ -861,7 +900,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
               </tbody>
             </table>
           </div>
-          <div class="card">
+          <div class="card" data-insight="Pie chart of AI spend split by team. Useful for chargeback and budget allocation decisions.">
             <div class="card-header">
               <div class="card-title">Cost by Team</div>
             </div>
@@ -895,29 +934,29 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
         </div>
 
         <div class="kpi-grid" id="modelSummaryKpis">
-          <div class="kpi-card">
+          <div class="kpi-card" data-insight="The lowest-cost model for your current usage profile (tokens/request × volume).">
             <div class="kpi-label">Cheapest Option</div>
             <div class="kpi-value" id="calcCheapestName" style="font-size:18px;">&mdash;</div>
             <div class="kpi-sub neutral" id="calcCheapestCost">&nbsp;</div>
           </div>
-          <div class="kpi-card">
+          <div class="kpi-card" data-insight="What your workload would cost using GPT-4o as the baseline for comparison.">
             <div class="kpi-label">GPT-4o Equivalent</div>
             <div class="kpi-value" id="calcGpt4oCost">&mdash;</div>
             <div class="kpi-sub neutral">baseline comparison</div>
           </div>
-          <div class="kpi-card">
+          <div class="kpi-card" data-insight="Maximum savings achievable by switching to the cheapest model for your workload.">
             <div class="kpi-label">Max Saving vs GPT-4o</div>
             <div class="kpi-value" id="calcMaxSaving" style="color:var(--accent-green);">&mdash;</div>
             <div class="kpi-sub neutral" id="calcMaxSavingSub">&nbsp;</div>
           </div>
-          <div class="kpi-card">
+          <div class="kpi-card" data-insight="Number of models currently tracked in the pricing database.">
             <div class="kpi-label">Models Compared</div>
             <div class="kpi-value" id="calcModelCount">&mdash;</div>
             <div class="kpi-sub neutral">across all providers</div>
           </div>
         </div>
 
-        <div class="card">
+        <div class="card" data-insight="Full pricing table across all providers. Filter by tier — Frontier, Mid, or Fast — to narrow down options.">
           <div class="card-header">
             <div class="card-title">All Models</div>
             <div class="model-filters">
@@ -935,7 +974,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
           </table>
         </div>
 
-        <div class="card">
+        <div class="card" data-insight="Relative cost share across OpenAI, Anthropic, and Google for your usage profile.">
           <div class="card-header">
             <div class="card-title">Provider Breakdown</div>
           </div>
@@ -948,21 +987,21 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
       <!-- ─── Members ─── -->
       <div id="view-members" class="view">
         <div class="kpi-grid" style="grid-template-columns: repeat(3, 1fr);">
-          <div class="kpi-card">
+          <div class="kpi-card" data-insight="Total number of team members with access to the VantageAI dashboard.">
             <div class="kpi-label">Members</div>
             <div class="kpi-value" id="memberCount">&mdash;</div>
           </div>
-          <div class="kpi-card">
+          <div class="kpi-card" data-insight="Month-to-date AI spend across all team members.">
             <div class="kpi-label">MTD Spend</div>
             <div class="kpi-value" id="memberMtdSpend">&mdash;</div>
           </div>
-          <div class="kpi-card">
+          <div class="kpi-card" data-insight="Your organization's monthly AI budget cap.">
             <div class="kpi-label">Org Budget</div>
             <div class="kpi-value" id="memberBudget">&mdash;</div>
           </div>
         </div>
 
-        <div class="card">
+        <div class="card" data-insight="Full roster with roles, teams, and API key status. Manage access and permissions here.">
           <div class="card-header">
             <div class="card-title">Team Members</div>
             <button class="btn btn-primary btn-sm" onclick="showInviteModal()">+ Invite</button>
@@ -977,7 +1016,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
           </table>
         </div>
 
-        <div class="card">
+        <div class="card" data-insight="Per-team budget allocations. Set limits to prevent any one team from exceeding their share.">
           <div class="card-header">
             <div class="card-title">Team Budgets</div>
           </div>
@@ -989,7 +1028,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
 
       <!-- ─── Budgets & Alerts ─── -->
       <div id="view-budgets" class="view">
-        <div class="card">
+        <div class="card" data-insight="Set the top-level monthly spend cap for your whole organization.">
           <div class="card-header">
             <div class="card-title">Organization Budget</div>
           </div>
@@ -1003,7 +1042,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
           <div id="orgBudgetStatus" style="margin-top:10px; font-size:11px; font-family:var(--font-mono); color:var(--text-muted);"></div>
         </div>
 
-        <div class="card">
+        <div class="card" data-insight="Granular per-team limits. Helps with chargeback and prevents budget overruns by any single team.">
           <div class="card-header">
             <div class="card-title">Team Budgets</div>
             <button class="btn btn-sm" onclick="showAddTeamBudgetModal()">+ Add Team Budget</button>
@@ -3299,6 +3338,92 @@ document.querySelectorAll('.modal-overlay').forEach(function(overlay) {
     if (e.target === overlay) overlay.classList.remove('active');
   });
 });
+</script>
+<script>
+// Card hold-to-reveal insight tooltip
+(function(){
+  const tip = document.createElement('div');
+  tip.id = 'card-insight-tip';
+  tip.setAttribute('role', 'tooltip');
+  tip.setAttribute('aria-live', 'polite');
+  document.body.appendChild(tip);
+
+  let holdTimer = null;
+  let activeCard = null;
+  const HOLD_MS = 4500;
+
+  function showTip(card, x, y) {
+    const text = card.dataset.insight;
+    const titleEl = card.querySelector('.kpi-label, .card-title');
+    if (!text) return;
+
+    tip.textContent = '';
+    if (titleEl) {
+      const strong = document.createElement('strong');
+      strong.textContent = titleEl.textContent.trim();
+      tip.appendChild(strong);
+    }
+    const p = document.createElement('p');
+    p.textContent = text;
+    tip.appendChild(p);
+
+    tip.style.left = '0';
+    tip.style.top = '0';
+    tip.style.opacity = '0';
+    tip.classList.add('visible');
+
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const margin = 16;
+    let left = x + 14;
+    let top  = y + 14;
+    if (left + tw + margin > vw) left = x - tw - 14;
+    if (top  + th + margin > vh) top  = y - th - 14;
+    tip.style.left = left + 'px';
+    tip.style.top  = top  + 'px';
+    tip.style.opacity = '1';
+  }
+
+  function hideTip() {
+    clearTimeout(holdTimer);
+    holdTimer = null;
+    activeCard = null;
+    tip.classList.remove('visible');
+    tip.style.opacity = '0';
+  }
+
+  function onEnter(e) {
+    const card = e.currentTarget;
+    if (activeCard === card) return;
+    hideTip();
+    activeCard = card;
+    holdTimer = setTimeout(() => showTip(card, e.clientX, e.clientY), HOLD_MS);
+  }
+
+  function onMove(e) {
+    if (!activeCard) return;
+    if (tip.classList.contains('visible')) return;
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(() => showTip(activeCard, e.clientX, e.clientY), HOLD_MS);
+  }
+
+  function onLeave() { hideTip(); }
+
+  document.querySelectorAll('.kpi-card[data-insight], .card[data-insight]').forEach(card => {
+    card.addEventListener('mouseenter', onEnter);
+    card.addEventListener('mousemove', onMove);
+    card.addEventListener('mouseleave', onLeave);
+    card.addEventListener('mousedown', hideTip);
+    let touchTimer = null;
+    card.addEventListener('touchstart', e => {
+      touchTimer = setTimeout(() => showTip(card, e.touches[0].clientX, e.touches[0].clientY), HOLD_MS);
+    }, {passive:true});
+    card.addEventListener('touchend', () => clearTimeout(touchTimer));
+    card.addEventListener('touchmove', () => clearTimeout(touchTimer));
+  });
+
+  document.addEventListener('click', hideTip);
+})();
 </script>
 </body>
 </html>
