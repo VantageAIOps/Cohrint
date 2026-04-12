@@ -13,3 +13,6 @@ preview_id = "8ad5c76d2e4b469096e2800dfa071948"
 [vars]
 RESEND_FROM = "vega@vantageaiops.com"
 SUPPORT_EMAIL = "support@vantageaiops.com"
+# Required secrets (set via `npx wrangler secret put <NAME>` — never commit values):
+#   RESEND_API_KEY   — Resend API key for outbound ticket emails
+#   VANTAGE_API_URL  — Base URL of the Vantage API (e.g. https://api.vantageaiops.com)

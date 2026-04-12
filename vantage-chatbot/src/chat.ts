@@ -6,9 +6,34 @@ import { sanitize } from "./sanitize";
 import { checkRateLimit } from "./ratelimit";
 // randomUUID is available as a global in the Workers runtime
 
+/** Resolve the org's actual plan from the Vantage session API.
+ *  Falls back to "free" on any error so the chat remains usable. */
+async function resolveOrgPlan(token: string | undefined, env: Env): Promise<string> {
+  if (!token || !env.VANTAGE_API_URL) return "free";
+  const cacheKey = `plan:${token.slice(-16)}`;
+  const cached = await env.VEGA_KV.get(cacheKey);
+  if (cached) return cached;
+  try {
+    const res = await fetch(`${env.VANTAGE_API_URL}/v1/auth/session`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return "free";
+    const data = await res.json() as { plan?: string };
+    const plan = data.plan ?? "free";
+    // Cache for 5 minutes to avoid per-request latency
+    await env.VEGA_KV.put(cacheKey, plan, { expirationTtl: 300 });
+    return plan;
+  } catch {
+    return "free";
+  }
+}
+
 export async function handleChat(c: Context<{ Bindings: Env }>): Promise<Response> {
   const orgId = c.req.header("X-Org-Id") ?? "anonymous";
-  const plan = c.req.header("X-Plan") ?? "free";
+  const token = c.req.header("Authorization")?.replace(/^Bearer\s+/i, "");
+
+  // Resolve plan server-side — never trust the X-Plan caller header for gating
+  const plan = await resolveOrgPlan(token, c.env);
 
   const { allowed, remaining } = await checkRateLimit(orgId, c.env);
   if (!allowed) {

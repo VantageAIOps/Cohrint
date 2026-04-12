@@ -120,37 +120,98 @@
     panel.classList.remove("vega-open");
   });
 
-  ticketBtn.addEventListener("click", function () {
-    var subject = window.prompt("Brief subject for your ticket:");
-    if (!subject) return;
-    var msgBody = window.prompt("Describe your issue:");
-    if (!msgBody) return;
-    var email = window.prompt("Your email address for follow-up:");
-    if (!email) return;
+  // ── Inline ticket form (replaces window.prompt — CSP-safe, works in iframes) ─
 
-    var tokenMatch = document.cookie.match(/session=([^;]+)/);
-    var reqHeaders = { "Content-Type": "application/json" };
-    if (tokenMatch) reqHeaders["Authorization"] = "Bearer " + tokenMatch[1];
+  var ticketForm = null;
 
-    fetch(CHATBOT_URL + "/ticket", {
-      method: "POST",
-      headers: reqHeaders,
-      body: JSON.stringify({ subject: subject, body: msgBody, email: email }),
-    })
-      .then(function (r) {
-        addMessage(
-          r.ok
-            ? "Ticket submitted! We\u2019ll follow up at " + email + " soon."
-            : "Couldn\u2019t submit ticket. Please email support@vantageaiops.com directly.",
-          "bot"
-        );
+  function removeTicketForm() {
+    if (ticketForm && ticketForm.parentNode) {
+      ticketForm.parentNode.removeChild(ticketForm);
+    }
+    ticketForm = null;
+  }
+
+  function buildTicketForm() {
+    removeTicketForm();
+
+    var form = makeEl("div", "vega-ticket-form");
+    form.style.cssText = "padding:12px;border-top:1px solid #3b3b5c;display:flex;flex-direction:column;gap:8px;";
+
+    function field(placeholder, type) {
+      var el = type === "textarea" ? makeEl("textarea") : makeEl("input");
+      el.setAttribute("placeholder", placeholder);
+      el.style.cssText = "background:#2a2a3e;border:1px solid #3b3b5c;border-radius:6px;color:#e2e8f0;padding:7px 10px;font-size:13px;outline:none;resize:none;width:100%;box-sizing:border-box;";
+      if (type === "textarea") el.setAttribute("rows", "3");
+      else el.setAttribute("type", type || "text");
+      return el;
+    }
+
+    var subjectEl = field("Subject", "text");
+    var bodyEl = field("Describe your issue\u2026", "textarea");
+    var emailEl = field("Your email", "email");
+
+    var btnRow = makeEl("div");
+    btnRow.style.cssText = "display:flex;gap:8px;";
+
+    var submitBtn = makeEl("button");
+    submitBtn.textContent = "Send ticket";
+    submitBtn.style.cssText = "background:#4f46e5;border:none;border-radius:6px;color:#fff;padding:7px 14px;cursor:pointer;font-size:13px;font-weight:500;flex:1;";
+
+    var cancelBtn = makeEl("button");
+    cancelBtn.textContent = "Cancel";
+    cancelBtn.style.cssText = "background:#2a2a3e;border:1px solid #3b3b5c;border-radius:6px;color:#e2e8f0;padding:7px 14px;cursor:pointer;font-size:13px;";
+
+    btnRow.appendChild(submitBtn);
+    btnRow.appendChild(cancelBtn);
+
+    form.appendChild(subjectEl);
+    form.appendChild(bodyEl);
+    form.appendChild(emailEl);
+    form.appendChild(btnRow);
+
+    cancelBtn.addEventListener("click", removeTicketForm);
+
+    submitBtn.addEventListener("click", function () {
+      var subject = subjectEl.value.trim();
+      var msgBody = bodyEl.value.trim();
+      var email = emailEl.value.trim();
+      if (!subject || !msgBody || !email) {
+        addMessage("Please fill in all three fields before sending.", "bot");
+        return;
+      }
+
+      submitBtn.disabled = true;
+      var tokenMatch = document.cookie.match(/session=([^;]+)/);
+      var reqHeaders = { "Content-Type": "application/json" };
+      if (tokenMatch) reqHeaders["Authorization"] = "Bearer " + tokenMatch[1];
+
+      fetch(CHATBOT_URL + "/ticket", {
+        method: "POST",
+        headers: reqHeaders,
+        body: JSON.stringify({ subject: subject, body: msgBody, email: email }),
       })
-      .catch(function () {
-        addMessage(
-          "Couldn\u2019t submit ticket. Please email support@vantageaiops.com directly.",
-          "bot"
-        );
-      });
+        .then(function (r) {
+          removeTicketForm();
+          addMessage(
+            r.ok
+              ? "Ticket submitted! We\u2019ll follow up at " + email + " soon."
+              : "Couldn\u2019t submit ticket. Please email support@vantageaiops.com directly.",
+            "bot"
+          );
+        })
+        .catch(function () {
+          removeTicketForm();
+          addMessage("Couldn\u2019t submit ticket. Please email support@vantageaiops.com directly.", "bot");
+        });
+    });
+
+    return form;
+  }
+
+  ticketBtn.addEventListener("click", function () {
+    ticketForm = buildTicketForm();
+    panel.insertBefore(ticketForm, footer);
+    ticketForm.querySelector("input,textarea").focus();
   });
 
   function sendMessage() {
