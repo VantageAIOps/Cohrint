@@ -38,7 +38,8 @@ class OTelExporter:
         self.org_id = os.environ.get("VANTAGE_ORG_ID", "")
 
     def _headers(self) -> dict[str, str]:
-        h = {"Content-Type": "application/json", "User-Agent": "vantage-agent/0.1.0"}
+        from . import __version__
+        h = {"Content-Type": "application/json", "User-Agent": f"vantage-agent/{__version__}"}
         if self.api_key:
             h["Authorization"] = f"Bearer {self.api_key}"
         return h

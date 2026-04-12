@@ -14,6 +14,7 @@ import sys
 
 from rich.console import Console
 
+from . import __version__
 from .anomaly import check_cost_anomaly
 from .api_client import AgentClient, DEFAULT_MODEL
 from .rate_limiter import wait_for_token, get_global_budget_used
@@ -27,7 +28,7 @@ from .tools import TOOL_MAP
 console = Console()
 
 BANNER = """
-  [bold]Vantage Agent[/bold] [dim]v0.1.0[/dim]
+  [bold]Vantage Agent[/bold] [dim]v{version}[/dim]
   [dim]AI coding agent with per-tool permissions, cost tracking & optimization[/dim]
   [dim]Model: {model}  |  CWD: {cwd}[/dim]
 
@@ -69,6 +70,7 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Resume a previous session by ID.",
     )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     return parser.parse_args()
 
 
@@ -80,6 +82,21 @@ def _build_client(args: argparse.Namespace) -> tuple[AgentClient, Tracker | None
 
     if args.api_key:
         os.environ["ANTHROPIC_API_KEY"] = args.api_key
+
+    # Determine backend
+    from .backends import auto_detect_backend
+    backend_name = args.backend  # could be None
+    if backend_name is None and not os.environ.get("ANTHROPIC_API_KEY"):
+        # No API key — try to auto-detect a CLI backend
+        try:
+            backend_name = auto_detect_backend()
+            if backend_name != "api":
+                console.print(f"  [dim]No API key found. Auto-detected backend: {backend_name}[/dim]")
+        except RuntimeError:
+            pass  # will fail naturally in AgentClient init
+
+    if backend_name not in (None, "api"):
+        console.print(f"  [yellow]Backend '{backend_name}' selected. Note: this backend has limited tool-use support.[/yellow]")
 
     client = AgentClient(
         model=model,
@@ -109,7 +126,7 @@ def _handle_command(line: str, client: AgentClient) -> bool:
         return True  # Signal exit
 
     if stripped == "/help":
-        console.print(BANNER.format(model=client.model, cwd=client.cwd))
+        console.print(BANNER.format(version=__version__, model=client.model, cwd=client.cwd))
         return True
 
     if stripped == "/tools":
@@ -180,8 +197,9 @@ def _handle_command(line: str, client: AgentClient) -> bool:
             return True
         new_model = parts[1].strip()
         client.model = new_model
-        client.cost.model = new_model
+        client.cost = SessionCost(model=new_model)
         console.print(f"  [green]Switched to {new_model}[/green]")
+        console.print("  [dim]Cost tracking reset for new model[/dim]")
         return True
 
     if stripped.startswith("/"):
@@ -193,7 +211,7 @@ def _handle_command(line: str, client: AgentClient) -> bool:
 
 def run_repl(client: AgentClient, tracker: Tracker | None = None) -> None:
     """Interactive REPL."""
-    console.print(BANNER.format(model=client.model, cwd=client.cwd))
+    console.print(BANNER.format(version=__version__, model=client.model, cwd=client.cwd))
 
     while True:
         try:
@@ -321,11 +339,35 @@ def _print_summary() -> None:
 
 def main() -> None:
     # Handle `vantageai-agent summary` before argparse (avoids positional arg conflict)
-    if len(sys.argv) > 1 and sys.argv[1] == "summary":
+    if len(sys.argv) == 2 and sys.argv[1] == "summary":
         _print_summary()
         return
 
     args = parse_args()
+
+    # S5: Validate --resume session backend matches available backend
+    if args.resume:
+        from .session_store import SessionStore, SessionNotFoundError
+        from .backends import auto_detect_backend
+        try:
+            _store = SessionStore()
+            _session_data = _store.load(args.resume)
+            _session_backend = _session_data.get("backend", "")
+            try:
+                _available_backend = args.backend or auto_detect_backend()
+            except Exception:
+                _available_backend = None
+            if _session_backend and _available_backend and _session_backend != _available_backend:
+                console.print(
+                    f"  [yellow]Warning: Session was created with backend '{_session_backend}' "
+                    f"which is not available. Starting fresh session.[/yellow]"
+                )
+                args.resume = None
+        except SessionNotFoundError:
+            console.print(f"  [red]Session {args.resume!r} not found.[/red]")
+            args.resume = None
+        except Exception:
+            pass
 
     # Show backend in banner
     if args.backend:

@@ -9,8 +9,12 @@ import uuid
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
+from rich.console import Console
+
 from .hooks import HookContext, CostSummary, run_pre_hooks, run_post_hooks
 from .session_store import SessionStore, DEFAULT_SESSIONS_DIR
+
+_console = Console()
 
 if TYPE_CHECKING:
     from .backends.base import Backend, BackendResult, AgentProcess
@@ -26,8 +30,12 @@ def _estimate_tokens(messages: list[dict]) -> int:
 def _trim_history(messages: list[dict]) -> list[dict]:
     """Remove oldest pairs until history fits within MAX_HISTORY_TOKENS."""
     msgs = list(messages)
+    trimmed = False
     while _estimate_tokens(msgs) > MAX_HISTORY_TOKENS and len(msgs) >= 2:
         msgs = msgs[2:]  # drop oldest user+assistant pair
+        trimmed = True
+    if trimmed:
+        _console.print("  [dim]Note: old context trimmed to fit token limit[/dim]")
     return msgs
 
 
@@ -187,6 +195,12 @@ class VantageSession:
         )
 
     def save(self) -> None:
+        # Preserve existing created_at; only set it if this is the first save
+        try:
+            existing = self._store.load(self.session_id)
+            created_at = existing.get("created_at", datetime.now(timezone.utc).isoformat())
+        except Exception:
+            created_at = datetime.now(timezone.utc).isoformat()
         self._store.save({
             "id": self.session_id,
             "backend": self.backend.name,
@@ -194,5 +208,5 @@ class VantageSession:
             "messages": self.history,
             "cost_summary": {**self._cost_summary, "backend": self.backend.name},
             "budget_usd": self._budget_usd,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": created_at,
         })

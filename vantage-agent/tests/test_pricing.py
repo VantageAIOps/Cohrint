@@ -21,9 +21,20 @@ class TestCalculateCost:
         cost = calculate_cost("gemini-2.0-flash", 1000, 500)
         assert cost > 0
 
-    def test_unknown_model_returns_zero(self):
-        cost = calculate_cost("totally-unknown-model-xyz", 1000, 500)
-        assert cost == 0
+    def test_unknown_model_uses_default_pricing(self):
+        """Unknown models now fall back to claude-sonnet-4-6 pricing with a warning."""
+        import sys
+        import io
+        stderr_capture = io.StringIO()
+        old_stderr = sys.stderr
+        sys.stderr = stderr_capture
+        try:
+            cost = calculate_cost("totally-unknown-model-xyz", 1000, 500)
+        finally:
+            sys.stderr = old_stderr
+        # Should use "default" pricing (claude-sonnet-4-6 rates) — not zero
+        assert cost > 0
+        assert "unknown model" in stderr_capture.getvalue()
 
     def test_zero_tokens_zero_cost(self):
         assert calculate_cost("gpt-4o", 0, 0) == 0

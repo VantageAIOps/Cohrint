@@ -36,6 +36,8 @@ class PermissionManager:
         if _PERM_FILE.exists():
             try:
                 data = json.loads(_PERM_FILE.read_text())
+                # schema_version missing → treat as v0 (backwards-compatible)
+                _schema = data.get("schema_version", 0)  # noqa: F841
                 saved = set(data.get("always_approved", []))
                 self.always_approved |= saved
                 self.session_approved |= saved
@@ -46,7 +48,10 @@ class PermissionManager:
         """Persist always-approved tools."""
         _STATE_DIR.mkdir(parents=True, exist_ok=True)
         _PERM_FILE.write_text(
-            json.dumps({"always_approved": sorted(self.always_approved)}, indent=2)
+            json.dumps(
+                {"schema_version": 1, "always_approved": sorted(self.always_approved)},
+                indent=2,
+            )
         )
 
     def is_approved(self, tool_name: str) -> bool:
