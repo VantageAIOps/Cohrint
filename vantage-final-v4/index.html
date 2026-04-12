@@ -414,6 +414,45 @@ footer a:hover{color:var(--text)}
 [data-theme="light"] .ticker-wrap{background:var(--bg2);border-color:rgba(0,0,0,.06)}
 [data-theme="light"] .demo-wrap{background:var(--bg2);border-color:rgba(0,0,0,.1)}
 [data-theme="light"] .demo-bar{background:var(--bg3);border-bottom-color:rgba(0,0,0,.06)}
+
+/* Card insight tooltip */
+#card-insight-tip{
+  position:fixed;
+  z-index:9999;
+  max-width:280px;
+  background:rgba(15,17,26,.96);
+  border:1px solid rgba(99,102,241,.35);
+  border-radius:10px;
+  padding:12px 16px;
+  box-shadow:0 8px 32px rgba(0,0,0,.45),0 0 0 1px rgba(99,102,241,.1);
+  pointer-events:none;
+  opacity:0;
+  transition:opacity .2s ease;
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+}
+#card-insight-tip.visible{display:block}
+#card-insight-tip strong{
+  display:block;
+  font-size:12px;
+  font-weight:600;
+  color:#a5b4fc;
+  margin-bottom:6px;
+  letter-spacing:.02em;
+}
+#card-insight-tip p{
+  font-size:12px;
+  color:rgba(255,255,255,.75);
+  line-height:1.55;
+  margin:0;
+}
+[data-theme="light"] #card-insight-tip{
+  background:rgba(255,255,255,.97);
+  border-color:rgba(99,102,241,.25);
+  box-shadow:0 8px 32px rgba(0,0,0,.12);
+}
+[data-theme="light"] #card-insight-tip strong{color:#4f46e5}
+[data-theme="light"] #card-insight-tip p{color:rgba(0,0,0,.7)}
 </style>
 </head>
 <body>
@@ -1195,6 +1234,95 @@ if ('serviceWorker' in navigator) {
     if (ev.data?.type === 'SW_UPDATED') window.location.reload();
   });
 }
+
+// ── Card hold-to-reveal insight tooltip ────────────────────────────────────
+(function(){
+  const tip = document.createElement('div');
+  tip.id = 'card-insight-tip';
+  tip.setAttribute('role', 'tooltip');
+  tip.setAttribute('aria-live', 'polite');
+  document.body.appendChild(tip);
+
+  let holdTimer = null;
+  let activeCard = null;
+  const HOLD_MS = 4500;
+
+  function showTip(card, x, y) {
+    const descEl = card.querySelector('.feat-desc, .int-card-desc, [data-insight]');
+    const text = card.dataset.insight || (descEl && descEl.textContent.trim());
+    if (!text) return;
+
+    const titleEl = card.querySelector('.feat-title, .int-card-title, h3, h4');
+
+    // Build tip using safe DOM methods — no innerHTML
+    tip.textContent = '';
+    if (titleEl) {
+      const strong = document.createElement('strong');
+      strong.textContent = titleEl.textContent.trim();
+      tip.appendChild(strong);
+    }
+    const p = document.createElement('p');
+    p.textContent = text;
+    tip.appendChild(p);
+
+    tip.style.left = '0';
+    tip.style.top = '0';
+    tip.style.opacity = '0';
+    tip.classList.add('visible');
+
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const margin = 16;
+    let left = x + 14;
+    let top  = y + 14;
+    if (left + tw + margin > vw) left = x - tw - 14;
+    if (top  + th + margin > vh) top  = y - th - 14;
+    tip.style.left = left + 'px';
+    tip.style.top  = top  + 'px';
+    tip.style.opacity = '1';
+  }
+
+  function hideTip() {
+    clearTimeout(holdTimer);
+    holdTimer = null;
+    activeCard = null;
+    tip.classList.remove('visible');
+    tip.style.opacity = '0';
+  }
+
+  function onEnter(e) {
+    const card = e.currentTarget;
+    if (activeCard === card) return;
+    hideTip();
+    activeCard = card;
+    holdTimer = setTimeout(() => showTip(card, e.clientX, e.clientY), HOLD_MS);
+  }
+
+  function onMove(e) {
+    if (!activeCard) return;
+    if (tip.classList.contains('visible')) return;
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(() => showTip(activeCard, e.clientX, e.clientY), HOLD_MS);
+  }
+
+  function onLeave() { hideTip(); }
+
+  document.querySelectorAll('.feat-card, .int-card, .testi-card, [data-insight]').forEach(card => {
+    card.addEventListener('mouseenter', onEnter);
+    card.addEventListener('mousemove', onMove);
+    card.addEventListener('mouseleave', onLeave);
+    card.addEventListener('mousedown', hideTip);
+    // Touch: long-press
+    let touchTimer = null;
+    card.addEventListener('touchstart', e => {
+      touchTimer = setTimeout(() => showTip(card, e.touches[0].clientX, e.touches[0].clientY), HOLD_MS);
+    }, {passive:true});
+    card.addEventListener('touchend', () => clearTimeout(touchTimer));
+    card.addEventListener('touchmove', () => clearTimeout(touchTimer));
+  });
+
+  document.addEventListener('click', hideTip);
+})();
 </script>
 </body>
 </html>
