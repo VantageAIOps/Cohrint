@@ -44,6 +44,65 @@ function sqliteMonthStart(): string {
   return d.toISOString().slice(0, 7) + '-01 00:00:00';
 }
 
+const ALLOWED_DAYS = new Set([7, 30, 90]);
+
+/**
+ * Returns parsed days if valid (7, 30, or 90).
+ * Throws a non-number sentinel so callers can return 400.
+ */
+function validateDays(raw: string | undefined): number {
+  const n = parseInt(raw ?? '30', 10);
+  if (!ALLOWED_DAYS.has(n)) throw new Error('invalid_days');
+  return n;
+}
+
+
+// ── GET /trend — daily cost per provider for stacked area chart ───────────
+
+crossplatform.get('/trend', async (c) => {
+  const orgId = c.get('orgId');
+  let days: number;
+  try {
+    days = validateDays(c.req.query('days'));
+  } catch {
+    return c.json({ error: 'days must be 7, 30, or 90' }, 400);
+  }
+  const since = sqliteDateSince(days);
+
+  const rows = await c.env.DB.prepare(`
+    SELECT DATE(period_start) AS day,
+           provider,
+           COALESCE(SUM(cost_usd), 0) AS cost
+    FROM cross_platform_usage
+    WHERE org_id = ? AND period_start >= ?
+    GROUP BY DATE(period_start), provider
+    ORDER BY day ASC
+  `).bind(orgId, since).all<{ day: string; provider: string; cost: number }>();
+
+  // Build the full N-day calendar spine regardless of whether every day has
+  // data. This ensures Chart.js always receives a continuous x-axis.
+  const spine: string[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - i);
+    spine.push(d.toISOString().slice(0, 10));
+  }
+
+  const data = rows.results ?? [];
+  const providerSet = new Set(data.map(r => r.provider));
+  const providers = [...providerSet].sort();
+
+  const series = providers.map(provider => ({
+    provider,
+    data: spine.map(day => {
+      const row = data.find(r => r.provider === provider && r.day === day);
+      return row ? Number(row.cost) : 0.0;
+    }),
+  }));
+
+  return c.json({ period_days: days, days: spine, providers, series });
+});
+
 // ── GET /summary — total spend across all platforms ─────────────────────────
 
 crossplatform.get('/summary', async (c) => {
