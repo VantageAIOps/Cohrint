@@ -212,12 +212,12 @@ class TestConfigAndStructure:
         assert (AGENT_DIR / "pyproject.toml").exists()
 
     def test_cl25_package_name_correct(self):
-        import tomllib  # Python 3.11+
-        with open(AGENT_DIR / "pyproject.toml", "rb") as f:
-            data = tomllib.load(f)
-        name = data["project"]["name"]
+        import re
+        content = (AGENT_DIR / "pyproject.toml").read_text()
+        m = re.search(r'^\s*name\s*=\s*"([^"]+)"', content, re.MULTILINE)
+        name = m.group(1) if m else ""
         chk("CL.25 package name is vantageai-agent", name == "vantageai-agent")
-        assert name == "vantageai-agent"
+        assert name == "vantageai-agent", f"got: {name!r}"
 
     def test_cl26_cli_entry_point(self):
         try:
