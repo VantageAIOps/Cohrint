@@ -1724,14 +1724,26 @@ export CLINE_OTEL_EXPORTER_OTLP_PROTOCOL=http/json</pre>
   https://api.vantageaiops.com/v1/cross-platform/summary?days=30</pre>
 <p>Response: <code>{ total_cost_usd, total_input_tokens, total_output_tokens, by_provider: [...], budget: {...} }</code></p>
 
+<h2>GET /v1/cross-platform/trend</h2>
+<p>Daily cost per provider for the stacked area chart. Returns a full calendar spine — all N days included even if spend is zero.</p>
+<pre>curl -H "Authorization: Bearer vnt_your_key" \
+  https://api.vantageaiops.com/v1/cross-platform/trend?days=30</pre>
+<p>Response: <code>{ period_days, days: ["2026-03-01", ...], providers: [...], series: [{ provider, data: [0.12, ...] }] }</code></p>
+<p><strong>Valid <code>days</code> values:</strong> <code>7</code>, <code>30</code>, <code>90</code>. Any other value returns 400.</p>
+
 <h2>GET /v1/cross-platform/developers</h2>
 <p>Per-developer spend table with ROI metrics.</p>
 <pre>curl -H "Authorization: Bearer vnt_your_key" \\
   https://api.vantageaiops.com/v1/cross-platform/developers?days=30</pre>
-<p>Response: <code>{ developers: [{ developer_email, total_cost, commits, pull_requests, lines_added, cost_per_pr, providers, ... }] }</code></p>
+<p>Response: <code>{ developers: [{ developer_id, developer_email, total_cost, commits, pull_requests, lines_added, cost_per_pr, providers, by_provider, ... }] }</code></p>
+<p><strong>Note:</strong> <code>developer_email</code> is redacted (<code>u***@domain.com</code>) for non-admin roles. Rows without a <code>developer_id</code> (legacy OTel-only events) are included with <code>developer_id: null</code>.</p>
 
-<h2>GET /v1/cross-platform/developer/:email</h2>
-<p>Single developer drill-down: by provider, by model, daily trend, productivity.</p>
+<h2>GET /v1/cross-platform/developer/:id</h2>
+<p>Single developer drill-down by internal UUID. Returns per-provider cost, per-model cost, daily trend, and productivity stats.</p>
+<pre>curl -H "Authorization: Bearer vnt_your_key" \
+  "https://api.vantageaiops.com/v1/cross-platform/developer/&lt;uuid&gt;?days=30"</pre>
+<p><code>:id</code> is the <code>developer_id</code> UUID from the <code>/developers</code> list. Admin/owner may query any developer; member/viewer may only query their own ID (403 otherwise).</p>
+<p>Response: <code>{ developer_id, developer_email, by_provider: [...], by_model: [...], daily_trend: [...], productivity: {...} }</code></p>
 
 <h2>GET /v1/cross-platform/live</h2>
 <p>Latest OTel events for real-time dashboard feed.</p>

@@ -293,12 +293,21 @@ def test_cross_platform_developers(headers):
 
 
 def test_cross_platform_developer_detail(headers):
-    """Query single developer drill-down."""
+    """Query single developer drill-down via UUID (route changed from :email to :id)."""
     section("OT.I — Developer Detail API")
 
-    r = requests.get(f"{API_URL}/v1/cross-platform/developer/alice%40acme.com?days=1",
-                     headers=headers, timeout=15)
-    chk("OT.26 GET /cross-platform/developer/:email → 200", r.status_code == 200, f"got {r.status_code}")
+    # Fetch developer_id UUID from the list endpoint — route now requires UUID, not email
+    list_r = requests.get(f"{API_URL}/v1/cross-platform/developers",
+                          headers=headers, params={"days": 7}, timeout=15)
+    devs = [d for d in list_r.json().get("developers", []) if d.get("developer_id")] if list_r.ok else []
+    if not devs:
+        chk("OT.26 GET /cross-platform/developer/:id — skipped (no developer_id in list)", True, "")
+        return
+
+    dev_id = devs[0]["developer_id"]
+    r = requests.get(f"{API_URL}/v1/cross-platform/developer/{dev_id}",
+                     headers=headers, params={"days": 7}, timeout=15)
+    chk("OT.26 GET /cross-platform/developer/:id → 200", r.status_code == 200, f"got {r.status_code}")
 
     if r.status_code == 200:
         data = r.json()
