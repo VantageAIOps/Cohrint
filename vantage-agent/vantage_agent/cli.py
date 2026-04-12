@@ -65,6 +65,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--api-key", default=None, help="Anthropic API key (or set ANTHROPIC_API_KEY)")
     parser.add_argument("--vantage-key", default=None, help="VantageAI dashboard API key for telemetry")
     parser.add_argument("--debug", action="store_true", help="Enable debug output")
+    parser.add_argument("--version", action="version", version=f"vantageai-agent {__version__}")
     parser.add_argument(
         "--backend",
         choices=["api", "claude", "codex", "gemini"],
