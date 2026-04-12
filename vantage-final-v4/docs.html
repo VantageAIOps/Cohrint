@@ -1760,18 +1760,23 @@ export CLINE_OTEL_EXPORTER_OTLP_PROTOCOL=http/json</pre>
 
 'vantage-cli': `
 <h1>VantageAI Agent — Python CLI</h1>
-<p>A Python-based interactive REPL and one-shot CLI with <strong>zero-latency prompt optimization</strong>, <strong>cost tracking</strong>, and dashboard integration.</p>
+<p>A Python-based interactive REPL and one-shot CLI with <strong>per-tool permissions</strong>, <strong>exact cost tracking</strong>, and support for both Anthropic API keys and <strong>Claude Max subscriptions</strong> (no API key required).</p>
 
 <h2>Install & Run</h2>
 <pre>pip install vantageai-agent
-vantageai-agent</pre>
+
+# With Anthropic API key
+vantageai-agent
+
+# With Claude Max subscription (no API key needed)
+vantageai-agent --backend claude</pre>
 
 <h2>CLI Flags</h2>
 <table class="api-table">
 <thead><tr><th>Flag</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>--backend &lt;name&gt;</code></td><td>Backend to use (e.g. <code>claude</code>, <code>openai</code>)</td></tr>
-<tr><td><code>--model &lt;name&gt;</code></td><td>Model to use (e.g. <code>claude-opus-4-5</code>)</td></tr>
+<tr><td><code>--backend &lt;name&gt;</code></td><td>Backend: <code>claude</code> (Claude Max), <code>api</code> (Anthropic API), <code>gemini</code>, <code>openai</code></td></tr>
+<tr><td><code>--model &lt;name&gt;</code></td><td>Model override (e.g. <code>claude-opus-4-6</code>)</td></tr>
 <tr><td><code>--resume &lt;session_id&gt;</code></td><td>Resume a previous session by ID</td></tr>
 <tr><td><code>--no-optimize</code></td><td>Disable prompt optimization</td></tr>
 </tbody></table>
@@ -1780,23 +1785,43 @@ vantageai-agent</pre>
 <table class="api-table">
 <thead><tr><th>Command</th><th>Action</th></tr></thead>
 <tbody>
-<tr><td><code>/quit</code> or <code>/exit</code></td><td>Exit the REPL</td></tr>
-<tr><td><code>/reset</code></td><td>Clear conversation context</td></tr>
-<tr><td><code>/optimize</code></td><td>Toggle prompt optimization on/off</td></tr>
+<tr><td><code>/quit</code> or <code>/exit</code></td><td>Exit and show session cost summary</td></tr>
+<tr><td><code>/reset</code></td><td>Clear conversation context, permissions, and cost</td></tr>
+<tr><td><code>/optimize on|off</code></td><td>Toggle prompt optimization</td></tr>
 <tr><td><code>/model &lt;name&gt;</code></td><td>Switch model mid-session</td></tr>
-<tr><td><code>/allow &lt;tool&gt;</code></td><td>Allow a tool/permission for this session</td></tr>
-<tr><td><code>/summary</code></td><td>Show dashboard spend, tokens, budget from API</td></tr>
-<tr><td><code>/sessions</code></td><td>List recent sessions with cost breakdown</td></tr>
+<tr><td><code>/allow &lt;tool&gt;</code></td><td>Approve a tool for this session (e.g. <code>/allow Bash,Write</code>)</td></tr>
+<tr><td><code>/allow all</code></td><td>Approve all tools for this session</td></tr>
+<tr><td><code>/tools</code></td><td>Show current tool permission status</td></tr>
+<tr><td><code>/tier</code></td><td>Change tool permission tier (Read-only / Standard / Full / Custom)</td></tr>
+<tr><td><code>/cost</code></td><td>Show session token usage and cost</td></tr>
 </tbody></table>
 
-<h2>How It Works</h2>
-<p>1. You type a prompt → 2. Agent optimizes it locally (&lt;1ms) → 3. Sends to backend → 4. Streams output in real-time → 5. Calculates cost + savings</p>
+<h2>Claude Max Backend</h2>
+<p>Use your Claude Max subscription instead of API credits. The <code>--backend claude</code> flag routes prompts through the Claude Code CLI with full multi-turn session support via <code>--resume</code>.</p>
+<pre># First run shows tier selection wizard
+vantageai-agent --backend claude
 
-<div class="info-box">Zero added latency: optimization is synchronous, tracking is async fire-and-forget.</div>
+# Costs shown as API-equivalent (actual charge: $0.00)
+# ↳ 1,234 tokens · API-equivalent: $0.0199  [Max subscription: $0.00 actual]</pre>
+
+<h2>Tool Permission Tiers</h2>
+<p>On first run with <code>--backend claude</code>, a wizard lets you choose what Claude is allowed to do automatically:</p>
+<table class="api-table">
+<thead><tr><th>Tier</th><th>Auto-approved tools</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><strong>1 — Read-only</strong></td><td>Read, Glob, Grep</td><td>Safest</td></tr>
+<tr><td><strong>2 — Standard</strong></td><td>+ Edit, Write</td><td>Default</td></tr>
+<tr><td><strong>3 — Full</strong></td><td>+ Bash (asks per-call)</td><td>Bash always prompts</td></tr>
+<tr><td><strong>4 — Custom</strong></td><td>You choose</td><td>Per-tool selection</td></tr>
+</tbody></table>
+<div class="info-box">Bash is never auto-approved in any tier — it always requires explicit confirmation per command.</div>
+
+<h2>How It Works</h2>
+<p>1. You type a prompt → 2. Agent optimizes it locally (&lt;1ms) → 3. Sends to backend → 4. Streams output with tool use → 5. Exact token cost extracted from response</p>
 
 <h2>Dashboard Integration</h2>
-<p>When configured with a VantageAI API key, the agent automatically pushes cost data to your dashboard. Events include: model, provider, tokens, cost, latency, and session ID.</p>
-<div class="info-box">Set your API key in <code>~/.vantage/config.json</code> or via <code>VANTAGE_API_KEY</code> environment variable.</div>
+<p>When configured with a VantageAI API key, the agent pushes cost data to your dashboard automatically.</p>
+<div class="info-box">Set <code>VANTAGE_API_KEY</code> or save to <code>~/.vantage-agent/api_key</code>.</div>
 
 <h2>Anomaly Detection</h2>
 <p>The agent warns when a prompt's cost exceeds 3x the session average, helping catch runaway token usage before it impacts your budget.</p>
