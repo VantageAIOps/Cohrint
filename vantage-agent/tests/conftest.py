@@ -82,13 +82,9 @@ def workspace(tmp_path):
 
 
 @pytest.fixture
-def perms(tmp_path, monkeypatch):
+def perms(tmp_path):
     """Isolated PermissionManager."""
-    state_dir = tmp_path / ".vantage-agent"
-    perm_file = state_dir / "permissions.json"
-    monkeypatch.setattr("vantage_agent.permissions._STATE_DIR", state_dir)
-    monkeypatch.setattr("vantage_agent.permissions._PERM_FILE", perm_file)
-    return PermissionManager()
+    return PermissionManager(config_dir=tmp_path / ".vantage-agent")
 
 
 @pytest.fixture

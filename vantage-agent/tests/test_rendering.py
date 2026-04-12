@@ -207,32 +207,32 @@ class TestThinkingRendering:
 # ── Section F: Permission Flow (Mock Interactive) ─────────────────────
 
 class TestPermissionFlow:
-    def test_safe_tools_auto_approved(self):
-        pm = PermissionManager()
+    def test_safe_tools_auto_approved(self, tmp_path):
+        pm = PermissionManager(config_dir=tmp_path)
         assert pm.check_permission("Read", {}) is True
         assert pm.check_permission("Glob", {}) is True
         assert pm.check_permission("Grep", {}) is True
 
-    def test_dangerous_tool_prompts_user(self):
-        pm = PermissionManager()
+    def test_dangerous_tool_prompts_user(self, tmp_path):
+        pm = PermissionManager(config_dir=tmp_path)
         with patch("rich.prompt.Prompt.ask", return_value="y"):
             assert pm.check_permission("Bash", {"command": "ls"}) is True
 
-    def test_deny_returns_false(self):
-        pm = PermissionManager()
+    def test_deny_returns_false(self, tmp_path):
+        pm = PermissionManager(config_dir=tmp_path)
         with patch("rich.prompt.Prompt.ask", return_value="n"):
             assert pm.check_permission("Bash", {"command": "rm -rf /"}) is False
 
-    def test_always_approve_persists_in_session(self):
-        pm = PermissionManager()
+    def test_always_approve_persists_in_session(self, tmp_path):
+        pm = PermissionManager(config_dir=tmp_path)
         with patch("rich.prompt.Prompt.ask", return_value="a"):
             assert pm.check_permission("Write", {"file_path": "/tmp/a"}) is True
         # Second call should not prompt
         assert pm.check_permission("Write", {"file_path": "/tmp/b"}) is True
 
-    def test_denied_tool_in_api_loop(self):
+    def test_denied_tool_in_api_loop(self, tmp_path):
         """When user denies a tool, API receives error result."""
-        pm = PermissionManager()
+        pm = PermissionManager(config_dir=tmp_path)
         with patch("rich.prompt.Prompt.ask", return_value="n"):
             allowed = pm.check_permission("Bash", {"command": "dangerous"})
         assert allowed is False
@@ -415,7 +415,7 @@ class TestAPIClientToolLoop:
         assert mock_client.messages.stream.call_count == 2
 
     @patch("vantage_agent.api_client.anthropic.Anthropic")
-    def test_permission_denied_stops_tool(self, mock_anthropic_cls):
+    def test_permission_denied_stops_tool(self, mock_anthropic_cls, tmp_path):
         """When user denies a tool, error result is sent back."""
         cb = MagicMock()
         cb.type = "tool_use"
@@ -445,7 +445,7 @@ class TestAPIClientToolLoop:
         mock_client.messages.stream.side_effect = [stream1, stream2]
         mock_anthropic_cls.return_value = mock_client
 
-        pm = PermissionManager()
+        pm = PermissionManager(config_dir=tmp_path)
         with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}):
             with patch("rich.prompt.Prompt.ask", return_value="n"):
                 client = AgentClient(permissions=pm, optimization=False)
