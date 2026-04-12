@@ -78,7 +78,6 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Resume a previous session by ID.",
     )
-    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     return parser.parse_args()
 
 
