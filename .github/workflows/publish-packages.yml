@@ -7,7 +7,6 @@ on:
   push:
     branches: [main]
     paths:
-      - 'vantage-cli/**'
       - 'vantage-mcp/**'
       - 'vantage-js-sdk/**'
       - 'vantage-local-proxy/**'
@@ -22,7 +21,6 @@ jobs:
     name: Detect version changes
     runs-on: ubuntu-latest
     outputs:
-      cli: ${{ steps.check.outputs.cli }}
       mcp: ${{ steps.check.outputs.mcp }}
       sdk: ${{ steps.check.outputs.sdk }}
       proxy: ${{ steps.check.outputs.proxy }}
@@ -53,7 +51,6 @@ jobs:
           }
 
           echo "Checking package versions..."
-          check_version "vantage-cli" "vantageai-cli" "cli"
           check_version "vantage-mcp" "vantageaiops-mcp" "mcp"
           check_version "vantage-js-sdk" "vantageaiops" "sdk"
           check_version "vantage-local-proxy" "vantageai-local-proxy" "proxy"
@@ -69,29 +66,6 @@ jobs:
             echo "agent=false" >> $GITHUB_OUTPUT
             echo "  → up to date"
           fi
-
-  publish-cli:
-    name: Publish vantageai-cli
-    needs: detect-changes
-    if: needs.detect-changes.outputs.cli == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
-      - name: Install, build, publish
-        working-directory: vantage-cli
-        run: |
-          npm ci
-          npm run build
-          npm publish --access public
-          NEW_VER=$(node -e "console.log(require('./package.json').version)")
-          npm deprecate "vantageai-cli@<${NEW_VER}" "Upgrade to ${NEW_VER}: run npm install -g vantageai-cli"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          # NEW_VER is derived from package.json — not user input, no injection risk
 
   publish-mcp:
     name: Publish vantageaiops-mcp
@@ -178,7 +152,7 @@ jobs:
 
   summary:
     name: Publish Summary
-    needs: [detect-changes, publish-cli, publish-mcp, publish-sdk, publish-proxy, publish-agent]
+    needs: [detect-changes, publish-mcp, publish-sdk, publish-proxy, publish-agent]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -188,7 +162,6 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Package | Changed | Result |" >> $GITHUB_STEP_SUMMARY
           echo "|---------|---------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| vantageai-cli | ${{ needs.detect-changes.outputs.cli }} | ${{ needs.publish-cli.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| vantageaiops-mcp | ${{ needs.detect-changes.outputs.mcp }} | ${{ needs.publish-mcp.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| vantageaiops | ${{ needs.detect-changes.outputs.sdk }} | ${{ needs.publish-sdk.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| vantageai-local-proxy | ${{ needs.detect-changes.outputs.proxy }} | ${{ needs.publish-proxy.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
