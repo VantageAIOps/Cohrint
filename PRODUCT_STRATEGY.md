@@ -233,6 +233,16 @@ All items below are shipped and live at `vantageaiops.com` as of 2026-04-14.
 - [x] Cron sync: Sundays UTC, idempotent upsert into `cross_platform_usage`
 - [x] Endpoints: `POST /v1/copilot/connect`, `DELETE /v1/copilot/connect`, `GET /v1/copilot/status`
 
+**Claude Code Integration (Stop Hook Tracking)**
+- [x] Zero-config Stop hook — auto-tracks every Claude Code session
+- [x] Three install channels: vantage-mcp setup, @vantageaiops/claude-code npm, manual install.sh
+- [x] Client-side deduplication — ~/.claude/vantage-state.json (50K ID cap), server-side INSERT OR IGNORE
+- [x] Dual-write architecture — events → /v1/events/batch (analytics) + /v1/otel/v1/metrics (cross-platform)
+- [x] Cost calculation — mirrors worker pricing table, supports 12 models (Claude, GPT-4o, o1, o3-mini, Gemini)
+- [x] Separate OTel AbortController — fire-and-forget OTel writes never block analytics uploads
+- [x] Dashboard card — Settings → Integrations → Claude Code, shows active status, last event, session count
+- [x] Integration status check — `/v1/analytics/summary?agent=claude-code` for setup verification
+
 **Datadog Metrics Exporter (`/v1/datadog/*`)**
 - [x] Pushes `vantage.ai.cost_usd` + `vantage.ai.tokens` gauge metrics to customer's own Datadog
 - [x] Tags: provider, model, developer_id, org_id
@@ -838,6 +848,88 @@ All P2 tasks shipped in PR #55 (merged 2026-04-14):
 - **Copilot OTel parity** — github/copilot-cli issue #2471. When it ships, update OTel adapter to consume it natively alongside the REST API adapter.
 - **Langfuse Agent Graph** — Benchmark against their agent viz for product parity decisions.
 - **GitHub Copilot seat pricing** — Any change to $19/user/month changes the Copilot adapter cost model.
+
+---
+
+## 13. Technical Design Decisions
+
+Architectural decisions and trade-offs made during V2 implementation. These are lessons learned from production deployment and should inform Phase 3 platform work.
+
+### 1. AbortController Isolation for Fire-and-Forget Requests
+
+**Decision:** OTel metrics emission must use its own `AbortController`, independent of the batch upload timer.
+
+**Why:** The Claude Code hook performs a dual-write: POSTs to `/v1/events/batch` (for dashboard) and emits OTLP JSON to `/v1/otel/v1/metrics` (for cross-platform console). If a single `AbortController` is shared, and the batch upload is slow on the user's network, the abort timeout fires and cancels the OTel request as well. This caused silent data loss — OTel events never reached the cross-platform console.
+
+**Implementation:** In vantage-track.js, the OTel fetch uses `new AbortController()` with a separate 5-second timeout. The batch upload uses a different controller. Both fire independently. If the OTel write fails, the batch upload still succeeds.
+
+**Trade-off:** Two simultaneous network requests instead of one. Negligible overhead for a background process, huge reliability gain.
+
+### 2. Agent-Scoped Analytics Without Per-Agent Caching
+
+**Decision:** `/v1/analytics/summary?agent=<name>` filters all DB queries by `agent_name` and **bypasses KV cache entirely**.
+
+**Why:** The analytics endpoint has a 5-minute KV cache for performance. But when a customer checks "is my Claude Code hook active?" via the dashboard, they want status **now**, not stale data. A shared KV cache would show "No Data" for 5 minutes after the first hook event, confusing users.
+
+**Implementation:** The cache is only used if `?agent=` is not provided. Agent-filtered requests always hit D1, adding the clause `AND agent_name = ?` to every query.
+
+**Trade-off:** O(n) DB hits for n status checks. In practice: 1–2 checks per setup, so negligible. Future: could use agent-specific cache keys (e.g., `analytics:summary:agent:claude-code`) if agents become high-frequency.
+
+### 3. Dual-Write Architecture for Event Sources
+
+**Decision:** Claude Code hook events are written to **both** `/v1/events/batch` (analytics pipeline) **and** `/v1/otel/v1/metrics` (cross-platform console).
+
+**Why:** VantageAI has two independent event pipelines:
+- **Analytics** (`events` table) powers the main dashboard, budgets, KPIs, team breakdowns
+- **Cross-Platform** (`cross_platform_usage` + OTel) powers the unified developer spend view across all tools (Copilot, Cursor, Claude Code, Codeium)
+
+If Claude Code only went to analytics, it would be invisible in the cross-platform console. Dual-write ensures one integration reaches both consumers.
+
+**Implementation:** Fire two separate fetch calls after event collection. Each has its own error handling and timeout.
+
+**Trade-off:** Client-side code duplication (hook must format data for both APIs). Future: server-side could accept either format and auto-distribute, but client-side duplication keeps the hook lightweight (zero dependencies).
+
+### 4. Client-Side Deduplication + Server-Side INSERT OR IGNORE
+
+**Decision:** The hook maintains `~/.claude/vantage-state.json` (capped at 50K event IDs) for client-side dedup, and the server uses `INSERT OR IGNORE` for a second layer.
+
+**Why:** Network failures and retry logic in browsers/CLIs are unpredictable. A user runs a Claude Code session, the hook POSTs the event, the response gets lost, the SDK retries, and now the event is in the database twice. Two protections: (1) client remembers IDs and won't re-POST, (2) server has a unique constraint on event_id and ignores duplicates.
+
+**Implementation:** After an HTTP 2xx response, event IDs are appended to `vantage-state.json`. On the next hook run, the hook loads this file and checks `uploadedIds.has(eventId)` before POSTing. Server uses `event_id` as a unique key.
+
+**Trade-off:** State file grows unbounded, so it's capped at 50K entries (client-side). Beyond 50K, old IDs are dropped. This is acceptable because: (a) events are older than the last 6 months of usage, (b) retry windows are < 1 hour in practice, (c) server-side constraint is the true safeguard.
+
+**Risk:** If state file is corrupted, the hook will re-upload old events. Mitigation: state file is JSON; hook safely catches parse errors and starts fresh.
+
+### 5. Setup Subcommand Before MCP Transport Initialization
+
+**Decision:** The `npx vantageaiops-mcp setup` subcommand must intercept `process.argv[2] === 'setup'` **before** `StdioServerTransport` is instantiated.
+
+**Why:** The MCP server runs an infinite loop on stdin (MCP protocol). If the setup subcommand runs after the transport starts, stdin is consumed by the transport and the process won't exit cleanly. The user runs `npx vantageaiops-mcp setup` and it hangs indefinitely.
+
+**Implementation:** In vantage-mcp/src/index.ts, the `main()` function checks `process.argv[2]` at the very top. If it's `'setup'`, it calls `runSetup()` synchronously and exits with `process.exit(0)` **before** creating the transport.
+
+**Order:**
+```
+main()
+  → check argv[2]
+  → if 'setup': runSetup() → exit(0)
+  → else: create StdioServerTransport + start loop
+```
+
+**Trade-off:** Setup code lives in the MCP package (not a separate CLI). This is fine because setup runs once; the MCP server itself runs continuously.
+
+### 6. Zero Runtime Dependencies Constraint
+
+**Decision:** All SDK/CLI packages (`vantage-mcp`, `@vantageaiops/claude-code`, `vantage-js-sdk`) must have **zero npm runtime dependencies**.
+
+**Why:** (a) Security: fewer dependencies = fewer CVEs to patch. (b) Installation speed: no `npm install` recursion. (c) Compliance: easier auditing for regulated customers. (d) Bundling: tools like Claude Code might bundle the SDK; zero deps makes bundling trivial.
+
+**Implementation:** Use only Node.js built-ins: `node:fs`, `node:os`, `node:path`, `node:url`, `node:crypto`, `node:https`. No axios, no node-fetch, just native fetch (Node 18+).
+
+**Trade-off:** Some nice-to-haves are unavailable (auto-retry libraries, XML parsing). The hook implements its own exponential backoff and JSON parsing (trivial for telemetry).
+
+**Exception:** Build tools (devDependencies) can have deps: esbuild, TypeScript, Vitest, etc. Only runtime code must be zero-dep.
 
 ---
 
