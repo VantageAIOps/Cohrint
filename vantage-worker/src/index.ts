@@ -50,9 +50,13 @@
  *   POST /v1/otel/v1/metrics             (OTLP metrics — Claude Code, Copilot, Gemini CLI)
  *   POST /v1/otel/v1/logs                (OTLP events — api_request, tool_result, etc.)
  *   POST /v1/otel/v1/traces              (OTLP traces — future)
+ *   POST /v1/copilot/connect             (admin — store GitHub org + PAT encrypted in KV)
+ *   DELETE /v1/copilot/connect           (admin — remove Copilot connection)
+ *   GET  /v1/copilot/status              (list Copilot connections + last sync time)
  *
  * Cron Triggers:
  *   Every 10 min  — anomaly detection (Z-score cost spike alerts)
+ *                 — GitHub Copilot Metrics sync (daily per-org KV guard, no-op if already ran today)
  */
 
 import { Hono } from 'hono';
@@ -72,6 +76,9 @@ import { otel }       from './routes/otel';
 import { crossplatform } from './routes/crossplatform';
 import { auditlog }    from './routes/auditlog';
 import { sessions }    from './routes/sessions';
+import { copilot, syncCopilotMetrics } from './routes/copilot';
+import { datadog, syncDatadogMetrics } from './routes/datadog';
+import { benchmark, syncBenchmarkContributions } from './routes/benchmark';
 import { runAnomalyDetection } from './lib/anomaly';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -104,6 +111,9 @@ app.route('/v1/otel',       otel);      // OpenTelemetry collector (Claude Code,
 app.route('/v1/cross-platform', crossplatform); // Cross-platform cost dashboard API
 app.route('/v1/audit-log',      auditlog);
 app.route('/v1/sessions',       sessions);  // OTel session rollup
+app.route('/v1/copilot',        copilot);   // GitHub Copilot Metrics API adapter
+app.route('/v1/datadog',        datadog);   // Datadog metrics exporter
+app.route('/v1/benchmark',      benchmark); // Anonymized cross-company benchmarks
 
 // ── 404 fallback ──────────────────────────────────────────────────────────────
 app.notFound((c) => c.json({
@@ -131,11 +141,55 @@ export default {
   fetch: app.fetch,
   async scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionContext) {
     ctx.waitUntil((async () => {
+      // ── Anomaly detection (every 10 min) ─────────────────────────────────
       try {
         const result = await runAnomalyDetection(env.DB, env.KV);
         console.log(`[anomaly-cron] checked=${result.checked} anomalies=${result.anomalies} alerts=${result.alerts_sent}`);
       } catch (err) {
         console.error('[anomaly-cron] Fatal error:', err);
+      }
+
+      // ── GitHub Copilot Metrics sync (daily — guarded by KV per-day key) ──
+      // syncCopilotMetrics internally skips orgs already synced today,
+      // so it's safe to attempt on every 10-min tick.
+      try {
+        const results = await syncCopilotMetrics(env);
+        const synced  = results.filter(r => !r.skipped && !r.error);
+        const errors  = results.filter(r => r.error);
+        if (synced.length > 0 || errors.length > 0) {
+          console.log(`[copilot-cron] synced=${synced.length} skipped=${results.filter(r => r.skipped).length} errors=${errors.length}`);
+          for (const e of errors) {
+            console.error(`[copilot-cron] ${e.github_org}: ${e.error}`);
+          }
+        }
+      } catch (err) {
+        console.error('[copilot-cron] Fatal error:', err);
+      }
+
+      // ── Datadog Metrics push (daily — guarded by KV per-day key) ─────────
+      // syncDatadogMetrics internally skips orgs already pushed today,
+      // so it's safe to call on every 10-min tick.
+      try {
+        const ddResults = await syncDatadogMetrics(env);
+        const ddSynced  = ddResults.filter(r => !r.skipped && !r.error);
+        const ddErrors  = ddResults.filter(r => r.error);
+        if (ddSynced.length > 0 || ddErrors.length > 0) {
+          console.log(`[datadog-cron] pushed=${ddSynced.length} skipped=${ddResults.filter(r => r.skipped).length} errors=${ddErrors.length}`);
+          for (const e of ddErrors) {
+            console.error(`[datadog-cron] org=${e.org_id}: ${e.error}`);
+          }
+        }
+      } catch (err) {
+        console.error('[datadog-cron] Fatal error:', err);
+      }
+
+      // ── Benchmark contributions (Sundays UTC only) ────────────────────────
+      // syncBenchmarkContributions checks day-of-week internally and is a
+      // no-op on non-Sunday ticks, so safe to call on every cron tick.
+      try {
+        await syncBenchmarkContributions(env);
+      } catch (err) {
+        console.error('[benchmark-cron] Fatal error:', err);
       }
     })());
   },

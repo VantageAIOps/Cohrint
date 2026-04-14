@@ -1154,6 +1154,55 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
             </label>
             <div id="benchmarkOptInStatus" style="margin-top:8px; font-size:11px; font-family:var(--font-mono); color:var(--text-muted);"></div>
           </div>
+
+          <!-- ── GitHub Copilot Integration ── -->
+          <div class="card" id="copilotCard">
+            <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+              <div class="card-title" style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:18px;">&#129303;</span> GitHub Copilot
+              </div>
+              <span id="copilotStatusBadge" style="display:none;font-size:10px;font-family:var(--font-mono);font-weight:600;padding:3px 8px;border-radius:10px;"></span>
+            </div>
+            <p style="font-size:12px;color:var(--text-secondary);margin-bottom:14px;">
+              Connect your GitHub organization to pull Copilot seat usage and cost data directly into VantageAI.
+            </p>
+
+            <!-- Connected state -->
+            <div id="copilotConnected" style="display:none;">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;font-size:12px;font-family:var(--font-mono);">
+                <div>
+                  <div style="color:var(--text-muted);margin-bottom:2px;">Organization</div>
+                  <div id="copilotConnOrg" style="color:var(--text-primary);font-weight:600;"></div>
+                </div>
+                <div>
+                  <div style="color:var(--text-muted);margin-bottom:2px;">Last synced</div>
+                  <div id="copilotConnLastSync" style="color:var(--text-secondary);"></div>
+                </div>
+              </div>
+              <div id="copilotConnError" style="display:none;font-size:11px;color:var(--accent-amber);font-family:var(--font-mono);margin-bottom:10px;padding:6px 10px;background:rgba(251,191,36,0.08);border-radius:4px;border-left:2px solid var(--accent-amber);"></div>
+              <button class="btn btn-danger btn-sm" onclick="disconnectCopilot()">Disconnect</button>
+              <div id="copilotDisconnectStatus" style="margin-top:8px;font-size:11px;font-family:var(--font-mono);color:var(--text-muted);"></div>
+            </div>
+
+            <!-- Connect form -->
+            <div id="copilotConnectForm">
+              <div class="form-group">
+                <label>GitHub Organization</label>
+                <input type="text" id="copilotOrg" placeholder="my-org" autocomplete="off" spellcheck="false">
+              </div>
+              <div class="form-group">
+                <label>Personal Access Token</label>
+                <input type="password" id="copilotToken" placeholder="ghp_... or github_pat_..." autocomplete="new-password" spellcheck="false">
+                <div style="margin-top:5px;font-size:11px;color:var(--text-muted);line-height:1.5;">
+                  Requires a GitHub PAT with <code style="font-family:var(--font-mono);color:var(--accent-blue);">read:org</code> and
+                  <code style="font-family:var(--font-mono);color:var(--accent-blue);">manage_billing:copilot</code> scopes.
+                  Fine-grained PATs (<code style="font-family:var(--font-mono);color:var(--accent-green);">github_pat_*</code>) are recommended.
+                </div>
+              </div>
+              <button class="btn btn-primary" onclick="connectCopilot()" id="copilotConnectBtn">Connect</button>
+              <div id="copilotConnectStatus" style="margin-top:8px;font-size:11px;font-family:var(--font-mono);color:var(--text-muted);"></div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1410,6 +1459,7 @@ var _API_CACHE_TTL = 5 * 60 * 1000; // 5 min cache TTL
 var TOOL_NAMES = {
   anthropic: 'Claude Code', openai: 'Codex CLI', google: 'Gemini CLI',
   codex: 'Codex CLI',
+  'github-copilot': 'GitHub Copilot', datadog: 'Datadog',
   // Future: Cursor, Windsurf, Aider, Cline, Roo Code, OpenCode, Kiro
   // cursor: 'Cursor', windsurf: 'Windsurf', aider: 'Aider',
   // cline: 'Cline', kiro: 'Kiro', 'roo-code': 'Roo Code', opencode: 'OpenCode'
@@ -1549,7 +1599,11 @@ function apiFetch(path, opts) {
         var retryAfter = parseInt(res.headers.get('Retry-After') || '60', 10);
         throw new Error('Rate limited. Retry in ' + retryAfter + 's');
       }
-      if (!res.ok) throw new Error('API ' + res.status);
+      if (!res.ok) {
+        return res.json().catch(function() { return {}; }).then(function(body) {
+          throw new Error((body && body.error) || ('API ' + res.status));
+        });
+      }
       return res.json().then(function(data) {
         if (isRead && data) _cacheSet(path, data);
         return data;
@@ -2962,6 +3016,141 @@ function loadSettings() {
   document.getElementById('settingsApiBase').value = localStorage.getItem('api_base') || 'https://api.vantageaiops.com';
   document.getElementById('privacyMode').value = localStorage.getItem('vantage_privacy') || 'strict';
   loadBenchmarkOptIn();
+  loadCopilotStatus();
+}
+
+/* ── GitHub Copilot ── */
+
+var _copilotStatusLoading = false;
+function loadCopilotStatus() {
+  // Guard against concurrent calls (e.g. tab switch during in-flight connect)
+  if (_copilotStatusLoading) return Promise.resolve();
+  _copilotStatusLoading = true;
+  return apiFetch('/v1/copilot/status').then(function(data) {
+    var connections = (data && data.connections) || [];
+    if (connections.length > 0) {
+      renderCopilotConnected(connections[0]);
+    } else {
+      renderCopilotDisconnected();
+    }
+  }).catch(function() {
+    // Show a neutral error state — don't silently show the connect form,
+    // which could cause a duplicate connect attempt when already connected.
+    var card = document.getElementById('copilotCard');
+    if (card) {
+      var errNote = card.querySelector('.copilot-load-error');
+      if (!errNote) {
+        errNote = document.createElement('p');
+        errNote.className = 'copilot-load-error';
+        errNote.style.cssText = 'color:var(--text-muted);font-size:12px;margin:8px 0 0;';
+        card.appendChild(errNote);
+      }
+      errNote.textContent = 'Could not load connection status. Refresh to retry.';
+    }
+  }).finally(function() {
+    _copilotStatusLoading = false;
+  });
+}
+
+function renderCopilotConnected(conn) {
+  document.getElementById('copilotConnected').style.display = '';
+  document.getElementById('copilotConnectForm').style.display = 'none';
+
+  var badge = document.getElementById('copilotStatusBadge');
+  badge.style.display = '';
+  if (conn.status === 'active') {
+    badge.textContent = 'ACTIVE';
+    badge.style.background = 'rgba(52,211,153,0.12)';
+    badge.style.color = 'var(--accent-green)';
+  } else if (conn.status === 'error') {
+    badge.textContent = 'ERROR';
+    badge.style.background = 'rgba(239,68,68,0.1)';
+    badge.style.color = 'var(--accent-red)';
+  } else {
+    badge.textContent = (conn.status || 'unknown').toUpperCase();
+    badge.style.background = 'rgba(122,139,160,0.12)';
+    badge.style.color = 'var(--text-secondary)';
+  }
+
+  document.getElementById('copilotConnOrg').textContent = conn.github_org || '—';
+
+  var lastSync = conn.last_synced_at;
+  document.getElementById('copilotConnLastSync').textContent = lastSync
+    ? new Date(lastSync).toLocaleString()
+    : 'Never';
+
+  var errEl = document.getElementById('copilotConnError');
+  if (conn.last_error) {
+    errEl.textContent = conn.last_error;
+    errEl.style.display = '';
+  } else {
+    errEl.style.display = 'none';
+  }
+}
+
+function renderCopilotDisconnected() {
+  document.getElementById('copilotConnected').style.display = 'none';
+  document.getElementById('copilotConnectForm').style.display = '';
+  var badge = document.getElementById('copilotStatusBadge');
+  badge.style.display = 'none';
+}
+
+function connectCopilot() {
+  var org = (document.getElementById('copilotOrg').value || '').trim();
+  var token = (document.getElementById('copilotToken').value || '').trim();
+  var statusEl = document.getElementById('copilotConnectStatus');
+  var btn = document.getElementById('copilotConnectBtn');
+
+  if (!org) { statusEl.style.color = 'var(--accent-red)'; statusEl.textContent = 'GitHub organization is required.'; return; }
+  if (!token) { statusEl.style.color = 'var(--accent-red)'; statusEl.textContent = 'Personal access token is required.'; return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Connecting…';
+  statusEl.style.color = 'var(--text-muted)';
+  statusEl.textContent = '';
+
+  apiFetch('/v1/copilot/connect', {
+    method: 'POST',
+    body: JSON.stringify({ github_org: org, token: token })
+  }).then(function() {
+    // Clear token from DOM immediately — never leave it in the field
+    document.getElementById('copilotToken').value = '';
+    document.getElementById('copilotOrg').value = '';
+    statusEl.style.color = 'var(--accent-green)';
+    statusEl.textContent = 'Connected successfully.';
+    setTimeout(function() { statusEl.textContent = ''; }, 3000);
+    // Re-enable button only after status reload so double-submit is blocked
+    return loadCopilotStatus();
+  }).then(function() {
+    btn.disabled = false;
+    btn.textContent = 'Connect';
+  }).catch(function(e) {
+    document.getElementById('copilotToken').value = '';
+    btn.disabled = false;
+    btn.textContent = 'Connect';
+    statusEl.style.color = 'var(--accent-red)';
+    statusEl.textContent = 'Connection failed: ' + e.message;
+  });
+}
+
+function disconnectCopilot() {
+  var org = document.getElementById('copilotConnOrg').textContent;
+  if (!org || org === '—') return;
+  if (!confirm('Disconnect GitHub Copilot integration for "' + org + '"? Existing synced data will be retained.')) return;
+
+  var statusEl = document.getElementById('copilotDisconnectStatus');
+  statusEl.style.color = 'var(--text-muted)';
+  statusEl.textContent = 'Disconnecting…';
+
+  apiFetch('/v1/copilot/connect?github_org=' + encodeURIComponent(org), {
+    method: 'DELETE'
+  }).then(function() {
+    statusEl.textContent = '';
+    loadCopilotStatus();
+  }).catch(function(e) {
+    statusEl.style.color = 'var(--accent-red)';
+    statusEl.textContent = 'Failed: ' + e.message;
+  });
 }
 
 function saveApiBase() {
@@ -3332,6 +3521,24 @@ function loadConnectedTools() {
       var already = connections.some(function(c) { return c.provider === b.provider; });
       if (!already) {
         connections.push({ provider: b.provider, status: b.status || 'off', source: 'billing' });
+      }
+    });
+
+    // Copilot connections (from /connections response)
+    var copilotConns = (data && data.copilot_connections) || [];
+    copilotConns.forEach(function(c) {
+      var already = connections.some(function(x) { return x.provider === 'github-copilot'; });
+      if (!already) {
+        connections.push({ provider: 'github-copilot', status: c.status || 'off', source: 'copilot' });
+      }
+    });
+
+    // Datadog connections (from /connections response)
+    var datadogConns = (data && data.datadog_connections) || [];
+    datadogConns.forEach(function(c) {
+      var already = connections.some(function(x) { return x.provider === 'datadog'; });
+      if (!already) {
+        connections.push({ provider: 'datadog', status: c.status || 'off', source: 'datadog' });
       }
     });
 

@@ -71,6 +71,36 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:16px 4
 .step-body code{font-family:var(--mono);font-size:12px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;padding:1px 6px;color:var(--accent)}
 .dashboard-btn{display:block;width:100%;background:var(--accent);color:#000;border:none;padding:14px;border-radius:9px;font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.04em;cursor:pointer;text-align:center;text-decoration:none;transition:opacity .2s;margin-top:20px}
 .dashboard-btn:hover{opacity:.88}
+/* pricing section */
+.pricing-section{padding:80px 24px 64px;position:relative}
+.pricing-section .glow2{position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:800px;height:240px;background:radial-gradient(ellipse,rgba(0,212,161,.06) 0%,transparent 70%);pointer-events:none}
+.pricing-heading{text-align:center;margin-bottom:48px}
+.pricing-heading h2{font-family:var(--serif);font-size:36px;font-weight:400;margin-bottom:10px}
+.pricing-heading p{font-size:14px;color:var(--muted);max-width:480px;margin:0 auto;line-height:1.6}
+.pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:1020px;margin:0 auto;position:relative;z-index:1}
+.tier-card{background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:32px 28px;display:flex;flex-direction:column}
+.tier-card.enterprise{border-color:rgba(0,212,161,.2);background:linear-gradient(135deg,var(--bg2) 0%,rgba(0,212,161,.03) 100%)}
+.tier-name{font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;margin-bottom:14px}
+.tier-price{font-family:var(--serif);font-size:34px;font-weight:400;line-height:1;margin-bottom:4px}
+.tier-price span{font-family:var(--sans);font-size:13px;font-weight:400;color:var(--muted)}
+.tier-billing{font-size:12px;color:var(--dim);margin-bottom:16px;font-family:var(--mono)}
+.tier-desc{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:22px;min-height:48px}
+.tier-divider{border:none;border-top:1px solid var(--border);margin-bottom:20px}
+.tier-features{list-style:none;flex:1;margin-bottom:24px}
+.tier-features li{font-size:13px;color:var(--muted);padding:5px 0;display:flex;align-items:flex-start;gap:9px;line-height:1.5}
+.tier-features li::before{content:"✓";color:var(--accent);font-family:var(--mono);font-size:12px;flex-shrink:0;margin-top:1px}
+.tier-features li .tag{font-size:10px;font-family:var(--mono);color:var(--dim);background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:4px;padding:1px 5px;white-space:nowrap;margin-left:4px}
+.tier-cta{display:block;width:100%;padding:13px;border-radius:9px;font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.04em;text-align:center;text-decoration:none;cursor:pointer;transition:opacity .2s,transform .15s;border:none}
+.tier-cta:hover{opacity:.85;transform:translateY(-1px)}
+.tier-cta.primary{background:var(--accent);color:#000}
+.tier-cta.secondary{background:rgba(255,255,255,.06);color:var(--text);border:1px solid var(--border2)}
+.tier-cta.outline{background:transparent;color:var(--accent);border:1px solid rgba(0,212,161,.35)}
+.tier-cta.outline:hover{background:rgba(0,212,161,.06)}
+.tier-note{font-size:11px;color:var(--dim);text-align:center;margin-top:10px;font-family:var(--mono)}
+.tier-note a{color:var(--muted);text-decoration:none;transition:color .2s}
+.tier-note a:hover{color:var(--text)}
+@media(max-width:860px){.pricing-grid{grid-template-columns:1fr;max-width:420px}}
+@media(max-width:560px){.pricing-section{padding:60px 20px 48px}.pricing-heading h2{font-size:28px}}
 footer{border-top:1px solid var(--border);padding:20px 48px;display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--dim);font-family:var(--mono)}
 footer a{color:var(--dim);text-decoration:none;transition:color .2s}
 footer a:hover{color:var(--text)}
@@ -191,6 +221,82 @@ footer a:hover{color:var(--text)}
 
   </div>
 </div>
+
+<!-- PRICING SECTION -->
+<section class="pricing-section">
+  <div class="glow2"></div>
+  <div class="pricing-heading">
+    <h2>Simple, <em style="font-style:italic;color:var(--accent)">honest</em> pricing</h2>
+    <p>Start free. Upgrade when your team needs more. No usage-based surprises.</p>
+  </div>
+  <div class="pricing-grid">
+
+    <!-- Free -->
+    <div class="tier-card">
+      <div class="tier-name">Free</div>
+      <div class="tier-price">$0</div>
+      <div class="tier-billing">forever</div>
+      <p class="tier-desc">For individual developers getting started with LLM cost visibility.</p>
+      <hr class="tier-divider">
+      <ul class="tier-features">
+        <li>50,000 events / month</li>
+        <li>1 developer seat</li>
+        <li>7-day data retention</li>
+        <li>SDK + OTel ingestion</li>
+        <li>Cost dashboard</li>
+        <li>Model &amp; team breakdown</li>
+      </ul>
+      <a href="#form-state" class="tier-cta secondary" onclick="document.getElementById('inp-email').focus();return false">Get started free</a>
+    </div>
+
+    <!-- Team -->
+    <div class="tier-card">
+      <div class="tier-name">Team</div>
+      <div class="tier-price">$49 <span>/ month</span></div>
+      <div class="tier-billing">up to 10 seats · billed monthly</div>
+      <p class="tier-desc">For engineering teams that need multi-developer tracking and longer history.</p>
+      <hr class="tier-divider">
+      <ul class="tier-features">
+        <li>Everything in Free</li>
+        <li>Unlimited events</li>
+        <li>Up to 10 seats</li>
+        <li>90-day data retention</li>
+        <li>Budget policies &amp; alerts</li>
+        <li>Cross-platform analytics</li>
+        <li>Audit log</li>
+        <li>Email support</li>
+      </ul>
+      <a href="mailto:sales@vantageaiops.com?subject=Team%20plan" class="tier-cta primary">Start Team trial</a>
+      <div class="tier-note" style="margin-top:8px;font-size:12px;color:var(--text-muted);">or email <a href="mailto:sales@vantageaiops.com" style="color:inherit;">sales@vantageaiops.com</a></div>
+    </div>
+
+    <!-- Enterprise -->
+    <div class="tier-card enterprise">
+      <div class="tier-name" style="color:var(--accent)">Enterprise</div>
+      <div class="tier-price" style="font-size:26px;padding-top:4px">Custom</div>
+      <div class="tier-billing">talk to sales</div>
+      <p class="tier-desc">For engineering orgs with compliance, SSO, and procurement requirements.</p>
+      <hr class="tier-divider">
+      <ul class="tier-features">
+        <li>Everything in Team</li>
+        <li>Unlimited seats</li>
+        <li>SSO / SAML <span class="tag">roadmap</span></li>
+        <li>SOC 2 Type I report <span class="tag">Q3 2026</span></li>
+        <li>Custom data retention</li>
+        <li>SLA + dedicated support</li>
+        <li>Custom DPA / BAA available</li>
+        <li>Audit log export</li>
+        <li>Priority onboarding</li>
+      </ul>
+      <a href="mailto:sales@vantageaiops.com?subject=Enterprise%20inquiry" class="tier-cta outline">Talk to sales</a>
+      <div class="tier-note">
+        We respond within 1 business day<br>
+        <a href="/trust.html">Review our security architecture →</a>
+      </div>
+    </div>
+
+  </div>
+</section>
 
 <footer>
   <a href="/">VantageAI</a>

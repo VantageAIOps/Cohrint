@@ -300,17 +300,6 @@ footer a:hover{color:var(--text)}
 .step-title{font-size:15px;font-weight:500;margin-bottom:8px}
 .step-desc{font-size:13px;color:var(--muted);line-height:1.6}
 
-/* TESTIMONIALS */
-.testi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:56px}
-.testi-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;display:flex;flex-direction:column;gap:14px;transition:border-color .2s}
-.testi-card:hover{border-color:var(--border2)}
-.testi-stars{color:var(--amber);font-size:12px;letter-spacing:2px}
-.testi-quote{font-size:14px;line-height:1.65;color:var(--text);flex:1}
-.testi-quote em{color:var(--accent);font-style:normal;font-weight:500}
-.testi-author{display:flex;align-items:center;gap:10px}
-.testi-avatar{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#000;flex-shrink:0}
-.testi-name{font-size:13px;font-weight:500}
-.testi-role{font-size:11px;color:var(--muted)}
 
 /* COMPARISON TABLE */
 .compare-wrap{margin-top:56px;border:1px solid var(--border);border-radius:14px;overflow:hidden}
@@ -358,7 +347,7 @@ footer a:hover{color:var(--text)}
   nav{padding:16px 20px}
   .nav-links{display:none}
   .nav-hamburger{display:flex}
-  .feat-panel,.pricing-grid,.steps,.testi-grid{grid-template-columns:1fr}
+  .feat-panel,.pricing-grid,.steps{grid-template-columns:1fr}
   .feat-tabs{width:100%;overflow-x:auto}
   .steps::before{display:none}
   .stats-strip{grid-template-columns:repeat(2,1fr)}
@@ -462,6 +451,7 @@ footer a:hover{color:var(--text)}
   <div class="nav-links">
     <a href="/calculator.html">Calculator</a>
     <a href="/docs.html">Docs</a>
+    <a href="/report.html">Report</a>
     <a href="#pricing">Pricing</a>
     <a href="#security">Security</a>
     <a href="/auth" id="nav-signin" style="font-size:13px;color:var(--muted);text-decoration:none;transition:color .2s">Sign in</a>
@@ -475,6 +465,7 @@ footer a:hover{color:var(--text)}
 <div class="nav-mobile" id="navMobile">
   <a href="/calculator.html">Calculator</a>
   <a href="/docs.html">Docs</a>
+  <a href="/report.html">Report</a>
   <a href="#pricing" onclick="closeMobileNav()">Pricing</a>
   <a href="#faq" onclick="closeMobileNav()">FAQ</a>
   <a href="/auth" id="nav-signin-mob">Sign in</a>
@@ -888,10 +879,15 @@ response = client.chat.completions.<span class="c-func">create</span>(
   </div>
 </section>
 
-<!-- STATS BAR (replaces fake testimonials) -->
-<section id="testimonials" style="padding-top:0;text-align:center">
-  <div class="sec-label" style="text-align:center">// platform at a glance</div>
-  <p style="font-size:20px;font-weight:600;color:var(--text);max-width:640px;margin:16px auto 0">10+ AI tools tracked &nbsp;·&nbsp; 40+ metrics per call &nbsp;·&nbsp; Hosted on Cloudflare's global edge</p>
+<!-- EARLY ACCESS / DESIGN PARTNERS -->
+<section id="social-proof" style="padding-top:0;text-align:center">
+  <div class="sec-label" style="text-align:center">// used by developers at</div>
+  <div style="max-width:640px;margin:0 auto;padding:40px 24px;background:var(--bg2);border:1px solid var(--border);border-radius:20px;margin-top:32px">
+    <p style="font-size:22px;font-weight:700;color:var(--text);margin:0 0 10px">In early access — design partners welcome</p>
+    <p style="font-size:14px;color:var(--muted);line-height:1.6;margin:0 0 28px">We're onboarding a small cohort of engineering teams to shape the roadmap. Early partners get free Pro access and a direct line to the founders.</p>
+    <a href="mailto:hello@vantageaiops.com?subject=Design Partner Interest" style="display:inline-block;padding:12px 28px;background:var(--accent);color:#000;font-weight:600;font-size:14px;border-radius:10px;text-decoration:none;transition:opacity .2s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">Become a design partner →</a>
+    <p style="font-size:12px;color:var(--muted);margin:16px 0 0">No commitment. Cancel anytime. hello@vantageaiops.com</p>
+  </div>
 </section>
 
 <!-- COMPARISON -->
@@ -1022,8 +1018,10 @@ response = client.chat.completions.<span class="c-func">create</span>(
     <a href="/docs.html">Docs</a>
     
     <a href="mailto:support@vantageaiops.com">Contact</a>
+    <a href="/report.html">Benchmark Report</a>
     <a href="/privacy.html">Privacy</a>
     <a href="/terms.html">Terms</a>
+    <a href="https://trust.vantageaiops.com">Security</a>
   </div>
   <span style="color:var(--dim)">© 2026 VantageAI</span>
 </footer>
@@ -1307,7 +1305,7 @@ if ('serviceWorker' in navigator) {
 
   function onLeave() { hideTip(); }
 
-  document.querySelectorAll('.feat-card, .int-card, .testi-card, [data-insight]').forEach(card => {
+  document.querySelectorAll('.feat-card, .int-card, [data-insight]').forEach(card => {
     card.addEventListener('mouseenter', onEnter);
     card.addEventListener('mousemove', onMove);
     card.addEventListener('mouseleave', onLeave);

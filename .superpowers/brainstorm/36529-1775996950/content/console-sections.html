@@ -1,0 +1,49 @@
+<h2>What's on the Cross-Platform tab?</h2>
+<p class="subtitle">All data exists in the DB. Pick which sections are in scope for MVP.</p>
+
+<div class="options" data-multiselect>
+  <div class="option" data-choice="kpis" onclick="toggleSelect(this)">
+    <div class="letter">1</div>
+    <div class="content">
+      <h3>KPI row — 4 cards</h3>
+      <p>Total cross-tool spend · Top tool by cost · Active developers · MTD vs budget</p>
+    </div>
+  </div>
+  <div class="option" data-choice="tool-breakdown" onclick="toggleSelect(this)">
+    <div class="letter">2</div>
+    <div class="content">
+      <h3>Tool breakdown chart</h3>
+      <p>Bar or donut: Copilot vs Claude Code vs Cursor vs Gemini CLI cost share. Period selector (7/30/90d).</p>
+    </div>
+  </div>
+  <div class="option" data-choice="developer-table" onclick="toggleSelect(this)">
+    <div class="letter">3</div>
+    <div class="content">
+      <h3>Per-developer attribution table</h3>
+      <p>email · total cost · tools used · commits · cost/commit. Sortable. Click row → drill-down modal.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="daily-trend" onclick="toggleSelect(this)">
+    <div class="letter">4</div>
+    <div class="content">
+      <h3>Daily cost trend (stacked by tool)</h3>
+      <p>Line/area chart showing per-tool spend over time. Spots when Cursor started spiking, etc.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="live-feed" onclick="toggleSelect(this)">
+    <div class="letter">5</div>
+    <div class="content">
+      <h3>Live event feed</h3>
+      <p>Real-time stream of API calls across all tools. Already exists on Overview — include here too?</p>
+    </div>
+  </div>
+  <div class="option" data-choice="connections" onclick="toggleSelect(this)">
+    <div class="letter">6</div>
+    <div class="content">
+      <h3>Connected tools status</h3>
+      <p>Which billing connectors are active, last sync time, errors. Quick "Add tool" CTA.</p>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:20px">Select all that belong in MVP. Deselect to push to v2.</p>

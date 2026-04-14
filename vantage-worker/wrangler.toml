@@ -34,8 +34,10 @@ RATE_LIMIT_RPM     = "1000"
 crons = ["*/10 * * * *"]
 
 # ── Secrets (set via: wrangler secret put SECRET_NAME) ───────────────────────
-# RESEND_API_KEY   — Resend API key for email (member invites, key recovery)
-#                    Get a free key at resend.com — 3,000 emails/month
+# RESEND_API_KEY             — Resend API key for email (member invites, key recovery)
+#                              Get a free key at resend.com — 3,000 emails/month
+# TOKEN_ENCRYPTION_SECRET    — AES-256-GCM key material for Copilot PAT encryption
+#                              Generate: openssl rand -base64 32
 
 # ── Preview environment ───────────────────────────────────────────────────────
 [env.preview]

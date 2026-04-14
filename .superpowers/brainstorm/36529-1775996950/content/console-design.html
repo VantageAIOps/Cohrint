@@ -1,0 +1,113 @@
+<h2>Cross-Platform Tab — Layout Design</h2>
+<p class="subtitle">Proposed section order. One new backend endpoint needed for the stacked trend chart.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Dashboard → Cross-Platform tab</div>
+  <div class="mockup-body" style="padding:16px;display:flex;flex-direction:column;gap:14px;">
+
+    <!-- Period selector -->
+    <div style="display:flex;justify-content:flex-end;gap:8px;">
+      <span style="background:#4f46e5;color:#fff;padding:4px 12px;border-radius:6px;font-size:12px">7d</span>
+      <span style="background:#2a2a3e;color:#aaa;padding:4px 12px;border-radius:6px;font-size:12px">30d</span>
+      <span style="background:#2a2a3e;color:#aaa;padding:4px 12px;border-radius:6px;font-size:12px">90d</span>
+    </div>
+
+    <!-- KPI row -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:8px;padding:12px;">
+        <div style="font-size:10px;color:#888;margin-bottom:4px">TOTAL SPEND</div>
+        <div style="font-size:20px;font-weight:700;color:#e2e8f0">$1,284</div>
+        <div style="font-size:10px;color:#4ade80">↑ 12% vs prev</div>
+      </div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:8px;padding:12px;">
+        <div style="font-size:10px;color:#888;margin-bottom:4px">TOP TOOL</div>
+        <div style="font-size:16px;font-weight:700;color:#e2e8f0">Claude Code</div>
+        <div style="font-size:10px;color:#aaa">$612 · 48%</div>
+      </div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:8px;padding:12px;">
+        <div style="font-size:10px;color:#888;margin-bottom:4px">ACTIVE DEVS</div>
+        <div style="font-size:20px;font-weight:700;color:#e2e8f0">14</div>
+        <div style="font-size:10px;color:#aaa">across 3 tools</div>
+      </div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:8px;padding:12px;">
+        <div style="font-size:10px;color:#888;margin-bottom:4px">MTD BUDGET</div>
+        <div style="font-size:20px;font-weight:700;color:#fb923c">72%</div>
+        <div style="font-size:10px;color:#aaa">$3,600 / $5,000</div>
+      </div>
+    </div>
+
+    <!-- Charts row -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:8px;padding:12px;">
+        <div style="font-size:11px;font-weight:600;color:#a5b4fc;margin-bottom:8px">Daily Spend by Tool <span style="font-size:9px;color:#4ade80;margin-left:6px">NEW endpoint</span></div>
+        <div style="height:80px;display:flex;align-items:flex-end;gap:3px;padding-bottom:4px">
+          <div style="flex:1;background:linear-gradient(#4f46e5,#6366f1);border-radius:2px 2px 0 0;height:60%"></div>
+          <div style="flex:1;background:linear-gradient(#4f46e5,#6366f1);border-radius:2px 2px 0 0;height:45%"></div>
+          <div style="flex:1;background:linear-gradient(#4f46e5,#6366f1);border-radius:2px 2px 0 0;height:70%"></div>
+          <div style="flex:1;background:linear-gradient(#4f46e5,#6366f1);border-radius:2px 2px 0 0;height:50%"></div>
+          <div style="flex:1;background:linear-gradient(#4f46e5,#6366f1);border-radius:2px 2px 0 0;height:80%"></div>
+          <div style="flex:1;background:linear-gradient(#4f46e5,#6366f1);border-radius:2px 2px 0 0;height:65%"></div>
+          <div style="flex:1;background:linear-gradient(#4f46e5,#6366f1);border-radius:2px 2px 0 0;height:90%"></div>
+        </div>
+        <div style="font-size:9px;color:#555;text-align:center">stacked area · Claude Code / Copilot / Cursor / Gemini</div>
+      </div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:8px;padding:12px;">
+        <div style="font-size:11px;font-weight:600;color:#a5b4fc;margin-bottom:8px">Tool Cost Share</div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <div style="width:70px;height:70px;border-radius:50%;background:conic-gradient(#6366f1 0% 48%,#06b6d4 48% 70%,#f59e0b 70% 85%,#10b981 85% 100%);flex-shrink:0"></div>
+          <div style="font-size:10px;display:flex;flex-direction:column;gap:4px">
+            <div><span style="color:#6366f1">■</span> Claude Code 48%</div>
+            <div><span style="color:#06b6d4">■</span> Copilot 22%</div>
+            <div><span style="color:#f59e0b">■</span> Cursor 15%</div>
+            <div><span style="color:#10b981">■</span> Gemini CLI 15%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Developer table -->
+    <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:8px;padding:12px;">
+      <div style="font-size:11px;font-weight:600;color:#a5b4fc;margin-bottom:8px">Per-Developer Attribution <span style="font-size:9px;color:#aaa">— click row for full detail</span></div>
+      <table style="width:100%;font-size:10px;border-collapse:collapse">
+        <thead><tr style="color:#666;border-bottom:1px solid #2a2a4a">
+          <td style="padding:4px">Developer</td><td style="padding:4px">Tools</td><td style="padding:4px">Spend</td><td style="padding:4px">Commits</td><td style="padding:4px">$/commit</td>
+        </tr></thead>
+        <tbody>
+          <tr style="border-bottom:1px solid #1e1e30;cursor:pointer" onmouseover="this.style.background='#1e1e3a'" onmouseout="this.style.background=''">
+            <td style="padding:5px;color:#e2e8f0">alice@co.com</td><td style="padding:5px;color:#aaa">CC · Copilot</td><td style="padding:5px;color:#4ade80">$312</td><td style="padding:5px;color:#aaa">47</td><td style="padding:5px;color:#aaa">$6.64</td>
+          </tr>
+          <tr style="border-bottom:1px solid #1e1e30;cursor:pointer" onmouseover="this.style.background='#1e1e3a'" onmouseout="this.style.background=''">
+            <td style="padding:5px;color:#e2e8f0">bob@co.com</td><td style="padding:5px;color:#aaa">Cursor</td><td style="padding:5px;color:#fb923c">$198</td><td style="padding:5px;color:#aaa">12</td><td style="padding:5px;color:#aaa">$16.50</td>
+          </tr>
+          <tr style="cursor:pointer" onmouseover="this.style.background='#1e1e3a'" onmouseout="this.style.background=''">
+            <td style="padding:5px;color:#e2e8f0">carol@co.com</td><td style="padding:5px;color:#aaa">CC · Gemini</td><td style="padding:5px;color:#4ade80">$142</td><td style="padding:5px;color:#aaa">38</td><td style="padding:5px;color:#aaa">$3.74</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Bottom row: live feed + connections -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:8px;padding:12px;">
+        <div style="font-size:11px;font-weight:600;color:#a5b4fc;margin-bottom:8px">Live Feed <span style="font-size:9px;color:#4ade80">● polling 15s</span></div>
+        <div style="font-size:10px;color:#aaa;display:flex;flex-direction:column;gap:5px">
+          <div style="display:flex;justify-content:space-between"><span style="color:#e2e8f0">claude-sonnet-4-6</span><span style="color:#4ade80">$0.012</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#e2e8f0">gpt-4o (Copilot)</span><span style="color:#4ade80">$0.008</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#e2e8f0">gemini-2.0-flash</span><span style="color:#4ade80">$0.002</span></div>
+        </div>
+      </div>
+      <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:8px;padding:12px;">
+        <div style="font-size:11px;font-weight:600;color:#a5b4fc;margin-bottom:8px">Connected Tools</div>
+        <div style="font-size:10px;display:flex;flex-direction:column;gap:5px">
+          <div style="display:flex;justify-content:space-between"><span style="color:#e2e8f0">Claude Code</span><span style="color:#4ade80">● live</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#e2e8f0">Copilot</span><span style="color:#4ade80">● synced 2m ago</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#e2e8f0">Cursor</span><span style="color:#fb923c">⚠ error</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#888">Gemini CLI</span><span style="color:#555">+ connect</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:16px">One new backend endpoint needed: <code style="background:#1a1a2e;padding:2px 6px;border-radius:4px">GET /v1/cross-platform/trend?days=N</code> — returns daily cost broken down by provider (for the stacked chart). Everything else uses existing routes.</p>
