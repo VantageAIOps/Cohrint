@@ -17,6 +17,8 @@ export type Bindings = {
   SUPERADMIN_SECRET?:  string;
   // CI bypass for signup rate limiting — set via: wrangler secret put VANTAGE_CI_SECRET
   VANTAGE_CI_SECRET?:  string;
+  // AES-256-GCM key material for Copilot PAT encryption — set via: wrangler secret put TOKEN_ENCRYPTION_SECRET
+  TOKEN_ENCRYPTION_SECRET?: string;
 };
 
 export type Variables = {

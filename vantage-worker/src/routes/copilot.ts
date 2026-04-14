@@ -42,14 +42,31 @@ function kvSyncGuardKey(orgId: string, githubOrg: string, day: string): string {
 }
 
 // ── AES-GCM helpers (Web Crypto — available in Cloudflare Workers) ───────────
+//
+// Key derivation: HKDF-SHA-256 from TOKEN_ENCRYPTION_SECRET (Worker secret) +
+// orgId as salt. Falls back to a fixed salt when the secret is not set (dev/test
+// only — production must set TOKEN_ENCRYPTION_SECRET via wrangler secret put).
 
-async function deriveKey(orgId: string): Promise<CryptoKey> {
-  const raw = new TextEncoder().encode(orgId.padEnd(32, '0').slice(0, 32));
-  return crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+async function deriveKey(orgId: string, secret?: string): Promise<CryptoKey> {
+  const enc      = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(secret ?? 'dev-insecure-fallback-set-TOKEN_ENCRYPTION_SECRET'),
+    { name: 'HKDF' },
+    false,
+    ['deriveKey'],
+  );
+  return crypto.subtle.deriveKey(
+    { name: 'HKDF', hash: 'SHA-256', salt: enc.encode(orgId), info: enc.encode('copilot-pat-v1') },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt'],
+  );
 }
 
-async function encryptToken(plaintext: string, orgId: string): Promise<string> {
-  const key = await deriveKey(orgId);
+async function encryptToken(plaintext: string, orgId: string, secret?: string): Promise<string> {
+  const key = await deriveKey(orgId, secret);
   const iv  = crypto.getRandomValues(new Uint8Array(12));
   const buf = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv },
@@ -62,8 +79,8 @@ async function encryptToken(plaintext: string, orgId: string): Promise<string> {
   return btoa(String.fromCharCode(...out));
 }
 
-async function decryptToken(ciphertext: string, orgId: string): Promise<string> {
-  const key     = await deriveKey(orgId);
+async function decryptToken(ciphertext: string, orgId: string, secret?: string): Promise<string> {
+  const key      = await deriveKey(orgId, secret);
   const combined = Uint8Array.from(atob(ciphertext), c => c.charCodeAt(0));
   const buf = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv: combined.slice(0, 12) },
@@ -202,9 +219,13 @@ export async function syncCopilotMetricsForOrg(
   const todayUtc  = new Date().toISOString().slice(0, 10);
   const guardKey  = kvSyncGuardKey(orgId, githubOrg, todayUtc);
 
+  // Write guard optimistically before any DB writes — prevents duplicate
+  // reprocessing if the Worker times out mid-loop. DELETE+INSERT is idempotent
+  // so a missed sync day is recovered on the next calendar day's cron run.
   if (await env.KV.get(guardKey)) {
     return { github_org: githubOrg, days_synced: 0, rows_upserted: 0, skipped: true };
   }
+  await env.KV.put(guardKey, '1', { expirationTtl: 23 * 3600 });
 
   const encryptedToken = await env.KV.get(kvTokenKey(orgId, githubOrg));
   if (!encryptedToken) {
@@ -213,7 +234,7 @@ export async function syncCopilotMetricsForOrg(
 
   let token: string;
   try {
-    token = await decryptToken(encryptedToken, orgId);
+    token = await decryptToken(encryptedToken, orgId, env.TOKEN_ENCRYPTION_SECRET);
   } catch {
     return { github_org: githubOrg, days_synced: 0, rows_upserted: 0, skipped: false, error: 'Token decryption failed' };
   }
@@ -271,13 +292,11 @@ export async function syncCopilotMetricsForOrg(
     const periodEnd   = `${date} 23:59:59`;
     const modelName   = modelNames[0] ?? null;
 
-    // Per-developer rows when seat data is available
-    const activeSeats = seats.filter(s =>
-      s.last_activity_at !== null && s.last_activity_at.slice(0, 10) >= date,
-    );
-
-    if (activeSeats.length > 0) {
-      for (const seat of activeSeats) {
+    if (seats.length > 0) {
+      // Cost per developer = SEAT_USD_PER_DAY (the fixed per-seat daily rate).
+      // Total daily cost = activeUsers * SEAT_USD_PER_DAY, distributed equally
+      // across activeUsers — not seats.length, which may include inactive seats.
+      for (const seat of seats) {
         const login       = seat.assignee.login;
         const email       = loginEmail.get(login) ?? null;
         const developerId = await stableDevId(orgId, githubOrg, login);
@@ -342,14 +361,12 @@ export async function syncCopilotMetricsForOrg(
     }
   }
 
-  // Mark connection active + set sync guard
+  // Mark connection active (guard was already written optimistically above)
   await env.DB.prepare(
     `UPDATE copilot_connections
      SET status = 'active', last_synced_at = datetime('now'), last_error = NULL, updated_at = datetime('now')
      WHERE org_id = ? AND github_org = ?`,
   ).bind(orgId, githubOrg).run();
-
-  await env.KV.put(guardKey, '1', { expirationTtl: 23 * 3600 });
 
   return { github_org: githubOrg, days_synced: metrics.length, rows_upserted: rowsUpserted, skipped: false };
 }
@@ -404,8 +421,8 @@ copilot.post('/connect', async (c) => {
   if (!/^[a-zA-Z0-9-]{1,39}$/.test(githubOrg)) {
     return c.json({ error: 'Invalid github_org — must be 1–39 alphanumeric/hyphen chars' }, 400);
   }
-  if (!/^(ghp_|github_pat_|ghs_)[A-Za-z0-9_]{20,}$/.test(token)) {
-    return c.json({ error: 'token must be a GitHub PAT (ghp_*, github_pat_*, or ghs_*)' }, 400);
+  if (!/^(ghp_|github_pat_)[A-Za-z0-9_]{20,}$/.test(token)) {
+    return c.json({ error: 'token must be a GitHub PAT (ghp_* or github_pat_*). ghs_* service tokens are not supported.' }, 400);
   }
 
   // Validate token + org access against GitHub API
@@ -426,7 +443,7 @@ copilot.post('/connect', async (c) => {
   if (testResp.status === 404) return c.json({ error: `Org '${githubOrg}' not found or Copilot not enabled` }, 404);
 
   // Encrypt + store in KV; never write plaintext token to D1
-  const encrypted = await encryptToken(token, orgId);
+  const encrypted = await encryptToken(token, orgId, c.env.TOKEN_ENCRYPTION_SECRET);
   const kvKey     = kvTokenKey(orgId, githubOrg);
   await c.env.KV.put(kvKey, encrypted);
 
@@ -482,6 +499,8 @@ copilot.delete('/connect', async (c) => {
 
 copilot.get('/status', async (c) => {
   const orgId = c.get('orgId');
+  const role  = c.get('role');
+  const isAdmin = role === 'owner' || role === 'admin';
 
   const rows = await c.env.DB.prepare(
     `SELECT github_org, status, last_synced_at, last_error, created_at
@@ -495,7 +514,16 @@ copilot.get('/status', async (c) => {
     created_at:     string;
   }>();
 
-  return c.json({ connections: rows.results ?? [] });
+  // Strip last_error for non-admin members — it may contain GitHub API fragments
+  const connections = (rows.results ?? []).map(r => ({
+    github_org:     r.github_org,
+    status:         r.status,
+    last_synced_at: r.last_synced_at,
+    created_at:     r.created_at,
+    ...(isAdmin ? { last_error: r.last_error } : {}),
+  }));
+
+  return c.json({ connections });
 });
 
 export { copilot };

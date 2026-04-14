@@ -26,14 +26,6 @@ platform.post('/pageview', async (c) => {
   // Best-effort insert; never fail the caller
   try {
     await c.env.DB.prepare(`
-      CREATE TABLE IF NOT EXISTS platform_pageviews (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        session_id TEXT, page TEXT, referrer TEXT,
-        created_at INTEGER NOT NULL DEFAULT (unixepoch())
-      )
-    `).run();
-
-    await c.env.DB.prepare(`
       INSERT INTO platform_pageviews (session_id, page, referrer)
       VALUES (?, ?, ?)
     `).bind(session_id || null, page || null, referrer || null).run();
@@ -53,14 +45,6 @@ platform.post('/session', async (c) => {
   const duration_sec = Math.min(Math.max(0, body.duration_sec ?? 0), 86_400);
 
   try {
-    await c.env.DB.prepare(`
-      CREATE TABLE IF NOT EXISTS platform_sessions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        org_id TEXT, session_id TEXT, duration_sec INTEGER DEFAULT 0,
-        created_at INTEGER NOT NULL DEFAULT (unixepoch())
-      )
-    `).run();
-
     // Upsert: update duration if session already recorded, else insert
     const existing = await c.env.DB.prepare(
       'SELECT id FROM platform_sessions WHERE session_id = ?'
@@ -83,7 +67,14 @@ platform.post('/session', async (c) => {
 
 // ── POST /v1/platform/report-signup ─────────────────────────────────────────
 // Public, no auth. Accepts { email } and stores in KV. Idempotent.
+// Rate limited: max 5 signups per IP per hour to prevent KV exhaustion.
 platform.post('/report-signup', async (c) => {
+  // IP-based rate limit — 5 attempts per hour per IP
+  const ip      = c.req.header('CF-Connecting-IP') ?? 'unknown';
+  const ipKey   = `report-signup:ip:${ip}`;
+  const ipCount = parseInt(await c.env.KV.get(ipKey) ?? '0', 10);
+  if (ipCount >= 5) return c.json({ ok: false, error: 'rate_limited' }, 429);
+
   let body: { email?: unknown };
   try { body = await c.req.json(); }
   catch { return c.json({ ok: false, error: 'invalid_json' }, 400); }
@@ -104,11 +95,15 @@ platform.post('/report-signup', async (c) => {
   const existing = await c.env.KV.get(key);
   if (existing) return c.json({ ok: true });
 
-  await c.env.KV.put(key, JSON.stringify({
-    email,
-    signed_up_at: new Date().toISOString(),
-    source: 'report-page',
-  }));
+  // Increment IP counter (1-hour window) and store signup
+  await Promise.all([
+    c.env.KV.put(ipKey, String(ipCount + 1), { expirationTtl: 3600 }),
+    c.env.KV.put(key, JSON.stringify({
+      email,
+      signed_up_at: new Date().toISOString(),
+      source: 'report-page',
+    }), { expirationTtl: 365 * 24 * 3600 }), // 1 year retention
+  ]);
 
   return c.json({ ok: true });
 });
