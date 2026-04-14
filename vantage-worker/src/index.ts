@@ -77,6 +77,8 @@ import { crossplatform } from './routes/crossplatform';
 import { auditlog }    from './routes/auditlog';
 import { sessions }    from './routes/sessions';
 import { copilot, syncCopilotMetrics } from './routes/copilot';
+import { datadog, syncDatadogMetrics } from './routes/datadog';
+import { benchmark, syncBenchmarkContributions } from './routes/benchmark';
 import { runAnomalyDetection } from './lib/anomaly';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -110,6 +112,8 @@ app.route('/v1/cross-platform', crossplatform); // Cross-platform cost dashboard
 app.route('/v1/audit-log',      auditlog);
 app.route('/v1/sessions',       sessions);  // OTel session rollup
 app.route('/v1/copilot',        copilot);   // GitHub Copilot Metrics API adapter
+app.route('/v1/datadog',        datadog);   // Datadog metrics exporter
+app.route('/v1/benchmark',      benchmark); // Anonymized cross-company benchmarks
 
 // ── 404 fallback ──────────────────────────────────────────────────────────────
 app.notFound((c) => c.json({
@@ -160,6 +164,32 @@ export default {
         }
       } catch (err) {
         console.error('[copilot-cron] Fatal error:', err);
+      }
+
+      // ── Datadog Metrics push (daily — guarded by KV per-day key) ─────────
+      // syncDatadogMetrics internally skips orgs already pushed today,
+      // so it's safe to call on every 10-min tick.
+      try {
+        const ddResults = await syncDatadogMetrics(env);
+        const ddSynced  = ddResults.filter(r => !r.skipped && !r.error);
+        const ddErrors  = ddResults.filter(r => r.error);
+        if (ddSynced.length > 0 || ddErrors.length > 0) {
+          console.log(`[datadog-cron] pushed=${ddSynced.length} skipped=${ddResults.filter(r => r.skipped).length} errors=${ddErrors.length}`);
+          for (const e of ddErrors) {
+            console.error(`[datadog-cron] org=${e.org_id}: ${e.error}`);
+          }
+        }
+      } catch (err) {
+        console.error('[datadog-cron] Fatal error:', err);
+      }
+
+      // ── Benchmark contributions (Sundays UTC only) ────────────────────────
+      // syncBenchmarkContributions checks day-of-week internally and is a
+      // no-op on non-Sunday ticks, so safe to call on every cron tick.
+      try {
+        await syncBenchmarkContributions(env);
+      } catch (err) {
+        console.error('[benchmark-cron] Fatal error:', err);
       }
     })());
   },
