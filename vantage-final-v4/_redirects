@@ -4,3 +4,5 @@
 /signin       /auth.html       301
 /dashboard    /app.html        301
 /pricing      /signup.html     301
+/security     /trust.html      301
+/trust        /trust.html      301

@@ -650,11 +650,11 @@ _Reordered 2026-04-14 based on competitive analysis, shipped work, and threat as
 
 ### P1 — This Week (highest leverage, low effort)
 
-- [ ] **Add compliance/security page to vantageaiops.com** — "Zero traffic interception. Your prompts never leave your infrastructure." Explicit Helicone proxy comparison. This is an enterprise procurement unblock. **1 week, 6h.**
-- [ ] **Replace fictional testimonials on landing page** — Remove or replace with real quotes + GitHub handles from real users. Enterprise sales stalls on fake social proof. **1h.**
+- [x] **Add compliance/security page to vantageaiops.com** — Shipped at `trust.vantageaiops.com`. Zero-interception architecture, privacy modes, Helicone comparison table, compliance roadmap, security contact. ✅ 2026-04-14
+- [x] **Replace fictional testimonials on landing page** — Removed fake quotes + dead CSS. Replaced with honest "design partners welcome" CTA → `hello@vantageaiops.com`. ✅ 2026-04-14
 - [ ] **Email 20 CTOs at AI-heavy startups** — Design partner outreach. Use Prompt #02. 5 warm leads = the next 6 months of roadmap feedback. **3h.**
-- [ ] **Add benchmark opt-in toggle to Settings page** — Single checkbox: "Contribute anonymized spend data to industry benchmarks." No data flows yet — just captures consent. This primes the data moat. **4h.**
-- [ ] **Fix website docs page** — Currently broken (links/content errors). Blocks developer trust during onboarding evaluation. **2h.**
+- [x] **Add benchmark opt-in toggle to Settings page** — Implemented: migration, PATCH `/v1/admin/org`, frontend toggle (opt-out default). ✅ 2026-04-14
+- [x] **Fix website docs page** — Fixed 8 issues: wrong package name, wrong endpoint, stale ClickHouse/Docker/self-host sections removed, speculative OTel configs removed. ✅ 2026-04-14
 
 ---
 

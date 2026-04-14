@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Security & Trust — VantageAI</title>
+<meta name="description" content="VantageAI security architecture. Zero traffic interception. Your prompts and API keys never leave your infrastructure. Built for enterprise security reviews.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://trust.vantageaiops.com">
+<meta property="og:title" content="Security & Trust — VantageAI">
+<meta property="og:description" content="Zero traffic interception. Your prompts never leave your infrastructure. Full security architecture for enterprise procurement reviews.">
+<meta property="og:url" content="https://trust.vantageaiops.com">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/svg+xml" href="https://vantageaiops.com/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="https://vantageaiops.com/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080c0f;--bg2:#0d1318;--bg3:#121920;--bg4:#161d25;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+  --text:#e8edf2;--muted:#6b7b8a;--dim:#3a4550;
+  --accent:#00d4a1;--blue:#0098ff;--amber:#f59e0b;--red:#f87171;--purple:#a78bfa;
+  --mono:'DM Mono',monospace;--serif:'Instrument Serif',Georgia,serif;--sans:'DM Sans',sans-serif;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:16px;line-height:1.7;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0;opacity:.4}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:18px 48px;border-bottom:1px solid var(--border);background:rgba(8,12,15,.88);backdrop-filter:blur(16px)}
+.nav-logo{font-family:var(--mono);font-size:15px;letter-spacing:.08em;color:var(--text);text-decoration:none;display:flex;align-items:center;gap:10px}
+.logo-dot{width:8px;height:8px;background:var(--accent);border-radius:50%;box-shadow:0 0 12px var(--accent);animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.8)}}
+.nav-right{display:flex;align-items:center;gap:24px}
+.nav-right a{font-size:13px;color:var(--muted);text-decoration:none;font-family:var(--mono);letter-spacing:.02em;transition:color .2s}
+.nav-right a:hover{color:var(--text)}
+.nav-badge{background:rgba(0,212,161,.08);border:1px solid rgba(0,212,161,.2);border-radius:100px;padding:4px 12px;font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.06em}
+
+/* HERO */
+.hero{padding:160px 48px 80px;max-width:1100px;margin:0 auto;position:relative}
+.hero-grid{position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);background-size:60px 60px;mask-image:radial-gradient(ellipse 80% 60% at 50% 30%,black 0%,transparent 80%);pointer-events:none;z-index:0}
+.hero-glow{position:absolute;top:60px;left:0;width:500px;height:280px;background:radial-gradient(ellipse,rgba(0,212,161,.1) 0%,transparent 70%);pointer-events:none}
+.hero-eyebrow{display:inline-flex;align-items:center;gap:8px;background:rgba(0,212,161,.08);border:1px solid rgba(0,212,161,.2);border-radius:100px;padding:6px 16px;font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.06em;margin-bottom:32px}
+.hero h1{font-family:var(--serif);font-size:clamp(40px,5vw,68px);font-weight:400;line-height:1.08;letter-spacing:-.02em;max-width:760px;margin-bottom:24px}
+.hero h1 em{font-style:italic;color:var(--accent)}
+.hero-sub{font-size:17px;color:var(--muted);max-width:580px;line-height:1.75;font-weight:300;margin-bottom:48px}
+.hero-meta{display:flex;align-items:center;gap:24px;flex-wrap:wrap}
+.hero-meta-item{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.hero-meta-item .dot{width:6px;height:6px;border-radius:50%}
+.dot-green{background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.dot-amber{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+
+/* CONTENT */
+.content{max-width:1100px;margin:0 auto;padding:0 48px 100px;position:relative;z-index:1}
+
+/* SECTION */
+.section{padding:72px 0;border-top:1px solid var(--border)}
+.sec-label{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:14px}
+.sec-title{font-family:var(--serif);font-size:clamp(28px,3vw,40px);font-weight:400;line-height:1.15;letter-spacing:-.02em;margin-bottom:12px}
+.sec-desc{font-size:15px;color:var(--muted);max-width:600px;line-height:1.75;margin-bottom:48px}
+
+/* ARCHITECTURE DIAGRAM */
+.arch-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:40px;overflow:hidden;position:relative}
+.arch-wrap::before{content:'// data flow';position:absolute;top:16px;right:20px;font-family:var(--mono);font-size:11px;color:var(--dim)}
+.arch-flow{display:flex;align-items:center;justify-content:center;gap:0;flex-wrap:wrap;row-gap:32px}
+.arch-node{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;padding:20px 24px;text-align:center;min-width:160px}
+.arch-node-label{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+.arch-node-name{font-size:14px;font-weight:500;color:var(--text)}
+.arch-node-sub{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:4px}
+.arch-node.highlight{border-color:rgba(0,212,161,.35);background:rgba(0,212,161,.05)}
+.arch-node.highlight .arch-node-name{color:var(--accent)}
+.arch-arrow{display:flex;flex-direction:column;align-items:center;gap:4px;padding:0 16px;min-width:100px}
+.arch-arrow-line{width:60px;height:1px;background:var(--border2);position:relative}
+.arch-arrow-line::after{content:'';position:absolute;right:-1px;top:-3px;width:6px;height:6px;border-top:1px solid var(--border2);border-right:1px solid var(--border2);transform:rotate(45deg)}
+.arch-arrow-label{font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:.04em;white-space:nowrap}
+.arch-arrow-sub{font-family:var(--mono);font-size:10px;color:var(--dim);white-space:nowrap}
+.arch-side{display:flex;flex-direction:column;align-items:center;gap:12px;padding:0 16px}
+.arch-side-line{width:1px;height:40px;background:var(--border2);position:relative}
+.arch-side-line::after{content:'';position:absolute;bottom:-1px;left:-3px;width:6px;height:6px;border-bottom:1px solid var(--border2);border-right:1px solid var(--border2);transform:rotate(45deg)}
+.arch-side-label{font-family:var(--mono);font-size:10px;color:var(--muted);text-align:center;max-width:120px;line-height:1.4}
+.arch-note{margin-top:24px;padding:16px 20px;background:rgba(0,212,161,.05);border:1px solid rgba(0,212,161,.15);border-radius:8px;font-family:var(--mono);font-size:12px;color:var(--muted);line-height:1.6}
+.arch-note strong{color:var(--accent)}
+
+/* PAYLOAD EXAMPLE */
+.payload-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:32px}
+.payload-box{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.payload-header{padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.payload-header-title{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.06em}
+.payload-badge{font-family:var(--mono);font-size:10px;padding:3px 10px;border-radius:100px}
+.badge-never{background:rgba(248,113,113,.1);color:var(--red);border:1px solid rgba(248,113,113,.2)}
+.badge-sent{background:rgba(0,212,161,.08);color:var(--accent);border:1px solid rgba(0,212,161,.2)}
+.payload-body{padding:20px;font-family:var(--mono);font-size:12px;line-height:1.8}
+.json-key{color:var(--blue)}
+.json-val{color:var(--accent)}
+.json-str{color:#a78bfa}
+.json-null{color:var(--red)}
+.json-comment{color:var(--dim)}
+
+/* MODES TABLE */
+.modes-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-top:32px}
+.mode-card{background:var(--bg2);padding:28px}
+.mode-name{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+.mode-name.strict{color:var(--accent)}
+.mode-name.standard{color:var(--blue)}
+.mode-name.relaxed{color:var(--amber)}
+.mode-headline{font-size:15px;font-weight:500;color:var(--text);margin-bottom:12px}
+.mode-install{font-family:var(--mono);font-size:11px;color:var(--dim);background:var(--bg3);padding:6px 10px;border-radius:6px;margin-bottom:16px;display:inline-block}
+.mode-list{list-style:none;display:flex;flex-direction:column;gap:8px}
+.mode-list li{font-size:13px;color:var(--muted);display:flex;align-items:flex-start;gap:10px;line-height:1.5}
+.mode-list li::before{content:'→';font-family:var(--mono);color:var(--dim);flex-shrink:0;margin-top:1px}
+.mode-list li.yes::before{content:'✓';color:var(--accent)}
+.mode-list li.no::before{content:'✗';color:var(--red)}
+
+/* COMPARISON TABLE */
+.cmp-wrap{overflow-x:auto;margin-top:32px;border:1px solid var(--border);border-radius:16px}
+.cmp-table{width:100%;border-collapse:collapse;font-size:13px}
+.cmp-table th{padding:16px 24px;text-align:left;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);background:var(--bg2)}
+.cmp-table th.col-vantage{color:var(--accent)}
+.cmp-table td{padding:14px 24px;border-bottom:1px solid var(--border);color:var(--muted);vertical-align:top;line-height:1.5}
+.cmp-table tr:last-child td{border-bottom:none}
+.cmp-table td:first-child{font-weight:500;color:var(--text)}
+.cmp-table td.col-vantage{background:rgba(0,212,161,.03)}
+.chk{color:var(--accent);font-weight:600}
+.cross{color:var(--red)}
+.partial{color:var(--amber)}
+
+/* CONTROLS GRID */
+.controls-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-top:32px}
+.control-card{background:var(--bg2);padding:28px}
+.control-icon{font-size:22px;margin-bottom:14px}
+.control-title{font-size:15px;font-weight:500;color:var(--text);margin-bottom:8px}
+.control-desc{font-size:13px;color:var(--muted);line-height:1.65}
+.control-tag{margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--dim);background:var(--bg3);padding:4px 10px;border-radius:5px;display:inline-block}
+
+/* DATA TABLE */
+.data-table{width:100%;border-collapse:collapse;margin-top:32px;font-size:13px}
+.data-table th{padding:12px 20px;text-align:left;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)}
+.data-table td{padding:14px 20px;border-bottom:1px solid var(--border);color:var(--muted);line-height:1.5}
+.data-table tr:last-child td{border-bottom:none}
+.data-table td:first-child{color:var(--text);font-weight:500}
+
+/* INFRA */
+.infra-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:32px}
+.infra-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:24px}
+.infra-provider{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:8px}
+.infra-name{font-size:14px;font-weight:500;color:var(--text);margin-bottom:8px}
+.infra-desc{font-size:13px;color:var(--muted);line-height:1.6}
+.infra-cert{margin-top:12px;display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--accent);background:rgba(0,212,161,.06);border:1px solid rgba(0,212,161,.15);padding:4px 10px;border-radius:100px}
+
+/* COMPLIANCE TIMELINE */
+.timeline{display:flex;flex-direction:column;gap:0;margin-top:32px;border:1px solid var(--border);border-radius:16px;overflow:hidden}
+.timeline-item{display:grid;grid-template-columns:160px 1fr;border-bottom:1px solid var(--border)}
+.timeline-item:last-child{border-bottom:none}
+.timeline-when{padding:24px;background:var(--bg2);border-right:1px solid var(--border);font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+.timeline-when strong{color:var(--text);font-size:13px}
+.timeline-body{padding:24px}
+.timeline-status{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;padding:3px 10px;border-radius:100px;margin-bottom:10px}
+.status-done{background:rgba(0,212,161,.08);color:var(--accent);border:1px solid rgba(0,212,161,.2)}
+.status-progress{background:rgba(245,158,11,.08);color:var(--amber);border:1px solid rgba(245,158,11,.2)}
+.status-planned{background:rgba(255,255,255,.04);color:var(--muted);border:1px solid var(--border)}
+.timeline-title{font-size:14px;font-weight:500;color:var(--text);margin-bottom:6px}
+.timeline-desc{font-size:13px;color:var(--muted);line-height:1.6}
+
+/* CONTACT */
+.contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:32px}
+.contact-card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:32px}
+.contact-card.primary{border-color:rgba(0,212,161,.2);background:rgba(0,212,161,.03)}
+.contact-type{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.contact-title{font-size:16px;font-weight:500;color:var(--text);margin-bottom:8px}
+.contact-desc{font-size:13px;color:var(--muted);line-height:1.65;margin-bottom:20px}
+.contact-email{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:13px;color:var(--accent);text-decoration:none;border:1px solid rgba(0,212,161,.25);padding:10px 18px;border-radius:8px;transition:background .2s}
+.contact-email:hover{background:rgba(0,212,161,.08)}
+.contact-sla{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:12px}
+
+/* FOOTER */
+footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+.footer-left{font-family:var(--mono);font-size:12px;color:var(--dim)}
+.footer-links{display:flex;gap:24px}
+.footer-links a{font-size:13px;color:var(--muted);text-decoration:none;transition:color .2s}
+.footer-links a:hover{color:var(--text)}
+
+/* MISC */
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.fade-in{animation:fadeUp .5s ease both}
+a{color:var(--accent);text-decoration:none}
+a:hover{opacity:.8}
+strong{font-weight:500;color:var(--text)}
+code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:2px 7px;border-radius:4px;color:var(--muted)}
+
+@media(max-width:768px){
+  nav{padding:16px 20px}
+  .hero{padding:120px 20px 60px}
+  .content{padding:0 20px 80px}
+  .payload-grid{grid-template-columns:1fr}
+  .modes-grid{grid-template-columns:1fr}
+  .controls-grid{grid-template-columns:1fr}
+  .infra-grid{grid-template-columns:1fr}
+  .contact-grid{grid-template-columns:1fr}
+  .timeline-item{grid-template-columns:1fr}
+  .timeline-when{border-right:none;border-bottom:1px solid var(--border);padding:16px 20px}
+  footer{padding:24px 20px;flex-direction:column;align-items:flex-start}
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="https://vantageaiops.com" class="nav-logo">
+    <span class="logo-dot"></span>
+    VantageAI
+  </a>
+  <div class="nav-right">
+    <span class="nav-badge">Trust &amp; Security</span>
+    <a href="https://vantageaiops.com/docs.html">Docs</a>
+    <a href="https://vantageaiops.com/privacy.html">Privacy</a>
+    <a href="https://vantageaiops.com/signup.html">Get started</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow"></div>
+  <div class="hero-eyebrow">Trust &amp; Security</div>
+  <h1>Your prompts never leave<br><em>your infrastructure.</em></h1>
+  <p class="hero-sub">VantageAI is an observer, not a middleman. We collect cost metadata — never prompt content. This page documents exactly what we see, what we store, and how we protect it.</p>
+  <div class="hero-meta">
+    <div class="hero-meta-item"><span class="dot dot-green"></span> Zero traffic interception</div>
+    <div class="hero-meta-item"><span class="dot dot-green"></span> No prompt or response storage</div>
+    <div class="hero-meta-item"><span class="dot dot-green"></span> Cloudflare edge infrastructure</div>
+    <div class="hero-meta-item"><span class="dot dot-amber"></span> SOC 2 Type I — in progress</div>
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- ARCHITECTURE -->
+  <div class="section">
+    <div class="sec-label">Architecture</div>
+    <div class="sec-title">How data flows</div>
+    <p class="sec-desc">VantageAI sits beside your AI calls, not in front of them. Your code communicates directly with OpenAI, Anthropic, or any provider — VantageAI reads response metadata after the call completes.</p>
+
+    <div class="arch-wrap">
+      <div class="arch-flow">
+        <div class="arch-node">
+          <div class="arch-node-label">Your Code</div>
+          <div class="arch-node-name">Application</div>
+          <div class="arch-node-sub">SDK / OTel / CLI</div>
+        </div>
+
+        <div class="arch-side">
+          <div style="display:flex;flex-direction:column;align-items:center">
+            <div style="width:1px;height:24px;background:var(--border2)"></div>
+            <div style="font-family:var(--mono);font-size:10px;color:var(--dim);text-align:center;padding:4px 0;white-space:nowrap">metadata only<br>async · non-blocking</div>
+            <div style="width:1px;height:24px;background:rgba(0,212,161,.3)"></div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;align-items:center;gap:20px">
+          <div class="arch-node highlight">
+            <div class="arch-node-label">VantageAI</div>
+            <div class="arch-node-name">Cost Observer</div>
+            <div class="arch-node-sub">tokens · cost · latency</div>
+          </div>
+        </div>
+
+        <div class="arch-arrow">
+          <div class="arch-arrow-line"></div>
+          <div class="arch-arrow-label">direct API call</div>
+          <div class="arch-arrow-sub">full request + response</div>
+        </div>
+
+        <div class="arch-node">
+          <div class="arch-node-label">AI Provider</div>
+          <div class="arch-node-name">OpenAI · Anthropic</div>
+          <div class="arch-node-sub">Google · Mistral · etc.</div>
+        </div>
+      </div>
+
+      <div class="arch-note">
+        <strong>Critical distinction:</strong> Your application calls the AI provider directly — VantageAI is never in the network path between your code and the provider. In SDK and OTel modes, the SDK reads token counts and cost from the response object in-process, then queues a metadata event asynchronously. Your production traffic is unaffected by VantageAI's availability.
+      </div>
+    </div>
+  </div>
+
+  <!-- WHAT WE SEE -->
+  <div class="section">
+    <div class="sec-label">Data Minimization</div>
+    <div class="sec-title">Exactly what we collect</div>
+    <p class="sec-desc">The following JSON examples show the actual payload sent to VantageAI servers versus what stays on your machine. No policy interpretation — this is the real data structure.</p>
+
+    <div class="payload-grid">
+      <div class="payload-box">
+        <div class="payload-header">
+          <span class="payload-header-title">Sent to VantageAI servers</span>
+          <span class="payload-badge badge-sent">✓ transmitted</span>
+        </div>
+        <div class="payload-body">
+<pre>{
+  <span class="json-key">"model"</span>: <span class="json-str">"gpt-4o"</span>,
+  <span class="json-key">"input_tokens"</span>: <span class="json-val">1842</span>,
+  <span class="json-key">"output_tokens"</span>: <span class="json-val">394</span>,
+  <span class="json-key">"latency_ms"</span>: <span class="json-val">1203</span>,
+  <span class="json-key">"cost_usd"</span>: <span class="json-val">0.00284</span>,
+  <span class="json-key">"timestamp"</span>: <span class="json-str">"2026-04-14T09:41:00Z"</span>,
+  <span class="json-key">"org_id"</span>: <span class="json-str">"org_8f3a..."</span>,
+  <span class="json-key">"developer_id"</span>: <span class="json-str">"dev_a1b2..."</span>,
+  <span class="json-key">"tool"</span>: <span class="json-str">"claude-code"</span>
+}</pre>
+        </div>
+      </div>
+
+      <div class="payload-box">
+        <div class="payload-header">
+          <span class="payload-header-title">Never leaves your machine</span>
+          <span class="payload-badge badge-never">✗ never sent</span>
+        </div>
+        <div class="payload-body">
+<pre>{
+  <span class="json-key">"messages"</span>: <span class="json-null">// your prompt content</span>,
+  <span class="json-key">"system"</span>: <span class="json-null">// system prompt</span>,
+  <span class="json-key">"response"</span>: <span class="json-null">// model response text</span>,
+  <span class="json-key">"api_key"</span>: <span class="json-null">// provider API keys</span>,
+  <span class="json-key">"function_args"</span>: <span class="json-null">// tool call payloads</span>,
+  <span class="json-key">"file_contents"</span>: <span class="json-null">// files in context</span>,
+  <span class="json-key">"user_data"</span>: <span class="json-null">// any PII you process</span>
+}</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRIVACY MODES -->
+  <div class="section">
+    <div class="sec-label">Privacy Modes</div>
+    <div class="sec-title">Choose your disclosure level</div>
+    <p class="sec-desc">VantageAI ships with three privacy modes. The default is Standard. Strict mode is designed for regulated industries — only aggregate counts leave your environment.</p>
+
+    <div class="modes-grid">
+      <div class="mode-card">
+        <div class="mode-name strict">Strict</div>
+        <div class="mode-headline">Aggregate counts only</div>
+        <div class="mode-install">VANTAGE_PRIVACY_MODE=strict</div>
+        <ul class="mode-list">
+          <li class="yes">Total token counts (no per-call breakdown)</li>
+          <li class="yes">Estimated cost range</li>
+          <li class="no">Model name suppressed</li>
+          <li class="no">No per-request events</li>
+          <li class="no">No developer attribution</li>
+          <li class="no">No latency data</li>
+        </ul>
+      </div>
+
+      <div class="mode-card">
+        <div class="mode-name standard">Standard</div>
+        <div class="mode-headline">Metadata per call</div>
+        <div class="mode-install">VANTAGE_PRIVACY_MODE=standard</div>
+        <ul class="mode-list">
+          <li class="yes">Per-call token counts</li>
+          <li class="yes">Model name and provider</li>
+          <li class="yes">Cost per call</li>
+          <li class="yes">Latency (ms)</li>
+          <li class="yes">Developer attribution (hashed ID)</li>
+          <li class="no">No prompt or response content</li>
+        </ul>
+      </div>
+
+      <div class="mode-card">
+        <div class="mode-name relaxed">Relaxed</div>
+        <div class="mode-headline">Metadata + quality signals</div>
+        <div class="mode-install">VANTAGE_PRIVACY_MODE=relaxed</div>
+        <ul class="mode-list">
+          <li class="yes">All Standard fields</li>
+          <li class="yes">Response quality score (0–100)</li>
+          <li class="yes">Prompt efficiency flags</li>
+          <li class="yes">Tool call count (no content)</li>
+          <li class="no">No prompt or response content</li>
+          <li class="no">No PII ever transmitted</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPARISON -->
+  <div class="section">
+    <div class="sec-label">Vendor Comparison</div>
+    <div class="sec-title">How we compare to proxy-based tools</div>
+    <p class="sec-desc">The core architectural difference between VantageAI and Helicone or LangSmith is whether your API traffic passes through a third-party server. This table is intended for security reviewers and procurement teams.</p>
+
+    <div class="cmp-wrap">
+      <table class="cmp-table">
+        <thead>
+          <tr>
+            <th>Question</th>
+            <th class="col-vantage">VantageAI</th>
+            <th>Helicone</th>
+            <th>LangSmith</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>API calls pass through vendor servers?</td>
+            <td class="col-vantage"><span class="chk">No</span> — direct to provider</td>
+            <td><span class="cross">Yes</span> — proxy required</td>
+            <td><span class="cross">Yes</span> — proxy required</td>
+          </tr>
+          <tr>
+            <td>Prompts transmitted to vendor?</td>
+            <td class="col-vantage"><span class="chk">Never</span> — metadata only</td>
+            <td><span class="cross">Yes</span> — full request logged</td>
+            <td><span class="cross">Yes</span> — full request logged</td>
+          </tr>
+          <tr>
+            <td>Production traffic affected by vendor outage?</td>
+            <td class="col-vantage"><span class="chk">No</span> — async, non-blocking</td>
+            <td><span class="cross">Yes</span> — in critical path</td>
+            <td><span class="cross">Yes</span> — in critical path</td>
+          </tr>
+          <tr>
+            <td>Works without changing API endpoint?</td>
+            <td class="col-vantage"><span class="chk">Yes</span> — OTel env var</td>
+            <td><span class="cross">No</span> — endpoint change required</td>
+            <td><span class="cross">No</span> — endpoint change required</td>
+          </tr>
+          <tr>
+            <td>API keys shared with vendor?</td>
+            <td class="col-vantage"><span class="chk">Never</span> — keys stay local</td>
+            <td><span class="cross">Yes</span> — forwarded through proxy</td>
+            <td><span class="cross">Yes</span> — forwarded through proxy</td>
+          </tr>
+          <tr>
+            <td>Local deployment option?</td>
+            <td class="col-vantage"><span class="chk">Yes</span> — local proxy mode</td>
+            <td><span class="partial">Partial</span> — self-hosted OSS</td>
+            <td><span class="partial">Partial</span> — self-hosted OSS</td>
+          </tr>
+          <tr>
+            <td>Strict privacy mode (no per-call data)?</td>
+            <td class="col-vantage"><span class="chk">Yes</span> — aggregate only</td>
+            <td><span class="cross">No</span></td>
+            <td><span class="cross">No</span></td>
+          </tr>
+          <tr>
+            <td>Zero-code integration (OTel env var)?</td>
+            <td class="col-vantage"><span class="chk">Yes</span></td>
+            <td><span class="cross">No</span></td>
+            <td><span class="cross">No</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SECURITY CONTROLS -->
+  <div class="section">
+    <div class="sec-label">Security Controls</div>
+    <div class="sec-title">What's implemented today</div>
+    <p class="sec-desc">Controls currently live in production. No roadmap items are listed here — those are in the Compliance section below.</p>
+
+    <div class="controls-grid">
+      <div class="control-card">
+        <div class="control-icon">🔑</div>
+        <div class="control-title">API Key Hashing</div>
+        <div class="control-desc">All API keys are hashed with SHA-256 on arrival. The plaintext key is shown exactly once at creation and never stored. Recovery is possible only via a single-use, time-limited email token.</div>
+        <span class="control-tag">SHA-256 · one-time display · email recovery</span>
+      </div>
+
+      <div class="control-card">
+        <div class="control-icon">🍪</div>
+        <div class="control-title">Session Security</div>
+        <div class="control-desc">Session tokens carry 256 bits of entropy. Cookies are HTTP-only and Secure — they cannot be read by JavaScript. Sessions expire after 30 days. Account owners can rotate all sessions instantly to force re-authentication.</div>
+        <span class="control-tag">HTTP-only · Secure · SameSite=Strict</span>
+      </div>
+
+      <div class="control-card">
+        <div class="control-icon">🛡️</div>
+        <div class="control-title">HTTP Security Headers</div>
+        <div class="control-desc">All responses include: HSTS with one-year max-age, Content-Security-Policy with strict frame-ancestors, Cross-Origin-Opener-Policy, and Cross-Origin-Resource-Policy. Verified via securityheaders.com.</div>
+        <span class="control-tag">HSTS · CSP · COOP · CORP</span>
+      </div>
+
+      <div class="control-card">
+        <div class="control-icon">🚧</div>
+        <div class="control-title">Rate Limiting &amp; Brute-Force Protection</div>
+        <div class="control-desc">Every authentication endpoint is protected by KV-backed per-IP rate limiting. Ten failed attempts within a five-minute window returns 429 with a Retry-After header. Degrades gracefully if KV is unavailable — no silent bypass.</div>
+        <span class="control-tag">10 attempts / 5 min · per-IP · 429 + Retry-After</span>
+      </div>
+
+      <div class="control-card">
+        <div class="control-icon">📋</div>
+        <div class="control-title">Audit Log</div>
+        <div class="control-desc">Every API action is recorded with actor, action type, timestamp, and IP address. Logs are append-only, export-ready, and available in the dashboard. Suitable for security incident investigation and compliance evidence packages.</div>
+        <span class="control-tag">actor · action · timestamp · exportable</span>
+      </div>
+
+      <div class="control-card">
+        <div class="control-icon">🔒</div>
+        <div class="control-title">Transport Encryption</div>
+        <div class="control-desc">All traffic between clients and VantageAI is encrypted with TLS 1.2 minimum. TLS 1.3 is preferred and negotiated by default. Cloudflare terminates TLS at the edge. No unencrypted endpoints exist.</div>
+        <span class="control-tag">TLS 1.3 · Cloudflare edge · HSTS enforced</span>
+      </div>
+
+      <div class="control-card">
+        <div class="control-icon">🔐</div>
+        <div class="control-title">Secrets Management</div>
+        <div class="control-desc">Worker secrets (signing keys, internal tokens) are stored exclusively in Cloudflare Worker Secrets — never in environment variables, source code, or configuration files. Secrets are not accessible after deployment, only usable.</div>
+        <span class="control-tag">Cloudflare Worker Secrets · not in source</span>
+      </div>
+
+      <div class="control-card">
+        <div class="control-icon">⚡</div>
+        <div class="control-title">Budget Policy Enforcement</div>
+        <div class="control-desc">Budget policies are enforced server-side — they cannot be bypassed by SDK configuration. When a budget threshold is hit, ingest is blocked at the API layer and a Slack webhook alert is dispatched within one minute.</div>
+        <span class="control-tag">server-side enforcement · Slack alerts · 1-min latency</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- DATA STORAGE -->
+  <div class="section">
+    <div class="sec-label">Data Storage &amp; Retention</div>
+    <div class="sec-title">What we store and for how long</div>
+    <p class="sec-desc">All data is stored in Cloudflare D1 (SQLite on Cloudflare's global network). Data is encrypted at rest by default via Cloudflare's storage layer.</p>
+
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Data Type</th>
+          <th>What it contains</th>
+          <th>Free</th>
+          <th>Team</th>
+          <th>Enterprise</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Usage events</td>
+          <td>Model, tokens, cost, latency, timestamp, developer ID (hashed)</td>
+          <td>30 days</td>
+          <td>1 year</td>
+          <td>Custom</td>
+        </tr>
+        <tr>
+          <td>Audit log</td>
+          <td>Actor, action, timestamp, IP address</td>
+          <td>30 days</td>
+          <td>1 year</td>
+          <td>Custom</td>
+        </tr>
+        <tr>
+          <td>Account data</td>
+          <td>Email, org name, API key hash</td>
+          <td>Until deletion</td>
+          <td>Until deletion</td>
+          <td>Until deletion</td>
+        </tr>
+        <tr>
+          <td>Budget policies</td>
+          <td>Threshold amounts, alert config (no usage data)</td>
+          <td>Until deletion</td>
+          <td>Until deletion</td>
+          <td>Until deletion</td>
+        </tr>
+        <tr>
+          <td>Prompt content</td>
+          <td>—</td>
+          <td style="color:var(--red)">Never stored</td>
+          <td style="color:var(--red)">Never stored</td>
+          <td style="color:var(--red)">Never stored</td>
+        </tr>
+        <tr>
+          <td>Provider API keys</td>
+          <td>—</td>
+          <td style="color:var(--red)">Never stored</td>
+          <td style="color:var(--red)">Never stored</td>
+          <td style="color:var(--red)">Never stored</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p style="margin-top:20px;font-size:13px;color:var(--muted)">You may request deletion of your account and all associated data at any time by emailing <a href="mailto:security@vantageaiops.com">security@vantageaiops.com</a>. Deletion is processed within 72 hours.</p>
+  </div>
+
+  <!-- INFRASTRUCTURE -->
+  <div class="section">
+    <div class="sec-label">Infrastructure</div>
+    <div class="sec-title">Where it runs</div>
+    <p class="sec-desc">VantageAI is built entirely on Cloudflare's platform. We inherit Cloudflare's security certifications for the infrastructure layer.</p>
+
+    <div class="infra-grid">
+      <div class="infra-card">
+        <div class="infra-provider">API Layer</div>
+        <div class="infra-name">Cloudflare Workers</div>
+        <div class="infra-desc">All API endpoints run as Cloudflare Workers on the global edge network. No origin server. Code executes in isolated V8 contexts — no shared memory between requests.</div>
+        <div class="infra-cert">SOC 2 Type II ↗</div>
+      </div>
+
+      <div class="infra-card">
+        <div class="infra-provider">Database</div>
+        <div class="infra-name">Cloudflare D1</div>
+        <div class="infra-desc">Usage events and account data are stored in Cloudflare D1 (SQLite). Data is encrypted at rest. Access is restricted to the Worker runtime — no public database endpoint exists.</div>
+        <div class="infra-cert">Encrypted at rest ↗</div>
+      </div>
+
+      <div class="infra-card">
+        <div class="infra-provider">Frontend</div>
+        <div class="infra-name">Cloudflare Pages</div>
+        <div class="infra-desc">The dashboard and all static assets are served from Cloudflare Pages. No server-side rendering. No third-party analytics SDKs or tracking pixels are loaded.</div>
+        <div class="infra-cert">No third-party trackers</div>
+      </div>
+
+      <div class="infra-card">
+        <div class="infra-provider">Rate Limiting</div>
+        <div class="infra-name">Cloudflare KV</div>
+        <div class="infra-desc">Per-IP rate limiting state is stored in Cloudflare KV. Brute-force protection on all authentication endpoints with graceful degradation if KV is unavailable.</div>
+        <div class="infra-cert">Global · low latency</div>
+      </div>
+
+      <div class="infra-card">
+        <div class="infra-provider">Email</div>
+        <div class="infra-name">Resend</div>
+        <div class="infra-desc">Transactional email (key recovery, team invites) is delivered via Resend. Only your email address is passed — no usage data, no API keys. Resend is not used for marketing.</div>
+        <div class="infra-cert">Transactional only</div>
+      </div>
+
+      <div class="infra-card">
+        <div class="infra-provider">Secrets</div>
+        <div class="infra-name">Cloudflare Worker Secrets</div>
+        <div class="infra-desc">All internal signing keys and tokens are stored in Cloudflare Worker Secrets — encrypted, write-only after deployment. Not accessible from outside the Worker runtime.</div>
+        <div class="infra-cert">Write-only · encrypted</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPLIANCE ROADMAP -->
+  <div class="section">
+    <div class="sec-label">Compliance Roadmap</div>
+    <div class="sec-title">Where we are and where we're going</div>
+    <p class="sec-desc">We are honest about what's done and what's in progress. Nothing is listed here unless it's real.</p>
+
+    <div class="timeline">
+      <div class="timeline-item">
+        <div class="timeline-when"><strong>Now</strong><span>April 2026</span></div>
+        <div class="timeline-body">
+          <div class="timeline-status status-done">✓ Live</div>
+          <div class="timeline-title">Security controls in production</div>
+          <div class="timeline-desc">API key hashing, HTTP-only sessions, HSTS, CSP, rate limiting, audit log, TLS everywhere, secrets in Worker Secrets. All documented on this page.</div>
+        </div>
+      </div>
+
+      <div class="timeline-item">
+        <div class="timeline-when"><strong>Q2 2026</strong><span>Month 2–3</span></div>
+        <div class="timeline-body">
+          <div class="timeline-status status-progress">◐ In progress</div>
+          <div class="timeline-title">SOC 2 Type I — readiness assessment</div>
+          <div class="timeline-desc">Beginning SOC 2 Type I audit preparation with Vanta. Covers all five Trust Service Criteria: Security, Availability, Processing Integrity, Confidentiality, and Privacy. Full report available to enterprise customers under NDA upon completion.</div>
+        </div>
+      </div>
+
+      <div class="timeline-item">
+        <div class="timeline-when"><strong>Q3 2026</strong><span>Month 7–8</span></div>
+        <div class="timeline-body">
+          <div class="timeline-status status-planned">Planned</div>
+          <div class="timeline-title">SOC 2 Type I certification</div>
+          <div class="timeline-desc">Target completion of SOC 2 Type I audit. Report will be available to enterprise customers under NDA. This is the foundation for Type II (12-month observation period begins on Type I completion).</div>
+        </div>
+      </div>
+
+      <div class="timeline-item">
+        <div class="timeline-when"><strong>Q4 2026</strong><span>Month 9–10</span></div>
+        <div class="timeline-body">
+          <div class="timeline-status status-planned">Planned</div>
+          <div class="timeline-title">Data Processing Agreement (DPA) template</div>
+          <div class="timeline-desc">Standardized DPA for enterprise customers. Covers data processor obligations, sub-processor list, breach notification timelines, and data subject rights. Required for GDPR-regulated customers in the EU.</div>
+        </div>
+      </div>
+
+      <div class="timeline-item">
+        <div class="timeline-when"><strong>2027</strong><span>Year 2</span></div>
+        <div class="timeline-body">
+          <div class="timeline-status status-planned">Planned</div>
+          <div class="timeline-title">SOC 2 Type II &amp; EU AI Act alignment</div>
+          <div class="timeline-desc">Twelve-month observation period completes. Type II report covers operational effectiveness over time. Simultaneously aligning audit trail and governance features with EU AI Act transparency requirements (Articles 13, 17, 26).</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTACT -->
+  <div class="section">
+    <div class="sec-label">Security Contact</div>
+    <div class="sec-title">For security reviews &amp; disclosures</div>
+    <p class="sec-desc">We respond to security questionnaires, vendor assessments, and vulnerability disclosures. Use the appropriate channel below.</p>
+
+    <div class="contact-grid">
+      <div class="contact-card primary">
+        <div class="contact-type">Vendor security review</div>
+        <div class="contact-title">Security questionnaires &amp; assessments</div>
+        <div class="contact-desc">Send your vendor security questionnaire (SIG Lite, CAIQ, custom form) to this address. We respond within 48 business hours. We can also schedule a security call for enterprise procurement reviews.</div>
+        <a href="mailto:security@vantageaiops.com" class="contact-email">security@vantageaiops.com</a>
+        <div class="contact-sla">Response SLA: 48 business hours</div>
+      </div>
+
+      <div class="contact-card">
+        <div class="contact-type">Vulnerability disclosure</div>
+        <div class="contact-title">Responsible disclosure</div>
+        <div class="contact-desc">If you have found a security vulnerability, please disclose it responsibly. We do not currently have a public bug bounty program but we acknowledge and credit all valid reports. Please do not disclose publicly before we have had a chance to remediate.</div>
+        <a href="mailto:security@vantageaiops.com" class="contact-email">security@vantageaiops.com</a>
+        <div class="contact-sla">Initial response: 24 hours · Remediation: 90 days</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-left">VantageAI · trust.vantageaiops.com · Last updated April 2026</div>
+  <div class="footer-links">
+    <a href="https://vantageaiops.com">Home</a>
+    <a href="https://vantageaiops.com/privacy.html">Privacy Policy</a>
+    <a href="https://vantageaiops.com/terms.html">Terms of Service</a>
+    <a href="https://vantageaiops.com/docs.html">Docs</a>
+    <a href="mailto:security@vantageaiops.com">security@vantageaiops.com</a>
+  </div>
+</footer>
+
+</body>
+</html>

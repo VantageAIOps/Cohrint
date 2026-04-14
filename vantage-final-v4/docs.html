@@ -269,8 +269,8 @@ quickstart: `
 <div class="tab-row"><div class="tab active" onclick="switchTab('qs',this,'qs-py')">Python</div><div class="tab" onclick="switchTab('qs',this,'qs-ts')">TypeScript</div></div>
 <div id="qs-py" class="tab-content active"><pre>pip install vantageaiops
 
-<span class="c-kw">import</span> vantage
-<span class="c-kw">from</span> vantage.proxy.openai_proxy <span class="c-kw">import</span> OpenAI
+<span class="c-kw">import</span> vantageaiops <span class="c-kw">as</span> vantage
+<span class="c-kw">from</span> vantageaiops.proxy.openai_proxy <span class="c-kw">import</span> OpenAI
 
 vantage.<span class="c-fn">init</span>(api_key=<span class="c-str">"vnt_your_key"</span>)
 client = OpenAI(api_key=<span class="c-str">"sk-..."</span>)
@@ -388,7 +388,7 @@ concepts: `
 │ vantage CLI  │──tracking──────────▸│              │
 │ Local Proxy  │──stats─────────────▸│              │
 └──────────────┘                    └──────────────┘
-                                     Billing APIs ──▸ /v1/connectors</pre>
+                                     Billing APIs ──▸ /v1/cross-platform/connections</pre>
 
 <h2>Key Concepts</h2>
 
@@ -599,6 +599,7 @@ mcp: `
 <tr><td><code>analyze_tokens</code></td><td>Count tokens and estimate cost for given text</td></tr>
 <tr><td><code>estimate_costs</code></td><td>Compare costs across all supported models</td></tr>
 <tr><td><code>compress_context</code></td><td>Compress conversation context within a token budget</td></tr>
+<tr><td><code>find_cheapest_model</code></td><td>Find the cheapest model for a given token budget, filterable by tier or provider</td></tr>
 </tbody></table>
 
 <h2>Claude Desktop setup (step by step)</h2>
@@ -656,29 +657,6 @@ Make sure your <code>VANTAGE_API_KEY</code> is correct and starts with <code>vnt
   <strong>Other MCP-compatible editors</strong>
   <p style="margin-top:8px;color:var(--muted)">VantageAI MCP works with any editor that supports the Model Context Protocol. Refer to your editor's documentation for MCP server configuration instructions.</p>
 </div>`,
-
-cursor: `
-<h1>Cursor</h1>
-<h2>Setup (2 minutes)</h2>
-<div class="step-row"><div class="step-num">1</div><div class="step-body">Edit <code>~/.cursor/mcp.json</code> (Cursor → Settings → MCP):</div></div>
-<pre>{
-  <span class="c-string">"mcpServers"</span>: {
-    <span class="c-string">"vantage"</span>: {
-      <span class="c-string">"command"</span>: <span class="c-string">"npx"</span>,
-      <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"vantageaiops-mcp"</span>],
-      <span class="c-string">"env"</span>: { <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"vnt_your_key"</span> }
-    }
-  }
-}</pre>
-<div class="step-row"><div class="step-num">2</div><div class="step-body">Restart Cursor. VantageAI tools appear automatically in the tool list.</div></div>
-<h2>Example prompts</h2>
-<pre><span class="c-comment">In Cursor chat:</span>
-How much have we spent on AI this month?
-Which model is costing us the most?
-Are we within our AI budget?
-Show me recent agent traces
-Track this call: gpt-4o, 500 prompt, 120 completion tokens, $0.003</pre>`,
-
 
 claudecode: `
 <h1>Claude Code</h1>
@@ -842,34 +820,6 @@ alerts: `
 </tbody></table>
 <h2>Delivery</h2>
 <p>Alerts deliver via Slack webhook, email, or PagerDuty. Configure in Settings → Notifications.</p>`,
-
-clickhouse: `
-<h1>ClickHouse Cloud setup</h1>
-<p>Vantage uses ClickHouse for time-series storage. The free tier handles early production load.</p>
-<div class="step-row"><div class="step-num">1</div><div class="step-body">Sign up at <a href="https://clickhouse.cloud" style="color:var(--accent)">clickhouse.cloud</a> → New service → Development tier (free)</div></div>
-<div class="step-row"><div class="step-num">2</div><div class="step-body">Note hostname, username (default), password</div></div>
-<div class="step-row"><div class="step-num">3</div><div class="step-body">Create the schema:</div></div>
-<pre><span class="c-keyword">from</span> vantageaiops.storage.clickhouse <span class="c-keyword">import</span> <span class="c-var">ClickHouseStorage</span>
-storage = <span class="c-var">ClickHouseStorage</span>(
-    <span class="c-var">host</span>=<span class="c-string">"your-service.clickhouse.cloud"</span>,
-    <span class="c-var">password</span>=<span class="c-string">"your-password"</span>
-)
-storage.<span class="c-func">create_schema</span>()  <span class="c-comment"># creates table + 2 materialised views</span></pre>`,
-
-selfhost: `
-<h1>Self-hosting</h1>
-<p>Run the full Vantage stack on your own infrastructure. Required for HIPAA/GDPR compliance.</p>
-<h2>Docker Compose (fastest)</h2>
-<pre>git clone https://github.com/vantage-ai/vantage
-cd vantage
-cp .env.example .env    # set CLICKHOUSE_HOST, CLICKHOUSE_PASSWORD
-docker-compose up -d</pre>
-<h2>Point SDK at your server</h2>
-<pre><span class="c-comment"># Python</span>
-vantage.<span class="c-func">init</span>(<span class="c-var">api_key</span>=<span class="c-string">"vnt_local"</span>)  <span class="c-comment"># override INGEST_URL in vantage/client.py</span>
-
-<span class="c-comment">// TypeScript</span>
-<span class="c-func">init</span>({ <span class="c-var">apiKey</span>: <span class="c-string">"vnt_local"</span>, <span class="c-var">ingestUrl</span>: <span class="c-string">"http://localhost:8000/v1/events"</span> });</pre>`,
 
 api: `
 <h1>REST API</h1>
@@ -1584,39 +1534,6 @@ export OTEL_RESOURCE_ATTRIBUTES="team.id=backend,cost_center=eng-100"</pre>
 </div>
 `,
 
-"otel-copilot": `
-<h1>GitHub Copilot — OTel Setup</h1>
-<p>Copilot Chat exports tokens, latency, tool calls, and session data via OpenTelemetry.</p>
-
-<h2>Setup (VS Code settings.json)</h2>
-<pre>{
-  "github.copilot.chat.otel.enabled": true,
-  "github.copilot.chat.otel.exporterType": "otlp-http",
-  "github.copilot.chat.otel.otlpEndpoint": "https://api.vantageaiops.com/v1/otel"
-}</pre>
-<p>Set auth via environment variable:</p>
-<pre>export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer vnt_your_key"</pre>
-
-<h2>Alternative: Environment Variables</h2>
-<pre>export COPILOT_OTEL_ENABLED=true
-export COPILOT_OTEL_ENDPOINT=https://api.vantageaiops.com/v1/otel
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer vnt_your_key"</pre>
-
-<h2>Metrics Received</h2>
-<table class="doc-table">
-<tr><th>Metric</th><th>Data</th></tr>
-<tr><td><code>gen_ai.client.token.usage</code></td><td>Input/output tokens per model (histogram)</td></tr>
-<tr><td><code>gen_ai.client.operation.duration</code></td><td>API call latency in seconds</td></tr>
-<tr><td><code>copilot_chat.time_to_first_token</code></td><td>TTFT in seconds</td></tr>
-<tr><td><code>copilot_chat.tool.call.count</code></td><td>Tool invocations by name</td></tr>
-<tr><td><code>copilot_chat.session.count</code></td><td>Sessions started</td></tr>
-</table>
-
-<div class="callout callout-amber">
-<strong>Note:</strong> Copilot does not emit cost in USD. VantageAI calculates cost from token counts + our pricing database.
-</div>
-`,
-
 "otel-gemini": `
 <h1>Gemini CLI — OTel Setup</h1>
 <p>Gemini CLI exports tokens (5 types including thinking tokens), API calls, file operations, and compression stats.</p>
@@ -1663,18 +1580,6 @@ otlp_endpoint = "https://api.vantageaiops.com/v1/otel"</pre>
 <li><code>codex.commit.count</code> — Git commits</li>
 <li><code>codex.lines_of_code.count</code> — Lines added/removed</li>
 </ul>
-`,
-
-"otel-cline": `
-<h1>Cline — OTel Setup</h1>
-<p>Cline (VS Code extension) exports token usage and tool calls via OpenTelemetry.</p>
-
-<h2>Setup (environment variables)</h2>
-<pre>export CLINE_OTEL_TELEMETRY_ENABLED=1
-export CLINE_OTEL_EXPORTER_OTLP_ENDPOINT=https://api.vantageaiops.com/v1/otel
-export CLINE_OTEL_EXPORTER_OTLP_PROTOCOL=http/json</pre>
-<p>Set auth:</p>
-<pre>export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer vnt_your_key"</pre>
 `,
 
 "otel-pricing": `
