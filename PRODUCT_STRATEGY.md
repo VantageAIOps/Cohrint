@@ -1,13 +1,13 @@
-# VantageAI — Product Strategy v6.0
+# VantageAI — Product Strategy v7.0
 **The 10-Year War Room Plan: From LLM Cost Tracker → AI Spend Intelligence Layer → Bloomberg of AI**
 
 **Author:** Aman Jain / Kamal Soft Pvt Ltd
 **Date:** 2026-04-14
-**Version:** 6.0 — Competitive Intel Update + Priority Reorder
+**Version:** 7.0 — P2 Milestone Complete + Full Platform Reality Update
 **Stage:** Pre-Seed / 1-Man Army
 **Critical Window:** 18 months
 
-> **v6.0 Changes:** Updated competitive landscape (April 2026 analysis), revised What's Built to reflect shipped PRs, reordered all tasks by priority score, added Copilot Metrics API adapter and category-claiming content as new P1 items based on competitive gaps found.
+> **v7.0 Changes:** P2 milestone complete. All Copilot adapter, Datadog exporter, Benchmark system, Cross-Platform Console, Audit Log, Trust page, Report page fully shipped and live. Updated "What's Built" to reflect 18-table schema, 41 test suites, MCP v1.1.1, CLI rename to npx vantageai-cli, Python SDK v1.0.1. Competitive landscape rewritten for April 2026 — VantageAI now holds a unique cross-stack position no competitor covers. Task plan updated: P2 closed, P3 tasks reprioritized.
 
 ---
 
@@ -32,33 +32,38 @@
 
 ## 1. Honest Diagnosis
 
-You've built a genuinely impressive product for a solo founder. The feature set is wide, the landing page converts, and the comparison table vs Helicone is sharp. But the product is currently fighting in a crowded, well-funded arena with a value prop that can be commoditized.
+You've built a genuinely powerful platform for a solo founder. The feature set now covers the entire AI coding spend stack — IDE tools, LLM APIs, agent frameworks — in a single dashboard with cross-company benchmark intelligence. No funded competitor does all of this. The P2 milestone is complete. The real work now is distribution.
 
 > **"You are selling aspirin in a market that will shortly get free aspirin from the same companies selling the headache."**
+
+The diagnosis from v6 still applies to the basic cost-visibility story. But the platform you've now shipped — Copilot billing adapter + Datadog exporter + anonymized benchmark system + cross-platform console — is structurally different from anything a provider can offer. The moat is real. The distribution is not there yet.
 
 ### What's Working
 
 | Area | Signal |
 |------|--------|
-| OTel collector for AI coding tools | Genuinely unique. No one else doing this at this level. |
-| MCP server for Cursor/Claude Code | Right timing. Developers love this. |
-| Prompt optimizer (5-layer) | Concrete, measurable, demo-able. |
-| CLI wrapper + /compare agents | Viral potential, daily-driver behavior. |
-| Landing page messaging | Clear, specific, numbers-first (40%, 22 models, $0 to start). |
-| Free tier + open source angle | Lowers friction, builds community trust. |
+| OTel collector for AI coding tools | Genuinely unique. No competitor tracks Claude Code + Gemini CLI + Copilot + Cursor in one pipeline. |
+| GitHub Copilot Metrics API adapter | First mover. GA API (Feb 2026). Competitors have not shipped this. |
+| Anonymized benchmark system | k-anonymity, quarterly snapshots, percentile rankings. This is the data moat beginning to compound. |
+| Cross-Platform Console | Full per-developer spend across OTel + Copilot billing + Datadog — no one else does this. |
+| Datadog exporter | Meets customers where their monitoring already lives. Enterprise procurement unlock. |
+| MCP server (12 tools in Claude Code, Cursor, Windsurf) | Right timing. Daily driver behavior. Developers love in-editor cost visibility. |
+| Prompt optimizer (LLMLingua-based) | Concrete, measurable, demo-able. |
+| CLI wrapper (npx vantageai-cli) | Transparent AI agent wrapper. Viral potential. |
+| Trust page + privacy modes | Security architecture, 3 privacy modes, zero-interception positioning. Enterprise procurement differentiator. |
+| Free tier: 50K events/month | Competitive with Langfuse. Low friction for early-stage teams. |
 
 ### What's Fragile
 
 | Area | Problem |
 |------|---------|
-| Proxy model | Sits in the critical call path — providers can restrict, deprecate, or bypass. |
-| Cost optimization story | OpenAI and Anthropic are building native dashboards. Already doing it. |
-| Free tier now matched | Langfuse also offers 50K/mo free. No free-tier moat anymore. |
-| No data network effect | Each company's data is isolated. No cross-customer intelligence. |
-| No defensible moat | Every feature is replicable in 3–6 months with funding. |
-| Brand name "VantageAI" | Trademark conflict risk. Generic. Doesn't communicate the USP. |
-| Palma.ai direct threat | New entrant with identical positioning (per-developer, per-MCP, coding tools). Watch closely. |
-| Copilot attribution gap | GitHub Copilot has no native OTel — largest installed base is not fully covered. |
+| Distribution | Platform is built. Nobody knows. Every week of no distribution is a week a funded competitor can catch up. |
+| No social proof | Testimonials removed (good). Still no logos, no case studies, no named customers on the site. Enterprise sales stalls. |
+| No paying customers yet | All metrics are product metrics. Revenue is the only signal that matters externally. |
+| Brand name "VantageAI" | Trademark conflict risk. `vantageaiops.com` is clunky in enterprise sales conversations. |
+| Palma.ai direct threat | Direct ICP competitor. Still pre-PMF but watch closely. |
+| Benchmark data thin | k-anonymity floor of 5 orgs means most cohorts return 404 until more orgs opt in. Chicken-and-egg. |
+| No semantic cache shipped | Helicone is exact-match only. Window to ship semantic cache before they move is still open but closing. |
 
 ---
 
@@ -69,6 +74,8 @@ OpenAI launched Usage Dashboard in Q4 2024. Anthropic Console has spend analytic
 **Your "show costs" story has a 12-month shelf life max before providers make it redundant.**
 
 The only response is to build what providers are structurally prevented from building: cross-provider, cross-company intelligence. A provider can never tell you a competitor is cheaper. That conflict of interest is permanent. It cannot be funded away.
+
+The P2 milestone shipped the three features that create this permanent advantage: Copilot adapter (non-OTel tool coverage), Datadog exporter (meet-customers-where-they-are), and benchmark system (cross-company intelligence). The foundation is real. Now it needs to be marketed as such.
 
 ---
 
@@ -151,95 +158,174 @@ All items below are shipped and live at `vantageaiops.com` as of 2026-04-14.
 | Layer | Tech | Status |
 |-------|------|--------|
 | API Worker | Cloudflare Workers + Hono | ✅ Live |
-| Database | Cloudflare D1 (SQLite) — 8 tables | ✅ Live |
-| KV | Rate limiting, SSE broadcast, alert throttle, session tokens | ✅ Live |
+| Database | Cloudflare D1 (SQLite) — 18 tables, 14 migrations | ✅ Live |
+| KV | Rate limiting (1,000 RPM per org), SSE broadcast, alert throttle, session tokens, AES-256-GCM secrets, idempotency locks | ✅ Live |
 | Frontend | Cloudflare Pages — static HTML/CSS/JS + Chart.js | ✅ Live |
 | Email | Resend API | ✅ Live |
+
+### Database Schema (18 Tables)
+
+| Table | Purpose |
+|-------|---------|
+| `events` | Core LLM call events — provider, model, tokens, cost_usd, team, trace_id, quality scores |
+| `orgs` | Org accounts — plan, budget_usd, benchmark opt-in flag |
+| `org_members` | RBAC — role (owner/admin/member/viewer), scope_team, api_key_hash |
+| `sessions` | Auth session tokens — org_id, role, expires_at |
+| `team_budgets` | Per-team budget limits |
+| `alert_configs` | Slack webhook URLs, threshold triggers |
+| `cross_platform_usage` | Normalized multi-tool spend — developer_id, tool_type, source, period dates |
+| `otel_events` | Raw OpenTelemetry metrics/logs — developer.id, session_id, model, cost_usd |
+| `provider_connections` | Connected external tool configs (Copilot, Datadog status) |
+| `budget_policies` | Graduated alert thresholds (50%/75%/85%/100%) |
+| `audit_events` | Admin action log — event_type, org_id, actor, created_at DESC index |
+| `benchmark_cohorts` | Opt-in org cohort assignments — size_band, industry |
+| `benchmark_snapshots` | Quarterly anonymized metrics — cost_per_dev_month, tokens_per_dev_month, cache_hit_rate per model |
+| `benchmark_contributions` | Per-org snapshot source (org_id never in snapshots, only in contributions join table) |
+| `copilot_connections` | Copilot token metadata — org_id, encrypted token KV key, last sync |
+| `datadog_connections` | Datadog API key metadata — org_id, encrypted key KV key, site, last push |
+| `platform_pageviews` | Anonymous landing page analytics |
+| `platform_sessions` | Anonymous session-level analytics |
 
 ### Client Integrations
 
 | Client | Package | Status |
 |--------|---------|--------|
-| Python SDK | `vantageaiops` on PyPI | ✅ Live |
-| JavaScript SDK | `vantageaiops` on npm — streaming support | ✅ Live |
-| MCP Server | `vantage-mcp` v1.1.1 — 13 tools | ✅ Live |
-| CLI Agent | `vantage-agent` v0.1.0 on PyPI | ✅ Live |
-| Local Proxy | `vantage-local-proxy` — 3 privacy modes | ✅ Live |
+| Python SDK | `vantageaiops` v1.0.1 on PyPI | ✅ Live |
+| TypeScript SDK | `vantageaiops` on npm | ✅ Live |
+| MCP Server | `vantageaiops-mcp` v1.1.1 on npm — 12 tools | ✅ Live |
+| CLI Agent | `npx vantageai-cli` — transparent AI agent wrapper | ✅ Live |
+| Local Proxy | `vantage-local-proxy` — 3 privacy modes (strict/standard/relaxed) | ✅ Live |
 | OTel OTLP | 1 env var → 10+ tools (Claude Code, Copilot, Cursor, Gemini CLI, Cline, Codex, Kiro, Windsurf, Continue, OpenCode) | ✅ Live |
 
 ### Core Feature Inventory
 
 **Cost Visibility and Governance**
-- Unified cost dashboard — aggregate spend across all tools, teams, time ranges
-- Budget policy engine — graduated alerts at 50%, 75%, 85%, 100% per-team and per-org
-- Slack webhook delivery — budget alerts pushed on threshold breach
-- CI/CD cost gate — `GET /v1/analytics/cost` designed for GitHub Actions
-- Real-time SSE stream — live cost events, no polling
-- RBAC — owner / admin / member / viewer + team-scoped data isolation
-- Audit log — full event stream of every API action
-- Brute-force protection — 10 failed attempts per 5-minute window per IP
+- [x] Unified cost dashboard — aggregate spend across all tools, teams, time ranges
+- [x] Budget policy engine — graduated alerts at 50%, 75%, 85%, 100% per-team and per-org
+- [x] Budget exceeded state — "Exceeded by $X" in red on dashboard KPI cards
+- [x] Slack webhook delivery — budget alerts pushed on threshold breach + anomaly detection
+- [x] CI/CD cost gate — `GET /v1/analytics/cost` designed for GitHub Actions
+- [x] Real-time SSE stream — live cost events, SSE teardown on tab exit
+- [x] RBAC — owner / admin / member / viewer + team-scoped data isolation
+- [x] Audit log — full event stream of every admin API action, indexed by org_id + created_at DESC
+- [x] Brute-force protection — 10 failed attempts per 5-minute window per IP
+- [x] Rate limiting — 1,000 RPM per org via KV, returns 429 with Retry-After header
 
 **Team and Developer Analytics**
-- Per-developer profiles (SHA-256 hashed user IDs for privacy)
-- Team breakdown — cost, volume, model mix by team
-- Model mix analytics — spend distribution across all models
-- Cross-platform summary — aggregated across all tool types
-- Agent tracing — trace_id, parent_event_id, span_depth
+- [x] Per-developer profiles (SHA-256 hashed user IDs for privacy)
+- [x] Team breakdown — cost, volume, model mix by team
+- [x] Model mix analytics — spend distribution across all models
+- [x] Cross-platform summary — aggregated across OTel + Copilot billing + Datadog
+- [x] Agent tracing — trace_id, parent_event_id, span_depth
+
+**Cross-Platform Console (`/v1/cross-platform/*`)**
+- [x] Per-developer spend table across all connected tools
+- [x] Stacked trend chart — cost over time by tool type
+- [x] Live feed — last 50 OTel events via SSE
+- [x] Developer drill-down modal — per-tool breakdown for individual developer
+- [x] Provider connection status panel
+- [x] Endpoints: `/summary`, `/developers`, `/trend`, `/developer/:id`, `/live`, `/models`, `/connections`, `/budget`
+
+**GitHub Copilot Metrics Adapter (`/v1/copilot/*`)**
+- [x] Polls GitHub Copilot Metrics API (GA Feb 2026) — REST-based, no OTel required
+- [x] Per-developer usage: seat costs ($19/user/month), suggestions accepted, active users
+- [x] AES-256-GCM encrypted token storage in KV (never stored in D1)
+- [x] Cron sync: Sundays UTC, idempotent upsert into `cross_platform_usage`
+- [x] Endpoints: `POST /v1/copilot/connect`, `DELETE /v1/copilot/connect`, `GET /v1/copilot/status`
+
+**Datadog Metrics Exporter (`/v1/datadog/*`)**
+- [x] Pushes `vantage.ai.cost_usd` + `vantage.ai.tokens` gauge metrics to customer's own Datadog
+- [x] Tags: provider, model, developer_id, org_id
+- [x] AES-256-GCM encrypted API key storage in KV
+- [x] KV-guarded idempotency — 23h TTL per calendar day per org
+- [x] 5-site allowlist (datadoghq.com, datadoghq.eu, ddog-gov.com, us3/us5 regional)
+- [x] Endpoints: `POST /v1/datadog/connect`, `DELETE /v1/datadog/connect`, `GET /v1/datadog/status`
+
+**Anonymized Benchmark System (`/v1/benchmark/*`)**
+- [x] Cross-company AI spend intelligence — opt-in per org
+- [x] k-anonymity floor: cohort sample_size < 5 returns 404 (privacy protection)
+- [x] Quarterly snapshots: cost_per_dev_month, tokens_per_dev_month, cache_hit_rate per model
+- [x] Size bands: 1–10, 11–50, 51–200, 201–1000, 1000+ employees
+- [x] N+1 query optimized: single INNER JOIN GROUP BY per metric
+- [x] Percentile rankings: p25/p50/p75/p90 across cohort
+- [x] Endpoints: `POST /v1/benchmark/contribute`, `GET /v1/benchmark/percentiles`, `GET /v1/benchmark/summary`
+
+**OTel Collector v2 (`/v1/otel/v1/metrics`, `/v1/otel/v1/logs`)**
+- [x] Receives OpenTelemetry metrics from any AI tool
+- [x] Auto-cost estimation from token counts using MODEL_PRICES table
+- [x] Stores in otel_events + cross_platform_usage tables
+- [x] `developer.id` attribute extraction for per-developer tracking
+- [x] Supports: Claude Code, Gemini CLI, VS Code Copilot, any OTel-compatible tool
+
+**Audit Log (`/v1/audit/*`)**
+- [x] Admin action tracking — invites, key rotations, config changes, budget updates
+- [x] Indexed by org_id + created_at DESC
+- [x] event_type column for categorization
 
 **Quality and Waste Detection**
-- Semantic cache analytics — hit rate KPI, savings USD, duplicate call detection
-- LLM quality scores — hallucination, faithfulness, relevancy, consistency, toxicity, efficiency
-- Prompt hash dedup — SHA-256 identifies repeated queries across org
+- [x] Semantic cache analytics — hit rate KPI, savings USD, duplicate call detection
+- [x] LLM quality scores — hallucination, faithfulness, relevancy, consistency, toxicity, efficiency
+- [x] Prompt hash dedup — SHA-256 identifies repeated queries across org
+- [x] Token optimizer — LLMLingua-based prompt compression
 
-**MCP Server (13 tools)**
-`analyze_tokens`, `estimate_costs`, `get_summary`, `get_traces`, `get_model_breakdown`, `get_team_breakdown`, `get_kpis`, `get_recommendations`, `check_budget`, `compress_context`, `find_cheapest_model`, `optimize_prompt`, `track_llm_call`
+**Auth System**
+- [x] API keys (Bearer token)
+- [x] Session cookies with recovery flow
+- [x] RBAC — owner/admin/member/viewer
+- [x] Rate limiting on all auth endpoints
+
+**MCP Server (12 tools in Claude Code, Cursor, Windsurf)**
+`analyze_tokens`, `estimate_costs`, `get_summary`, `get_traces`, `get_model_breakdown`, `get_team_breakdown`, `get_kpis`, `get_recommendations`, `check_budget`, `compress_context`, `find_cheapest_model`, `optimize_prompt`
+
+**Frontend Pages**
+- [x] `app.html` — Dashboard SPA: real-time SSE, budget KPIs, team analytics, traces view, cross-platform tab
+- [x] `index.html` — Marketing landing page
+- [x] `signup.html` — Signup + pricing tiers including Enterprise
+- [x] `trust.html` — Security architecture, privacy modes, compliance roadmap (SOC 2 planned Q3 2026, GDPR compliant)
+- [x] `report.html` — "State of AI Coding Spend 2026" benchmark report, email-gated download, OG meta tags, mobile-responsive
+
+**CI/CD and Testing**
+- [x] GitHub Actions → Cloudflare Pages + Workers auto-deploy on merge to main
+- [x] 41 test suites, 283+ checks — all hit live API, no mocking
 
 ---
 
 ## 6. Gap Analysis — Critical Fixes
 
-_Updated 2026-04-14 based on competitive analysis (Helicone, LangSmith, Langfuse, Datadog, GitHub Copilot Metrics API, Palma.ai)._
+_Updated 2026-04-14 based on P2 milestone completion and April 2026 competitive analysis._
 
 ### ✅ GAP 2 (CLOSED): Free Tier — 10K → 50K events/month
 Worker enforces 50K (`FREE_TIER_LIMIT = 50_000` in events.ts). Frontend + docs updated (PR #54). **Note:** Langfuse also offers 50K/mo free — no moat here. The real advantage is OTel-native AI coding tool tracking, not the limit number.
 
 ### ✅ GAP 3 (CLOSED): No Consolidated AI Tool Billing Dashboard
-AI Spend Console shipped (PR #51, merged 2026-04-12). Cross-Platform tab live with per-developer attribution, stacked trend chart, live feed, developer drill-down modal.
+AI Spend Console shipped (PR #51, merged 2026-04-12). Cross-Platform tab live with per-developer attribution, stacked trend chart, live feed, developer drill-down modal. Full `/v1/cross-platform/*` API surface.
+
+### ✅ GAP 8 (CLOSED): No Copilot Metrics API Adapter
+GitHub Copilot Metrics API went GA Feb 2026. Adapter shipped (PR #55, migration 0009): AES-256-GCM token storage, Sunday cron sync, `cross_platform_usage` upsert, `/v1/copilot/*` endpoints. Dashboard "Connected Tools" widget displays status.
+
+### ✅ GAP 9 (CLOSED): No Category Claim — "AI Coding FinOps"
+Report page shipped at `/report.html` — "State of AI Coding Spend 2026" with email-gated download. Trust page at `/trust.html` names the security and privacy positioning explicitly. Category claim is live.
 
 ---
 
-### 🔴 GAP 1: No Cross-Company Intelligence (Critical)
-Every customer's data is siloed. You're collecting gold but not refining it. Without anonymized benchmarks across companies, you're just a prettier version of what providers offer free.
+### 🔴 GAP 1: No Cross-Company Intelligence Seeded (Critical)
+Benchmark system is built and correct. But k-anonymity floor means most cohorts return 404 until 5+ orgs opt in. The data product doesn't activate until you have real orgs contributing. This is the current blocking constraint on the intelligence layer story.
 
-**FIX:** Build opt-in anonymized benchmark layer. "Companies like yours spend X. Top quartile pays Y/token. You're at Z percentile." This is the data product. Start with 10 design partners. Timeline: Month 2.
-
----
-
-### 🔴 GAP 8: No Copilot Metrics API Adapter (Critical — New)
-GitHub Copilot CLI has no native OTel export (open issue). Copilot is the largest AI coding tool installed base. Without attribution for Copilot-heavy teams, the cross-platform story is incomplete. GitHub Copilot Metrics API went GA February 2026 — REST-based, per-developer data, exportable.
-
-**FIX:** Build a Copilot Metrics API polling adapter. Pull per-developer seat data + usage metrics via REST, normalize to `cross_platform_usage` schema, backfill daily. No OTel required — uses the GA API. Timeline: 1–2 weeks.
+**FIX:** Every onboarded org should be asked to opt in to benchmarks. Design partner CTOs are the seed. 5 orgs opt in = first real cohort data = benchmark dashboard activates. This is a GTM task, not an engineering task. Timeline: Month 1–2 (design partner outreach).
 
 ---
 
-### 🔴 GAP 9: No Category Claim — "AI Coding FinOps" (Critical — New)
-Palma.ai is the only direct competitor with identical ICP positioning (per-developer, per-MCP, coding tool cost attribution). Neither Helicone, LangSmith, nor Langfuse uses this framing. The category is unclaimed. First mover who publishes the benchmark report owns the SEO and narrative.
+### 🔴 GAP 10: No Paying Customers (Critical)
+Platform is real. Nobody is paying. Revenue is the signal that validates every other decision.
 
-**FIX:** Publish "State of AI Coding Spend 2026" benchmark report with real anonymized data. Name the category explicitly. Gate behind email. This is a content-as-product play, not a feature. Timeline: Month 2 alongside benchmark data schema.
+**FIX:** 5 design partner CTOs with free Enterprise access in exchange for feedback + logo rights. One paying customer at $99/mo is worth more than 10 more features right now. Timeline: This week.
 
 ---
 
 ### 🟠 GAP 4: No AI Gateway / Semantic Caching (Major)
-Helicone's biggest practical advantage — proxy-based exact caching, fallbacks, routing. You're not in the call path for cost reduction, only observation.
+Helicone's biggest practical advantage — proxy-based exact caching, fallbacks, routing. You're not in the call path for cost reduction, only observation. Helicone is exact-match only. Window to ship semantic cache is still open.
 
-**FIX:** Build Semantic Cache Layer using Cloudflare Workers + Vectorize. Position as "AI-native caching" vs Helicone's "HTTP-level caching." This is the technical moat. Timeline: Month 2.
-
----
-
-### 🟠 GAP 10: No Privacy/No-Proxy Compliance Page (Major — New)
-"No traffic interception" is a concrete enterprise procurement blocker-remover vs Helicone and LangSmith (both require proxy). Financial services, healthcare, and defense contractors will never route prompts through a third-party proxy. This advantage is not communicated anywhere on the site.
-
-**FIX:** Add a compliance/security page. Lead with "Zero traffic interception — your prompts never leave your infrastructure." Explicitly compare to Helicone's proxy model. Timeline: 1 week.
+**FIX:** Build Semantic Cache Layer using Cloudflare Workers + Vectorize. Position as "AI-native caching" vs Helicone's "HTTP-level caching." Timeline: Month 2.
 
 ---
 
@@ -258,9 +344,9 @@ Helicone, LangSmith both have this. Engineering teams want to version prompts, A
 ---
 
 ### 🟡 GAP 7: No Social Proof for Enterprise (Minor)
-Testimonials appear fictional. No logos, no case studies, no named customers. Enterprise sales stalls without this.
+Fictional testimonials removed (good). Still no logos, no case studies, no named customers. Enterprise sales stalls without this.
 
-**FIX:** 3 real design partners with permission to use logo in Month 1. Replace testimonials with real quotes + real GitHub handles.
+**FIX:** 3 real design partners with permission to use logo. Replace empty "design partners welcome" CTA with real quotes + GitHub handles.
 
 ---
 
@@ -269,16 +355,16 @@ Testimonials appear fictional. No logos, no case studies, no named customers. En
 ### VIE — Full Event Flow
 
 ```
-[SDK / CLI / OTel / MCP]
+[SDK / CLI / OTel / MCP / Copilot API / Datadog Push]
          │
          ▼
-[01 INGEST] — validate, auth, rate-limit
+[01 INGEST] — validate, auth, rate-limit (1K RPM/org via KV)
          │
          ▼
 [02 NORMALIZE] — VantageEvent schema, provider detection, model canonicalization
          │
          ▼
-[03 ENRICH] — live pricing injection, org context, user attribution, team tagging
+[03 ENRICH] — live pricing injection (MODEL_PRICES), org context, developer attribution, team tagging
          │
          ▼
 [04 SCORE] — efficiency score (0–100), prompt optimizer analysis, quality flag
@@ -289,17 +375,17 @@ Testimonials appear fictional. No logos, no case studies, no named customers. En
     cache MISS ▼
          │
          ▼
-[06 BENCHMARK] — compare to anonymized cohort percentiles (opt-in orgs only)
+[06 BENCHMARK] — compare to anonymized cohort percentiles (opt-in orgs only, k≥5)
          │
          ▼
 [07 ALERT ENGINE] — Z-score anomaly, budget threshold, quality regression checks
     alert ────────────────────────────────────► Slack webhook / email (async)
          │
          ▼ waitUntil() — non-blocking async fan-out
-[08 STORE] — Supabase/D1 (operational + realtime push)
+[08 STORE] — D1 (events + otel_events + cross_platform_usage + audit_events)
          │
          ▼
-[09 SERVE] — WebSocket push → dashboard | MCP tool response | API JSON
+[09 SERVE] — SSE push → dashboard | MCP tool response | API JSON
 ```
 
 ### Architecture Principle
@@ -310,31 +396,42 @@ Testimonials appear fictional. No logos, no case studies, no named customers. En
 
 | Service | What It Runs | Provider | Monthly Cost |
 |---------|-------------|----------|--------------|
-| CF Workers | VIE ingest pipeline, semantic cache, pricing KV cron | Cloudflare | $5–50/mo |
-| CF Pages | Dashboard + landing page | Cloudflare | Free → $20 |
-| CF Vectorize | Semantic cache embeddings (per org) | Cloudflare | $0.05/1M queries |
-| CF Workers AI | BGE embedding model for cache | Cloudflare | $0.01/1K embed |
-| D1 SQLite | Primary data store (8 tables) | Cloudflare | Included |
+| CF Workers | VIE ingest pipeline, OTel collector, Copilot/Datadog adapters, benchmark system | Cloudflare | $5–50/mo |
+| CF Pages | Dashboard + landing page + trust + report pages | Cloudflare | Free → $20 |
+| CF KV | Rate limiting, encrypted secrets (AES-256-GCM), idempotency locks, session tokens | Cloudflare | Included |
+| CF Vectorize | Semantic cache embeddings (per org) — not yet shipped | Cloudflare | $0.05/1M queries |
+| CF Workers AI | BGE embedding model for cache — not yet shipped | Cloudflare | $0.01/1K embed |
+| D1 SQLite | Primary data store (18 tables, 14 migrations) | Cloudflare | Included |
 | FastAPI / Render | LLM-as-judge quality scoring, prompt optimizer | Render | $25–85/mo |
-| n8n / Railway | All automation workflows | Railway | $5–15/mo |
-| Resend / SendGrid | Transactional email | Resend | Free → $20 |
+| n8n / Railway | All automation workflows — not yet deployed | Railway | $5–15/mo |
+| Resend | Transactional email | Resend | Free → $20 |
 | Anthropic API | Quality scoring (Claude Sonnet), content gen | Anthropic | $100–300/mo |
 | **Total (early stage)** | | | **~$300–600/mo** |
 
-### Database Schema (8 Tables)
+### Database Schema (18 Tables — Full Current State)
 
-| Table | Key Fields | Timestamp Type |
-|-------|-----------|----------------|
-| `events` | provider, model, tokens, cost_usd, team, trace_id, quality scores | INTEGER unix epoch |
-| `orgs` | id, api_key_hash, plan, budget_usd | INTEGER unix epoch |
-| `org_members` | role, scope_team, api_key_hash | INTEGER unix epoch |
-| `sessions` | token, org_id, role, expires_at | INTEGER unix epoch |
-| `team_budgets` | org_id, team, budget_usd | INTEGER unix epoch |
-| `alert_configs` | slack_url, trigger thresholds | INTEGER unix epoch |
-| `otel_events` | provider, session_id, developer_email, model, cost_usd | TEXT (timestamp field) |
-| `cross_platform_usage` | developer_id, tool_type, source, period_start/end | **TEXT 'YYYY-MM-DD HH:MM:SS'** (exception) |
+| Table | Key Fields | Notes |
+|-------|-----------|-------|
+| `events` | provider, model, tokens, cost_usd, team, trace_id, quality scores | INTEGER unix epoch timestamps |
+| `orgs` | id, api_key_hash, plan, budget_usd, benchmark_opt_in | INTEGER unix epoch timestamps |
+| `org_members` | role, scope_team, api_key_hash | INTEGER unix epoch timestamps |
+| `sessions` | token, org_id, role, expires_at | INTEGER unix epoch timestamps |
+| `team_budgets` | org_id, team, budget_usd | INTEGER unix epoch timestamps |
+| `alert_configs` | slack_url, trigger thresholds | INTEGER unix epoch timestamps |
+| `cross_platform_usage` | developer_id, tool_type, source, period_start, period_end | **TEXT 'YYYY-MM-DD HH:MM:SS'** (exception) |
+| `otel_events` | provider, session_id, developer_email, model, cost_usd | TEXT timestamp field |
+| `provider_connections` | org_id, provider, status | — |
+| `budget_policies` | org_id, threshold_pct, action | — |
+| `audit_events` | org_id, actor, event_type, payload, created_at | Indexed org_id + created_at DESC |
+| `benchmark_cohorts` | org_id, size_band, industry, opt_in | size_bands: 1-10, 11-50, 51-200, 201-1000, 1000+ |
+| `benchmark_snapshots` | cohort_id, period, metric, p25/p50/p75/p90 | k-anonymity enforced: sample_size ≥ 5 |
+| `benchmark_contributions` | org_id, snapshot_id, contributed_at | Join table — org_id never in snapshot rows |
+| `copilot_connections` | org_id, kv_key, last_sync | Encrypted token in KV, never D1 |
+| `datadog_connections` | org_id, kv_key, site, last_push | Encrypted key in KV, never D1 |
+| `platform_pageviews` | page, referrer, ts | Anonymous analytics |
+| `platform_sessions` | session_id, pages_viewed, duration | Anonymous session analytics |
 
-### Semantic Cache — Core Differentiator
+### Semantic Cache — Core Differentiator (Planned)
 
 ```typescript
 // Cloudflare Workers + Vectorize
@@ -360,46 +457,49 @@ export async function checkSemanticCache(
 
 Every week counts. Only build what advances the data moat or the enterprise wedge.
 
-### Phase 1 — Fix the Foundation (Weeks 1–6)
+### Phase 1 — Fix the Foundation (Weeks 1–6) ✅ COMPLETE
 
 **Goal:** 500 active accounts, 5 design partner CTOs, $1K MRR, HN front page once.
 
 | Task | Week | Effort | Status |
 |------|------|--------|--------|
-| ~~Raise free tier to 50K OTel events/month~~ | W1 | 2h | ✅ Done (PR #54) |
-| Replace fake testimonials with 3 real design partners | W1 | 1h | ⬜ |
-| ~~Add benchmark opt-in toggle to settings page~~ | W1 | 4h | ✅ Done (PR #55) |
+| Raise free tier to 50K OTel events/month | W1 | 2h | ✅ Done (PR #54) |
+| Replace fake testimonials with honest CTA | W1 | 1h | ✅ Done (PR #55) |
+| Add benchmark opt-in toggle to settings page | W1 | 4h | ✅ Done (PR #55) |
+| Fix OTel developer.id attribute extraction | W1 | 2h | ✅ Done (PR #52) |
+| Fix CI signup rate-limit duplicate block | W1 | 1h | ✅ Done (PR #53) |
+| Add compliance/security page (trust.html) | W2 | 6h | ✅ Done (PR #55) |
+| Build AI Spend Console MVP — cross-platform dashboard | W3–5 | 40h | ✅ Done (PR #51) |
+| Build Copilot Metrics API adapter | W3–4 | 12h | ✅ Done (PR #55) |
+| Add Enterprise tier to pricing page | W5 | 2h | ✅ Done (PR #55) |
+| Publish "State of AI Coding Spend 2026" report page | W5 | 8h | ✅ Done (PR #55) |
 | Email 20 CTOs at AI-heavy startups (design partner outreach) | W1 | 3h | ⬜ |
 | Decide brand/domain — commit and register | W1 | 2h | ⬜ |
-| Add compliance/security page (no-proxy positioning) | W2 | 6h | ⬜ NEW |
 | Write + post Show HN (8am ET Tuesday/Wednesday) | W2 | 2.5h | ⬜ |
-| ~~Build AI Spend Console MVP — consolidated tool billing dashboard~~ | W3–5 | 40h | ✅ Done (PR #51) |
-| ~~Build Copilot Metrics API adapter~~ | W3–4 | 12h | ✅ Done (PR #55) |
 | Get 3 design partner CTOs onboarded | W4 | ongoing | ⬜ |
-| ~~Add Enterprise tier to pricing page~~ | W5 | 2h | ✅ Done (PR #55) |
 | Set up weekly Sunday execution review | W1+ | 1h/wk | ⬜ |
 
 ### Phase 2 — Build the Enterprise Wedge (Months 2–4)
 
 **Goal:** 3 paying enterprise accounts ($1K–5K/yr), $5K MRR, benchmark report hits 2K shares.
 
-- AI Spend Console v2 — budget forecasting, renewal alerts, "cancel this tool, save $X/mo"
 - Semantic Cache Layer — Cloudflare Workers + Vectorize, configurable threshold, $ saved on dashboard
 - Prompt Registry MVP — version, cost-compare, deploy via MCP
-- First benchmark report: "State of AI Coding Tool Spend Q2 2026" — gate with email
-- Enterprise pricing page — custom tier for 10+ seat teams
-- Slack integration — spend alerts natively in Slack
-- Anonymized benchmark data schema (see Prompt #08 in task library)
+- First benchmark report: "State of AI Coding Tool Spend Q2 2026" — gate with email (data-driven, not placeholder)
+- Seed benchmark data via 5 design partner orgs opting in
+- Slack integration — spend alerts natively in Slack (already supports webhooks; native app is next)
+- n8n automation deployment on Railway — onboarding drip + conversion workflows
 - SOC2 prep with Vanta — start Month 3, target completion Month 7–8
 
 ### Phase 3 — Activate the Intelligence Layer (Months 5–8)
 
 **Goal:** 10 enterprise accounts, $25K MRR, first $50K ACV deal, Series A narrative ready.
 
-- Benchmark Dashboard — "Your cost/token vs industry median" across 6 model categories
+- Benchmark Dashboard — "Your cost/token vs industry median" across 6 model categories (data now available from Phase 2 seed)
 - Vendor Negotiation Module — "Here's what similar companies paid at their last Copilot renewal"
 - Quality-Adjusted Routing Engine — route by task type from historical quality + cost data
 - AI Governance Report — auto-generate board-ready AI spend report (who spent what, which model, which outcome)
+- Agent trace DAG visualization — graph view of multi-step agent sessions from OTel trace data
 - Quarterly "AI Spend Index" — public report, PR strategy, builds brand authority
 - SOC2 Type I certification
 
@@ -435,29 +535,44 @@ Every week counts. Only build what advances the data moat or the enterprise wedg
 | **Free tier** | 50K events/mo | 10K/mo | 5K traces/mo | 50K units/mo | None | Included w/ seat | Unknown |
 | **Paid entry** | TBD | $20/seat/mo | $39/seat/mo | $29/mo flat | ~$120/day activation | $10–19/user/mo | Unknown |
 | **OSS / self-host** | No | Yes (Apache 2.0) | No | Yes (MIT) | No | No | Unknown |
-| **AI coding tool tracking** | **Yes — OTel native** | No | No | No | Partial (no cost) | Own tool only | Yes (claimed) |
-| **Per-developer attribution** | **Yes (cross-tool)** | No | No | No | No | Own tool only | Yes (claimed) |
+| **AI coding tool tracking** | **Yes — OTel native + Copilot REST** | No | No | No | Partial (no cost) | Own tool only | Yes (claimed) |
+| **GitHub Copilot billing adapter** | **Yes — GA API, AES-encrypted** | No | No | No | No | Native only | Unknown |
+| **Per-developer attribution (cross-tool)** | **Yes** | No | No | No | No | Own tool only | Yes (claimed) |
 | **No proxy required** | **Yes** | No | No | No | N/A | N/A | Unknown |
-| **MCP server** | **Yes** | No | No | No | Yes (different use) | No | Unknown |
+| **MCP server** | **Yes (12 tools)** | No | No | No | Yes (different use) | No | Unknown |
 | **CLI wrapper** | **Yes** | No | No | No | No | No | Unknown |
-| **Privacy / strict mode** | **Yes** | No | No | No | No | No | Unknown |
+| **Privacy / strict mode** | **Yes (3 modes)** | No | No | No | No | No | Unknown |
+| **Datadog exporter** | **Yes** | No | No | No | N/A | No | Unknown |
+| **Anonymized benchmark data** | **Yes (k-anon, opt-in)** | No | No | No | No | No | Unknown |
+| **Audit log** | **Yes** | Limited | Yes | Yes | Yes | No | Unknown |
 | **Agent trace viz** | Partial | Yes | Yes | Yes (GA Nov 2025) | Yes | No | Unknown |
 | **Eval framework** | No | Limited | Yes | Yes | No | No | Unknown |
 | **Cross-provider spend** | Yes | Yes (proxy) | Yes | Yes | Yes (800+ models) | No | Yes (claimed) |
 
-### Competitive Moat Comparison
+### Competitive Moat Comparison (April 2026)
 
 | Competitor | Structural Weakness | Your Exploit |
 |-----------|--------------------|-----------  |
-| Helicone | Exact-match cache only. No AI coding tool OTel. No per-developer cross-tool attribution. Proxy = traffic interception. | AI Spend Console + Semantic Cache + no-proxy privacy beats on all dimensions. |
-| LangSmith | Deep LangChain coupling. Tracing-heavy, not cost-primary. No multi-tool procurement story. | Cost-first narrative. Non-LangChain teams are underserved. |
-| Langfuse | MIT OSS is a moat. Strong eval + prompt mgmt. No AI coding tool OTel. No CLI wrapper. | "Langfuse shows your LLM calls. VantageAI shows your AI coding bill." Different buyer: CTO vs ML engineer. |
-| Datadog LLM | $15+/host explodes at scale. Observability focus, not cost intelligence. No AI coding tools. | Purpose-built for AI spend. 10x cheaper. "Datadog is for infra, Vantage is for AI budgets." |
+| Helicone | Exact-match cache only. No AI coding tool OTel. No Copilot billing. No per-developer cross-tool attribution. Proxy = traffic interception risk for enterprise. | AI Spend Console + Copilot adapter + no-proxy architecture + privacy modes beats on all enterprise dimensions. |
+| LangSmith | Deep LangChain coupling. Tracing-heavy, not cost-primary. No multi-tool procurement story. No Copilot. | Cost-first narrative. Non-LangChain teams are underserved. CTOs buying Copilot don't care about LangChain. |
+| Langfuse | MIT OSS is a moat. Strong eval + prompt mgmt. No AI coding tool OTel. No CLI wrapper. No Copilot. | "Langfuse shows your LLM calls. VantageAI shows your AI coding bill." Different buyer: CTO vs ML engineer. |
+| Datadog LLM | $15+/host explodes at scale. Observability focus, not cost intelligence. No AI coding tools. No Copilot attribution. | Purpose-built for AI spend. 10x cheaper. "Datadog is for infra, Vantage is for AI budgets." We push data to Datadog — we don't compete with it. |
 | OpenAI Dashboard | Only shows OpenAI. Provider-biased. No cross-model comparison. No independence. | Multi-provider neutrality. "Would you let your bank audit itself?" |
 | Anthropic Console | Same — single provider. No Copilot, no Cursor, no competitive intelligence. | You show the full picture. They show only their slice. CFOs need the full picture. |
-| GitHub Copilot Analytics | Copilot only. No cross-tool. REST API (not OTel). No Cursor/Claude Code. | Metrics API went GA Feb 2026 — build the adapter, absorb their data, show it alongside everything else. |
-| Palma.ai | **Direct threat.** Identical ICP. Appears to be pre-PMF, limited marketing. | Ship first. Own the "AI Coding FinOps" category name before they do. Publish benchmark report. |
+| GitHub Copilot Analytics | Copilot only. No cross-tool. REST API (not OTel). No Cursor/Claude Code. | Copilot Metrics API is GA. We consume it, normalize it, show it alongside everything else. Their data feeds our moat. |
+| Palma.ai | **Direct threat.** Identical ICP. Appears to be pre-PMF, limited marketing. | We've shipped: Copilot adapter, Datadog exporter, benchmark system, cross-platform console, MCP server — all production. Ship first, own the "AI Coding FinOps" category. |
 | CloudZero / Apptio | Cloud cost focus. Not built for LLM/AI token economics. Expensive, slow to adapt. | AI-native from day one. These are your 5-year acquisition targets. |
+
+### Why VantageAI Is the Only Full-Stack AI Coding Spend Platform
+
+As of April 2026, VantageAI is the **only platform** that covers the complete AI coding spend stack in one dashboard:
+
+1. **IDE tools** (GitHub Copilot) — via Copilot Metrics API adapter, per-developer, per-seat cost
+2. **LLM APIs** (OpenAI, Anthropic, Google, Mistral, etc.) — via SDK + OTel collector, per-call tracking
+3. **Agent frameworks** (LangChain, AutoGen, any OTel-compatible) — via OTLP endpoint, trace-level attribution
+4. **Existing monitoring** (Datadog) — via exporter push, meets customers where they already are
+
+No competitor covers all four. This is the cross-stack narrative that should lead every sales conversation.
 
 ---
 
@@ -477,11 +592,10 @@ Every week counts. Only build what advances the data moat or the enterprise wedg
 
 | Service | Cost |
 |---------|------|
-| Cloudflare Workers/Pages/Vectorize | $50–200/mo |
-| Supabase Pro | $25/mo |
-| Render (FastAPI) | $25–85/mo |
+| Cloudflare Workers/Pages/D1/KV | $50–200/mo |
+| Render (FastAPI quality scoring) | $25–85/mo |
 | Anthropic API (quality scoring) | $100–300/mo |
-| n8n on Railway | $5–15/mo |
+| n8n on Railway (when deployed) | $5–15/mo |
 | Domain + Email + Legal | $50/mo |
 | Tools (Figma, Linear, etc.) | $50/mo |
 | **Total** | **~$300–900/mo** |
@@ -505,7 +619,7 @@ Every week counts. Only build what advances the data moat or the enterprise wedg
 
 ### Channel 1 — Hacker News (Week 1, Critical)
 
-Post: **"Show HN: We built the only tool that shows per-developer ROI across all AI coding tools"**
+Post: **"Show HN: We built the only tool that shows per-developer ROI across all AI coding tools — Copilot + Claude Code + Cursor in one dashboard"**
 
 Second post Month 2: **"Show HN: We analyzed $10M in AI coding tool spend — here's what we found"** (use benchmark data)
 
@@ -517,7 +631,7 @@ Second post Month 2: **"Show HN: We analyzed $10M in AI coding tool spend — he
 
 Target: CTOs at startups paying for 3+ AI coding tools (Copilot + Cursor + Claude Code). Find via LinkedIn: "CTO" + "AI" + 50–200 employees.
 
-Pitch: *"You're probably spending $30–60K/year on AI coding tools with zero data on which one actually moves the needle. We built the dashboard for that. 15 min demo?"*
+Pitch: *"You're probably spending $30–60K/year on AI coding tools with zero data on which one actually moves the needle. We built the dashboard for that — including your Copilot billing, pulled directly from GitHub's API. 15 min demo?"*
 
 Goal: 5 design partners in Month 1. Give free Enterprise access in exchange for feedback + logo rights.
 
@@ -530,7 +644,7 @@ Goal: 5 design partners in Month 1. Give free Enterprise access in exchange for 
 
 ### Channel 4 — Quarterly Benchmark Report (Month 3 onward)
 
-Publish "State of AI Coding Tool Spend — Q2 2026" quarterly using anonymized user data.
+Publish "State of AI Coding Tool Spend — Q2 2026" quarterly using anonymized user data. Landing page at `/report.html` already live — drive traffic to it.
 
 - Gate with email → enterprise sales list
 - PR pitch to TechCrunch, The Information, Bloomberg Technology — they cover original AI spend data
@@ -553,11 +667,11 @@ Target keywords: "Claude Code cost per developer", "GitHub Copilot ROI tracking"
 
 ## 12. Automation Layer — n8n Workflows
 
-Self-hosted n8n on Railway ($5/mo). All 7 core business automations — no code deployments to change them.
+Self-hosted n8n on Railway ($5/mo). All 7 core business automations — no code deployments to change them. **Not yet deployed — Month 2 priority.**
 
 ### Workflow 1 — New User Onboarding
 
-Trigger: Supabase webhook → INSERT on users
+Trigger: D1 webhook → INSERT on orgs
 
 1. Wait 5 min → Send Email #1 (welcome + "install in 2 lines")
 2. D+2: Check for first event → branch: no activity (activation email + Calendly) / has activity (first insights email with real top cost)
@@ -573,7 +687,7 @@ Trigger: CF Worker webhook when Z-score of 10-min spend > 3σ vs 30-day baseline
 1. Enrich: which user/feature caused the spike? Top 3 expensive calls.
 2. Build Slack Block Kit message: spike amount, % over baseline, top offending calls, one-click "investigate" link.
 3. POST to org's Slack webhook + email to admin.
-4. Log to anomaly_alerts table — prevent duplicate alerts within 30min.
+4. Log to audit_events table — prevent duplicate alerts within 30min.
 
 **Enterprise impact:** "We caught a runaway agent before your invoice" = instant renewal.
 
@@ -592,18 +706,18 @@ Trigger: Cron 1st of month 7:00 AM IST, Enterprise plan orgs.
 
 1. Aggregate prior month: total spend, per-team, per-developer, cost/PR, model mix, cache savings, quality trend.
 2. Claude Opus narrative: 3-paragraph CFO-facing executive summary with forward-looking recommendation.
-3. Generate PDF → Supabase Storage.
+3. Generate PDF → KV storage.
 4. Send to org admin + configured CC emails. Slack post in #finance or #leadership.
 
 **This feature gets Vantage invited to the board meeting.**
 
 ### Workflow 5 — Renewal Intelligence Alert
 
-Trigger: Daily check on `ai_tool_contracts` table.
+Trigger: Daily check on `provider_connections` + `copilot_connections` tables.
 
-1. Find contracts renewing in 30/14/7 days.
-2. Pull 90-day ROI data for that tool: spend, cost/dev/month, quality scores, usage trend.
-3. Claude: "Should this company renew [TOOL]? Give: renew/cancel/negotiate + one-sentence reason."
+1. Find Copilot contracts renewing in 30/14/7 days (inferred from connection date).
+2. Pull 90-day ROI data for that tool: spend, cost/dev/month, suggestions accepted, usage trend.
+3. Claude: "Should this company renew Copilot? Give: renew/cancel/negotiate + one-sentence reason."
 4. Send alert with recommendation to CTO: "Your Copilot renews in 14 days. Our recommendation: NEGOTIATE DOWN."
 
 **This is the enterprise killer feature.** Being the tool that tells your CTO to cancel Copilot (with data) = they trust you forever.
@@ -612,7 +726,7 @@ Trigger: Daily check on `ai_tool_contracts` table.
 
 Trigger: Cron every Friday 5:00 PM IST.
 
-1. Pull most interesting delta from `benchmark_cohorts` (opted-in orgs, fully anonymized).
+1. Pull most interesting delta from `benchmark_snapshots` (opted-in orgs, fully anonymized).
 2. Claude: generate 280-char tweet + 500-word LinkedIn post about the stat.
 3. Save to Notion content calendar. Status: "Draft — needs approval."
 4. Slack DM Aman with Notion link.
@@ -621,7 +735,7 @@ Trigger: Cron every Friday 5:00 PM IST.
 
 ### Workflow 7 — Free → Paid Conversion Trigger
 
-Trigger: Supabase webhook → org hits 8,000 events (80% of free tier).
+Trigger: KV counter → org hits 40,000 events (80% of 50K free tier).
 
 1. Calculate total $ saved via optimizer + cache this month for this org.
 2. Send ROI-first email: "You've used 80% of your free tier. Vantage has saved you $[X] this month. For $99/mo, unlimited tracking — that's [X/99]x ROI."
@@ -633,58 +747,63 @@ Trigger: Supabase webhook → org hits 8,000 events (80% of free tier).
 
 ## 13. Task Plan — Priority-Ordered Execution
 
-_Reordered 2026-04-14 based on competitive analysis, shipped work, and threat assessment. Tasks are ordered by: (1) competitive urgency, (2) revenue impact, (3) effort. Completed tasks marked ✅._
+_Reordered 2026-04-14 based on P2 completion, competitive analysis, and threat assessment. Tasks ordered by: (1) competitive urgency, (2) revenue impact, (3) effort. Completed tasks marked ✅._
 
 ---
 
-### P0 — Done / In-Flight (merge + deploy)
+### P0 — Done / Merged
 
 | Task | Status | PR |
 |------|--------|----|
 | AI Spend Console MVP (Cross-Platform tab, /trend, per-dev attribution) | ✅ Merged | #51 |
-| Fix free tier copy: 10K → 50K events/month (index.html + ADMIN_GUIDE) | ✅ Open — awaiting merge | #54 |
-| Fix CI signup rate-limit (duplicate block bypassed CI bypass header) | ✅ Open — awaiting merge | #53 |
-| Fix OTel `developer.id` attribute extraction | ✅ Open — awaiting merge | #52 |
+| Fix OTel `developer.id` attribute extraction | ✅ Merged | #52 |
+| Fix CI signup rate-limit duplicate block | ✅ Merged | #53 |
+| Fix free tier copy: 10K → 50K events/month | ✅ Merged | #54 |
+| P2 milestone: Copilot adapter, Datadog exporter, Benchmark system, Trust page, Report page, Enterprise pricing, Audit log | ✅ Merged | #55 |
 
 ---
 
-### P1 — This Week (highest leverage, low effort)
+### P1 — This Week (highest leverage, GTM focus)
 
-- [x] **Add compliance/security page to vantageaiops.com** — Shipped at `trust.vantageaiops.com`. Zero-interception architecture, privacy modes, Helicone comparison table, compliance roadmap, security contact. ✅ 2026-04-14
-- [x] **Replace fictional testimonials on landing page** — Removed fake quotes + dead CSS. Replaced with honest "design partners welcome" CTA → `hello@vantageaiops.com`. ✅ 2026-04-14
-- [ ] **Email 20 CTOs at AI-heavy startups** — Design partner outreach. Use Prompt #02. 5 warm leads = the next 6 months of roadmap feedback. **3h.**
-- [x] **Add benchmark opt-in toggle to Settings page** — Implemented: migration, PATCH `/v1/admin/org`, frontend toggle (opt-out default). ✅ 2026-04-14
-- [x] **Fix website docs page** — Fixed 8 issues: wrong package name, wrong endpoint, stale ClickHouse/Docker/self-host sections removed, speculative OTel configs removed. ✅ 2026-04-14
-
----
-
-### P2 — Next 2 Weeks (high competitive urgency)
-
-- [~] **Build Copilot Metrics API adapter** — Backend, migration 0009, Settings card all shipped. Dashboard "Connected Tools" widget now displays Copilot status (fixed in post-PR audit). ✅ Backend 2026-04-14; frontend widget fix pending deploy.
-- [x] **Publish "State of AI Coding Spend 2026" benchmark report** — Gated landing page at `/report.html` with email capture → KV store. Linked from nav + footer. ✅ 2026-04-14 (report.html, /report-signup endpoint)
-- [ ] **Write + post Show HN** — 8am ET Tuesday or Wednesday. Use Prompt #05. AI Spend Console is the hook. **2.5h.**
-- [ ] **Decide brand/domain** — Commit to vantageai.com or register a new domain (spendlens.ai, ailedger.com). `vantageaiops.com` is a liability in enterprise sales. **2h.**
-- [x] **Add Enterprise tier to pricing page** — "Talk to sales" tier with SOC2 (Q3 2026 roadmap), SSO, unlimited seats, custom retention. Links to trust.vantageaiops.com. ✅ 2026-04-14 (signup.html)
+- [ ] **Email 20 CTOs at AI-heavy startups** — Design partner outreach. Use Prompt #02. Frame around Copilot billing visibility — that's the new hook. 5 warm leads = the next 6 months of roadmap feedback. **3h.**
+- [ ] **Write + post Show HN** — 8am ET Tuesday or Wednesday. Lead with cross-stack story: "only tool that covers Copilot + Claude Code + any LLM API in one dashboard." Use Prompt #05. **2.5h.**
+- [ ] **Decide brand/domain** — Commit to vantageai.com or register spendlens.ai / ailedger.com. `vantageaiops.com` is a liability in enterprise sales. **2h.**
+- [ ] **Seed benchmark data** — Manually opt in 3–5 early orgs (with permission). First cohort with k≥5 unlocks the entire benchmark story. **1h + outreach.**
 
 ---
 
-### P3 — Month 2 (build sprint)
+### P2 — COMPLETE ✅
 
-- [x] **Design anonymized benchmark data schema** — Opt-in only, cohorts by size_band+industry, p25/p50/p75/p90 percentiles, k-anonymity floor (sample_size ≥ 5), org_id never in snapshots. ✅ 2026-04-14 (migration 0011, benchmark.ts)
+All P2 tasks shipped in PR #55 (merged 2026-04-14):
+- [x] Copilot Metrics API adapter (backend + cron + KV encryption)
+- [x] Datadog metrics exporter (push model + idempotency)
+- [x] Anonymized benchmark system (schema + k-anonymity + percentiles)
+- [x] Cross-Platform Console full implementation
+- [x] Audit log (`/v1/audit/*`)
+- [x] Trust page (`/trust.html`)
+- [x] Report page (`/report.html`, email-gated)
+- [x] Enterprise tier on pricing page
+- [x] Benchmark opt-in toggle in org settings
+- [x] Fake testimonials removed; honest design-partner CTA
+- [x] Test suites 39–41 shipped
+
+---
+
+### P3 — Month 2 (build + GTM sprint)
+
 - [ ] **Build semantic cache layer** — Cloudflare Workers + Vectorize. BGE embedding, configurable similarity threshold (default 0.92), $ saved on dashboard. Ship before Helicone moves to semantic matching. Use Prompt #03. **2 weeks.**
-- [ ] **Get 3 design partner CTOs onboarded** — AI Spend Console is the hook. These are your first paying customers and your benchmark data seed. **ongoing.**
-- [ ] **Deploy n8n on Railway** — Onboarding drip + trial conversion workflows. **6h.**
-- [x] **Datadog exporter** — HKDF-encrypted API key, site allowlist (5 sites), `vantage.ai.cost_usd` + `vantage.ai.tokens` gauge series pushed daily with provider/model/developer_id tags. ✅ 2026-04-14 (datadog.ts, migration 0012)
+- [ ] **Get 3 design partner CTOs onboarded** — Cross-platform console + Copilot adapter is the hook. These are your first paying customers and your benchmark data seed. **ongoing.**
+- [ ] **Deploy n8n on Railway** — Onboarding drip + trial conversion workflows (Workflow 1 + 7). **6h.**
 - [ ] **Start SOC2 prep with Vanta** — Timeline: begin Month 3, target Type I at Month 7–8. **ongoing.**
-- [ ] **LinkedIn/Twitter — 2x/week data-driven posts** — Use benchmark data + AI Spend Console screenshots. **3h/wk.**
-- [ ] **First $1K MRR milestone** — 10 Team plan customers. **milestone.**
+- [ ] **LinkedIn/Twitter — 2x/week data-driven posts** — Use benchmark data + Cross-Platform Console screenshots. AI Coding FinOps category claim. **3h/wk.**
+- [ ] **First $1K MRR milestone** — 10 Team plan customers at $99/mo. **milestone.**
 
 ---
 
 ### P4 — Month 3–4
 
-- [ ] **Launch public benchmark dashboard** — email-gated, shows industry median cost/dev/month by tool. SEO + lead gen. **1 week.**
-- [ ] **Publish first full benchmark report** — "State of AI Coding Spend Q2 2026." Use Prompt #04. PR strategy. **1 week.**
+- [ ] **Launch public benchmark dashboard** — email-gated, shows industry median cost/dev/month by tool and company size band. SEO + lead gen. **1 week.**
+- [ ] **Publish first full benchmark report** — "State of AI Coding Spend Q2 2026" with real anonymized data from design partners. Use Prompt #04. PR strategy. **1 week.**
 - [ ] **Prompt Registry MVP** — version prompts, cost-per-version comparison. Closes gap vs Helicone + LangSmith. **6 weeks.**
 - [ ] **Agent trace DAG visualization** — Basic graph view of multi-step agent sessions from existing OTel trace data. Closes most visible gap vs Langfuse Agent Graph. **2 weeks.**
 - [ ] **Finance tool BD outreach** — Ramp, Brex, Zip integration conversations. **M4.**
@@ -693,7 +812,7 @@ _Reordered 2026-04-14 based on competitive analysis, shipped work, and threat as
 
 ### P5 — Month 5–8
 
-- [ ] **Vendor Negotiation Module** — "What similar companies paid at their last Copilot renewal." **M5.**
+- [ ] **Vendor Negotiation Module** — "What similar companies paid at their last Copilot renewal." Powered by benchmark data from P3 seed. **M5.**
 - [ ] **AI Governance Report auto-generation** — Board-ready audit trail. Regulatory inevitability play. **M6.**
 - [ ] **Quarterly "AI Spend Index" public report** — PR + authority play. **M6.**
 - [ ] **Series A narrative draft** — Use Prompt #09. **M6.**
@@ -716,8 +835,9 @@ _Reordered 2026-04-14 based on competitive analysis, shipped work, and threat as
 
 - **Palma.ai** — Direct ICP competitor. Check pricing page, LinkedIn hiring, funding announcements. If they raise, accelerate category-claiming content immediately.
 - **Helicone** — Watch for semantic cache PR in helicone/helicone GitHub. Any ship = you have less time.
-- **Copilot OTel parity** — github/copilot-cli issue #2471. When it ships, update OTel adapter to consume it natively.
+- **Copilot OTel parity** — github/copilot-cli issue #2471. When it ships, update OTel adapter to consume it natively alongside the REST API adapter.
 - **Langfuse Agent Graph** — Benchmark against their agent viz for product parity decisions.
+- **GitHub Copilot seat pricing** — Any change to $19/user/month changes the Copilot adapter cost model.
 
 ---
 
@@ -748,7 +868,7 @@ Use these directly in Claude sessions. Each is tuned for your specific build tas
 > You are a senior product manager at a B2B SaaS startup. Write a detailed PRD for an "AI Spend Console" — a dashboard consolidating spend across GitHub Copilot, Claude Code, Cursor, Gemini CLI, and Codeium. Target user: CTO at a 50–300 person engineering org. Include: user stories, core metrics (total spend, per-developer cost, cost per PR, cost per feature, tool comparison ROI), data model requirements, prioritized feature list for a 4-week MVP. Output as structured markdown.
 
 **Prompt 02 — Cold Outreach Email Variants (Week 1)**
-> Write 3 cold email variants targeting CTOs at AI-heavy startups (50–300 employees) paying for 3+ AI coding tools. Under 100 words. Lead with specific pain ($30–80K/year, zero ROI data). Offer 15-min demo. End with yes/no question. Variants: (1) pain-led, (2) data-led (industry benchmark), (3) fear-of-waste. Subject lines for each. No buzzwords.
+> Write 3 cold email variants targeting CTOs at AI-heavy startups (50–300 employees) paying for 3+ AI coding tools. Under 100 words. Lead with specific pain ($30–80K/year, zero ROI data). Hook on Copilot billing visibility — we pull directly from GitHub's API, no OTel required. Offer 15-min demo. End with yes/no question. Variants: (1) pain-led, (2) data-led (industry benchmark), (3) fear-of-waste. Subject lines for each. No buzzwords.
 
 **Prompt 03 — Semantic Cache Architecture (Week 3)**
 > Design a semantic caching system for LLM API calls on Cloudflare Workers + Vectorize. Requirements: embed prompts with bge-small-en, query Vectorize at configurable similarity threshold (default 0.92), return cached response if match, else forward + cache. Track hit rate, cost saved, latency delta per request in D1. Expose threshold as per-org config in Vantage dashboard. Write complete TypeScript Cloudflare Worker code with error handling, D1 schema, and cost-savings calculation function. Production-ready only.
@@ -757,24 +877,25 @@ Use these directly in Claude sessions. Each is tuned for your specific build tas
 > You are a data analyst at an AI infrastructure company. Write a "State of AI Coding Tool Spend — Q2 2026" report using this data: [INSERT AGGREGATE STATS]. Include: executive summary (3 bullets), 5–7 data-backed findings, per-developer cost benchmarks by company size, model usage trends, tool consolidation patterns, 3 actionable recommendations. Tone: authoritative but accessible. 1,500–2,000 words. Include 4 chart descriptions. Gate behind email capture.
 
 **Prompt 05 — HN Launch Post (Week 2)**
-> Write a "Show HN" post for Hacker News launching Vantage's AI Spend Console. No marketing language. Be technical and honest. Acknowledge Helicone. Explain the specific technical problem solved. Share one interesting finding from early data. 300–500 words. First-person builder voice. Include 3 talking points to use in comment replies about how this differs from Helicone.
+> Write a "Show HN" post for Hacker News launching Vantage's AI Spend Console. No marketing language. Be technical and honest. Acknowledge Helicone. Explain the specific technical problem solved: we cover Copilot billing (via GitHub's Metrics API, no OTel required), Claude Code + Gemini CLI (via OTel OTLP), and any LLM API (via SDK) — all in one per-developer dashboard. Share one interesting finding from early data. 300–500 words. First-person builder voice. Include 3 talking points for comment replies about how this differs from Helicone.
 
 **Prompt 06 — Enterprise Pricing Page Copy (Month 2)**
 > Write copy for an Enterprise pricing tier. Product: Vantage AI — AI spend intelligence for engineering orgs. Target: CTOs and CFOs at 100+ person companies. Include: one-line value prop, 8–10 features with benefit-focused descriptions, ROI/compliance/security proof points, 2-sentence "who it's for," CTA. Price: custom/talk to sales. Tone: confident, executive-facing. No em-dashes. Max 400 words.
 
 **Prompt 07 — SOC2 Prep Checklist (Month 4)**
-> Create a SOC 2 Type I readiness checklist for an early-stage B2B SaaS with this stack: Cloudflare Workers/Pages, D1/SQLite, Render (FastAPI), Python SDK on PyPI. 1 full-time employee, 3 design partner customers. Cover all 5 Trust Service Criteria. For each: controls already in place given the stack, gaps to address, policies/documents to write, tools to use (Vanta/Drata), timeline. Prioritized action plan. Flag mandatory vs nice-to-have for $10K ACV enterprise deals.
+> Create a SOC 2 Type I readiness checklist for an early-stage B2B SaaS with this stack: Cloudflare Workers/Pages/D1/KV, Render (FastAPI), Python SDK on PyPI. 1 full-time employee, 3 design partner customers. Cover all 5 Trust Service Criteria. For each: controls already in place given the stack, gaps to address, policies/documents to write, tools to use (Vanta/Drata), timeline. Prioritized action plan. Flag mandatory vs nice-to-have for $10K ACV enterprise deals.
 
 **Prompt 08 — Anonymized Benchmark Schema (Month 2)**
-> Design a PostgreSQL schema for collecting anonymized benchmark data from multiple enterprise customers. Requirements: opt-in only, no org identifiers (bucketed cohorts by company size, industry), metrics: avg cost/token by model, avg cost/dev/month, tool mix, cache hit rate, quality score by model and task type. Support percentile rankings (p25/p50/p75/p90) and quarterly snapshots. Write complete SQL DDL with indexes, RLS policies, and 3 example aggregate queries: (a) median cost/dev by company size, (b) model market share by industry, (c) p75 cost/token for Claude Sonnet.
+> Design a D1 SQLite schema for collecting anonymized benchmark data from multiple enterprise customers. Requirements: opt-in only, no org identifiers in snapshot rows (bucketed cohorts by company size band and industry), metrics: avg cost/token by model, avg cost/dev/month, tool mix, cache hit rate, quality score by model and task type. Support percentile rankings (p25/p50/p75/p90) and quarterly snapshots. k-anonymity floor: cohort sample_size ≥ 5. Write complete SQL DDL with indexes and 3 example aggregate queries: (a) median cost/dev by company size, (b) model market share by industry, (c) p75 cost/token for Claude Sonnet.
 
 **Prompt 09 — Series A Narrative (Month 6)**
-> Write a Series A investor narrative for Vantage AI — the neutral AI spend intelligence layer for enterprise engineering orgs. Traction: $35K MRR, 15 enterprise customers, 500+ companies contributing anonymized benchmark data. Stack: Cloudflare, D1, FastAPI. Team: solo founder with prior SaaS experience. Cover: problem, insight (structural conflict of interest angle), solution, traction, market size ($8B AI coding tool → $50B AI spend governance), business model, why now (AI Act, multi-provider world), ask ($2M seed / $8M Series A). Data-driven, not hype. Flag where specific metrics are needed.
+> Write a Series A investor narrative for Vantage AI — the neutral AI spend intelligence layer for enterprise engineering orgs. Traction: $35K MRR, 15 enterprise customers, 500+ companies contributing anonymized benchmark data. Stack: Cloudflare, D1, FastAPI. Team: solo founder with prior SaaS experience. Cover: problem, insight (structural conflict of interest angle), solution, traction, market size ($8B AI coding tool → $50B AI spend governance), business model, why now (AI Act, multi-provider world, Copilot + Claude Code proliferation), ask ($2M seed / $8M Series A). Data-driven, not hype. Flag where specific metrics are needed.
 
 **Prompt 10 — Weekly Execution Review (Recurring)**
-> I am a solo founder building Vantage AI. Here is week [N] status: [PASTE completed tasks, blockers, metrics (MRR, signups, demos booked, features shipped)]. Review against north stars: 500 accounts by Month 3, 5 design partners by Month 2, AI Spend Console shipped Week 6, HN front page once in 4 weeks, $1K MRR by Month 3. Identify: (a) what I'm behind on and highest-leverage action to catch up, (b) what I should stop doing, (c) one specific thing to do in next 7 days for max impact. Direct. No fluff.
+> I am a solo founder building Vantage AI. Here is week [N] status: [PASTE completed tasks, blockers, metrics (MRR, signups, demos booked, features shipped)]. Review against north stars: 500 accounts by Month 3, 5 design partners by Month 2, $1K MRR by Month 3. Identify: (a) what I'm behind on and highest-leverage action to catch up, (b) what I should stop doing, (c) one specific thing to do in next 7 days for max impact. Direct. No fluff.
 
 ---
 
 *VantageAI · War Room Strategy · Confidential · April 2026*
+*P2 is complete. The platform is real. The only question left is distribution.*
 *Every week you don't own your layer, a better-funded player gets closer to it.*
