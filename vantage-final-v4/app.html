@@ -3020,7 +3020,11 @@ function loadSettings() {
 
 /* ── GitHub Copilot ── */
 
+var _copilotStatusLoading = false;
 function loadCopilotStatus() {
+  // Guard against concurrent calls (e.g. tab switch during in-flight connect)
+  if (_copilotStatusLoading) return Promise.resolve();
+  _copilotStatusLoading = true;
   return apiFetch('/v1/copilot/status').then(function(data) {
     var connections = (data && data.connections) || [];
     if (connections.length > 0) {
@@ -3042,6 +3046,8 @@ function loadCopilotStatus() {
       }
       errNote.textContent = 'Could not load connection status. Refresh to retry.';
     }
+  }).finally(function() {
+    _copilotStatusLoading = false;
   });
 }
 

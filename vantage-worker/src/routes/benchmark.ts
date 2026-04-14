@@ -253,22 +253,22 @@ export async function computeAndUpsertContribution(
         const r = await db.prepare(`
           SELECT SUM(cost_usd) AS c, SUM(input_tokens + output_tokens) AS t
           FROM cross_platform_usage
-          WHERE org_id = ? AND model = ? AND created_at >= ? AND input_tokens > 0
-        `).bind(cOrgId, mv.model, qStart).first<{ c: number; t: number }>();
+          WHERE org_id = ? AND model = ? AND created_at >= ? AND created_at < ? AND input_tokens > 0
+        `).bind(cOrgId, mv.model, qStart, qEnd).first<{ c: number; t: number }>();
         if (r && r.t > 0 && r.c > 0) val = r.c / r.t;
       } else if (mv.metricName === 'cost_per_dev_month') {
         const r = await db.prepare(`
           SELECT COUNT(DISTINCT developer_email) AS d, SUM(cost_usd) AS c
           FROM cross_platform_usage
-          WHERE org_id = ? AND created_at >= ? AND developer_email IS NOT NULL
-        `).bind(cOrgId, qStart).first<{ d: number; c: number }>();
+          WHERE org_id = ? AND created_at >= ? AND created_at < ? AND developer_email IS NOT NULL
+        `).bind(cOrgId, qStart, qEnd).first<{ d: number; c: number }>();
         if (r && r.d > 0 && r.c > 0) val = (r.c / r.d) / 3;
       } else if (mv.metricName === 'cache_hit_rate') {
         const r = await db.prepare(`
           SELECT SUM(COALESCE(cached_tokens, 0)) AS ca,
                  SUM(input_tokens + output_tokens + COALESCE(cached_tokens, 0)) AS g
-          FROM cross_platform_usage WHERE org_id = ? AND created_at >= ?
-        `).bind(cOrgId, qStart).first<{ ca: number; g: number }>();
+          FROM cross_platform_usage WHERE org_id = ? AND created_at >= ? AND created_at < ?
+        `).bind(cOrgId, qStart, qEnd).first<{ ca: number; g: number }>();
         if (r && r.g > 0) val = r.ca / r.g;
       }
 
@@ -323,6 +323,13 @@ export async function syncBenchmarkContributions(env: Bindings): Promise<void> {
  */
 benchmark.post('/contribute', authMiddleware, async (c) => {
   const orgId = c.get('orgId');
+  const role  = c.get('role');
+  // Restrict to owner/admin — any authenticated member triggering this causes
+  // an O(N contributors) re-aggregation loop; a viewer should not be able to
+  // initiate that workload.
+  if (role !== 'owner' && role !== 'admin') {
+    return c.json({ error: 'Forbidden — admin or owner required' }, 403);
+  }
   const result = await computeAndUpsertContribution(c.env.DB, orgId);
   if (!result.contributed) {
     return c.json({ ok: false, reason: result.reason ?? 'skipped' }, 200);

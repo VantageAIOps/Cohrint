@@ -368,7 +368,7 @@ Every week counts. Only build what advances the data moat or the enterprise wedg
 |------|------|--------|--------|
 | ~~Raise free tier to 50K OTel events/month~~ | W1 | 2h | ✅ Done (PR #54) |
 | Replace fake testimonials with 3 real design partners | W1 | 1h | ⬜ |
-| Add benchmark opt-in toggle to settings page | W1 | 4h | ⬜ |
+| ~~Add benchmark opt-in toggle to settings page~~ | W1 | 4h | ✅ Done (PR #55) |
 | Email 20 CTOs at AI-heavy startups (design partner outreach) | W1 | 3h | ⬜ |
 | Decide brand/domain — commit and register | W1 | 2h | ⬜ |
 | Add compliance/security page (no-proxy positioning) | W2 | 6h | ⬜ NEW |

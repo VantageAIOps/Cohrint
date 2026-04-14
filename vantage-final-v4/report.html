@@ -473,12 +473,6 @@ async function submitSignup(emailId, btnId, successId) {
       // Hide form, show success
       emailEl.parentElement.style.display = 'none';
       successEl.style.display = 'flex';
-
-      // Sync both forms if one already succeeded
-      ['heroEmail','bottomEmail'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el && el.value === '') el.value = email;
-      });
     } else {
       const body = await res.json().catch(() => ({}));
       const msg = body.error === 'rate_limited'

@@ -238,6 +238,18 @@ export async function syncCopilotMetricsForOrg(
     return { github_org: githubOrg, days_synced: 0, rows_upserted: 0, skipped: false, error: 'Token decryption failed' };
   }
 
+  // Re-validate github_org from DB before constructing any URLs — guards against
+  // rows inserted via migration or prior bugs that bypass the connect-time regex.
+  if (!/^[a-zA-Z0-9-]{1,39}$/.test(githubOrg)) {
+    return { github_org: githubOrg, days_synced: 0, rows_upserted: 0, skipped: false, error: 'Invalid github_org in DB — please reconnect' };
+  }
+
+  // Re-validate token format from KV — guards against tokens stored before the
+  // prefix validation was introduced or tokens rotated to an unsupported format.
+  if (!/^(ghp_|github_pat_)[A-Za-z0-9_]{20,}$/.test(token)) {
+    return { github_org: githubOrg, days_synced: 0, rows_upserted: 0, skipped: false, error: 'Stored token failed prefix validation — please reconnect' };
+  }
+
   // Guard is written after successful token validation. DELETE+INSERT is idempotent
   // so a missed sync day is recovered on the next calendar day's cron run.
   await env.KV.put(guardKey, '1', { expirationTtl: 23 * 3600 });
@@ -295,6 +307,11 @@ export async function syncCopilotMetricsForOrg(
     const periodEnd   = `${date} 23:59:59`;
     const modelName   = modelNames[0] ?? null;
 
+    // Batch all DELETE+INSERT pairs for the day atomically via D1 batch().
+    // This prevents a crash between DELETE and INSERT from silently zeroing
+    // a developer's cost row for that day.
+    const dayBatch: D1PreparedStatement[] = [];
+
     if (seats.length > 0) {
       // Total daily cost = activeUsers * SEAT_USD_PER_DAY. Distribute equally
       // across all seat holders so per-developer attribution sums correctly.
@@ -308,13 +325,42 @@ export async function syncCopilotMetricsForOrg(
         const email       = loginEmail.get(login) ?? null;
         const developerId = await stableDevId(orgId, githubOrg, login);
 
-        // DELETE existing row for this (org, dev, day, provider) then INSERT fresh
-        await env.DB.prepare(
+        dayBatch.push(
+          env.DB.prepare(
+            `DELETE FROM cross_platform_usage
+             WHERE org_id = ? AND developer_id = ? AND period_start = ? AND provider = 'github-copilot'`,
+          ).bind(orgId, developerId, periodStart),
+          env.DB.prepare(
+            `INSERT INTO cross_platform_usage
+               (id, org_id, provider, tool_type, source,
+                developer_id, developer_email,
+                model, cost_usd,
+                input_tokens, output_tokens, cached_tokens, total_requests,
+                period_start, period_end, raw_data, synced_at, created_at)
+             VALUES
+               (lower(hex(randomblob(16))), ?, 'github-copilot', 'coding_assistant', 'billing_api',
+                ?, ?,
+                ?, ?,
+                0, 0, 0, 1,
+                ?, ?, ?, datetime('now'), datetime('now'))`,
+          ).bind(
+            orgId, developerId, email,
+            modelName, costPerSeat,
+            periodStart, periodEnd, rawData,
+          ),
+        );
+        rowsUpserted++;
+      }
+    } else {
+      // Org-aggregate fallback row
+      const developerId = await stableDevId(orgId, githubOrg, `__org__${githubOrg}`);
+
+      dayBatch.push(
+        env.DB.prepare(
           `DELETE FROM cross_platform_usage
            WHERE org_id = ? AND developer_id = ? AND period_start = ? AND provider = 'github-copilot'`,
-        ).bind(orgId, developerId, periodStart).run();
-
-        await env.DB.prepare(
+        ).bind(orgId, developerId, periodStart),
+        env.DB.prepare(
           `INSERT INTO cross_platform_usage
              (id, org_id, provider, tool_type, source,
               developer_id, developer_email,
@@ -323,49 +369,21 @@ export async function syncCopilotMetricsForOrg(
               period_start, period_end, raw_data, synced_at, created_at)
            VALUES
              (lower(hex(randomblob(16))), ?, 'github-copilot', 'coding_assistant', 'billing_api',
+              ?, NULL,
               ?, ?,
-              ?, ?,
-              0, 0, 0, 1,
+              0, 0, 0, ?,
               ?, ?, ?, datetime('now'), datetime('now'))`,
         ).bind(
-          orgId, developerId, email,
-          modelName, costPerSeat,
+          orgId, developerId,
+          modelName, activeUsers * SEAT_USD_PER_DAY,
+          activeUsers,
           periodStart, periodEnd, rawData,
-        ).run();
-
-        rowsUpserted++;
-      }
-    } else {
-      // Org-aggregate fallback row
-      const developerId = await stableDevId(orgId, githubOrg, `__org__${githubOrg}`);
-
-      await env.DB.prepare(
-        `DELETE FROM cross_platform_usage
-         WHERE org_id = ? AND developer_id = ? AND period_start = ? AND provider = 'github-copilot'`,
-      ).bind(orgId, developerId, periodStart).run();
-
-      await env.DB.prepare(
-        `INSERT INTO cross_platform_usage
-           (id, org_id, provider, tool_type, source,
-            developer_id, developer_email,
-            model, cost_usd,
-            input_tokens, output_tokens, cached_tokens, total_requests,
-            period_start, period_end, raw_data, synced_at, created_at)
-         VALUES
-           (lower(hex(randomblob(16))), ?, 'github-copilot', 'coding_assistant', 'billing_api',
-            ?, NULL,
-            ?, ?,
-            0, 0, 0, ?,
-            ?, ?, ?, datetime('now'), datetime('now'))`,
-      ).bind(
-        orgId, developerId,
-        modelName, activeUsers * SEAT_USD_PER_DAY,
-        activeUsers,
-        periodStart, periodEnd, rawData,
-      ).run();
-
+        ),
+      );
       rowsUpserted++;
     }
+
+    if (dayBatch.length > 0) await env.DB.batch(dayBatch);
   }
 
   // Mark connection active (guard was already written optimistically above)
