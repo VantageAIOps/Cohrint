@@ -3652,13 +3652,13 @@ function loadConnectedTools() {
 // Close modals on overlay click or Escape key
 document.querySelectorAll('.modal-overlay').forEach(function(overlay) {
   overlay.addEventListener('click', function(e) {
-    if (e.target === overlay) overlay.classList.remove('active');
+    if (e.target === overlay) closeModal(overlay.id);
   });
 });
 document.addEventListener('keydown', function(e) {
   if (e.key !== 'Escape') return;
   document.querySelectorAll('.modal-overlay.active').forEach(function(m) {
-    m.classList.remove('active');
+    closeModal(m.id);
   });
 });
 </script>
