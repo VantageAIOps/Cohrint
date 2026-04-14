@@ -566,6 +566,10 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
   display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;
 }
 
+.grid-2 {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;
+}
+
 .profile-card {
   display: flex; align-items: center; gap: 16px; padding: 18px;
 }
@@ -610,7 +614,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
 @media (max-width: 900px) {
   .sidebar { display: none; }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
-  .chart-row, .chart-row-equal, .settings-grid { grid-template-columns: 1fr; }
+  .chart-row, .chart-row-equal, .settings-grid, .grid-2 { grid-template-columns: 1fr; }
   .usage-inputs { grid-template-columns: 1fr; }
 }
 
@@ -1315,9 +1319,9 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
       <div id="view-cross-platform" class="view">
 
         <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:16px">
-          <button class="period-btn cp-period active" data-days="7">7d</button>
-          <button class="period-btn cp-period" data-days="30">30d</button>
-          <button class="period-btn cp-period" data-days="90">90d</button>
+          <button class="period-btn cp-period active" data-days="7" onclick="setCpPeriod(7,this)">7d</button>
+          <button class="period-btn cp-period" data-days="30" onclick="setCpPeriod(30,this)">30d</button>
+          <button class="period-btn cp-period" data-days="90" onclick="setCpPeriod(90,this)">90d</button>
         </div>
 
         <div id="cp-kpis" class="kpi-grid" style="margin-bottom:16px"></div>
@@ -1722,6 +1726,7 @@ function loadViewData(view) {
   switch (view) {
     case 'overview': loadOverview(); break;
     case 'spend': loadSpend(); break;
+    case 'cross-platform': loadCrossplatform(); break;
     case 'models': updateModelCalc(); break;
     case 'members': loadMembers(); break;
     case 'budgets': loadBudgets(); break;
@@ -2508,6 +2513,222 @@ function renderTeamPie(teams) {
   });
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Cross-Platform AI Spend Console
+   ═══════════════════════════════════════════════════════════════════════════ */
+var _cpTrendChart = null;
+var _cpDonutChart = null;
+var _cpPeriod = 7;
+
+function setCpPeriod(days, btn) {
+  _cpPeriod = days;
+  document.querySelectorAll('.cp-period').forEach(function(b) { b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  loadCrossplatform();
+}
+
+function loadCrossplatform() {
+  var days = _cpPeriod;
+  Promise.all([
+    apiFetch('/v1/cross-platform/summary?days=' + days).catch(function() { return null; }),
+    apiFetch('/v1/cross-platform/developers?days=' + days).catch(function() { return null; }),
+    apiFetch('/v1/cross-platform/live?limit=20').catch(function() { return null; }),
+    apiFetch('/v1/cross-platform/connections').catch(function() { return null; }),
+  ]).then(function(results) {
+    renderCpKpis(results[0], results[1]);
+    renderCpTrend(results[0]);
+    renderCpDonut(results[0]);
+    renderCpDevTable(results[1]);
+    renderCpLiveFeed(results[2]);
+    renderCpConnections(results[3]);
+  }).catch(function(e) { console.error('[vantage] cross-platform error:', e); });
+}
+
+function _cpEmptyState(el, msg) {
+  var d = document.createElement('div');
+  d.style.cssText = 'padding:24px;color:var(--text-muted);text-align:center;font-size:12px;';
+  d.textContent = msg;
+  el.appendChild(d);
+}
+
+function renderCpKpis(summary, devs) {
+  var el = document.getElementById('cp-kpis');
+  if (!el) return;
+  el.textContent = '';
+  var byProvider = (summary && summary.by_provider) || [];
+  var totalCost  = byProvider.reduce(function(s, p) { return s + (p.total_cost || p.cost || 0); }, 0);
+  var totalReqs  = byProvider.reduce(function(s, p) { return s + (p.records || p.request_count || 0); }, 0);
+  var totalDevs  = (devs && devs.developers ? devs.developers.length : 0) || (summary && summary.total_developers) || 0;
+  var prevCost   = (summary && summary.previous_period_cost) || 0;
+
+  var kpis = [
+    { label: 'Total AI Spend', value: fmt(totalCost), sub: prevCost > 0 ? (((totalCost - prevCost) / prevCost * 100).toFixed(1) + '% vs prev') : (_cpPeriod + 'd window') },
+    { label: 'Total Requests', value: fmtNum(totalReqs), sub: byProvider.length + ' tool' + (byProvider.length !== 1 ? 's' : '') + ' connected' },
+    { label: 'Active Developers', value: fmtNum(totalDevs), sub: totalDevs > 0 ? (fmt(totalCost / totalDevs) + '/dev') : 'no data' },
+  ];
+  kpis.forEach(function(k) {
+    var card = document.createElement('div'); card.className = 'kpi-card';
+    var lbl = document.createElement('div'); lbl.className = 'kpi-label'; lbl.textContent = k.label;
+    var val = document.createElement('div'); val.className = 'kpi-value'; val.textContent = k.value;
+    var sub = document.createElement('div'); sub.className = 'kpi-sub'; sub.textContent = k.sub;
+    card.appendChild(lbl); card.appendChild(val); card.appendChild(sub);
+    el.appendChild(card);
+  });
+}
+
+function renderCpTrend(summary) {
+  var canvas = document.getElementById('cp-trend-canvas');
+  if (!canvas) return;
+  var daily = (summary && summary.daily) || [];
+  var errEl = document.getElementById('cp-trend-error');
+  if (daily.length === 0) {
+    if (_cpTrendChart) { _cpTrendChart.destroy(); _cpTrendChart = null; }
+    if (errEl) errEl.textContent = 'No data yet — connect a tool to start tracking spend.';
+    return;
+  }
+  if (errEl) errEl.textContent = '';
+  var byProvider = (summary && summary.by_provider) || [];
+  var providers = byProvider.map(function(p) { return p.provider; });
+  var labels = daily.map(function(d) {
+    var raw = d.date || d.day || '';
+    var dt = new Date(raw.length === 10 ? raw + 'T00:00:00Z' : raw);
+    return (dt.getUTCMonth() + 1) + '/' + dt.getUTCDate();
+  });
+  var datasets;
+  if (daily[0] && daily[0].by_provider && providers.length > 1) {
+    datasets = providers.map(function(prov) {
+      return { label: toolName(prov), data: daily.map(function(d) { var bp = (d.by_provider||[]).find(function(x){return x.provider===prov;}); return bp?(bp.cost_usd||bp.cost||0):0; }), borderColor: toolColor(prov), backgroundColor: toolColor(prov)+'22', fill:true, tension:0.3, borderWidth:2, pointRadius:2 };
+    });
+  } else {
+    datasets = [{ label: 'Total Spend', data: daily.map(function(d){return d.cost_usd||d.total_cost||d.cost||0;}), borderColor:'#34d399', backgroundColor:'#34d39922', fill:true, tension:0.3, borderWidth:2, pointRadius:2 }];
+  }
+  if (_cpTrendChart) _cpTrendChart.destroy();
+  _cpTrendChart = new Chart(canvas, { type:'line', data:{labels:labels,datasets:datasets}, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:providers.length>1,labels:{color:'#94a3b8',font:{size:11}}}},scales:{x:{ticks:{color:'#64748b',font:{size:10}},grid:{color:'#1e293b'}},y:{ticks:{color:'#64748b',font:{size:10},callback:function(v){return'$'+v.toFixed(2);}},grid:{color:'#1e293b'}}}} });
+}
+
+function renderCpDonut(summary) {
+  var canvas = document.getElementById('cp-donut-canvas');
+  if (!canvas) return;
+  var byProvider = (summary && summary.by_provider) || [];
+  var errEl = document.getElementById('cp-donut-error');
+  if (byProvider.length === 0) {
+    if (_cpDonutChart) { _cpDonutChart.destroy(); _cpDonutChart = null; }
+    if (errEl) errEl.textContent = 'No provider data yet.';
+    return;
+  }
+  if (errEl) errEl.textContent = '';
+  var sorted = byProvider.slice().sort(function(a,b){return(b.total_cost||b.cost||0)-(a.total_cost||a.cost||0);});
+  if (_cpDonutChart) _cpDonutChart.destroy();
+  _cpDonutChart = new Chart(canvas, { type:'doughnut', data:{labels:sorted.map(function(p){return toolName(p.provider);}),datasets:[{data:sorted.map(function(p){return p.total_cost||p.cost||0;}),backgroundColor:sorted.map(function(p){return toolColor(p.provider);}),borderWidth:0}]}, options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'right',labels:{color:'#94a3b8',font:{size:11},padding:12}},tooltip:{callbacks:{label:function(ctx){return' '+ctx.label+': '+fmt(ctx.raw);}}}}} });
+}
+
+function renderCpDevTable(devs) {
+  var el = document.getElementById('cp-dev-table');
+  if (!el) return;
+  el.textContent = '';
+  var list = (devs && devs.developers) || [];
+  if (list.length === 0) { _cpEmptyState(el, 'No developer attribution data yet.'); return; }
+
+  var table = document.createElement('table');
+  table.style.cssText = 'width:100%;border-collapse:collapse;font-size:12px;';
+
+  var thead = document.createElement('thead');
+  var hrow = document.createElement('tr');
+  ['Developer','Spend','Requests','Tools'].forEach(function(h, i) {
+    var th = document.createElement('th');
+    th.style.cssText = 'padding:8px 0;color:var(--text-muted);font-weight:500;border-bottom:1px solid var(--border);text-align:' + (i===0?'left':'right') + ';';
+    th.textContent = h;
+    hrow.appendChild(th);
+  });
+  thead.appendChild(hrow);
+  table.appendChild(thead);
+
+  var tbody = document.createElement('tbody');
+  list.slice(0, 15).forEach(function(dev) {
+    var email = dev.developer_email || dev.email || '-';
+    var cost  = dev.total_cost || dev.cost || 0;
+    var reqs  = dev.records || dev.request_count || 0;
+    var tools = (dev.providers || dev.tools || []).map(function(p) { return toolName(p); }).join(', ') || '-';
+    var tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid var(--border)';
+
+    var td1 = document.createElement('td'); td1.style.cssText = 'padding:8px 0;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'; td1.textContent = email;
+    var td2 = document.createElement('td'); td2.style.cssText = 'text-align:right;padding:8px 0;color:var(--accent-green);font-family:var(--font-mono)'; td2.textContent = fmt(cost);
+    var td3 = document.createElement('td'); td3.style.cssText = 'text-align:right;padding:8px 0;color:var(--text-muted)'; td3.textContent = fmtNum(reqs);
+    var td4 = document.createElement('td'); td4.style.cssText = 'text-align:right;padding:8px 0;color:var(--text-muted);font-size:10px'; td4.textContent = tools;
+    tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(td4);
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  el.appendChild(table);
+}
+
+function renderCpLiveFeed(live) {
+  var el = document.getElementById('cp-live-feed');
+  if (!el) return;
+  el.textContent = '';
+  el.className = 'live-feed';
+  el.style.maxHeight = '240px';
+  var items = (live && live.events) ? live.events : (Array.isArray(live) ? live : []);
+  if (items.length === 0) { _cpEmptyState(el, 'Waiting for activity…'); return; }
+  items.slice(0, 20).forEach(function(ev) {
+    var time = ev.timestamp || ev.created_at || '';
+    var timeStr = time ? new Date(time).toLocaleTimeString('en-US', {hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}) : '';
+    var provider = ev.provider || ev.source || '';
+    var color = toolColor(provider);
+    var item = document.createElement('div'); item.className = 'live-item';
+    var ts = document.createElement('span'); ts.className = 'live-time'; ts.textContent = timeStr;
+    var ps = document.createElement('span'); ps.className = 'live-provider'; ps.style.color = color; ps.textContent = toolName(provider);
+    var ms = document.createElement('span'); ms.className = 'live-model'; ms.textContent = ev.model || '';
+    var cs = document.createElement('span'); cs.className = 'live-cost'; var c = ev.cost_usd||ev.cost||0; cs.textContent = c>0 ? fmt(c) : '';
+    item.appendChild(ts); item.appendChild(ps); item.appendChild(ms); item.appendChild(cs);
+    el.appendChild(item);
+  });
+}
+
+function renderCpConnections(conns) {
+  var el = document.getElementById('cp-connections');
+  if (!el) return;
+  el.textContent = '';
+  var allConns = [];
+  var now = Date.now();
+  var STALE = 24 * 3600 * 1000;
+  ((conns && conns.otel_sources) || []).forEach(function(s) {
+    var lastMs = s.last_data_at ? new Date(s.last_data_at.replace(' ','T')+'Z').getTime() : 0;
+    allConns.push({ label: toolName(s.provider), sub: 'OTel', status: (lastMs&&(now-lastMs)<STALE)?'active':'pending', provider: s.provider });
+  });
+  ((conns && conns.billing_connections) || []).forEach(function(b) {
+    if (!allConns.some(function(c){return c.provider===b.provider;}))
+      allConns.push({ label: toolName(b.provider), sub: 'Billing', status: b.status||'off', provider: b.provider });
+  });
+  ((conns && conns.copilot_connections) || []).forEach(function(c) {
+    allConns.push({ label: 'GitHub Copilot', sub: c.github_org||'Copilot', status: c.status||'off', provider: 'github-copilot' });
+  });
+  ((conns && conns.datadog_connections) || []).forEach(function(c) {
+    allConns.push({ label: 'Datadog', sub: 'Metrics export', status: c.status||'off', provider: 'datadog' });
+  });
+  if (allConns.length === 0) { _cpEmptyState(el, 'No tools connected yet.\nAdd integrations in Settings.'); return; }
+  allConns.forEach(function(conn) {
+    var isActive = conn.status==='active'||conn.status==='live'||conn.status==='connected';
+    var isPending = conn.status==='pending';
+    var dotColor = isActive ? 'var(--accent-green)' : isPending ? 'var(--accent-amber)' : '#475569';
+    var color = toolColor(conn.provider);
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);';
+    var icon = document.createElement('div');
+    icon.style.cssText = 'width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0;background:'+color+'22;color:'+color+';';
+    icon.textContent = conn.label.charAt(0).toUpperCase();
+    var info = document.createElement('div'); info.style.cssText = 'flex:1;min-width:0;';
+    var nameEl = document.createElement('div'); nameEl.style.cssText = 'font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'; nameEl.textContent = conn.label;
+    var subEl = document.createElement('div'); subEl.style.cssText = 'font-size:10px;color:var(--text-muted);'; subEl.textContent = conn.sub;
+    info.appendChild(nameEl); info.appendChild(subEl);
+    var dot = document.createElement('div');
+    dot.style.cssText = 'width:7px;height:7px;border-radius:50%;flex-shrink:0;background:'+dotColor+';'+(isActive?'box-shadow:0 0 6px '+dotColor+';':'');
+    row.appendChild(icon); row.appendChild(info); row.appendChild(dot);
+    el.appendChild(row);
+  });
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Model Pricing Calculator
