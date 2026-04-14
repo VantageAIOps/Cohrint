@@ -660,7 +660,7 @@ _Reordered 2026-04-14 based on competitive analysis, shipped work, and threat as
 
 ### P2 — Next 2 Weeks (high competitive urgency)
 
-- [x] **Build Copilot Metrics API adapter** — GitHub Copilot Metrics API went GA February 2026. Per-developer REST endpoint, no OTel required. Poll daily, normalize to `cross_platform_usage`. Closes attribution gap for the largest AI coding tool installed base. ✅ 2026-04-14 (copilot.ts, migration 0009, Copilot connect UI in app.html)
+- [~] **Build Copilot Metrics API adapter** — Backend, migration 0009, Settings card all shipped. Dashboard "Connected Tools" widget now displays Copilot status (fixed in post-PR audit). ✅ Backend 2026-04-14; frontend widget fix pending deploy.
 - [x] **Publish "State of AI Coding Spend 2026" benchmark report** — Gated landing page at `/report.html` with email capture → KV store. Linked from nav + footer. ✅ 2026-04-14 (report.html, /report-signup endpoint)
 - [ ] **Write + post Show HN** — 8am ET Tuesday or Wednesday. Use Prompt #05. AI Spend Console is the hook. **2.5h.**
 - [ ] **Decide brand/domain** — Commit to vantageai.com or register a new domain (spendlens.ai, ailedger.com). `vantageaiops.com` is a liability in enterprise sales. **2h.**

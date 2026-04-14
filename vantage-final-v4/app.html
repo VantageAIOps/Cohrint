@@ -1459,6 +1459,7 @@ var _API_CACHE_TTL = 5 * 60 * 1000; // 5 min cache TTL
 var TOOL_NAMES = {
   anthropic: 'Claude Code', openai: 'Codex CLI', google: 'Gemini CLI',
   codex: 'Codex CLI',
+  'github-copilot': 'GitHub Copilot', datadog: 'Datadog',
   // Future: Cursor, Windsurf, Aider, Cline, Roo Code, OpenCode, Kiro
   // cursor: 'Cursor', windsurf: 'Windsurf', aider: 'Aider',
   // cline: 'Cline', kiro: 'Kiro', 'roo-code': 'Roo Code', opencode: 'OpenCode'
@@ -3520,6 +3521,24 @@ function loadConnectedTools() {
       var already = connections.some(function(c) { return c.provider === b.provider; });
       if (!already) {
         connections.push({ provider: b.provider, status: b.status || 'off', source: 'billing' });
+      }
+    });
+
+    // Copilot connections (from /connections response)
+    var copilotConns = (data && data.copilot_connections) || [];
+    copilotConns.forEach(function(c) {
+      var already = connections.some(function(x) { return x.provider === 'github-copilot'; });
+      if (!already) {
+        connections.push({ provider: 'github-copilot', status: c.status || 'off', source: 'copilot' });
+      }
+    });
+
+    // Datadog connections (from /connections response)
+    var datadogConns = (data && data.datadog_connections) || [];
+    datadogConns.forEach(function(c) {
+      var already = connections.some(function(x) { return x.provider === 'datadog'; });
+      if (!already) {
+        connections.push({ provider: 'datadog', status: c.status || 'off', source: 'datadog' });
       }
     });
 

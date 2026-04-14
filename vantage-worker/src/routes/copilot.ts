@@ -48,10 +48,11 @@ function kvSyncGuardKey(orgId: string, githubOrg: string, day: string): string {
 // only — production must set TOKEN_ENCRYPTION_SECRET via wrangler secret put).
 
 async function deriveKey(orgId: string, secret?: string): Promise<CryptoKey> {
+  if (!secret) throw new Error('TOKEN_ENCRYPTION_SECRET is not configured');
   const enc      = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
-    enc.encode(secret ?? 'dev-insecure-fallback-set-TOKEN_ENCRYPTION_SECRET'),
+    enc.encode(secret),
     { name: 'HKDF' },
     false,
     ['deriveKey'],

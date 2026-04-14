@@ -51,10 +51,11 @@ function kvSyncGuardKey(orgId: string, day: string): string {
 // ── AES-GCM helpers — same HKDF pattern as copilot.ts ────────────────────────
 
 async function deriveKey(orgId: string, secret?: string): Promise<CryptoKey> {
+  if (!secret) throw new Error('TOKEN_ENCRYPTION_SECRET is not configured');
   const enc = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
-    enc.encode(secret ?? 'dev-insecure-fallback-set-TOKEN_ENCRYPTION_SECRET'),
+    enc.encode(secret),
     { name: 'HKDF' },
     false,
     ['deriveKey'],

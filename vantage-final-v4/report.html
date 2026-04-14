@@ -463,7 +463,8 @@ async function submitSignup(emailId, btnId, successId) {
   btnEl.textContent = 'Sending…';
 
   try {
-    const res = await fetch('https://api.vantageaiops.com/v1/platform/report-signup', {
+    const apiBase = localStorage.getItem('api_base') || 'https://api.vantageaiops.com';
+    const res = await fetch(`${apiBase}/v1/platform/report-signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),

@@ -1949,7 +1949,7 @@ vantageai-agent --backend claude
 <thead><tr><th>Param</th><th>Required</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>metric</code></td><td>Yes</td><td><code>cost_per_token</code> · <code>cost_per_dev_month</code> · <code>cache_hit_rate</code></td></tr>
-<tr><td><code>model</code></td><td>Conditional</td><td>Model name (e.g. <code>gpt-4o</code>). Required when <code>metric=cost_per_token</code>; ignored for other metrics</td></tr>
+<tr><td><code>model</code></td><td>Optional</td><td>Model name to filter results (e.g. <code>gpt-4o</code>). If omitted, aggregates across all models. Only relevant when <code>metric=cost_per_token</code></td></tr>
 </tbody>
 </table>
 <p><strong>Response 200</strong></p>

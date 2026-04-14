@@ -62,6 +62,8 @@ e9183a3 PR #48 — fix/webkit-session-ci-warn
 | `0010_platform_tables.sql` | platform_pageviews, platform_sessions |
 | `0011_benchmark_snapshots.sql` | benchmark_cohorts, benchmark_snapshots, benchmark_contributions |
 | `0012_datadog_connections.sql` | datadog_connections |
+| `0013_schema_fixes.sql` | DROP platform_sessions.org_id; add session/copilot/datadog indexes |
+| `0014_drop_copilot_kv_key.sql` | DROP kv_key column from copilot_connections |
 
 ### New/modified frontend
 | File | Change |
@@ -77,7 +79,7 @@ e9183a3 PR #48 — fix/webkit-session-ci-warn
 
 ### After PR #55 merges
 - [ ] Run `cd vantage-worker && npx wrangler d1 migrations apply vantage-events --remote`
-      (applies migrations 0009, 0010, 0011, 0012)
+      (applies migrations 0009, 0010, 0011, 0012, 0013, 0014)
 - [ ] Deploy worker: `cd vantage-worker && npx wrangler deploy`
 - [ ] Deploy frontend: `npx wrangler pages deploy ./vantage-final-v4 --project-name=vantageai`
 - [ ] Confirm trust.vantageaiops.com is live and serving trust-site/index.html
