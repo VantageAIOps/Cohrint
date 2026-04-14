@@ -219,14 +219,13 @@ export async function syncCopilotMetricsForOrg(
   const todayUtc  = new Date().toISOString().slice(0, 10);
   const guardKey  = kvSyncGuardKey(orgId, githubOrg, todayUtc);
 
-  // Write guard optimistically before any DB writes — prevents duplicate
-  // reprocessing if the Worker times out mid-loop. DELETE+INSERT is idempotent
-  // so a missed sync day is recovered on the next calendar day's cron run.
   if (await env.KV.get(guardKey)) {
     return { github_org: githubOrg, days_synced: 0, rows_upserted: 0, skipped: true };
   }
-  await env.KV.put(guardKey, '1', { expirationTtl: 23 * 3600 });
 
+  // Fetch + decrypt token BEFORE writing the guard. If decryption fails (e.g.
+  // corrupt KV value), we must not lock out the next cron tick — the user may
+  // re-connect and the new token should be retried immediately.
   const encryptedToken = await env.KV.get(kvTokenKey(orgId, githubOrg));
   if (!encryptedToken) {
     return { github_org: githubOrg, days_synced: 0, rows_upserted: 0, skipped: false, error: 'No token in KV' };
@@ -238,6 +237,10 @@ export async function syncCopilotMetricsForOrg(
   } catch {
     return { github_org: githubOrg, days_synced: 0, rows_upserted: 0, skipped: false, error: 'Token decryption failed' };
   }
+
+  // Guard is written after successful token validation. DELETE+INSERT is idempotent
+  // so a missed sync day is recovered on the next calendar day's cron run.
+  await env.KV.put(guardKey, '1', { expirationTtl: 23 * 3600 });
 
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
 
@@ -293,9 +296,13 @@ export async function syncCopilotMetricsForOrg(
     const modelName   = modelNames[0] ?? null;
 
     if (seats.length > 0) {
-      // Cost per developer = SEAT_USD_PER_DAY (the fixed per-seat daily rate).
-      // Total daily cost = activeUsers * SEAT_USD_PER_DAY, distributed equally
-      // across activeUsers — not seats.length, which may include inactive seats.
+      // Total daily cost = activeUsers * SEAT_USD_PER_DAY. Distribute equally
+      // across all seat holders so per-developer attribution sums correctly.
+      // We can't know *which* specific developers were active on a given day
+      // (the Metrics API only exposes total_active_users, not per-login), so
+      // we spread the active cost proportionally across all seats.
+      const costPerSeat = (activeUsers * SEAT_USD_PER_DAY) / seats.length;
+
       for (const seat of seats) {
         const login       = seat.assignee.login;
         const email       = loginEmail.get(login) ?? null;
@@ -322,7 +329,7 @@ export async function syncCopilotMetricsForOrg(
               ?, ?, ?, datetime('now'), datetime('now'))`,
         ).bind(
           orgId, developerId, email,
-          modelName, SEAT_USD_PER_DAY,
+          modelName, costPerSeat,
           periodStart, periodEnd, rawData,
         ).run();
 
@@ -441,6 +448,7 @@ copilot.post('/connect', async (c) => {
   if (testResp.status === 401) return c.json({ error: 'GitHub token is invalid or expired' }, 400);
   if (testResp.status === 403) return c.json({ error: 'Token lacks manage_billing:copilot scope' }, 400);
   if (testResp.status === 404) return c.json({ error: `Org '${githubOrg}' not found or Copilot not enabled` }, 404);
+  if (!testResp.ok) return c.json({ error: `GitHub API returned ${testResp.status} — try again later` }, 502);
 
   // Encrypt + store in KV; never write plaintext token to D1
   const encrypted = await encryptToken(token, orgId, c.env.TOKEN_ENCRYPTION_SECRET);
@@ -472,17 +480,12 @@ copilot.delete('/connect', async (c) => {
     return c.json({ error: 'Forbidden — admin or owner required' }, 403);
   }
 
-  let body: unknown;
-  try { body = await c.req.json(); } catch { return c.json({ error: 'Invalid JSON body' }, 400); }
-
-  if (
-    typeof body !== 'object' || body === null ||
-    typeof (body as Record<string, unknown>).github_org !== 'string'
-  ) {
-    return c.json({ error: 'Required: github_org (string)' }, 400);
+  // github_org is passed as a query param — DELETE bodies are non-standard
+  // and may be stripped by intermediate HTTP stacks.
+  const githubOrg = c.req.query('github_org') ?? '';
+  if (!githubOrg) {
+    return c.json({ error: 'Required query param: github_org' }, 400);
   }
-
-  const { github_org: githubOrg } = body as { github_org: string };
 
   await c.env.KV.delete(kvTokenKey(orgId, githubOrg));
 

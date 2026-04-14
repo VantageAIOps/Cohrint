@@ -36,12 +36,14 @@ platform.post('/pageview', async (c) => {
 
 // ── POST /v1/platform/session ────────────────────────────────────────────────
 platform.post('/session', async (c) => {
-  let body: { session_id?: string; org_id?: string; duration_sec?: number };
+  // org_id is intentionally NOT accepted from the caller — this is a public
+  // endpoint and accepting caller-supplied org_id would allow anyone to spoof
+  // session attribution for any org.
+  let body: { session_id?: string; duration_sec?: number };
   try { body = await c.req.json(); }
   catch { return c.json({ ok: false }, 400); }
 
   const session_id   = (body.session_id   ?? '').slice(0, 64);
-  const org_id       = (body.org_id       ?? '').slice(0, 64);
   const duration_sec = Math.min(Math.max(0, body.duration_sec ?? 0), 86_400);
 
   try {
@@ -56,9 +58,9 @@ platform.post('/session', async (c) => {
       ).bind(duration_sec, session_id).run();
     } else {
       await c.env.DB.prepare(`
-        INSERT INTO platform_sessions (org_id, session_id, duration_sec)
-        VALUES (?, ?, ?)
-      `).bind(org_id || null, session_id || null, duration_sec).run();
+        INSERT INTO platform_sessions (session_id, duration_sec)
+        VALUES (?, ?)
+      `).bind(session_id || null, duration_sec).run();
     }
   } catch { /* best effort */ }
 

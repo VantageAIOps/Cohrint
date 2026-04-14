@@ -1598,7 +1598,11 @@ function apiFetch(path, opts) {
         var retryAfter = parseInt(res.headers.get('Retry-After') || '60', 10);
         throw new Error('Rate limited. Retry in ' + retryAfter + 's');
       }
-      if (!res.ok) throw new Error('API ' + res.status);
+      if (!res.ok) {
+        return res.json().catch(function() { return {}; }).then(function(body) {
+          throw new Error((body && body.error) || ('API ' + res.status));
+        });
+      }
       return res.json().then(function(data) {
         if (isRead && data) _cacheSet(path, data);
         return data;
@@ -3017,7 +3021,7 @@ function loadSettings() {
 /* ── GitHub Copilot ── */
 
 function loadCopilotStatus() {
-  apiFetch('/v1/copilot/status').then(function(data) {
+  return apiFetch('/v1/copilot/status').then(function(data) {
     var connections = (data && data.connections) || [];
     if (connections.length > 0) {
       renderCopilotConnected(connections[0]);
@@ -3025,7 +3029,19 @@ function loadCopilotStatus() {
       renderCopilotDisconnected();
     }
   }).catch(function() {
-    renderCopilotDisconnected();
+    // Show a neutral error state — don't silently show the connect form,
+    // which could cause a duplicate connect attempt when already connected.
+    var card = document.getElementById('copilotCard');
+    if (card) {
+      var errNote = card.querySelector('.copilot-load-error');
+      if (!errNote) {
+        errNote = document.createElement('p');
+        errNote.className = 'copilot-load-error';
+        errNote.style.cssText = 'color:var(--text-muted);font-size:12px;margin:8px 0 0;';
+        card.appendChild(errNote);
+      }
+      errNote.textContent = 'Could not load connection status. Refresh to retry.';
+    }
   });
 }
 
@@ -3093,12 +3109,14 @@ function connectCopilot() {
     // Clear token from DOM immediately — never leave it in the field
     document.getElementById('copilotToken').value = '';
     document.getElementById('copilotOrg').value = '';
-    btn.disabled = false;
-    btn.textContent = 'Connect';
     statusEl.style.color = 'var(--accent-green)';
     statusEl.textContent = 'Connected successfully.';
     setTimeout(function() { statusEl.textContent = ''; }, 3000);
-    loadCopilotStatus();
+    // Re-enable button only after status reload so double-submit is blocked
+    return loadCopilotStatus();
+  }).then(function() {
+    btn.disabled = false;
+    btn.textContent = 'Connect';
   }).catch(function(e) {
     document.getElementById('copilotToken').value = '';
     btn.disabled = false;
@@ -3117,9 +3135,8 @@ function disconnectCopilot() {
   statusEl.style.color = 'var(--text-muted)';
   statusEl.textContent = 'Disconnecting…';
 
-  apiFetch('/v1/copilot/connect', {
-    method: 'DELETE',
-    body: JSON.stringify({ github_org: org })
+  apiFetch('/v1/copilot/connect?github_org=' + encodeURIComponent(org), {
+    method: 'DELETE'
   }).then(function() {
     statusEl.textContent = '';
     loadCopilotStatus();

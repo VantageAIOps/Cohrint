@@ -114,11 +114,16 @@ export async function computeAndUpsertContribution(
   const quarter  = currentQuarter();
 
   // 3. Compute per-model cost/token from cross_platform_usage (current quarter)
-  // Quarter → date range: Q1=Jan–Mar, Q2=Apr–Jun, Q3=Jul–Aug (sic Jul–Sep), Q4=Oct–Dec
+  // Quarter → date range: Q1=Jan–Mar, Q2=Apr–Jun, Q3=Jul–Sep, Q4=Oct–Dec
   const [year, qPart] = quarter.split('-');
   const qNum = parseInt(qPart.replace('Q', ''), 10);
   const qStartMonth = String((qNum - 1) * 3 + 1).padStart(2, '0');
   const qStart = `${year}-${qStartMonth}-01 00:00:00`;
+  // Exclusive upper bound — next quarter's first day — so historic quarters
+  // don't accumulate future data if the cron re-runs after quarter rollover.
+  const qEndYear  = qNum === 4 ? String(parseInt(year, 10) + 1) : year;
+  const qEndMonth = String(qNum === 4 ? 1 : qNum * 3 + 1).padStart(2, '0');
+  const qEnd = `${qEndYear}-${qEndMonth}-01 00:00:00`;
 
   const modelRows = await db.prepare(`
     SELECT
@@ -129,11 +134,11 @@ export async function computeAndUpsertContribution(
       SUM(input_tokens + output_tokens + COALESCE(cached_tokens, 0)) AS gross_tokens
     FROM cross_platform_usage
     WHERE org_id = ?
-      AND created_at >= ?
+      AND created_at >= ? AND created_at < ?
       AND model IS NOT NULL
       AND input_tokens > 0
     GROUP BY model
-  `).bind(orgId, qStart).all<{
+  `).bind(orgId, qStart, qEnd).all<{
     model: string;
     total_cost: number;
     total_tokens: number;
@@ -147,8 +152,8 @@ export async function computeAndUpsertContribution(
       COUNT(DISTINCT developer_email) AS dev_count,
       SUM(cost_usd)                  AS total_cost
     FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ? AND developer_email IS NOT NULL
-  `).bind(orgId, qStart).first<{ dev_count: number; total_cost: number }>();
+    WHERE org_id = ? AND created_at >= ? AND created_at < ? AND developer_email IS NOT NULL
+  `).bind(orgId, qStart, qEnd).first<{ dev_count: number; total_cost: number }>();
 
   // Cache hit rate (cached_tokens / gross_tokens across all usage)
   const cacheRow = await db.prepare(`
@@ -156,8 +161,8 @@ export async function computeAndUpsertContribution(
       SUM(COALESCE(cached_tokens, 0)) AS cached,
       SUM(input_tokens + output_tokens + COALESCE(cached_tokens, 0)) AS gross
     FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ?
-  `).bind(orgId, qStart).first<{ cached: number; gross: number }>();
+    WHERE org_id = ? AND created_at >= ? AND created_at < ?
+  `).bind(orgId, qStart, qEnd).first<{ cached: number; gross: number }>();
 
   // 4. Build a list of {snapshotId, orgValue} pairs to record contribution
   type MetricValue = { metricName: string; model: string | null; value: number };
@@ -359,6 +364,7 @@ benchmark.get('/percentiles', async (c) => {
       AND COALESCE(bs.model, '') = COALESCE(?, '')
       AND bs.sample_size >= 5
     GROUP BY bs.quarter
+    HAVING MIN(bs.sample_size) >= 5
     ORDER BY bs.quarter DESC
     LIMIT 1
   `).bind(metric, model).first<{

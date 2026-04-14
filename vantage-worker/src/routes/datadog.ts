@@ -191,10 +191,9 @@ export async function syncDatadogMetricsForOrg(
   if (await env.KV.get(guardKey)) {
     return { org_id: orgId, series_pushed: 0, skipped: true };
   }
-  // Write guard optimistically before any work
-  await env.KV.put(guardKey, '1', { expirationTtl: 23 * 3600 });
 
-  // Load connection
+  // Load connection BEFORE writing the guard. If decryption fails, we must not
+  // lock out the next cron tick — the user may reconnect and retry immediately.
   const conn = await env.DB.prepare(
     `SELECT encrypted_api_key, datadog_site FROM datadog_connections
      WHERE org_id = ? AND status != 'paused' LIMIT 1`,
@@ -210,6 +209,10 @@ export async function syncDatadogMetricsForOrg(
   } catch {
     return { org_id: orgId, series_pushed: 0, skipped: false, error: 'API key decryption failed' };
   }
+
+  // Guard written after successful decryption — if decrypt failed we want the
+  // next cron tick to retry (e.g. after the user reconnects with a valid key).
+  await env.KV.put(guardKey, '1', { expirationTtl: 23 * 3600 });
 
   // Last 24 h of cross_platform_usage, aggregated per developer/provider/model
   const since = new Date(Date.now() - 24 * 3600 * 1000)

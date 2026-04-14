@@ -480,13 +480,27 @@ async function submitSignup(emailId, btnId, successId) {
         if (el && el.value === '') el.value = email;
       });
     } else {
-      throw new Error('Server error');
+      const body = await res.json().catch(() => ({}));
+      const msg = body.error === 'rate_limited'
+        ? 'Too many attempts — please try again later.'
+        : 'Something went wrong. Please try again.';
+      throw new Error(msg);
     }
-  } catch {
+  } catch (err) {
     btnEl.disabled = false;
     btnEl.textContent = 'Get the report →';
     emailEl.style.borderColor = 'rgba(248,113,113,.5)';
     setTimeout(() => { emailEl.style.borderColor = ''; }, 3000);
+    // Show error message below the button
+    let errEl = btnEl.parentElement && btnEl.parentElement.querySelector('.signup-error');
+    if (!errEl) {
+      errEl = document.createElement('p');
+      errEl.className = 'signup-error';
+      errEl.style.cssText = 'color:rgba(248,113,113,.9);font-size:13px;margin:6px 0 0;text-align:center;';
+      if (btnEl.parentElement) btnEl.parentElement.appendChild(errEl);
+    }
+    errEl.textContent = err instanceof Error ? err.message : 'Something went wrong.';
+    setTimeout(() => { if (errEl) errEl.textContent = ''; }, 5000);
   }
 }
 
