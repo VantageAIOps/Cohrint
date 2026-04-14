@@ -81,4 +81,36 @@ platform.post('/session', async (c) => {
   return c.json({ ok: true });
 });
 
+// ── POST /v1/platform/report-signup ─────────────────────────────────────────
+// Public, no auth. Accepts { email } and stores in KV. Idempotent.
+platform.post('/report-signup', async (c) => {
+  let body: { email?: unknown };
+  try { body = await c.req.json(); }
+  catch { return c.json({ ok: false, error: 'invalid_json' }, 400); }
+
+  const raw = body.email;
+  if (typeof raw !== 'string') return c.json({ ok: false, error: 'email_required' }, 400);
+
+  const email = raw.trim().toLowerCase().slice(0, 320);
+
+  // Basic RFC-5322-ish validation
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+    return c.json({ ok: false, error: 'invalid_email' }, 400);
+  }
+
+  const key = `report-signup:${email}`;
+
+  // Idempotent — if already signed up, return ok silently
+  const existing = await c.env.KV.get(key);
+  if (existing) return c.json({ ok: true });
+
+  await c.env.KV.put(key, JSON.stringify({
+    email,
+    signed_up_at: new Date().toISOString(),
+    source: 'report-page',
+  }));
+
+  return c.json({ ok: true });
+});
+
 export { platform };

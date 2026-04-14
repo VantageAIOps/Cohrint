@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>State of AI Coding Spend 2026 — The AI Coding FinOps Benchmark Report</title>
+<meta name="description" content="The first independent benchmark report on AI Coding FinOps. What engineering teams actually pay per developer across Claude Code, Copilot, Cursor, Gemini CLI, and Codeium.">
+<meta name="keywords" content="AI coding spend report, AI coding FinOps, Claude Code cost, Copilot cost per developer, Cursor pricing, AI developer tools budget, engineering AI spend benchmark 2026">
+<meta name="author" content="VantageAI">
+<meta name="robots" content="index, follow">
+
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="VantageAI">
+<meta property="og:title" content="State of AI Coding Spend 2026 — The AI Coding FinOps Benchmark Report">
+<meta property="og:description" content="The first independent benchmark on AI Coding FinOps. Cost per developer, token patterns, ROI frameworks, and budget policy benchmarks across every major AI coding tool.">
+<meta property="og:url" content="https://vantageaiops.com/report.html">
+<meta property="og:image" content="https://vantageaiops.com/og-image.png">
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="State of AI Coding Spend 2026 — AI Coding FinOps Benchmark">
+<meta name="twitter:description" content="The first independent benchmark on AI Coding FinOps. What teams actually pay per developer.">
+<meta name="twitter:image" content="https://vantageaiops.com/og-image.png">
+
+<link rel="canonical" href="https://vantageaiops.com/report.html">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#00d4a1">
+
+<!-- JSON-LD: Report -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Report",
+  "name": "State of AI Coding Spend 2026",
+  "description": "The first benchmark report on AI Coding FinOps — what engineering teams actually pay, per developer, per tool.",
+  "url": "https://vantageaiops.com/report.html",
+  "author": {
+    "@type": "Organization",
+    "name": "VantageAI",
+    "url": "https://vantageaiops.com"
+  },
+  "datePublished": "2026-04-14",
+  "genre": "Research Report",
+  "about": "AI Coding FinOps — cost per developer analysis across Claude Code, GitHub Copilot, Cursor, Gemini CLI, and Codeium"
+}
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080c0f;--bg2:#0d1318;--bg3:#121920;--bg4:#161d25;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+  --text:#e8edf2;--muted:#6b7b8a;--dim:#3a4550;
+  --accent:#00d4a1;--blue:#0098ff;--amber:#f59e0b;--red:#f87171;
+  --mono:'DM Mono',monospace;--serif:'Instrument Serif',Georgia,serif;--sans:'DM Sans',sans-serif;
+}
+html{scroll-behavior:smooth;overflow-x:hidden;max-width:100vw}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:16px;line-height:1.6;overflow-x:hidden}
+
+/* NOISE */
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0;opacity:.4}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:18px 48px;border-bottom:1px solid var(--border);background:rgba(8,12,15,.88);backdrop-filter:blur(16px)}
+.nav-logo{font-family:var(--mono);font-size:15px;letter-spacing:.08em;color:var(--text);text-decoration:none;display:flex;align-items:center;gap:10px}
+.logo-dot{width:8px;height:8px;background:var(--accent);border-radius:50%;box-shadow:0 0 12px var(--accent);animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.8)}}
+.nav-links{display:flex;align-items:center;gap:32px}
+.nav-links a{font-size:13px;color:var(--muted);text-decoration:none;letter-spacing:.02em;transition:color .2s}
+.nav-links a:hover{color:var(--text)}
+.nav-cta{background:var(--accent)!important;color:#fff!important;padding:8px 20px;border-radius:6px;font-weight:500!important;transition:opacity .2s!important}
+.nav-cta:hover{opacity:.85}
+
+/* HERO */
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:120px 24px 80px;text-align:center;position:relative}
+.hero-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);background-size:60px 60px;mask-image:radial-gradient(ellipse 80% 60% at 50% 40%,black 0%,transparent 80%)}
+.hero-glow{position:absolute;top:20%;left:50%;transform:translateX(-50%);width:700px;height:350px;background:radial-gradient(ellipse,rgba(0,212,161,.10) 0%,transparent 70%);pointer-events:none}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(0,212,161,.08);border:1px solid rgba(0,212,161,.2);border-radius:100px;padding:6px 16px;font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.06em;margin-bottom:36px;animation:fadeUp .6s ease both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.hero h1{font-family:var(--serif);font-size:clamp(42px,6.5vw,86px);font-weight:400;line-height:1.05;letter-spacing:-.02em;max-width:900px;animation:fadeUp .7s .1s ease both}
+.hero h1 em{font-style:italic;color:var(--accent)}
+.hero-sub{margin-top:28px;font-size:18px;color:var(--muted);max-width:600px;line-height:1.7;font-weight:300;animation:fadeUp .7s .2s ease both}
+.hero-meta{display:flex;align-items:center;justify-content:center;gap:24px;margin-top:32px;animation:fadeUp .7s .25s ease both}
+.hero-meta-item{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em}
+.hero-meta-dot{width:5px;height:5px;background:var(--dim);border-radius:50%}
+
+/* GATE CARD */
+.gate-wrap{margin-top:56px;animation:fadeUp .7s .35s ease both;width:100%;max-width:480px}
+.gate-card{background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:32px;text-align:left}
+.gate-label{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:12px}
+.gate-headline{font-size:15px;color:var(--text);font-weight:500;margin-bottom:8px;line-height:1.4}
+.gate-sub{font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.5}
+.gate-form{display:flex;gap:8px}
+.gate-input{flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:12px 16px;font-size:14px;color:var(--text);font-family:var(--sans);outline:none;transition:border-color .2s}
+.gate-input::placeholder{color:var(--dim)}
+.gate-input:focus{border-color:rgba(0,212,161,.4)}
+.gate-btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:12px 20px;font-family:var(--mono);font-size:12px;letter-spacing:.04em;font-weight:500;cursor:pointer;white-space:nowrap;transition:opacity .2s,transform .2s}
+.gate-btn:hover{opacity:.85;transform:translateY(-1px)}
+.gate-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.gate-success{display:none;align-items:center;gap:12px;padding:16px;background:rgba(0,212,161,.06);border:1px solid rgba(0,212,161,.2);border-radius:10px;font-size:14px;color:var(--accent)}
+.gate-success-icon{font-size:20px;flex-shrink:0}
+.gate-privacy{font-size:11px;color:var(--dim);margin-top:12px;text-align:center}
+
+/* STAT STRIP */
+.stat-strip{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--border);border-bottom:1px solid var(--border);position:relative;z-index:1}
+.stat-item{padding:40px 32px;border-right:1px solid var(--border);text-align:center}
+.stat-item:last-child{border-right:none}
+.stat-num{font-family:var(--serif);font-size:48px;font-weight:400;line-height:1;letter-spacing:-.03em}
+.stat-num span{color:var(--accent)}
+.stat-lbl{font-size:13px;color:var(--muted);margin-top:8px;line-height:1.4}
+.stat-note{font-family:var(--mono);font-size:10px;color:var(--dim);margin-top:4px;letter-spacing:.02em}
+
+/* SECTIONS */
+.section{padding:96px 24px;max-width:1080px;margin:0 auto;position:relative;z-index:1}
+.sec-label{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:16px}
+.sec-title{font-family:var(--serif);font-size:clamp(32px,3.5vw,48px);font-weight:400;line-height:1.1;letter-spacing:-.02em;max-width:680px}
+.sec-title em{font-style:italic;color:var(--muted)}
+.sec-body{font-size:16px;color:var(--muted);line-height:1.8;max-width:680px;margin-top:20px}
+.sec-body strong{color:var(--text)}
+
+/* WHY SECTION */
+.why-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-top:40px}
+.why-card{background:var(--bg2);padding:36px;transition:background .2s}
+.why-card:hover{background:var(--bg3)}
+.why-icon{font-size:28px;margin-bottom:16px}
+.why-card h3{font-size:15px;font-weight:500;color:var(--text);margin-bottom:10px}
+.why-card p{font-size:14px;color:var(--muted);line-height:1.7}
+
+/* CONTENTS */
+.contents-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:40px}
+.chapter{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:24px;display:flex;gap:20px;align-items:flex-start;transition:border-color .2s}
+.chapter:hover{border-color:var(--border2)}
+.chapter-num{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.08em;padding-top:2px;flex-shrink:0;width:32px}
+.chapter-body h3{font-size:14px;font-weight:500;color:var(--text);margin-bottom:6px}
+.chapter-body p{font-size:13px;color:var(--muted);line-height:1.6}
+.chapter-tag{display:inline-block;margin-top:8px;font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.06em;background:var(--bg3);padding:3px 8px;border-radius:4px}
+
+/* FINDINGS */
+.findings-list{margin-top:40px;display:flex;flex-direction:column;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+.finding{background:var(--bg2);padding:28px 32px;display:grid;grid-template-columns:auto 1fr;gap:24px;align-items:start;transition:background .2s}
+.finding:hover{background:var(--bg3)}
+.finding-index{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.08em;padding-top:2px;white-space:nowrap}
+.finding-text{font-size:15px;color:var(--text);line-height:1.6;font-weight:400}
+.finding-text strong{color:var(--accent)}
+.finding-source{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:6px;letter-spacing:.02em}
+
+/* DATA SECTION */
+.data-card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:40px;margin-top:40px}
+.data-card p{font-size:15px;color:var(--muted);line-height:1.8;max-width:720px}
+.data-card p + p{margin-top:16px}
+.data-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(0,152,255,.06);border:1px solid rgba(0,152,255,.15);border-radius:6px;padding:4px 12px;font-family:var(--mono);font-size:10px;color:var(--blue);letter-spacing:.06em;margin-bottom:20px}
+
+/* GATE BOTTOM */
+.gate-bottom{background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:80px 24px;text-align:center;position:relative;z-index:1}
+.gate-bottom-inner{max-width:560px;margin:0 auto}
+.gate-bottom h2{font-family:var(--serif);font-size:clamp(32px,4vw,48px);font-weight:400;letter-spacing:-.02em;line-height:1.1;margin-bottom:16px}
+.gate-bottom h2 em{font-style:italic;color:var(--accent)}
+.gate-bottom p{font-size:16px;color:var(--muted);margin-bottom:32px;line-height:1.7}
+.gate-bottom .gate-form{justify-content:center;max-width:440px;margin:0 auto}
+.gate-bottom .gate-success{justify-content:center}
+
+/* FOOTER */
+footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1}
+.footer-logo{font-family:var(--mono);font-size:13px;color:var(--muted);text-decoration:none;display:flex;align-items:center;gap:8px}
+.footer-links{display:flex;gap:24px}
+.footer-links a{font-size:13px;color:var(--dim);text-decoration:none;transition:color .2s}
+.footer-links a:hover{color:var(--muted)}
+.footer-copy{font-family:var(--mono);font-size:11px;color:var(--dim)}
+
+@media(max-width:768px){
+  nav{padding:16px 20px}
+  .nav-links{display:none}
+  .hero{padding:100px 20px 60px}
+  .stat-strip{grid-template-columns:1fr}
+  .stat-item{border-right:none;border-bottom:1px solid var(--border);padding:28px 24px}
+  .stat-item:last-child{border-bottom:none}
+  .why-grid{grid-template-columns:1fr}
+  .contents-grid{grid-template-columns:1fr}
+  .gate-form{flex-direction:column}
+  .gate-btn{width:100%}
+  footer{flex-direction:column;gap:16px;text-align:center;padding:28px 20px}
+  .footer-links{flex-wrap:wrap;justify-content:center}
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="https://vantageaiops.com" class="nav-logo">
+    <span class="logo-dot"></span>
+    VantageAI
+  </a>
+  <div class="nav-links">
+    <a href="https://vantageaiops.com/docs.html">Docs</a>
+    <a href="https://vantageaiops.com/calculator.html">Calculator</a>
+    <a href="https://vantageaiops.com" class="nav-cta">Get Started Free</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow"></div>
+
+  <div class="hero-badge">
+    <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="4" stroke="currentColor" stroke-width="1.2"/><path d="M5 3v2.5l1.5 1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+    BENCHMARK REPORT — 2026
+  </div>
+
+  <h1>State of AI Coding<br><em>Spend 2026</em></h1>
+  <p class="hero-sub">The first benchmark report on AI Coding FinOps — what engineering teams actually pay, per developer, per tool.</p>
+
+  <div class="hero-meta">
+    <span class="hero-meta-item">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="2" width="10" height="9" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M1 5h10" stroke="currentColor" stroke-width="1.2"/><path d="M4 1v2M8 1v2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      PUBLISHED APRIL 2026
+    </span>
+    <span class="hero-meta-dot"></span>
+    <span class="hero-meta-item">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1a5 5 0 1 0 0 10A5 5 0 0 0 6 1z" stroke="currentColor" stroke-width="1.2"/><path d="M6 3.5V6l2 1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      5 TOOLS BENCHMARKED
+    </span>
+    <span class="hero-meta-dot"></span>
+    <span class="hero-meta-item">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 10l3-3 2 2 3-4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      AI CODING FINOPS
+    </span>
+  </div>
+
+  <div class="gate-wrap">
+    <div class="gate-card">
+      <div class="gate-label">Free Report</div>
+      <div class="gate-headline">Get the full benchmark report</div>
+      <div class="gate-sub">Cost-per-developer data, ROI frameworks, and budget policy benchmarks. Sent directly to your inbox.</div>
+      <div class="gate-form" id="heroForm">
+        <input type="email" class="gate-input" placeholder="you@company.com" id="heroEmail" autocomplete="email">
+        <button class="gate-btn" id="heroBtn" onclick="submitSignup('heroEmail','heroBtn','heroSuccess')">Get the report →</button>
+      </div>
+      <div class="gate-success" id="heroSuccess">
+        <span class="gate-success-icon">✓</span>
+        <span>Thank you — report incoming. Check your inbox.</span>
+      </div>
+      <div class="gate-privacy">No spam. Unsubscribe anytime. We never sell your email.</div>
+    </div>
+  </div>
+</section>
+
+<!-- STAT STRIP -->
+<div class="stat-strip">
+  <div class="stat-item">
+    <div class="stat-num">$<span>45K</span>–$94K</div>
+    <div class="stat-lbl">Annual Copilot cost for a 200-person eng team</div>
+    <div class="stat-note">Based on public Copilot pricing · $19–$39/seat/mo</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num"><span>3</span>+</div>
+    <div class="stat-lbl">AI coding tools the average team runs simultaneously</div>
+    <div class="stat-note">With zero consolidated spend view</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num"><span>0</span></div>
+    <div class="stat-lbl">Budget policies set on AI tool spend in most eng orgs</div>
+    <div class="stat-note">Based on onboarding conversations with early access customers</div>
+  </div>
+</div>
+
+<!-- WHY THIS REPORT -->
+<div class="section">
+  <div class="sec-label">The Problem</div>
+  <h2 class="sec-title">Nobody is publishing<br><em>this data</em></h2>
+  <p class="sec-body">AI coding tools are the fastest-growing line item in engineering budgets, yet most CTOs have <strong>zero visibility</strong> into cost-per-developer or ROI. Copilot, Claude Code, Cursor, and Gemini CLI each have different pricing models — usage-based, seat-based, or both — and no vendor has any incentive to help you compare. This is the independent benchmark.</p>
+
+  <div class="why-grid">
+    <div class="why-card">
+      <div class="why-icon">📊</div>
+      <h3>Vendors don't publish this</h3>
+      <p>GitHub won't tell you what Copilot costs per PR merged. Anthropic won't publish what the average Claude Code session costs a senior engineer. Nobody will. We did.</p>
+    </div>
+    <div class="why-card">
+      <div class="why-icon">🔍</div>
+      <h3>Finance can't see it either</h3>
+      <p>AI coding spend lands across engineering expense reports, AWS bills, and SaaS subscriptions simultaneously. No CFO has a single number. This report gives you the benchmark to build one.</p>
+    </div>
+    <div class="why-card">
+      <div class="why-icon">⚖️</div>
+      <h3>ROI is unmeasured</h3>
+      <p>Teams are paying $50–200/developer/month across tools but measuring ROI informally at best. We introduce a cost-per-PR and cost-per-feature framework any engineering org can adopt.</p>
+    </div>
+    <div class="why-card">
+      <div class="why-icon">🚨</div>
+      <h3>Spend is accelerating</h3>
+      <p>The shift from seat-based to usage-based AI coding tools means spend can 10x without a single new hire. Engineering leaders need a new FinOps discipline — this report defines it.</p>
+    </div>
+  </div>
+</div>
+
+<!-- WHAT'S INSIDE -->
+<div style="background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);position:relative;z-index:1">
+  <div class="section">
+    <div class="sec-label">Report Contents</div>
+    <h2 class="sec-title">Five chapters.<br><em>Actionable data.</em></h2>
+
+    <div class="contents-grid">
+      <div class="chapter">
+        <div class="chapter-num">01</div>
+        <div class="chapter-body">
+          <h3>Cost Per Developer Per Month</h3>
+          <p>Seat and usage costs across Claude Code, GitHub Copilot, Cursor, Gemini CLI, and Codeium. Blended cost for teams running multiple tools simultaneously.</p>
+          <span class="chapter-tag">PRICING ANALYSIS</span>
+        </div>
+      </div>
+      <div class="chapter">
+        <div class="chapter-num">02</div>
+        <div class="chapter-body">
+          <h3>Token Consumption by Developer Role</h3>
+          <p>How usage varies between senior and junior engineers, and between frontend and backend specialists. Where token spend is concentrated and why.</p>
+          <span class="chapter-tag">USAGE PATTERNS</span>
+        </div>
+      </div>
+      <div class="chapter">
+        <div class="chapter-num">03</div>
+        <div class="chapter-body">
+          <h3>ROI Calculation Framework</h3>
+          <p>A practical methodology for measuring cost per PR merged, cost per feature shipped, and total AI tooling ROI — benchmarked against industry medians.</p>
+          <span class="chapter-tag">METHODOLOGY</span>
+        </div>
+      </div>
+      <div class="chapter">
+        <div class="chapter-num">04</div>
+        <div class="chapter-body">
+          <h3>Budget Policy Benchmarks</h3>
+          <p>What percentage of engineering teams have spend limits, alerts, or approval workflows for AI tool spend. And what the organizations that do have policies look like.</p>
+          <span class="chapter-tag">GOVERNANCE</span>
+        </div>
+      </div>
+      <div class="chapter">
+        <div class="chapter-num">05</div>
+        <div class="chapter-body">
+          <h3>Model Switching Patterns</h3>
+          <p>When teams downgrade models for cost reasons versus upgrade for quality. Trigger thresholds, switching costs, and the hidden price of context re-loading.</p>
+          <span class="chapter-tag">BEHAVIOR ANALYSIS</span>
+        </div>
+      </div>
+      <div class="chapter" style="background:rgba(0,212,161,.03);border-color:rgba(0,212,161,.15)">
+        <div class="chapter-num" style="color:var(--muted)">+</div>
+        <div class="chapter-body">
+          <h3>Appendix: Pricing Reference</h3>
+          <p>Current public pricing for all benchmarked tools, updated April 2026. API pricing, seat costs, enterprise tiers, and what each vendor charges for usage overages.</p>
+          <span class="chapter-tag">REFERENCE</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- KEY FINDINGS -->
+<div class="section">
+  <div class="sec-label">Key Findings Preview</div>
+  <h2 class="sec-title">The numbers<br><em>nobody talks about</em></h2>
+
+  <div class="findings-list">
+    <div class="finding">
+      <div class="finding-index">01</div>
+      <div>
+        <div class="finding-text">GitHub Copilot alone costs <strong>$19–$39/seat/month</strong>. A 200-person engineering team pays <strong>$45,600–$93,600/year</strong> — before they add a single Claude Code, Cursor, or Gemini CLI seat.</div>
+        <div class="finding-source">Source: GitHub public pricing (github.com/features/copilot) · Calculation: 200 seats × 12 months</div>
+      </div>
+    </div>
+    <div class="finding">
+      <div class="finding-index">02</div>
+      <div>
+        <div class="finding-text">Teams using <strong>3 or more AI coding tools simultaneously</strong> have no consolidated view of total spend. Each tool bills differently — some per seat, some per token, some both.</div>
+        <div class="finding-source">Observation from VantageAI onboarding data — individual org details anonymized</div>
+      </div>
+    </div>
+    <div class="finding">
+      <div class="finding-index">03</div>
+      <div>
+        <div class="finding-text">The average engineering organization has <strong>zero budget policy</strong> on AI tool spend — no monthly cap, no per-developer limit, no approval workflow for new tools.</div>
+        <div class="finding-source">Estimated from VantageAI early-access onboarding conversations · Not a formal survey</div>
+      </div>
+    </div>
+    <div class="finding">
+      <div class="finding-index">04</div>
+      <div>
+        <div class="finding-text">Usage-based AI coding tools like Claude Code create a <strong>new class of spend risk</strong>: a single developer running a complex agentic task can generate more API cost in one session than their monthly Copilot seat.</div>
+        <div class="finding-source">Based on Anthropic public API pricing + representative task modeling</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ABOUT THE DATA -->
+<div style="background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);position:relative;z-index:1">
+  <div class="section">
+    <div class="sec-label">Methodology</div>
+    <h2 class="sec-title">About the data</h2>
+    <div class="data-card">
+      <div class="data-badge">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1a4 4 0 1 0 0 8A4 4 0 0 0 5 1zm0 1.5v2.8l1.5 1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        ANONYMIZED &amp; AGGREGATED
+      </div>
+      <p>This report draws on aggregate, anonymized usage data from VantageAI early access customers, supplemented by public pricing data and published industry research. All individual organization data is anonymized before inclusion. No company names or individual developer data appear in the report.</p>
+      <p>Pricing data is sourced directly from vendor public pricing pages as of April 2026. Where pricing has multiple tiers, we document each tier and note the conditions for each. Observations labeled as such are derived from qualitative signals from onboarding conversations and product usage patterns — they are not formal survey results.</p>
+      <p>The ROI framework in Chapter 3 is a methodology we developed; the benchmarks within it represent estimates based on available data, clearly labeled with their confidence level and data source.</p>
+    </div>
+  </div>
+</div>
+
+<!-- GATE BOTTOM -->
+<div class="gate-bottom">
+  <div class="gate-bottom-inner">
+    <h2>Get the full<br><em>report free</em></h2>
+    <p>The complete benchmark with all five chapters, the ROI framework, and the pricing reference appendix.</p>
+    <div class="gate-form" id="bottomForm">
+      <input type="email" class="gate-input" placeholder="you@company.com" id="bottomEmail" autocomplete="email">
+      <button class="gate-btn" id="bottomBtn" onclick="submitSignup('bottomEmail','bottomBtn','bottomSuccess')">Get the report →</button>
+    </div>
+    <div class="gate-success" id="bottomSuccess">
+      <span class="gate-success-icon">✓</span>
+      <span>Thank you — report incoming. Check your inbox.</span>
+    </div>
+    <p style="font-size:12px;color:var(--dim);margin-top:16px;font-family:var(--mono)">No spam. Unsubscribe anytime.</p>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <a href="https://vantageaiops.com" class="footer-logo">
+    <span class="logo-dot" style="width:6px;height:6px"></span>
+    VantageAI
+  </a>
+  <div class="footer-links">
+    <a href="https://vantageaiops.com">Home</a>
+    <a href="https://vantageaiops.com/docs.html">Docs</a>
+    <a href="https://vantageaiops.com/calculator.html">Calculator</a>
+    <a href="https://vantageaiops.com/privacy.html">Privacy Policy</a>
+  </div>
+  <div class="footer-copy">© 2026 VantageAI</div>
+</footer>
+
+<script>
+async function submitSignup(emailId, btnId, successId) {
+  const emailEl = document.getElementById(emailId);
+  const btnEl   = document.getElementById(btnId);
+  const successEl = document.getElementById(successId);
+
+  const email = (emailEl.value || '').trim();
+
+  // Basic client-side validation
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    emailEl.style.borderColor = 'rgba(248,113,113,.5)';
+    emailEl.focus();
+    setTimeout(() => { emailEl.style.borderColor = ''; }, 2000);
+    return;
+  }
+
+  btnEl.disabled = true;
+  btnEl.textContent = 'Sending…';
+
+  try {
+    const res = await fetch('https://api.vantageaiops.com/v1/platform/report-signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+
+    if (res.ok) {
+      // Hide form, show success
+      emailEl.parentElement.style.display = 'none';
+      successEl.style.display = 'flex';
+
+      // Sync both forms if one already succeeded
+      ['heroEmail','bottomEmail'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.value === '') el.value = email;
+      });
+    } else {
+      throw new Error('Server error');
+    }
+  } catch {
+    btnEl.disabled = false;
+    btnEl.textContent = 'Get the report →';
+    emailEl.style.borderColor = 'rgba(248,113,113,.5)';
+    setTimeout(() => { emailEl.style.borderColor = ''; }, 3000);
+  }
+}
+
+// Allow Enter key to submit
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  const active = document.activeElement;
+  if (active && active.id === 'heroEmail') submitSignup('heroEmail','heroBtn','heroSuccess');
+  if (active && active.id === 'bottomEmail') submitSignup('bottomEmail','bottomBtn','bottomSuccess');
+});
+</script>
+</body>
+</html>
