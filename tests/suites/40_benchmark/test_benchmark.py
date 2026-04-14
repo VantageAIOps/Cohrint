@@ -255,7 +255,7 @@ class TestBenchmarkPercentiles:
                              timeout=10)
             if r.status_code == 200:
                 data = r.json()
-                for field in ("p25", "p50", "p75", "p90", "sample_size", "quarter"):
+                for field in ("p25", "p50", "p75", "p90", "sample_size", "quarter", "metric"):
                     chk(f"BM.14 /percentiles 200 has field {field!r}",
                         field in data, f"keys: {list(data.keys())}")
                 return

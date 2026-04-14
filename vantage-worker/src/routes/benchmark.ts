@@ -232,47 +232,54 @@ export async function computeAndUpsertContribution(
       VALUES (?, ?, datetime('now'))
     `).bind(orgId, snapId).run();
 
-    // Re-gather all contributing orgs' values for this snapshot so we can recompute
-    // Note: We store org_id in contributions but not individual values.
-    // To recompute percentiles we need to pull each org's value fresh.
-    // For scalability we re-query the DB for all opted-in orgs in this cohort.
-    const contributors = await db.prepare(`
-      SELECT bc.org_id
-      FROM benchmark_contributions bc
-      WHERE bc.snapshot_id = ?
-    `).bind(snapId).all<{ org_id: string }>();
-
-    const orgIds = (contributors.results ?? []).map(r => r.org_id);
-
-    // Fetch each contributing org's metric value
+    // Re-gather all contributing orgs' metric values in a single GROUP BY query
+    // to avoid an N+1 round-trip per contributor.
     const orgValues: number[] = [];
-    for (const cOrgId of orgIds) {
-      let val: number | null = null;
 
-      if (mv.metricName === 'cost_per_token' && mv.model) {
-        const r = await db.prepare(`
-          SELECT SUM(cost_usd) AS c, SUM(input_tokens + output_tokens) AS t
-          FROM cross_platform_usage
-          WHERE org_id = ? AND model = ? AND created_at >= ? AND created_at < ? AND input_tokens > 0
-        `).bind(cOrgId, mv.model, qStart, qEnd).first<{ c: number; t: number }>();
-        if (r && r.t > 0 && r.c > 0) val = r.c / r.t;
-      } else if (mv.metricName === 'cost_per_dev_month') {
-        const r = await db.prepare(`
-          SELECT COUNT(DISTINCT developer_email) AS d, SUM(cost_usd) AS c
-          FROM cross_platform_usage
-          WHERE org_id = ? AND created_at >= ? AND created_at < ? AND developer_email IS NOT NULL
-        `).bind(cOrgId, qStart, qEnd).first<{ d: number; c: number }>();
-        if (r && r.d > 0 && r.c > 0) val = (r.c / r.d) / 3;
-      } else if (mv.metricName === 'cache_hit_rate') {
-        const r = await db.prepare(`
-          SELECT SUM(COALESCE(cached_tokens, 0)) AS ca,
-                 SUM(input_tokens + output_tokens + COALESCE(cached_tokens, 0)) AS g
-          FROM cross_platform_usage WHERE org_id = ? AND created_at >= ? AND created_at < ?
-        `).bind(cOrgId, qStart, qEnd).first<{ ca: number; g: number }>();
-        if (r && r.g > 0) val = r.ca / r.g;
+    if (mv.metricName === 'cost_per_token' && mv.model) {
+      const rows = await db.prepare(`
+        SELECT cpu.org_id,
+               SUM(cpu.cost_usd) AS c,
+               SUM(cpu.input_tokens + cpu.output_tokens) AS t
+        FROM cross_platform_usage cpu
+        INNER JOIN benchmark_contributions bc ON bc.org_id = cpu.org_id
+        WHERE bc.snapshot_id = ?
+          AND cpu.model = ? AND cpu.created_at >= ? AND cpu.created_at < ?
+          AND cpu.input_tokens > 0
+        GROUP BY cpu.org_id
+      `).bind(snapId, mv.model, qStart, qEnd).all<{ org_id: string; c: number; t: number }>();
+      for (const r of (rows.results ?? [])) {
+        if (r.t > 0 && r.c > 0) { const v = r.c / r.t; if (isFinite(v)) orgValues.push(v); }
       }
-
-      if (val !== null && isFinite(val)) orgValues.push(val);
+    } else if (mv.metricName === 'cost_per_dev_month') {
+      const rows = await db.prepare(`
+        SELECT cpu.org_id,
+               COUNT(DISTINCT cpu.developer_email) AS d,
+               SUM(cpu.cost_usd) AS c
+        FROM cross_platform_usage cpu
+        INNER JOIN benchmark_contributions bc ON bc.org_id = cpu.org_id
+        WHERE bc.snapshot_id = ?
+          AND cpu.created_at >= ? AND cpu.created_at < ?
+          AND cpu.developer_email IS NOT NULL
+        GROUP BY cpu.org_id
+      `).bind(snapId, qStart, qEnd).all<{ org_id: string; d: number; c: number }>();
+      for (const r of (rows.results ?? [])) {
+        if (r.d > 0 && r.c > 0) { const v = (r.c / r.d) / 3; if (isFinite(v)) orgValues.push(v); }
+      }
+    } else if (mv.metricName === 'cache_hit_rate') {
+      const rows = await db.prepare(`
+        SELECT cpu.org_id,
+               SUM(COALESCE(cpu.cached_tokens, 0)) AS ca,
+               SUM(cpu.input_tokens + cpu.output_tokens + COALESCE(cpu.cached_tokens, 0)) AS g
+        FROM cross_platform_usage cpu
+        INNER JOIN benchmark_contributions bc ON bc.org_id = cpu.org_id
+        WHERE bc.snapshot_id = ?
+          AND cpu.created_at >= ? AND cpu.created_at < ?
+        GROUP BY cpu.org_id
+      `).bind(snapId, qStart, qEnd).all<{ org_id: string; ca: number; g: number }>();
+      for (const r of (rows.results ?? [])) {
+        if (r.g > 0) { const v = r.ca / r.g; if (isFinite(v)) orgValues.push(v); }
+      }
     }
 
     orgValues.sort((a, b) => a - b);

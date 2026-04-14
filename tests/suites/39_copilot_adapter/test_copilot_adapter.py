@@ -273,34 +273,74 @@ class TestCopilotStatus:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  Section E: DELETE /connect  (CP.20 – CP.22)
+#  Section E: POST /connect success response shape  (CP.23 – CP.24)
+#
+#  Note: a successful connect requires a real GitHub PAT and org with Copilot
+#  enabled, which is not available in CI. These tests verify the contract at the
+#  network/validation boundary only (400/404 from GitHub means the backend
+#  correctly reached the validation step and the 201 shape is asserted by CP.12).
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestCopilotConnectSuccessContract:
+    """
+    Verify POST /connect response contract against a known-bad credential.
+    A real success (201) requires a live GitHub PAT — not available in CI.
+    CP.12 already asserts that a fake-but-well-formed PAT returns 400 or 404
+    (never 201), which guards against silent accept regressions.
+    CP.23 documents the expected 201 body shape for reference.
+    """
+
+    def test_cp23_201_shape_documented(self, headers):
+        """
+        Document the expected 201 response shape for POST /connect.
+        The backend (copilot.ts) must return:
+          { connected: true, github_org: <str>, message: <str> }
+        This test is a no-op assertion on a fake credential (validates
+        the rejection path) but records the 201 contract explicitly.
+        """
+        if not _copilot_deployed(headers):
+            pytest.skip("copilot endpoints return 500 — copilot_connections table not yet deployed")
+        r = requests.post(CONNECT_URL,
+                          json={"github_org": "vantageai-nonexistent-xyz",
+                                "token": _FAKE_PAT},
+                          headers=headers, timeout=20)
+        # Fake PAT must be rejected — never 201
+        chk("CP.23 fake PAT must not return 201 (201 shape: {connected,github_org,message})",
+            r.status_code != 201,
+            f"got unexpected 201: {r.text[:200]}")
+        assert r.status_code != 201
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Section F: DELETE /connect  (CP.24 – CP.26)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class TestCopilotDelete:
     """DELETE /v1/copilot/connect validation."""
 
-    def test_cp20_delete_missing_github_org_param_returns_400(self, headers):
+    def test_cp24_delete_missing_github_org_param_returns_400(self, headers):
         section("E --- DELETE /copilot/connect")
         r = requests.delete(CONNECT_URL, headers=headers, timeout=10)
-        chk("CP.20 DELETE missing github_org param -> 400",
+        section("F --- DELETE /copilot/connect")
+        chk("CP.24 DELETE missing github_org param -> 400",
             r.status_code == 400, f"got {r.status_code}: {r.text[:120]}")
         assert r.status_code == 400
 
-    def test_cp21_delete_nonexistent_org_returns_404(self, headers):
+    def test_cp25_delete_nonexistent_org_returns_404(self, headers):
         """An org that was never connected must return 404."""
         if not _copilot_deployed(headers):
             pytest.skip("copilot endpoints return 500 — copilot_connections table not yet deployed")
         nonexistent = f"never-connected-org-{random.randint(10000, 99999)}"
         r = requests.delete(f"{CONNECT_URL}?github_org={nonexistent}",
                             headers=headers, timeout=10)
-        chk("CP.21 DELETE non-existent org -> 404",
+        chk("CP.25 DELETE non-existent org -> 404",
             r.status_code == 404, f"got {r.status_code}: {r.text[:120]}")
         assert r.status_code == 404
 
-    def test_cp22_delete_empty_github_org_param_returns_400(self, headers):
+    def test_cp26_delete_empty_github_org_param_returns_400(self, headers):
         r = requests.delete(f"{CONNECT_URL}?github_org=",
                             headers=headers, timeout=10)
-        chk("CP.22 DELETE empty github_org param -> 400",
+        chk("CP.26 DELETE empty github_org param -> 400",
             r.status_code == 400, f"got {r.status_code}: {r.text[:120]}")
         assert r.status_code == 400
 

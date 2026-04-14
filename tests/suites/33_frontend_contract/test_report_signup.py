@@ -248,7 +248,7 @@ class TestReportSignupNoAuth:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  Note: Rate-limit test (RS.13) is intentionally skipped.
+#  Section F: Rate Limiting  (RS.13)
 #
 #  The rate limit is enforced on CF-Connecting-IP which is set by Cloudflare's
 #  edge network and cannot be controlled from external test clients. There is no
@@ -258,25 +258,29 @@ class TestReportSignupNoAuth:
 #  Worker unit test with a mocked KV binding.
 # ═══════════════════════════════════════════════════════════════════════════════
 
-@pytest.mark.skip(
-    reason=(
-        "CF-Connecting-IP is injected by Cloudflare edge and cannot be controlled "
-        "from external test clients. Rate-limit behaviour requires 5 requests from "
-        "the same IP within one hour — not reliably triggerable in CI without "
-        "dedicated IP management. Test the rate-limit path via Worker unit tests."
+class TestReportSignupRateLimit:
+    """Rate-limit enforcement (CF-Connecting-IP based, skipped in external CI)."""
+
+    @pytest.mark.skip(
+        reason=(
+            "CF-Connecting-IP is injected by Cloudflare edge and cannot be controlled "
+            "from external test clients. Rate-limit behaviour requires 5 requests from "
+            "the same IP within one hour — not reliably triggerable in CI without "
+            "dedicated IP management. Test the rate-limit path via Worker unit tests."
+        )
     )
-)
-def test_rs13_rate_limit_sixth_request_returns_429():
-    """6th POST from same IP within one hour must return 429 { ok: false, error: 'rate_limited' }."""
-    email_base = _rand_email("rs13rl")
-    for i in range(5):
-        requests.post(SIGNUP_URL,
-                      json={"email": f"{i}-{email_base}"},
-                      timeout=10)
-    r = requests.post(SIGNUP_URL,
-                      json={"email": f"6th-{email_base}"},
-                      timeout=10)
-    assert r.status_code == 429
-    data = r.json()
-    assert data.get("ok") is False
-    assert data.get("error") == "rate_limited"
+    def test_rs13_rate_limit_sixth_request_returns_429(self):
+        """6th POST from same IP within one hour must return 429 { ok: false, error: 'rate_limited' }."""
+        section("F --- Rate Limiting")
+        email_base = _rand_email("rs13rl")
+        for i in range(5):
+            requests.post(SIGNUP_URL,
+                          json={"email": f"{i}-{email_base}"},
+                          timeout=10)
+        r = requests.post(SIGNUP_URL,
+                          json={"email": f"6th-{email_base}"},
+                          timeout=10)
+        assert r.status_code == 429
+        data = r.json()
+        assert data.get("ok") is False
+        assert data.get("error") == "rate_limited"
