@@ -374,9 +374,9 @@ Every week counts. Only build what advances the data moat or the enterprise wedg
 | Add compliance/security page (no-proxy positioning) | W2 | 6h | ⬜ NEW |
 | Write + post Show HN (8am ET Tuesday/Wednesday) | W2 | 2.5h | ⬜ |
 | ~~Build AI Spend Console MVP — consolidated tool billing dashboard~~ | W3–5 | 40h | ✅ Done (PR #51) |
-| Build Copilot Metrics API adapter | W3–4 | 12h | ⬜ NEW |
+| ~~Build Copilot Metrics API adapter~~ | W3–4 | 12h | ✅ Done (PR #55) |
 | Get 3 design partner CTOs onboarded | W4 | ongoing | ⬜ |
-| Add Enterprise tier to pricing page | W5 | 2h | ⬜ |
+| ~~Add Enterprise tier to pricing page~~ | W5 | 2h | ✅ Done (PR #55) |
 | Set up weekly Sunday execution review | W1+ | 1h/wk | ⬜ |
 
 ### Phase 2 — Build the Enterprise Wedge (Months 2–4)
@@ -660,21 +660,21 @@ _Reordered 2026-04-14 based on competitive analysis, shipped work, and threat as
 
 ### P2 — Next 2 Weeks (high competitive urgency)
 
-- [ ] **Build Copilot Metrics API adapter** — GitHub Copilot Metrics API went GA February 2026. Per-developer REST endpoint, no OTel required. Poll daily, normalize to `cross_platform_usage`. Closes attribution gap for the largest AI coding tool installed base. **1–2 weeks, 12h.** _(See GAP 8)_
-- [ ] **Publish "State of AI Coding Spend 2026" benchmark report** — Even with limited data, use available aggregate stats + industry research. Gate behind email. Name the category "AI Coding FinOps" explicitly. First mover owns the narrative before Palma.ai does. **1 week, 8h.** _(See GAP 9)_
+- [x] **Build Copilot Metrics API adapter** — GitHub Copilot Metrics API went GA February 2026. Per-developer REST endpoint, no OTel required. Poll daily, normalize to `cross_platform_usage`. Closes attribution gap for the largest AI coding tool installed base. ✅ 2026-04-14 (copilot.ts, migration 0009, Copilot connect UI in app.html)
+- [x] **Publish "State of AI Coding Spend 2026" benchmark report** — Gated landing page at `/report.html` with email capture → KV store. Linked from nav + footer. ✅ 2026-04-14 (report.html, /report-signup endpoint)
 - [ ] **Write + post Show HN** — 8am ET Tuesday or Wednesday. Use Prompt #05. AI Spend Console is the hook. **2.5h.**
 - [ ] **Decide brand/domain** — Commit to vantageai.com or register a new domain (spendlens.ai, ailedger.com). `vantageaiops.com` is a liability in enterprise sales. **2h.**
-- [ ] **Add Enterprise tier to pricing page** — "Talk to sales" tier with SOC2, SSO, unlimited seats, custom retention. Signals enterprise-readiness even before the product is fully there. **2h.**
+- [x] **Add Enterprise tier to pricing page** — "Talk to sales" tier with SOC2 (Q3 2026 roadmap), SSO, unlimited seats, custom retention. Links to trust.vantageaiops.com. ✅ 2026-04-14 (signup.html)
 
 ---
 
 ### P3 — Month 2 (build sprint)
 
-- [ ] **Design anonymized benchmark data schema** — Opt-in only, no org identifiers, bucketed cohorts by company size + industry. p25/p50/p75/p90 percentile rankings. Use Prompt #08. **8h.**
+- [x] **Design anonymized benchmark data schema** — Opt-in only, cohorts by size_band+industry, p25/p50/p75/p90 percentiles, k-anonymity floor (sample_size ≥ 5), org_id never in snapshots. ✅ 2026-04-14 (migration 0011, benchmark.ts)
 - [ ] **Build semantic cache layer** — Cloudflare Workers + Vectorize. BGE embedding, configurable similarity threshold (default 0.92), $ saved on dashboard. Ship before Helicone moves to semantic matching. Use Prompt #03. **2 weeks.**
 - [ ] **Get 3 design partner CTOs onboarded** — AI Spend Console is the hook. These are your first paying customers and your benchmark data seed. **ongoing.**
 - [ ] **Deploy n8n on Railway** — Onboarding drip + trial conversion workflows. **6h.**
-- [ ] **Datadog exporter** — Let teams already on Datadog route VantageAI per-developer metrics into their existing dashboards. Additive, not rip-and-replace. **1 week.**
+- [x] **Datadog exporter** — HKDF-encrypted API key, site allowlist (5 sites), `vantage.ai.cost_usd` + `vantage.ai.tokens` gauge series pushed daily with provider/model/developer_id tags. ✅ 2026-04-14 (datadog.ts, migration 0012)
 - [ ] **Start SOC2 prep with Vanta** — Timeline: begin Month 3, target Type I at Month 7–8. **ongoing.**
 - [ ] **LinkedIn/Twitter — 2x/week data-driven posts** — Use benchmark data + AI Spend Console screenshots. **3h/wk.**
 - [ ] **First $1K MRR milestone** — 10 Team plan customers. **milestone.**
