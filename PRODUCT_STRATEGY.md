@@ -1,11 +1,13 @@
-# VantageAI — Product Strategy v5.0
+# VantageAI — Product Strategy v6.0
 **The 10-Year War Room Plan: From LLM Cost Tracker → AI Spend Intelligence Layer → Bloomberg of AI**
 
 **Author:** Aman Jain / Kamal Soft Pvt Ltd
-**Date:** 2026-04-10
-**Version:** 5.0 — Strategic Rewrite
+**Date:** 2026-04-14
+**Version:** 6.0 — Competitive Intel Update + Priority Reorder
 **Stage:** Pre-Seed / 1-Man Army
 **Critical Window:** 18 months
+
+> **v6.0 Changes:** Updated competitive landscape (April 2026 analysis), revised What's Built to reflect shipped PRs, reordered all tasks by priority score, added Copilot Metrics API adapter and category-claiming content as new P1 items based on competitive gaps found.
 
 ---
 
@@ -51,10 +53,12 @@ You've built a genuinely impressive product for a solo founder. The feature set 
 |------|---------|
 | Proxy model | Sits in the critical call path — providers can restrict, deprecate, or bypass. |
 | Cost optimization story | OpenAI and Anthropic are building native dashboards. Already doing it. |
-| 10K free tier | vs Helicone's 100K — major acquisition friction for developers. |
+| Free tier now matched | Langfuse also offers 50K/mo free. No free-tier moat anymore. |
 | No data network effect | Each company's data is isolated. No cross-customer intelligence. |
 | No defensible moat | Every feature is replicable in 3–6 months with funding. |
 | Brand name "VantageAI" | Trademark conflict risk. Generic. Doesn't communicate the USP. |
+| Palma.ai direct threat | New entrant with identical positioning (per-developer, per-MCP, coding tools). Watch closely. |
+| Copilot attribution gap | GitHub Copilot has no native OTel — largest installed base is not fully covered. |
 
 ---
 
@@ -140,7 +144,7 @@ EU AI Act, SOX-equivalent AI audit requirements, HIPAA AI governance — all com
 
 ## 5. What's Built
 
-All items below are shipped and live at `vantageaiops.com` as of 2026-04-10.
+All items below are shipped and live at `vantageaiops.com` as of 2026-04-14.
 
 ### Infrastructure
 
@@ -194,6 +198,16 @@ All items below are shipped and live at `vantageaiops.com` as of 2026-04-10.
 
 ## 6. Gap Analysis — Critical Fixes
 
+_Updated 2026-04-14 based on competitive analysis (Helicone, LangSmith, Langfuse, Datadog, GitHub Copilot Metrics API, Palma.ai)._
+
+### ✅ GAP 2 (CLOSED): Free Tier — 10K → 50K events/month
+Worker enforces 50K (`FREE_TIER_LIMIT = 50_000` in events.ts). Frontend + docs updated (PR #54). **Note:** Langfuse also offers 50K/mo free — no moat here. The real advantage is OTel-native AI coding tool tracking, not the limit number.
+
+### ✅ GAP 3 (CLOSED): No Consolidated AI Tool Billing Dashboard
+AI Spend Console shipped (PR #51, merged 2026-04-12). Cross-Platform tab live with per-developer attribution, stacked trend chart, live feed, developer drill-down modal.
+
+---
+
 ### 🔴 GAP 1: No Cross-Company Intelligence (Critical)
 Every customer's data is siloed. You're collecting gold but not refining it. Without anonymized benchmarks across companies, you're just a prettier version of what providers offer free.
 
@@ -201,17 +215,17 @@ Every customer's data is siloed. You're collecting gold but not refining it. Wit
 
 ---
 
-### 🔴 GAP 2: Free Tier — 10K vs Helicone's 100K (Critical)
-The biggest developer acquisition friction point. Developers won't switch from Helicone's 100K free for 10K free. The bottom-up PLG motion is crippled.
+### 🔴 GAP 8: No Copilot Metrics API Adapter (Critical — New)
+GitHub Copilot CLI has no native OTel export (open issue). Copilot is the largest AI coding tool installed base. Without attribution for Copilot-heavy teams, the cross-platform story is incomplete. GitHub Copilot Metrics API went GA February 2026 — REST-based, per-developer data, exportable.
 
-**FIX:** Raise free tier to 50K OTel events/month for AI coding tool tracking (your differentiator). Keep SDK requests at 10K. Separate the two track metrics. Timeline: Week 1.
+**FIX:** Build a Copilot Metrics API polling adapter. Pull per-developer seat data + usage metrics via REST, normalize to `cross_platform_usage` schema, backfill daily. No OTel required — uses the GA API. Timeline: 1–2 weeks.
 
 ---
 
-### 🔴 GAP 3: No Consolidated AI Tool Billing Dashboard (Critical)
-The CTO pivot requires showing Copilot + Claude Code + Cursor + Gemini CLI spend in one view with per-developer attribution. This doesn't exist anywhere. This is the enterprise wedge.
+### 🔴 GAP 9: No Category Claim — "AI Coding FinOps" (Critical — New)
+Palma.ai is the only direct competitor with identical ICP positioning (per-developer, per-MCP, coding tool cost attribution). Neither Helicone, LangSmith, nor Langfuse uses this framing. The category is unclaimed. First mover who publishes the benchmark report owns the SEO and narrative.
 
-**FIX:** Build "AI Spend Console" as a named product. 4-week build. Q2 2026 launch announcement. Timeline: Weeks 3–6.
+**FIX:** Publish "State of AI Coding Spend 2026" benchmark report with real anonymized data. Name the category explicitly. Gate behind email. This is a content-as-product play, not a feature. Timeline: Month 2 alongside benchmark data schema.
 
 ---
 
@@ -219,6 +233,13 @@ The CTO pivot requires showing Copilot + Claude Code + Cursor + Gemini CLI spend
 Helicone's biggest practical advantage — proxy-based exact caching, fallbacks, routing. You're not in the call path for cost reduction, only observation.
 
 **FIX:** Build Semantic Cache Layer using Cloudflare Workers + Vectorize. Position as "AI-native caching" vs Helicone's "HTTP-level caching." This is the technical moat. Timeline: Month 2.
+
+---
+
+### 🟠 GAP 10: No Privacy/No-Proxy Compliance Page (Major — New)
+"No traffic interception" is a concrete enterprise procurement blocker-remover vs Helicone and LangSmith (both require proxy). Financial services, healthcare, and defense contractors will never route prompts through a third-party proxy. This advantage is not communicated anywhere on the site.
+
+**FIX:** Add a compliance/security page. Lead with "Zero traffic interception — your prompts never leave your infrastructure." Explicitly compare to Helicone's proxy model. Timeline: 1 week.
 
 ---
 
@@ -343,20 +364,20 @@ Every week counts. Only build what advances the data moat or the enterprise wedg
 
 **Goal:** 500 active accounts, 5 design partner CTOs, $1K MRR, HN front page once.
 
-| Task | Week | Effort |
-|------|------|--------|
-| Raise free tier to 50K OTel events/month | W1 | 2h |
-| Replace fake testimonials with 3 real design partners | W1 | 1h |
-| Add benchmark opt-in toggle to settings page | W1 | 4h |
-| Email 20 CTOs at AI-heavy startups (design partner outreach) | W1 | 3h |
-| Decide brand/domain — commit and register | W1 | 2h |
-| Draft AI Spend Console PRD | W2 | 3h |
-| Write + post Show HN (8am ET Tuesday/Wednesday) | W2 | 2.5h |
-| Build AI Spend Console MVP — consolidated tool billing dashboard | W3–5 | 40h |
-| Add per-developer cost attribution to OTel collector | W3 | 8h |
-| Get 3 design partner CTOs onboarded | W4 | ongoing |
-| Add Enterprise tier to pricing page | W5 | 2h |
-| Set up weekly Sunday execution review | W1+ | 1h/wk |
+| Task | Week | Effort | Status |
+|------|------|--------|--------|
+| ~~Raise free tier to 50K OTel events/month~~ | W1 | 2h | ✅ Done (PR #54) |
+| Replace fake testimonials with 3 real design partners | W1 | 1h | ⬜ |
+| Add benchmark opt-in toggle to settings page | W1 | 4h | ⬜ |
+| Email 20 CTOs at AI-heavy startups (design partner outreach) | W1 | 3h | ⬜ |
+| Decide brand/domain — commit and register | W1 | 2h | ⬜ |
+| Add compliance/security page (no-proxy positioning) | W2 | 6h | ⬜ NEW |
+| Write + post Show HN (8am ET Tuesday/Wednesday) | W2 | 2.5h | ⬜ |
+| ~~Build AI Spend Console MVP — consolidated tool billing dashboard~~ | W3–5 | 40h | ✅ Done (PR #51) |
+| Build Copilot Metrics API adapter | W3–4 | 12h | ⬜ NEW |
+| Get 3 design partner CTOs onboarded | W4 | ongoing | ⬜ |
+| Add Enterprise tier to pricing page | W5 | 2h | ⬜ |
+| Set up weekly Sunday execution review | W1+ | 1h/wk | ⬜ |
 
 ### Phase 2 — Build the Enterprise Wedge (Months 2–4)
 
@@ -407,15 +428,35 @@ Every week counts. Only build what advances the data moat or the enterprise wedg
 | IT Financial Management (Apptio comp) | $4.5B | SOM — 5-year target |
 | Initial serviceable market | ~$500M | Realistic SOM Y3–5 (10K companies × $50K ACV) |
 
+### Competitive Landscape (April 2026)
+
+| Dimension | VantageAI | Helicone | LangSmith | Langfuse | Datadog LLM Obs. | GitHub Copilot Analytics | Palma.ai |
+|---|---|---|---|---|---|---|---|
+| **Free tier** | 50K events/mo | 10K/mo | 5K traces/mo | 50K units/mo | None | Included w/ seat | Unknown |
+| **Paid entry** | TBD | $20/seat/mo | $39/seat/mo | $29/mo flat | ~$120/day activation | $10–19/user/mo | Unknown |
+| **OSS / self-host** | No | Yes (Apache 2.0) | No | Yes (MIT) | No | No | Unknown |
+| **AI coding tool tracking** | **Yes — OTel native** | No | No | No | Partial (no cost) | Own tool only | Yes (claimed) |
+| **Per-developer attribution** | **Yes (cross-tool)** | No | No | No | No | Own tool only | Yes (claimed) |
+| **No proxy required** | **Yes** | No | No | No | N/A | N/A | Unknown |
+| **MCP server** | **Yes** | No | No | No | Yes (different use) | No | Unknown |
+| **CLI wrapper** | **Yes** | No | No | No | No | No | Unknown |
+| **Privacy / strict mode** | **Yes** | No | No | No | No | No | Unknown |
+| **Agent trace viz** | Partial | Yes | Yes | Yes (GA Nov 2025) | Yes | No | Unknown |
+| **Eval framework** | No | Limited | Yes | Yes | No | No | Unknown |
+| **Cross-provider spend** | Yes | Yes (proxy) | Yes | Yes | Yes (800+ models) | No | Yes (claimed) |
+
 ### Competitive Moat Comparison
 
 | Competitor | Structural Weakness | Your Exploit |
 |-----------|--------------------|-----------  |
-| Helicone | Exact-match cache only. No cross-company intel. No AI coding tool OTel. No enterprise ROI story. | AI Spend Console + Semantic Cache + Benchmarks beats on all 3 dimensions. |
+| Helicone | Exact-match cache only. No AI coding tool OTel. No per-developer cross-tool attribution. Proxy = traffic interception. | AI Spend Console + Semantic Cache + no-proxy privacy beats on all dimensions. |
 | LangSmith | Deep LangChain coupling. Tracing-heavy, not cost-primary. No multi-tool procurement story. | Cost-first narrative. Non-LangChain teams are underserved. |
+| Langfuse | MIT OSS is a moat. Strong eval + prompt mgmt. No AI coding tool OTel. No CLI wrapper. | "Langfuse shows your LLM calls. VantageAI shows your AI coding bill." Different buyer: CTO vs ML engineer. |
 | Datadog LLM | $15+/host explodes at scale. Observability focus, not cost intelligence. No AI coding tools. | Purpose-built for AI spend. 10x cheaper. "Datadog is for infra, Vantage is for AI budgets." |
 | OpenAI Dashboard | Only shows OpenAI. Provider-biased. No cross-model comparison. No independence. | Multi-provider neutrality. "Would you let your bank audit itself?" |
 | Anthropic Console | Same — single provider. No Copilot, no Cursor, no competitive intelligence. | You show the full picture. They show only their slice. CFOs need the full picture. |
+| GitHub Copilot Analytics | Copilot only. No cross-tool. REST API (not OTel). No Cursor/Claude Code. | Metrics API went GA Feb 2026 — build the adapter, absorb their data, show it alongside everything else. |
+| Palma.ai | **Direct threat.** Identical ICP. Appears to be pre-PMF, limited marketing. | Ship first. Own the "AI Coding FinOps" category name before they do. Publish benchmark report. |
 | CloudZero / Apptio | Cloud cost focus. Not built for LLM/AI token economics. Expensive, slow to adapt. | AI-native from day one. These are your 5-year acquisition targets. |
 
 ---
@@ -590,57 +631,93 @@ Trigger: Supabase webhook → org hits 8,000 events (80% of free tier).
 
 ---
 
-## 13. Task Plan — Week-by-Week Execution
+## 13. Task Plan — Priority-Ordered Execution
 
-### 🔴 Week 1–2 (Critical Path)
+_Reordered 2026-04-14 based on competitive analysis, shipped work, and threat assessment. Tasks are ordered by: (1) competitive urgency, (2) revenue impact, (3) effort. Completed tasks marked ✅._
 
-- [ ] Raise free tier to 50K OTel events on vantageaiops.com — **W1, 2h**
-- [ ] Add benchmark opt-in toggle to settings page — **W1, 4h**
-- [ ] Email 20 CTOs at AI-heavy startups (design partner outreach) — **W1, 3h**
-- [ ] Replace fictional testimonials with real quotes or remove — **W1, 1h**
-- [ ] Decide brand/domain — commit to vantageai.com or new domain — **W1, 2h**
-- [ ] Draft AI Spend Console PRD — **W2, 3h**
-- [ ] Write HN Show HN post draft — **W2, 2h**
-- [ ] Post Show HN (8am ET Tuesday or Wednesday) — **W2, 0.5h**
-- [ ] Set up weekly Sunday execution review — **W1+, 1h/wk**
+---
 
-### 🟠 Week 3–6 (Build Sprint)
+### P0 — Done / In-Flight (merge + deploy)
 
-- [ ] Build AI Spend Console MVP — consolidated tool billing dashboard — **W3–5, 40h**
-- [ ] Add per-developer cost attribution to OTel collector — **W3, 8h**
-- [ ] Get 3 design partner CTOs onboarded to AI Spend Console — **W4, ongoing**
-- [ ] Semantic cache architecture design — **W5, 4h**
-- [ ] Add Enterprise tier to pricing page — **W5, 2h**
-- [ ] Deploy n8n on Railway + configure onboarding + conversion workflows — **W4, 6h**
+| Task | Status | PR |
+|------|--------|----|
+| AI Spend Console MVP (Cross-Platform tab, /trend, per-dev attribution) | ✅ Merged | #51 |
+| Fix free tier copy: 10K → 50K events/month (index.html + ADMIN_GUIDE) | ✅ Open — awaiting merge | #54 |
+| Fix CI signup rate-limit (duplicate block bypassed CI bypass header) | ✅ Open — awaiting merge | #53 |
+| Fix OTel `developer.id` attribute extraction | ✅ Open — awaiting merge | #52 |
 
-### 🟡 Month 2–3
+---
 
-- [ ] Build semantic cache layer on Cloudflare Vectorize — **M2, 2 weeks**
-- [ ] Design anonymized benchmark data schema — **M2, 8h**
-- [ ] Publish first benchmark report — **M3, 1 week**
-- [ ] Start SOC2 prep with Vanta — **M3, ongoing**
-- [ ] First $1K MRR — close 10 Team plan customers — **M3, milestone**
-- [ ] LinkedIn/Twitter — publish 2x/week data-driven posts — **M2+, 3h/wk**
-- [ ] Launch public benchmark dashboard (email-gated) — **M3**
+### P1 — This Week (highest leverage, low effort)
 
-### 🔵 Month 4–6
+- [ ] **Add compliance/security page to vantageaiops.com** — "Zero traffic interception. Your prompts never leave your infrastructure." Explicit Helicone proxy comparison. This is an enterprise procurement unblock. **1 week, 6h.**
+- [ ] **Replace fictional testimonials on landing page** — Remove or replace with real quotes + GitHub handles from real users. Enterprise sales stalls on fake social proof. **1h.**
+- [ ] **Email 20 CTOs at AI-heavy startups** — Design partner outreach. Use Prompt #02. 5 warm leads = the next 6 months of roadmap feedback. **3h.**
+- [ ] **Add benchmark opt-in toggle to Settings page** — Single checkbox: "Contribute anonymized spend data to industry benchmarks." No data flows yet — just captures consent. This primes the data moat. **4h.**
+- [ ] **Fix website docs page** — Currently broken (links/content errors). Blocks developer trust during onboarding evaluation. **2h.**
 
-- [ ] Prompt Registry MVP — **M4, 6 weeks**
-- [ ] Vendor Negotiation Module — "what similar companies paid at renewal" — **M5**
-- [ ] Finance tool BD outreach — Ramp, Brex, Zip — **M5**
-- [ ] AI Governance Report auto-generation — **M6**
-- [ ] Quarterly "AI Spend Index" public report — **M6**
-- [ ] Series A narrative draft — **M6, use Prompt #09**
+---
 
-### 🟢 Month 7–18
+### P2 — Next 2 Weeks (high competitive urgency)
 
-- [ ] SOC2 Type I certification — **M7–8**
-- [ ] Quality-Adjusted Routing Engine — **M7**
-- [ ] AI Procurement API (Ramp/Brex/Coupa integration) — **M9**
-- [ ] Compliance Module — EU AI Act audit trail — **M10**
-- [ ] Model Performance Index — public quality/cost rankings — **M12**
-- [ ] Raise seed/Series A — **M12–15**
-- [ ] First BD hire — **M14**
+- [ ] **Build Copilot Metrics API adapter** — GitHub Copilot Metrics API went GA February 2026. Per-developer REST endpoint, no OTel required. Poll daily, normalize to `cross_platform_usage`. Closes attribution gap for the largest AI coding tool installed base. **1–2 weeks, 12h.** _(See GAP 8)_
+- [ ] **Publish "State of AI Coding Spend 2026" benchmark report** — Even with limited data, use available aggregate stats + industry research. Gate behind email. Name the category "AI Coding FinOps" explicitly. First mover owns the narrative before Palma.ai does. **1 week, 8h.** _(See GAP 9)_
+- [ ] **Write + post Show HN** — 8am ET Tuesday or Wednesday. Use Prompt #05. AI Spend Console is the hook. **2.5h.**
+- [ ] **Decide brand/domain** — Commit to vantageai.com or register a new domain (spendlens.ai, ailedger.com). `vantageaiops.com` is a liability in enterprise sales. **2h.**
+- [ ] **Add Enterprise tier to pricing page** — "Talk to sales" tier with SOC2, SSO, unlimited seats, custom retention. Signals enterprise-readiness even before the product is fully there. **2h.**
+
+---
+
+### P3 — Month 2 (build sprint)
+
+- [ ] **Design anonymized benchmark data schema** — Opt-in only, no org identifiers, bucketed cohorts by company size + industry. p25/p50/p75/p90 percentile rankings. Use Prompt #08. **8h.**
+- [ ] **Build semantic cache layer** — Cloudflare Workers + Vectorize. BGE embedding, configurable similarity threshold (default 0.92), $ saved on dashboard. Ship before Helicone moves to semantic matching. Use Prompt #03. **2 weeks.**
+- [ ] **Get 3 design partner CTOs onboarded** — AI Spend Console is the hook. These are your first paying customers and your benchmark data seed. **ongoing.**
+- [ ] **Deploy n8n on Railway** — Onboarding drip + trial conversion workflows. **6h.**
+- [ ] **Datadog exporter** — Let teams already on Datadog route VantageAI per-developer metrics into their existing dashboards. Additive, not rip-and-replace. **1 week.**
+- [ ] **Start SOC2 prep with Vanta** — Timeline: begin Month 3, target Type I at Month 7–8. **ongoing.**
+- [ ] **LinkedIn/Twitter — 2x/week data-driven posts** — Use benchmark data + AI Spend Console screenshots. **3h/wk.**
+- [ ] **First $1K MRR milestone** — 10 Team plan customers. **milestone.**
+
+---
+
+### P4 — Month 3–4
+
+- [ ] **Launch public benchmark dashboard** — email-gated, shows industry median cost/dev/month by tool. SEO + lead gen. **1 week.**
+- [ ] **Publish first full benchmark report** — "State of AI Coding Spend Q2 2026." Use Prompt #04. PR strategy. **1 week.**
+- [ ] **Prompt Registry MVP** — version prompts, cost-per-version comparison. Closes gap vs Helicone + LangSmith. **6 weeks.**
+- [ ] **Agent trace DAG visualization** — Basic graph view of multi-step agent sessions from existing OTel trace data. Closes most visible gap vs Langfuse Agent Graph. **2 weeks.**
+- [ ] **Finance tool BD outreach** — Ramp, Brex, Zip integration conversations. **M4.**
+
+---
+
+### P5 — Month 5–8
+
+- [ ] **Vendor Negotiation Module** — "What similar companies paid at their last Copilot renewal." **M5.**
+- [ ] **AI Governance Report auto-generation** — Board-ready audit trail. Regulatory inevitability play. **M6.**
+- [ ] **Quarterly "AI Spend Index" public report** — PR + authority play. **M6.**
+- [ ] **Series A narrative draft** — Use Prompt #09. **M6.**
+- [ ] **SOC2 Type I certification** — **M7–8.**
+- [ ] **Quality-Adjusted Routing Engine** — Route by task type from historical quality + cost data. **M7.**
+
+---
+
+### P6 — Month 9–18 (platform plays)
+
+- [ ] **AI Procurement API** — Ramp, Brex, Coupa integration. **M9.**
+- [ ] **Compliance Module** — EU AI Act audit trail, HIPAA AI governance. **M10.**
+- [ ] **Model Performance Index** — Public quality/cost ranking per task type. SEO + authority. **M12.**
+- [ ] **Raise seed/Series A** — With 10+ enterprise customers + benchmark data from 500+ companies. **M12–15.**
+- [ ] **First BD hire** — You build, they sell. **M14.**
+
+---
+
+### Watch List (monitor monthly)
+
+- **Palma.ai** — Direct ICP competitor. Check pricing page, LinkedIn hiring, funding announcements. If they raise, accelerate category-claiming content immediately.
+- **Helicone** — Watch for semantic cache PR in helicone/helicone GitHub. Any ship = you have less time.
+- **Copilot OTel parity** — github/copilot-cli issue #2471. When it ships, update OTel adapter to consume it natively.
+- **Langfuse Agent Graph** — Benchmark against their agent viz for product parity decisions.
 
 ---
 
