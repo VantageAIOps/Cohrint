@@ -253,7 +253,7 @@ otel.post('/v1/metrics', async (c) => {
 
     // Extract user identity from resource attributes
     const developerEmail = getAttr(resAttrs, 'user.email');
-    const developerId = getAttr(resAttrs, 'user.account_uuid') ?? getAttr(resAttrs, 'user.account_id') ?? getAttr(resAttrs, 'user.id');
+    const developerId = getAttr(resAttrs, 'developer.id') ?? getAttr(resAttrs, 'user.account_uuid') ?? getAttr(resAttrs, 'user.account_id') ?? getAttr(resAttrs, 'user.id');
     const sessionId = getAttr(resAttrs, 'session.id');
     const terminalType = getAttr(resAttrs, 'terminal.type');
     const team = getAttr(resAttrs, 'team.id') ?? getAttr(resAttrs, 'department');
@@ -669,7 +669,7 @@ otel.post('/v1/logs', async (c) => {
     const serviceName = getAttr(resAttrs, 'service.name') ?? 'unknown';
     const { provider } = detectProvider(serviceName);
     const developerEmail = getAttr(resAttrs, 'user.email');
-    const developerId = getAttr(resAttrs, 'user.account_uuid') ?? getAttr(resAttrs, 'user.id');
+    const developerId = getAttr(resAttrs, 'developer.id') ?? getAttr(resAttrs, 'user.account_uuid') ?? getAttr(resAttrs, 'user.id');
     const sessionId = getAttr(resAttrs, 'session.id');
 
     for (const sl of rl.scopeLogs ?? []) {
