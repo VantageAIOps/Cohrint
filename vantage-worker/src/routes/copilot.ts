@@ -468,18 +468,18 @@ copilot.post('/connect', async (c) => {
   if (testResp.status === 404) return c.json({ error: `Org '${githubOrg}' not found or Copilot not enabled` }, 404);
   if (!testResp.ok) return c.json({ error: `GitHub API returned ${testResp.status} — try again later` }, 502);
 
-  // Encrypt + store in KV; never write plaintext token to D1
+  // Encrypt + store in KV; never write plaintext token to D1.
+  // The KV key is always reconstructed deterministically by kvTokenKey() —
+  // it is not persisted in D1 (kv_key column was dropped in migration 0014).
   const encrypted = await encryptToken(token, orgId, c.env.TOKEN_ENCRYPTION_SECRET);
-  const kvKey     = kvTokenKey(orgId, githubOrg);
-  await c.env.KV.put(kvKey, encrypted);
+  await c.env.KV.put(kvTokenKey(orgId, githubOrg), encrypted);
 
   await c.env.DB.prepare(
-    `INSERT INTO copilot_connections (org_id, github_org, kv_key, status, updated_at)
-     VALUES (?, ?, ?, 'active', datetime('now'))
+    `INSERT INTO copilot_connections (org_id, github_org, status, updated_at)
+     VALUES (?, ?, 'active', datetime('now'))
      ON CONFLICT(org_id, github_org) DO UPDATE SET
-       kv_key = excluded.kv_key, status = 'active',
-       last_error = NULL, updated_at = datetime('now')`,
-  ).bind(orgId, githubOrg, kvKey).run();
+       status = 'active', last_error = NULL, updated_at = datetime('now')`,
+  ).bind(orgId, githubOrg).run();
 
   return c.json({
     connected:  true,

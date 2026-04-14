@@ -469,8 +469,38 @@ crossplatform.get('/connections', async (c) => {
     GROUP BY provider
   `).bind(orgId).all();
 
-  // Strip last_error from billing_connections for non-admin roles —
-  // internal error messages from billing API integrations are admin-only
+  // Include GitHub Copilot connections (stored in copilot_connections, not
+  // provider_connections) so the dashboard connections panel shows Copilot status.
+  const copilotConnections = await c.env.DB.prepare(`
+    SELECT github_org, status, last_synced_at, last_error, created_at
+    FROM copilot_connections WHERE org_id = ?
+  `).bind(orgId).all();
+
+  const copilotSources = (copilotConnections.results ?? []).map((r: any) => ({
+    provider:      'github-copilot',
+    github_org:    r.github_org,
+    status:        r.status,
+    last_synced_at: r.last_synced_at,
+    last_error:    isAdmin ? r.last_error : undefined,
+    created_at:    r.created_at,
+  }));
+
+  // Also include Datadog connections
+  const datadogConnections = await c.env.DB.prepare(`
+    SELECT datadog_site, status, last_synced_at, last_error, created_at
+    FROM datadog_connections WHERE org_id = ? AND status != 'paused'
+  `).bind(orgId).all();
+
+  const datadogSources = (datadogConnections.results ?? []).map((r: any) => ({
+    provider:      'datadog',
+    datadog_site:  r.datadog_site,
+    status:        r.status,
+    last_synced_at: r.last_synced_at,
+    last_error:    isAdmin ? r.last_error : undefined,
+    created_at:    r.created_at,
+  }));
+
+  // Strip last_error from billing_connections for non-admin roles
   const billingConnections = isAdmin
     ? connections.results
     : (connections.results ?? []).map((r: any) => {
@@ -480,7 +510,9 @@ crossplatform.get('/connections', async (c) => {
 
   return c.json({
     billing_connections: billingConnections,
-    otel_sources: otelFreshness.results,
+    otel_sources:        otelFreshness.results,
+    copilot_connections: copilotSources,
+    datadog_connections: datadogSources,
   });
 });
 
