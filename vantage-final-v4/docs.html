@@ -220,6 +220,13 @@ pre{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;pad
     </div>
 
     <div class="docs-nav-group">
+      <div class="docs-nav-sec" onclick="toggleNavGroup(this)">Integrations</div>
+      <a class="docs-nav-item" onclick="show('copilot-api',this)">GitHub Copilot</a>
+      <a class="docs-nav-item" onclick="show('datadog-api',this)">Datadog Export</a>
+      <a class="docs-nav-item" onclick="show('benchmark-api',this)">Benchmark Data</a>
+    </div>
+
+    <div class="docs-nav-group">
       <div class="docs-nav-sec" onclick="toggleNavGroup(this)">Privacy &amp; Security</div>
       <a class="docs-nav-item" onclick="show('local-proxy',this)">Local Proxy (zero-trust)</a>
       <a class="docs-nav-item" onclick="show('privacy-modes',this)">SDK privacy modes</a>
@@ -240,6 +247,7 @@ pre{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;pad
     <div class="docs-nav-group">
       <div class="docs-nav-sec" onclick="toggleNavGroup(this)">Reference</div>
       <a class="docs-nav-item" onclick="show('api',this)">REST API</a>
+      <a class="docs-nav-item" onclick="show('platform-api',this)">Platform API</a>
       <a class="docs-nav-item" onclick="show('mcp-tools',this)">MCP tools</a>
       <a class="docs-nav-item" onclick="show('mcp-workflows',this)">MCP workflow examples</a>
     </div>
@@ -1755,6 +1763,257 @@ vantageai-agent --backend claude
 
 <h2>Anomaly Detection</h2>
 <p>The agent warns when a prompt's cost exceeds 3x the session average, helping catch runaway token usage before it impacts your budget.</p>
+`,
+
+'copilot-api': `
+<h1>GitHub Copilot Metrics API</h1>
+<p>Connect a GitHub organisation to pull Copilot seat usage and daily active-user counts into your VantageAI cross-platform dashboard. Metrics sync once per day via a scheduled cron. Tokens are AES-256-GCM encrypted at rest and never written to the database in plain text.</p>
+
+<div class="info-box"><strong>Required GitHub PAT scopes:</strong> <code>read:org</code> and <code>manage_billing:copilot</code>. Classic tokens (<code>ghp_*</code>) and fine-grained tokens (<code>github_pat_*</code>) are both supported. Service tokens (<code>ghs_*</code>) are not.</div>
+
+<h2>POST /v1/copilot/connect</h2>
+<p>Store a GitHub organisation and PAT. VantageAI validates the token against the GitHub Copilot Billing API before saving it.</p>
+<table class="api-table">
+<thead><tr><th>Auth</th><th>Role required</th></tr></thead>
+<tbody><tr><td>Bearer token</td><td><code>admin</code> or <code>owner</code></td></tr></tbody>
+</table>
+<pre>curl -X POST https://api.vantageaiops.com/v1/copilot/connect \\
+  -H "Authorization: Bearer vnt_your_key" \\
+  -H "Content-Type: application/json" \\
+  -d '{"github_org": "acme-corp", "token": "ghp_xxxxxxxxxxxxxxxxxxxx"}'</pre>
+<p><strong>Request body</strong></p>
+<table class="api-table">
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>github_org</code></td><td>string</td><td>GitHub organisation slug — 1–39 alphanumeric/hyphen characters</td></tr>
+<tr><td><code>token</code></td><td>string</td><td>GitHub PAT starting with <code>ghp_</code> or <code>github_pat_</code>, minimum 20 characters after the prefix</td></tr>
+</tbody>
+</table>
+<p><strong>Response 201</strong></p>
+<pre>{ "connected": true, "github_org": "acme-corp", "message": "Connection saved. Metrics sync daily via the scheduled cron." }</pre>
+<p><strong>Errors</strong></p>
+<table class="api-table">
+<thead><tr><th>Status</th><th>Cause</th></tr></thead>
+<tbody>
+<tr><td>400</td><td>Invalid JSON, missing fields, <code>github_org</code> fails format check, or token prefix not <code>ghp_</code>/<code>github_pat_</code></td></tr>
+<tr><td>400</td><td>GitHub returned 401 — token is invalid or expired</td></tr>
+<tr><td>400</td><td>GitHub returned 403 — token is missing <code>manage_billing:copilot</code> scope</td></tr>
+<tr><td>404</td><td>Org not found on GitHub or Copilot is not enabled for the org</td></tr>
+<tr><td>502</td><td>GitHub API returned an unexpected error; retry later</td></tr>
+</tbody>
+</table>
+
+<h2>DELETE /v1/copilot/connect</h2>
+<p>Remove a Copilot connection. The encrypted PAT is deleted from KV and the connection row is removed from the database.</p>
+<table class="api-table">
+<thead><tr><th>Auth</th><th>Role required</th></tr></thead>
+<tbody><tr><td>Bearer token</td><td><code>admin</code> or <code>owner</code></td></tr></tbody>
+</table>
+<pre>curl -X DELETE \\
+  "https://api.vantageaiops.com/v1/copilot/connect?github_org=acme-corp" \\
+  -H "Authorization: Bearer vnt_your_key"</pre>
+<p><strong>Query parameters</strong></p>
+<table class="api-table">
+<thead><tr><th>Param</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>github_org</code></td><td>Yes</td><td>GitHub organisation slug to disconnect</td></tr>
+</tbody>
+</table>
+<p><strong>Response 200</strong></p>
+<pre>{ "disconnected": true, "github_org": "acme-corp" }</pre>
+<p><strong>Errors:</strong> 400 if <code>github_org</code> query param is missing; 404 if no connection exists for that org.</p>
+
+<h2>GET /v1/copilot/status</h2>
+<p>List all Copilot connections for the authenticated org including sync status and last sync time. Non-admin roles receive the same response but the <code>last_error</code> field is omitted.</p>
+<table class="api-table">
+<thead><tr><th>Auth</th><th>Role required</th></tr></thead>
+<tbody><tr><td>Bearer token</td><td>Any (non-admin gets <code>last_error</code> redacted)</td></tr></tbody>
+</table>
+<pre>curl https://api.vantageaiops.com/v1/copilot/status \\
+  -H "Authorization: Bearer vnt_your_key"</pre>
+<p><strong>Response 200</strong></p>
+<pre>{
+  "connections": [
+    {
+      "github_org": "acme-corp",
+      "status": "active",
+      "last_synced_at": "2026-04-14 06:00:00",
+      "created_at": "2026-04-01 12:34:56",
+      "last_error": null        <span class="c-comment">// admin/owner only; omitted for other roles</span>
+    }
+  ]
+}</pre>
+<p><strong>Status values:</strong> <code>active</code> — syncing normally; <code>error</code> — last sync failed (see <code>last_error</code>); <code>paused</code> — excluded from cron.</p>
+`,
+
+'datadog-api': `
+<h1>Datadog Export</h1>
+<p>Push VantageAI cost and token metrics into your own Datadog account as custom metrics. Once connected, a daily cron exports the previous 24 hours of <code>cross_platform_usage</code> data as two Datadog gauge series:</p>
+<ul style="font-size:14px;color:var(--muted);line-height:2;margin:0 0 16px 20px">
+  <li><code>vantage.ai.cost_usd</code> — tagged by <code>provider</code>, <code>model</code>, <code>developer_id</code>, <code>org_id</code></li>
+  <li><code>vantage.ai.tokens</code> — same tags; only emitted when <code>input_tokens + output_tokens &gt; 0</code></li>
+</ul>
+<div class="info-box">Datadog API keys are AES-256-GCM encrypted before storage and never logged in plain text.</div>
+
+<h2>POST /v1/datadog/connect</h2>
+<p>Validate and store a Datadog API key. The key is tested against <code>/api/v1/validate</code> on the target site before saving.</p>
+<table class="api-table">
+<thead><tr><th>Auth</th><th>Role required</th></tr></thead>
+<tbody><tr><td>Bearer token</td><td><code>admin</code> or <code>owner</code></td></tr></tbody>
+</table>
+<pre>curl -X POST https://api.vantageaiops.com/v1/datadog/connect \\
+  -H "Authorization: Bearer vnt_your_key" \\
+  -H "Content-Type: application/json" \\
+  -d '{"api_key": "dd_api_xxxxxxxxxxxx", "site": "datadoghq.eu"}'</pre>
+<p><strong>Request body</strong></p>
+<table class="api-table">
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>api_key</code></td><td>string</td><td>Yes</td><td>Datadog API key with metrics write permission</td></tr>
+<tr><td><code>site</code></td><td>string</td><td>No</td><td>Datadog site. Defaults to <code>datadoghq.com</code>. Allowed values: <code>datadoghq.com</code>, <code>datadoghq.eu</code>, <code>us3.datadoghq.com</code>, <code>us5.datadoghq.com</code>, <code>ap1.datadoghq.com</code></td></tr>
+</tbody>
+</table>
+<p><strong>Response 201</strong></p>
+<pre>{ "connected": true, "datadog_site": "datadoghq.eu", "message": "Connection saved. Metrics sync daily via the scheduled cron." }</pre>
+<p><strong>Errors:</strong> 400 if <code>site</code> is not in the allowed list, or if Datadog's validation endpoint rejects the API key.</p>
+
+<h2>DELETE /v1/datadog/connect</h2>
+<p>Remove the Datadog connection for the authenticated org.</p>
+<table class="api-table">
+<thead><tr><th>Auth</th><th>Role required</th></tr></thead>
+<tbody><tr><td>Bearer token</td><td><code>admin</code> or <code>owner</code></td></tr></tbody>
+</table>
+<pre>curl -X DELETE https://api.vantageaiops.com/v1/datadog/connect \\
+  -H "Authorization: Bearer vnt_your_key"</pre>
+<p><strong>Response 200</strong></p>
+<pre>{ "disconnected": true }</pre>
+<p><strong>Errors:</strong> 404 if no Datadog connection exists for the org.</p>
+
+<h2>GET /v1/datadog/status</h2>
+<p>Check the Datadog connection status and last sync time for the authenticated org.</p>
+<table class="api-table">
+<thead><tr><th>Auth</th><th>Role required</th></tr></thead>
+<tbody><tr><td>Bearer token</td><td><code>admin</code> or <code>owner</code></td></tr></tbody>
+</table>
+<pre>curl https://api.vantageaiops.com/v1/datadog/status \\
+  -H "Authorization: Bearer vnt_your_key"</pre>
+<p><strong>Response — not connected</strong></p>
+<pre>{ "connected": false }</pre>
+<p><strong>Response — connected</strong></p>
+<pre>{
+  "connected": true,
+  "datadog_site": "datadoghq.com",
+  "status": "active",
+  "last_synced_at": "2026-04-14 06:00:00",
+  "last_error": null,
+  "created_at": "2026-04-01 12:34:56"
+}</pre>
+<p><strong>Status values:</strong> <code>active</code> — last push succeeded; <code>error</code> — last push failed (see <code>last_error</code>); <code>paused</code> — excluded from cron.</p>
+`,
+
+'benchmark-api': `
+<h1>Benchmark Data API</h1>
+<p>Anonymised cross-company AI cost benchmarks. Opt-in only — your org's data is never included unless benchmark sharing is enabled in Settings. All public endpoints enforce a <strong>k-anonymity floor of 5</strong>: cohorts with fewer than 5 contributing orgs return 404 rather than exposing outlier data.</p>
+
+<div class="warn-box"><strong>Opt-in required.</strong> An org must have <code>benchmark_opt_in</code> enabled (Settings → Benchmarks) before <code>POST /contribute</code> has any effect. Contribution is also gated to <code>admin</code> and <code>owner</code> roles to prevent unbounded re-aggregation by viewer accounts.</div>
+
+<h2>POST /v1/benchmark/contribute</h2>
+<p>Compute the authenticated org's quarterly metrics and upsert them into the shared benchmark dataset. Idempotent — safe to call multiple times per quarter.</p>
+<table class="api-table">
+<thead><tr><th>Auth</th><th>Role required</th></tr></thead>
+<tbody><tr><td>Bearer token</td><td><code>admin</code> or <code>owner</code></td></tr></tbody>
+</table>
+<pre>curl -X POST https://api.vantageaiops.com/v1/benchmark/contribute \\
+  -H "Authorization: Bearer vnt_your_key"</pre>
+<p><strong>Response 200 — contributed</strong></p>
+<pre>{ "ok": true }</pre>
+<p><strong>Response 200 — skipped</strong></p>
+<pre>{ "ok": false, "reason": "not_opted_in" }</pre>
+<table class="api-table">
+<thead><tr><th>Reason</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>not_opted_in</code></td><td>Benchmark sharing is disabled for this org in Settings</td></tr>
+<tr><td><code>no_usage_data</code></td><td>No <code>cross_platform_usage</code> rows with token data exist for the current quarter</td></tr>
+</tbody>
+</table>
+
+<h2>GET /v1/benchmark/percentiles</h2>
+<p>Retrieve weighted-aggregate percentiles for a specific metric, optionally filtered by model. Returns data for the most recent quarter that has at least 5 contributing orgs.</p>
+<table class="api-table">
+<thead><tr><th>Auth</th><th>Role required</th></tr></thead>
+<tbody><tr><td>None</td><td>Public</td></tr></tbody>
+</table>
+<pre>curl "https://api.vantageaiops.com/v1/benchmark/percentiles?metric=cost_per_token&model=gpt-4o"</pre>
+<p><strong>Query parameters</strong></p>
+<table class="api-table">
+<thead><tr><th>Param</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>metric</code></td><td>Yes</td><td><code>cost_per_token</code> · <code>cost_per_dev_month</code> · <code>cache_hit_rate</code></td></tr>
+<tr><td><code>model</code></td><td>Conditional</td><td>Model name (e.g. <code>gpt-4o</code>). Required when <code>metric=cost_per_token</code>; ignored for other metrics</td></tr>
+</tbody>
+</table>
+<p><strong>Response 200</strong></p>
+<pre>{
+  "metric": "cost_per_token",
+  "model": "gpt-4o",
+  "quarter": "2026-Q2",
+  "sample_size": 12,
+  "p25": 0.0000024,
+  "p50": 0.0000031,
+  "p75": 0.0000048,
+  "p90": 0.0000071
+}</pre>
+<p><strong>Errors:</strong> 400 if <code>metric</code> is missing or not one of the allowed values; 404 if the cohort has fewer than 5 contributing orgs (k-anonymity floor).</p>
+<div class="info-box">Percentiles are sample-size-weighted averages across all cohorts. They are a safe approximation — true percentile merging would require individual org values, which are never exposed.</div>
+
+<h2>GET /v1/benchmark/summary</h2>
+<p>List all available metric + model + quarter combinations that meet the k-anonymity floor. Use this to discover which <code>percentiles</code> queries will return data.</p>
+<table class="api-table">
+<thead><tr><th>Auth</th><th>Role required</th></tr></thead>
+<tbody><tr><td>None</td><td>Public</td></tr></tbody>
+</table>
+<pre>curl https://api.vantageaiops.com/v1/benchmark/summary</pre>
+<p><strong>Response 200</strong></p>
+<pre>{
+  "available": [
+    { "metric": "cost_per_token", "model": "gpt-4o",  "quarter": "2026-Q2", "sample_size": 12, "cohort_count": 3 },
+    { "metric": "cache_hit_rate",  "model": null,       "quarter": "2026-Q2", "sample_size": 8,  "cohort_count": 2 },
+    { "metric": "cost_per_dev_month", "model": null,   "quarter": "2026-Q1", "sample_size": 6,  "cohort_count": 2 }
+  ]
+}</pre>
+<p>Only entries where <code>sample_size &ge; 5</code> are included. <code>model</code> is <code>null</code> for metrics that are not model-specific (<code>cost_per_dev_month</code>, <code>cache_hit_rate</code>).</p>
+`,
+
+'platform-api': `
+<h1>Platform API</h1>
+<p>Lightweight public endpoints used by the VantageAI frontend. No authentication is required.</p>
+
+<h2>POST /v1/platform/report-signup</h2>
+<p>Register an email address for the VantageAI benchmark report waitlist. Idempotent — submitting the same email a second time returns <code>ok: true</code> silently without re-counting the IP quota.</p>
+<table class="api-table">
+<thead><tr><th>Auth</th><th>Rate limit</th></tr></thead>
+<tbody><tr><td>None (public)</td><td>5 attempts per IP per hour</td></tr></tbody>
+</table>
+<pre>curl -X POST https://api.vantageaiops.com/v1/platform/report-signup \\
+  -H "Content-Type: application/json" \\
+  -d '{"email": "you@example.com"}'</pre>
+<p><strong>Request body</strong></p>
+<table class="api-table">
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>email</code></td><td>string</td><td>Valid email address. Normalised to lowercase before storage. Max 320 characters.</td></tr>
+</tbody>
+</table>
+<p><strong>Response 200</strong></p>
+<pre>{ "ok": true }</pre>
+<p><strong>Errors</strong></p>
+<table class="api-table">
+<thead><tr><th>Status</th><th>Cause</th></tr></thead>
+<tbody>
+<tr><td>400</td><td>Invalid JSON, <code>email</code> field missing or not a string, or email fails format validation</td></tr>
+<tr><td>429</td><td>IP has submitted 5 or more attempts within the past hour</td></tr>
+</tbody>
+</table>
 `
 
 };
