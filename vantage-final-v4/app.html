@@ -3234,9 +3234,11 @@ var _claudeCodeStatusLoading = false;
 function loadClaudeCodeStatus() {
   if (_claudeCodeStatusLoading) return Promise.resolve();
   _claudeCodeStatusLoading = true;
-  return apiFetch('/v1/analytics/summary').then(function(data) {
-    var total = (data && data.total_requests) || 0;
-    if (total > 0 && data && data.last_event_at) {
+  // Filter to claude-code agent_name so events from other sources (SDK, Copilot, etc.)
+  // don't produce a false "ACTIVE" state for the Claude Code hook.
+  return apiFetch('/v1/analytics/summary?agent=claude-code').then(function(data) {
+    var total = (data && data.today_requests) || 0;
+    if (total > 0) {
       renderClaudeCodeActive(data);
     } else {
       renderClaudeCodeSetup();
@@ -3262,7 +3264,7 @@ function renderClaudeCodeActive(data) {
   document.getElementById('claudeCodeLastEvent').textContent = lastEvent
     ? new Date(lastEvent).toLocaleString()
     : 'Unknown';
-  document.getElementById('claudeCodeEventCount').textContent = (data.total_requests || 0).toLocaleString();
+  document.getElementById('claudeCodeEventCount').textContent = (data.today_requests || 0).toLocaleString();
 }
 
 function renderClaudeCodeSetup() {
@@ -3284,8 +3286,8 @@ function checkClaudeCodeSetup() {
   statusEl.style.color = 'var(--text-muted)';
   statusEl.textContent = 'Looking for recent events…';
 
-  apiFetch('/v1/analytics/summary').then(function(data) {
-    var total = (data && data.total_requests) || 0;
+  apiFetch('/v1/analytics/summary?agent=claude-code').then(function(data) {
+    var total = (data && data.today_requests) || 0;
     if (total > 0) {
       statusEl.style.color = 'var(--accent-green)';
       statusEl.textContent = 'Events detected! Hook is working.';

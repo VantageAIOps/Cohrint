@@ -251,12 +251,12 @@ async function main() {
       await saveState(state);
 
       // 2. Emit OTel metrics so events appear in Cross-Platform Console
+      // Uses its own AbortController — independent of the batch upload timeout
       const otelPayload = buildOtelPayload(allNew);
       fetch(`${API_BASE}/v1/otel/v1/metrics`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${API_KEY}` },
         body: JSON.stringify(otelPayload),
-        signal: ac.signal,
       }).catch(() => {}); // fire-and-forget, don't block exit
 
       // 3. Provide feedback on successful upload
