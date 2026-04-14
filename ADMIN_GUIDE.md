@@ -32,6 +32,11 @@
 25. [Cross-Platform OTel Collector (v2)](#25-cross-platform-otel-collector-v2)
 26. [VantageAI CLI — AI Agent Wrapper](#26-vantageai-cli--ai-agent-wrapper)
 27. [Security & Governance](#27-security--governance)
+28. [GitHub Copilot Metrics Adapter](#28-github-copilot-metrics-adapter)
+29. [Datadog Metrics Exporter](#29-datadog-metrics-exporter)
+30. [Anonymized Benchmark System](#30-anonymized-benchmark-system)
+31. [Cross-Platform Console](#31-cross-platform-console)
+32. [Audit Log](#32-audit-log)
 
 ---
 
@@ -156,7 +161,7 @@ RESEND_API_KEY   — email sending
 
 ## 3. Database Schema & Data Model
 
-VantageAI uses Cloudflare D1 (SQLite). Six tables.
+VantageAI uses Cloudflare D1 (SQLite). Core tables plus extended tables added in v2.
 
 ### 3.1 `orgs` — One row per organization (account owner)
 
@@ -168,8 +173,9 @@ CREATE TABLE orgs (
   name          TEXT,
   email         TEXT UNIQUE,
   plan          TEXT DEFAULT 'free',   -- 'free' | 'team' | 'enterprise'
-  budget_usd    REAL DEFAULT 0,        -- monthly spend limit
-  created_at    INTEGER               -- unix timestamp
+  budget_usd         REAL DEFAULT 0,      -- monthly spend limit
+  benchmark_opt_in   INTEGER NOT NULL DEFAULT 0,  -- 1 = contributing to anonymized benchmarks
+  created_at         INTEGER              -- unix timestamp
 );
 ```
 
@@ -253,6 +259,8 @@ CREATE TABLE events (
   toxicity_score      REAL,
   efficiency_score    REAL,
   created_at          INTEGER NOT NULL,  -- unix timestamp
+  prompt_hash         TEXT,              -- SHA-256 of prompt (strict/hashed privacy modes)
+  cache_hit           INTEGER NOT NULL DEFAULT 0,  -- 1 if cache_read_input_tokens > 0
   PRIMARY KEY (id, org_id)              -- composite PK (dedup per org)
 );
 ```
@@ -285,6 +293,172 @@ CREATE TABLE alert_configs (
   trigger_anomaly INTEGER DEFAULT 1,   -- fire on cost spike
   trigger_daily   INTEGER DEFAULT 0,   -- daily summary
   updated_at      INTEGER
+);
+```
+
+### 3.7 `cross_platform_usage` — OTel + billing API aggregated usage per developer
+
+Added in migration `0001_cross_platform_usage.sql`. Unified schema for all data sources.
+
+```sql
+CREATE TABLE cross_platform_usage (
+  id              TEXT PRIMARY KEY,
+  org_id          TEXT NOT NULL,
+  source          TEXT NOT NULL,       -- 'otel' | 'copilot' | 'datadog' | 'sdk'
+  provider        TEXT,                -- 'anthropic' | 'openai' | 'google' | 'github_copilot'
+  developer_id    TEXT,                -- opaque UUID (hashed from email)
+  developer_email TEXT,
+  model           TEXT,
+  input_tokens    INTEGER DEFAULT 0,
+  output_tokens   INTEGER DEFAULT 0,
+  cache_tokens    INTEGER DEFAULT 0,
+  cost_usd        REAL DEFAULT 0,
+  commits         INTEGER DEFAULT 0,
+  pull_requests   INTEGER DEFAULT 0,
+  lines_added     INTEGER DEFAULT 0,
+  active_time_s   INTEGER DEFAULT 0,
+  period_date     TEXT,                -- YYYY-MM-DD
+  created_at      TEXT                 -- YYYY-MM-DD HH:MM:SS
+);
+```
+
+### 3.8 `otel_events` — Raw OpenTelemetry events
+
+```sql
+CREATE TABLE otel_events (
+  id              TEXT PRIMARY KEY,
+  org_id          TEXT NOT NULL,
+  service_name    TEXT,
+  event_type      TEXT,                -- 'api_request' | 'tool_result' | 'user_prompt'
+  developer_id    TEXT,
+  developer_email TEXT,
+  model           TEXT,
+  input_tokens    INTEGER DEFAULT 0,
+  output_tokens   INTEGER DEFAULT 0,
+  cache_tokens    INTEGER DEFAULT 0,
+  cost_usd        REAL DEFAULT 0,
+  latency_ms      INTEGER DEFAULT 0,
+  metadata        TEXT,                -- JSON
+  created_at      TEXT                 -- YYYY-MM-DD HH:MM:SS
+);
+```
+
+### 3.9 `provider_connections` — Generic provider connection status
+
+```sql
+CREATE TABLE provider_connections (
+  id          TEXT PRIMARY KEY,
+  org_id      TEXT NOT NULL,
+  provider    TEXT NOT NULL,           -- 'copilot' | 'datadog' | 'gemini' | etc.
+  status      TEXT DEFAULT 'pending',  -- 'active' | 'error' | 'pending'
+  last_sync   TEXT,
+  last_error  TEXT,
+  config      TEXT,                    -- JSON (non-sensitive config only)
+  created_at  TEXT
+);
+```
+
+### 3.10 `budget_policies` — Cross-platform budget rules
+
+```sql
+CREATE TABLE budget_policies (
+  id              TEXT PRIMARY KEY,
+  org_id          TEXT NOT NULL,
+  scope           TEXT NOT NULL,       -- 'org' | 'team' | 'developer'
+  scope_value     TEXT,                -- team name or developer_id (NULL for org-wide)
+  budget_usd      REAL NOT NULL,
+  period          TEXT DEFAULT 'month',-- 'day' | 'week' | 'month'
+  enforcement     TEXT DEFAULT 'alert',-- 'alert' | 'block'
+  created_at      TEXT
+);
+```
+
+### 3.11 `audit_events` — Admin action log
+
+```sql
+CREATE TABLE audit_events (
+  id           TEXT PRIMARY KEY,
+  org_id       TEXT NOT NULL,
+  actor_id     TEXT,
+  actor_email  TEXT,
+  action       TEXT NOT NULL,          -- 'member.invited' | 'key.rotated' | 'budget.changed' | etc.
+  target_id    TEXT,
+  target_type  TEXT,
+  metadata     TEXT,                   -- JSON
+  event_type   TEXT,                   -- coarse category: 'auth' | 'admin' | 'billing'
+  created_at   TEXT
+);
+```
+
+### 3.12 `benchmark_cohorts` — Size band + industry cohorts
+
+```sql
+CREATE TABLE benchmark_cohorts (
+  id          TEXT PRIMARY KEY,
+  size_band   TEXT NOT NULL,           -- '1-10' | '11-50' | '51-200' | '201-1000' | '1000+'
+  industry    TEXT,
+  description TEXT,
+  created_at  TEXT
+);
+```
+
+### 3.13 `benchmark_snapshots` — Quarterly metric snapshots
+
+```sql
+CREATE TABLE benchmark_snapshots (
+  id                  TEXT PRIMARY KEY,
+  cohort_id           TEXT NOT NULL,   -- FK → benchmark_cohorts.id
+  quarter             TEXT NOT NULL,   -- '2026-Q2' format
+  sample_size         INTEGER DEFAULT 0,
+  cost_per_dev_month  REAL,            -- median USD/developer/month
+  tokens_per_dev_month REAL,
+  cache_hit_rate      REAL,            -- 0.0–1.0
+  model               TEXT,           -- NULL = all models, else specific model
+  created_at          TEXT
+);
+```
+
+### 3.14 `benchmark_contributions` — Per-org contribution to a snapshot
+
+```sql
+CREATE TABLE benchmark_contributions (
+  id           TEXT PRIMARY KEY,
+  org_id       TEXT NOT NULL,
+  snapshot_id  TEXT NOT NULL,          -- FK → benchmark_snapshots.id
+  contributed_at TEXT
+  -- No org-identifying metrics stored here; contribution is a membership record only
+);
+```
+
+### 3.15 `copilot_connections` — GitHub Copilot connection config
+
+```sql
+CREATE TABLE copilot_connections (
+  id          TEXT PRIMARY KEY,
+  org_id      TEXT NOT NULL UNIQUE,
+  github_org  TEXT NOT NULL,
+  status      TEXT DEFAULT 'active',   -- 'active' | 'error' | 'revoked'
+  last_sync   TEXT,
+  last_error  TEXT,
+  created_at  TEXT
+  -- NOTE: The encrypted GitHub token is stored in KV under copilot:token:{orgId}:{githubOrg}
+  -- NEVER stored in D1
+);
+```
+
+### 3.16 `datadog_connections` — Datadog API key (AES-256-GCM encrypted)
+
+```sql
+CREATE TABLE datadog_connections (
+  id          TEXT PRIMARY KEY,
+  org_id      TEXT NOT NULL UNIQUE,
+  dd_site     TEXT NOT NULL,           -- 'datadoghq.com' | 'datadoghq.eu' | etc.
+  api_key_enc TEXT NOT NULL,           -- AES-256-GCM encrypted key (hex)
+  api_key_iv  TEXT NOT NULL,           -- GCM IV (hex)
+  status      TEXT DEFAULT 'active',
+  last_sync   TEXT,
+  last_error  TEXT,
+  created_at  TEXT
 );
 ```
 
@@ -457,11 +631,11 @@ Algorithm:
   SELECT COUNT(*) FROM events
   WHERE org_id = ? AND created_at >= strftime('%s', 'now', 'start of month')
 
-  if plan == 'free' AND current_count + new_events > 10000:
+  if plan == 'free' AND current_count + new_events > 50000:
     return 429 {
       error: "Free tier limit reached",
       events_used: N,
-      events_limit: 10000,
+      events_limit: 50000,
       upgrade_url: "https://vantageaiops.com/signup.html"
     }
 ```
@@ -1072,6 +1246,24 @@ done
 exit 1
 ```
 
+### 14.3.1 Active Test Suites (32–41)
+
+In addition to the legacy suites 01–13 and OTel/cross-platform suites 17–27, the following suites are active:
+
+| Suite | Directory | Coverage |
+|---|---|---|
+| 32 | `32_audit_log` | Audit event creation, pagination, role guard |
+| 33 | `33_frontend_contract` | API shape contract checks for all frontend-consumed endpoints |
+| 34 | `34_vega_chatbot` | Chatbot/recommendations widget API |
+| 35 | `35_cross_platform_console` | Cross-platform console all 8 endpoints |
+| 35b | `35_recommendations` | Recommendations engine API |
+| 36 | `36_semantic_cache` | Semantic cache hit/miss + prompt_hash dedup |
+| 37 | `37_all_dashboard_cards` | All dashboard card data shapes |
+| 38 | `38_security_hardening` | OWASP top-10 guards, injection, CORS |
+| 39 | `39_copilot_adapter` | Copilot connect/disconnect/sync flow |
+| 40 | `40_benchmark` | Benchmark contribute, percentiles, k-anonymity floor |
+| 41 | `41_datadog_exporter` | Datadog connect, encrypt/decrypt, sync |
+
 ### 14.4 Required GitHub Secrets
 
 | Secret | Purpose | Where to Get |
@@ -1605,6 +1797,26 @@ npx wrangler d1 execute vantage-events --file ./migrations/0002_add_anomaly_scor
 
 Always use `IF NOT EXISTS` and `IF NOT EXISTS` for safety. D1 has no rollback — test on preview first.
 
+### 19.5.1 Migration File Registry
+
+All applied migrations in order:
+
+| File | Description |
+|---|---|
+| `0001_cross_platform_usage.sql` | Creates `cross_platform_usage`, `otel_events`, `provider_connections`, `budget_policies` tables |
+| `0003_audit_events.sql` | Creates `audit_events` table |
+| `0004_audit_event_type.sql` | `ALTER TABLE audit_events ADD COLUMN event_type TEXT` |
+| `0005_otel_traces.sql` | Creates `otel_traces` table |
+| `0006_otel_sessions.sql` | Creates `otel_sessions` table |
+| `0007_prompt_hash.sql` | `ALTER TABLE events ADD COLUMN prompt_hash TEXT` and `cache_hit INTEGER NOT NULL DEFAULT 0` |
+| `0008_benchmark_opt_in.sql` | `ALTER TABLE orgs ADD COLUMN benchmark_opt_in INTEGER NOT NULL DEFAULT 0` |
+| `0009_copilot_connections.sql` | Creates `copilot_connections` table |
+| `0010_platform_tables.sql` | Creates `platform_pageviews`, `platform_sessions`, `benchmark_cohorts`, `benchmark_snapshots`, `benchmark_contributions` tables |
+| `0011_benchmark_snapshots.sql` | Adds additional indexes on `benchmark_snapshots` |
+| `0012_datadog_connections.sql` | Creates `datadog_connections` table |
+| `0013_schema_fixes.sql` | Additional indexes and schema fixes |
+| `0014_drop_copilot_kv_key.sql` | Removes `kv_key` column from `copilot_connections` (token moved to KV-only) |
+
 ### 19.6 SQLite Date Format (Critical)
 
 All date comparisons in cross-platform queries use SQLite-native format: `YYYY-MM-DD HH:MM:SS` (space separator, no T, no Z). This is because `datetime('now')` in SQLite produces this format.
@@ -1734,6 +1946,9 @@ All date comparisons in cross-platform queries use SQLite-native format: `YYYY-M
 ### D1 Database ID
 `a1301c2a-19bf-4fa3-8321-bba5e497de10`
 
+### D1 Database Name
+`vantage-events`
+
 ### KV Namespace ID
 `65b5609ad5b747c9b416632a19529f24`
 
@@ -1742,6 +1957,17 @@ All date comparisons in cross-platform queries use SQLite-native format: `YYYY-M
 
 ### SSE Architecture
 Polling-over-SSE: 2s poll interval, 25s max connection, auto-reconnect
+
+### All D1 Tables
+`orgs`, `org_members`, `sessions`, `events`, `team_budgets`, `alert_configs`, `cross_platform_usage`, `otel_events`, `otel_traces`, `otel_sessions`, `provider_connections`, `budget_policies`, `audit_events`, `copilot_connections`, `datadog_connections`, `benchmark_cohorts`, `benchmark_snapshots`, `benchmark_contributions`, `platform_pageviews`, `platform_sessions`
+
+### Cron Schedule
+- **Benchmark + Copilot sync:** Sundays UTC (`syncBenchmarkContributions()` + Copilot Metrics API poll)
+- **Datadog sync:** Daily UTC (exports last 24h of `cross_platform_usage`)
+
+### Required Wrangler Secrets
+- `RESEND_API_KEY` — email sending
+- `TOKEN_ENCRYPTION_SECRET` — AES-256-GCM key for Copilot/Datadog token encryption (**throws on startup if missing — no silent fallback**)
 
 ---
 
@@ -2780,6 +3006,283 @@ The Security & Governance view in `app.html` shows:
 ---
 
 *Last updated: 7 April 2026 — v2.4 consolidated Python agent (vantage-cli deleted, all features ported to vantageai-agent). 273 agent tests + 294 backend tests = 567+ total checks.*
+
+---
+
+## 28. GitHub Copilot Metrics Adapter
+
+### Purpose
+
+Polls the GitHub Copilot Metrics API (GA February 2026) to import per-developer seat and usage data into the cross-platform console. This gives teams a unified view of Copilot spend alongside OTel-tracked tool usage — without any developer-side configuration.
+
+### Cost Model
+
+GitHub Copilot is billed at **$19/user/month**. The adapter converts this to a daily per-active-user rate:
+
+```
+$19/user/month ÷ 30 days = ~$0.6333/day per active user
+```
+
+Active users are determined from the GitHub Metrics API response (`active_this_cycle = true`). Inactive seat-holders are not counted as daily cost to avoid inflating spend.
+
+### Token Security
+
+Copilot API tokens are treated as high-sensitivity secrets:
+
+- **Encryption:** AES-256-GCM with a HKDF-SHA-256 derived key per `(orgId, githubOrg)` pair
+- **Storage:** KV only, under key `copilot:token:{orgId}:{githubOrg}` — **NEVER written to D1**
+- **Master secret:** `TOKEN_ENCRYPTION_SECRET` Wrangler secret. If not set, the Worker throws at startup — there is no silent fallback.
+- The `copilot_connections` D1 table stores only non-sensitive config (github_org, status, last_sync). The `kv_key` column was removed in migration `0014_drop_copilot_kv_key.sql`.
+
+### Cron Schedule
+
+The adapter runs on **Sundays UTC** via the Cloudflare Worker cron trigger. It is idempotent:
+
+- **Guard key:** `copilot:sync:{orgId}:{githubOrg}:{YYYY-MM-DD}` in KV with a 25-hour TTL
+- If the guard key exists, the sync is skipped (prevents double-counting on re-runs)
+- Data is written to `cross_platform_usage` with `source='copilot'`
+
+### API Endpoints
+
+All endpoints require the `admin` or `owner` role.
+
+| Method | Path | Body / Description |
+|---|---|---|
+| `POST` | `/v1/copilot/connect` | `{ github_org: string, token: string }` — stores encrypted token in KV, inserts row in `copilot_connections` |
+| `DELETE` | `/v1/copilot/connect` | Removes KV token + deletes row from `copilot_connections` |
+| `GET` | `/v1/copilot/status` | Returns `{ status, github_org, last_sync, last_error }` |
+
+### Data Written
+
+Each sync writes one row per (developer, date) to `cross_platform_usage`:
+
+```json
+{
+  "source": "copilot",
+  "provider": "github_copilot",
+  "developer_email": "dev@company.com",
+  "cost_usd": 0.6333,
+  "period_date": "2026-04-13"
+}
+```
+
+---
+
+## 29. Datadog Metrics Exporter
+
+### Purpose
+
+**PUSH** vantage.ai.* metrics into the customer's own Datadog account. This is additive and non-destructive — it only creates new metrics under the `vantage.ai.*` namespace and never reads or modifies existing Datadog data.
+
+### Metrics Exported
+
+| Metric | Type | Tags |
+|---|---|---|
+| `vantage.ai.cost_usd` | gauge | `provider`, `model`, `developer_id`, `org_id` |
+| `vantage.ai.tokens` | gauge | `provider`, `model`, `developer_id`, `org_id` |
+
+Values are aggregated daily from `cross_platform_usage`.
+
+### API Key Security
+
+Datadog API keys are stored AES-256-GCM encrypted in D1:
+
+- `datadog_connections.api_key_enc` — ciphertext (hex)
+- `datadog_connections.api_key_iv` — GCM IV (hex)
+- Decrypted in-memory at sync time using `TOKEN_ENCRYPTION_SECRET`
+
+### Supported Datadog Sites
+
+| Site | Endpoint |
+|---|---|
+| US1 (default) | `datadoghq.com` |
+| EU1 | `datadoghq.eu` |
+| US3 | `us3.datadoghq.com` |
+| US5 | `us5.datadoghq.com` |
+| AP1 | `ap1.datadoghq.com` |
+| Gov | `ddog-gov.com` |
+
+The `dd_site` column in `datadog_connections` controls which endpoint is used. Any value not in the list returns 400 at connect time.
+
+### Idempotency
+
+A KV guard key prevents double-sending for the same day:
+
+```
+Key:  datadog:last_sync:{orgId}:{YYYY-MM-DD}
+TTL:  23 hours
+```
+
+If the key exists, the sync is skipped. This means the daily cron can be re-run safely.
+
+### Cron Schedule
+
+Runs **daily UTC** via Cloudflare Worker cron. Syncs the last 24 hours of `cross_platform_usage` for each org that has an active `datadog_connections` row.
+
+### API Endpoints
+
+All endpoints require the `admin` or `owner` role.
+
+| Method | Path | Body / Description |
+|---|---|---|
+| `POST` | `/v1/datadog/connect` | `{ dd_site: string, api_key: string }` — encrypts key, inserts row |
+| `DELETE` | `/v1/datadog/connect` | Removes encrypted key + deletes row |
+| `GET` | `/v1/datadog/status` | Returns `{ status, dd_site, last_sync, last_error }` |
+
+---
+
+## 30. Anonymized Benchmark System
+
+### Purpose
+
+Cross-company AI spend benchmarks — entirely opt-in and privacy-preserving. Allows engineering teams to see how their AI spend compares to peers in the same size band and industry, without exposing any org-identifying information.
+
+### Privacy Guarantees
+
+- **k-anonymity floor:** Cohorts with `sample_size < 5` return `404 Not Found` — no data is returned until at least 5 orgs contribute to a cohort. This prevents reverse-engineering individual org data.
+- **No org identifiers in public endpoints:** All public endpoints return only aggregated metrics. Org IDs, names, and emails are never returned.
+- **Contribution is a membership record only:** The `benchmark_contributions` table records that an org contributed to a snapshot but stores no org-specific metrics.
+
+### Metrics Tracked
+
+| Metric | Description |
+|---|---|
+| `cost_per_dev_month` | Median USD spent per active developer per month |
+| `tokens_per_dev_month` | Median tokens consumed per active developer per month |
+| `cache_hit_rate` | Cache hit rate (0.0–1.0), optionally broken out per model |
+
+### Cohort Structure
+
+**Size bands:** `'1-10'`, `'11-50'`, `'51-200'`, `'201-1000'`, `'1000+'`
+
+**Quarter format:** `currentQuarter()` returns strings like `'2026-Q2'` (year + ISO quarter number).
+
+### Snapshot Computation
+
+```sql
+-- Single INNER JOIN GROUP BY query per metric (not N+1 per-org loop)
+SELECT
+  s.cohort_id,
+  COUNT(DISTINCT bc.org_id)    AS sample_size,
+  AVG(cpu.cost_usd / ...)      AS cost_per_dev_month,
+  ...
+FROM benchmark_snapshots s
+INNER JOIN benchmark_contributions bc ON bc.snapshot_id = s.id
+INNER JOIN cross_platform_usage cpu   ON cpu.org_id = bc.org_id
+GROUP BY s.cohort_id, s.quarter
+```
+
+The `syncBenchmarkContributions()` function runs this query on **Sundays UTC** and upserts results into `benchmark_snapshots`.
+
+### API Endpoints
+
+**Public (no auth required):**
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/benchmark/percentiles?model=&metric=` | Returns `{ p25, p50, p75, p90 }` for the requested metric. Returns 404 if `sample_size < 5`. |
+| `GET` | `/v1/benchmark/summary` | Returns available cohorts + metrics overview |
+
+**Auth required:**
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/v1/benchmark/contribute` | Opts the authenticated org in (`benchmark_opt_in = 1`) and immediately triggers a snapshot contribution computation |
+
+---
+
+## 31. Cross-Platform Console
+
+### Purpose
+
+A unified view of **all AI spend** across an organization — OTel telemetry from coding tools, GitHub Copilot billing data, and direct API events. Aggregated from the `cross_platform_usage` table which receives data from all sources.
+
+### Data Sources Aggregated
+
+| Source | Written by |
+|---|---|
+| OTel telemetry | `POST /v1/otel/v1/metrics` and `/v1/otel/v1/logs` |
+| GitHub Copilot | Copilot Metrics Adapter cron (§28) |
+| Datadog-sourced | Not applicable — Datadog exporter is PUSH-only |
+| SDK events (cross-platform view) | Cross-platform query joins `events` + `cross_platform_usage` |
+
+### SQLite Date Format
+
+All queries use `YYYY-MM-DD HH:MM:SS` (space separator, no T, no Z). Helper functions in `crossplatform.ts`:
+- `sqliteDateSince(days)` — N days ago
+- `sqliteTodayStart()` — today at 00:00:00
+- `sqliteMonthStart()` — first of current month
+
+### API Endpoints
+
+All endpoints require authentication (any role).
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/cross-platform/summary?days=N` | Total spend by provider + tool type. `days` must be 7, 30, or 90. |
+| `GET` | `/v1/cross-platform/developers?days=N` | Per-developer spend table with ROI metrics. `developer_email` redacted to `u***@domain.com` for non-admin roles. |
+| `GET` | `/v1/cross-platform/trend?days=N` | Daily cost per provider for stacked area chart. Full calendar spine (zero-filled days included). |
+| `GET` | `/v1/cross-platform/developer/:id?days=N` | Single developer drill-down. Admin/owner: any developer. Member/viewer: self only (403 otherwise). |
+| `GET` | `/v1/cross-platform/live?limit=N` | Last N OTel events (default 50). `developer_email` redacted for non-admin. |
+| `GET` | `/v1/cross-platform/models?days=N` | Cost by model across all providers and sources. |
+| `GET` | `/v1/cross-platform/connections` | Provider connection status (copilot + datadog). `last_error` stripped for non-admin. |
+| `GET` | `/v1/cross-platform/budget?days=N` | Budget policies from `budget_policies` + current spend from `cross_platform_usage`. |
+
+**Parameter validation:** `?days=` accepts only `7`, `30`, or `90`. Any other value returns `400 Bad Request`.
+
+---
+
+## 32. Audit Log
+
+### Purpose
+
+An immutable log of all admin actions — member management, API key rotations, configuration changes, and budget modifications. Enables compliance review and incident investigation.
+
+### Schema
+
+```sql
+CREATE TABLE audit_events (
+  id           TEXT PRIMARY KEY,       -- UUID
+  org_id       TEXT NOT NULL,
+  actor_id     TEXT,                   -- member ID or 'owner'
+  actor_email  TEXT,
+  action       TEXT NOT NULL,          -- e.g. 'member.invited', 'key.rotated', 'budget.changed'
+  target_id    TEXT,                   -- ID of the affected resource
+  target_type  TEXT,                   -- 'member' | 'org' | 'budget_policy' | 'alert_config'
+  metadata     TEXT,                   -- JSON blob with action-specific details
+  event_type   TEXT,                   -- coarse category: 'auth' | 'admin' | 'billing'
+  created_at   TEXT                    -- YYYY-MM-DD HH:MM:SS
+);
+```
+
+### API Endpoint
+
+```
+GET /v1/audit/log?limit=50&offset=0
+```
+
+- **Auth:** `admin` or `owner` role required (403 for `member` and `viewer`)
+- **Response:** `{ events: AuditEvent[], total: number }`
+- **Pagination:** `limit` (max 200) + `offset`
+
+### Written By
+
+Audit events are created by the following routes (using `waitUntil` for non-blocking writes):
+
+| Route | Action logged |
+|---|---|
+| `POST /v1/auth/members` | `member.invited` |
+| `DELETE /v1/auth/members/:id` | `member.removed` |
+| `POST /v1/auth/members/:id/rotate` | `key.rotated` (member) |
+| `POST /v1/auth/rotate` | `key.rotated` (owner) |
+| `POST /v1/alerts/slack/:orgId` | `alert.configured` |
+| `PUT /v1/admin/team-budgets/:team` | `budget.changed` |
+| `POST /v1/copilot/connect` | `copilot.connected` |
+| `DELETE /v1/copilot/connect` | `copilot.disconnected` |
+| `POST /v1/datadog/connect` | `datadog.connected` |
+| `DELETE /v1/datadog/connect` | `datadog.disconnected` |
+
+---
 
 ## CLI Agent Configuration
 

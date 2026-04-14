@@ -484,6 +484,14 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
   color: var(--text-primary);
 }
 
+.modal-close {
+  position: absolute; top: 12px; right: 12px;
+  background: none; border: none; color: var(--text-muted);
+  font-size: 22px; line-height: 1; cursor: pointer; padding: 4px 8px;
+  border-radius: var(--radius); transition: color 0.15s, background 0.15s;
+}
+.modal-close:hover { color: var(--text-primary); background: var(--bg-hover); }
+
 /* ── Form elements ── */
 .form-group { margin-bottom: 14px; }
 
@@ -1693,6 +1701,10 @@ function populateUserFromSession(s) {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function nav(view, btn) {
+  // Tear down SSE when leaving overview to avoid idle connections
+  if (activeView === 'overview' && view !== 'overview') {
+    if (_sseSource) { _sseSource.close(); _sseSource = null; }
+  }
   activeView = view;
   document.querySelectorAll('button.sb-item').forEach(function(b) { b.classList.remove('active'); });
   if (btn) btn.classList.add('active');
@@ -1813,7 +1825,15 @@ function loadOverview() {
       var budgetPct = Math.min(100, (budgetSpend / budgetLimit * 100)).toFixed(0);
       document.getElementById('kpiBudgetPct').textContent = budgetPct + '%';
       document.getElementById('kpiBudgetFill').style.width = budgetPct + '%';
-      document.getElementById('kpiBudgetSub').textContent = fmt(budgetLimit - budgetSpend) + ' remaining';
+      var remaining = budgetLimit - budgetSpend;
+      var budgetSubEl = document.getElementById('kpiBudgetSub');
+      if (remaining < 0) {
+        budgetSubEl.textContent = 'Exceeded by ' + fmt(Math.abs(remaining));
+        budgetSubEl.style.color = 'var(--accent-red, #f87171)';
+      } else {
+        budgetSubEl.textContent = fmt(remaining) + ' remaining';
+        budgetSubEl.style.color = '';
+      }
     } else {
       document.getElementById('kpiBudgetPct').textContent = 'N/A';
       document.getElementById('kpiBudgetSub').textContent = 'No budget set';
@@ -2810,7 +2830,13 @@ function showInviteModal() {
 }
 
 function closeModal(id) {
-  document.getElementById(id).classList.remove('active');
+  var el = document.getElementById(id);
+  el.classList.remove('active');
+  // Reset all form fields so stale data doesn't persist on reopen
+  el.querySelectorAll('input, select, textarea').forEach(function(f) {
+    if (f.type === 'checkbox' || f.type === 'radio') f.checked = false;
+    else f.value = '';
+  });
 }
 
 function inviteMember() {
@@ -3407,14 +3433,17 @@ function loadIntegrations() {
 
 function loadAccount() {
   apiFetch('/v1/admin/overview').catch(function() { return null; }).then(function(overview) {
-    if (overview) {
-      var used = (overview.org && overview.org.events_this_month) || overview.events_used || overview.event_count || 0;
-      var limit = (overview.org && overview.org.events_limit) || overview.events_limit || overview.plan_limit || 0;
-      document.getElementById('accountEventsUsed').textContent = fmtNum(used);
-      document.getElementById('accountEventsLimit').textContent = limit > 0 ? fmtNum(limit) : 'Unlimited';
-      if (limit > 0) {
-        document.getElementById('accountUsageFill').style.width = Math.min(100, (used / limit * 100)).toFixed(0) + '%';
-      }
+    if (!overview) {
+      document.getElementById('accountEventsUsed').textContent = '—';
+      document.getElementById('accountEventsLimit').textContent = 'Failed to load';
+      return;
+    }
+    var used = (overview.org && overview.org.events_this_month) || overview.events_used || overview.event_count || 0;
+    var limit = (overview.org && overview.org.events_limit) || overview.events_limit || overview.plan_limit || 0;
+    document.getElementById('accountEventsUsed').textContent = fmtNum(used);
+    document.getElementById('accountEventsLimit').textContent = limit > 0 ? fmtNum(limit) : 'Unlimited';
+    if (limit > 0) {
+      document.getElementById('accountUsageFill').style.width = Math.min(100, (used / limit * 100)).toFixed(0) + '%';
     }
   });
 }
@@ -3620,10 +3649,16 @@ function loadConnectedTools() {
   });
 })();
 
-// Close modals on overlay click
+// Close modals on overlay click or Escape key
 document.querySelectorAll('.modal-overlay').forEach(function(overlay) {
   overlay.addEventListener('click', function(e) {
-    if (e.target === overlay) overlay.classList.remove('active');
+    if (e.target === overlay) closeModal(overlay.id);
+  });
+});
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Escape') return;
+  document.querySelectorAll('.modal-overlay.active').forEach(function(m) {
+    closeModal(m.id);
   });
 });
 </script>

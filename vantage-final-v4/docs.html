@@ -224,6 +224,7 @@ pre{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;pad
       <a class="docs-nav-item" onclick="show('copilot-api',this)">GitHub Copilot</a>
       <a class="docs-nav-item" onclick="show('datadog-api',this)">Datadog Export</a>
       <a class="docs-nav-item" onclick="show('benchmark-api',this)">Benchmark Data</a>
+      <a class="docs-nav-item" onclick="show('audit-log',this)">Audit Log</a>
     </div>
 
     <div class="docs-nav-group">
@@ -1629,48 +1630,159 @@ otlp_endpoint = "https://api.vantageaiops.com/v1/otel"</pre>
 
 "xp-api": `
 <h1>Cross-Platform API Reference</h1>
-<p>Query aggregated data from all connected AI tools. All endpoints require <code>Authorization: Bearer vnt_your_key</code>.</p>
+<p>Query aggregated data from all connected AI tools. All endpoints require <code>Authorization: Bearer vnt_your_key</code>. All responses are <code>Content-Type: application/json</code>. Errors return <code>{"error": "message"}</code> with an appropriate HTTP status code.</p>
 
 <h2>GET /v1/cross-platform/summary</h2>
-<p>Total spend across all platforms with provider and source breakdown.</p>
+<p>Total spend across all platforms with provider and tool-type breakdown.</p>
+<table class="api-table">
+<thead><tr><th>Auth</th><th>Query params</th></tr></thead>
+<tbody><tr><td>Bearer token</td><td><code>?period=30</code> — look-back window in days (default 30)</td></tr></tbody>
+</table>
 <pre>curl -H "Authorization: Bearer vnt_your_key" \\
-  https://api.vantageaiops.com/v1/cross-platform/summary?days=30</pre>
-<p>Response: <code>{ total_cost_usd, total_input_tokens, total_output_tokens, by_provider: [...], budget: {...} }</code></p>
-
-<h2>GET /v1/cross-platform/trend</h2>
-<p>Daily cost per provider for the stacked area chart. Returns a full calendar spine — all N days included even if spend is zero.</p>
-<pre>curl -H "Authorization: Bearer vnt_your_key" \
-  https://api.vantageaiops.com/v1/cross-platform/trend?days=30</pre>
-<p>Response: <code>{ period_days, days: ["2026-03-01", ...], providers: [...], series: [{ provider, data: [0.12, ...] }] }</code></p>
-<p><strong>Valid <code>days</code> values:</strong> <code>7</code>, <code>30</code>, <code>90</code>. Any other value returns 400.</p>
+  "https://api.vantageaiops.com/v1/cross-platform/summary?period=30"</pre>
+<p><strong>Response 200</strong></p>
+<pre>{
+  "total_cost_usd": 142.38,
+  "total_tokens": 18240000,
+  "total_requests": 4821,
+  "by_provider": [
+    { "provider": "anthropic", "cost_usd": 89.10, "tokens": 11200000 },
+    { "provider": "openai",    "cost_usd": 53.28, "tokens":  7040000 }
+  ],
+  "by_tool_type": [
+    { "tool_type": "claude_code", "cost_usd": 72.00 },
+    { "tool_type": "sdk",         "cost_usd": 70.38 }
+  ]
+}</pre>
 
 <h2>GET /v1/cross-platform/developers</h2>
-<p>Per-developer spend table with ROI metrics.</p>
+<p>Per-developer spend with provider breakdown. <code>developer_email</code> is redacted (<code>u***@domain.com</code>) for non-admin roles.</p>
+<table class="api-table">
+<thead><tr><th>Auth</th><th>Query params</th></tr></thead>
+<tbody><tr><td>Bearer token</td><td><code>?period=30</code></td></tr></tbody>
+</table>
 <pre>curl -H "Authorization: Bearer vnt_your_key" \\
-  https://api.vantageaiops.com/v1/cross-platform/developers?days=30</pre>
-<p>Response: <code>{ developers: [{ developer_id, developer_email, total_cost, commits, pull_requests, lines_added, cost_per_pr, providers, by_provider, ... }] }</code></p>
-<p><strong>Note:</strong> <code>developer_email</code> is redacted (<code>u***@domain.com</code>) for non-admin roles. Rows without a <code>developer_id</code> (legacy OTel-only events) are included with <code>developer_id: null</code>.</p>
+  "https://api.vantageaiops.com/v1/cross-platform/developers?period=30"</pre>
+<p><strong>Response 200</strong></p>
+<pre>{
+  "developers": [
+    {
+      "developer_email": "alice@acme.com",
+      "developer_id": "dev_uuid_here",
+      "total_cost_usd": 28.40,
+      "total_tokens": 3500000,
+      "providers": ["anthropic", "openai"]
+    }
+  ]
+}</pre>
 
-<h2>GET /v1/cross-platform/developer/:id</h2>
-<p>Single developer drill-down by internal UUID. Returns per-provider cost, per-model cost, daily trend, and productivity stats.</p>
-<pre>curl -H "Authorization: Bearer vnt_your_key" \
-  "https://api.vantageaiops.com/v1/cross-platform/developer/&lt;uuid&gt;?days=30"</pre>
-<p><code>:id</code> is the <code>developer_id</code> UUID from the <code>/developers</code> list. Admin/owner may query any developer; member/viewer may only query their own ID (403 otherwise).</p>
-<p>Response: <code>{ developer_id, developer_email, by_provider: [...], by_model: [...], daily_trend: [...], productivity: {...} }</code></p>
+<h2>GET /v1/cross-platform/trend</h2>
+<p>Daily cost time series by provider — use for stacked area / bar charts. Returns a full calendar spine; zero-spend days are included.</p>
+<table class="api-table">
+<thead><tr><th>Auth</th><th>Query params</th></tr></thead>
+<tbody><tr><td>Bearer token</td><td><code>?period=30</code> — valid values: <code>7</code>, <code>30</code>, <code>90</code>. Any other value returns 400.</td></tr></tbody>
+</table>
+<pre>curl -H "Authorization: Bearer vnt_your_key" \\
+  "https://api.vantageaiops.com/v1/cross-platform/trend?period=30"</pre>
+<p><strong>Response 200</strong></p>
+<pre>{
+  "period_days": 30,
+  "days": ["2026-03-16", "2026-03-17", "..."],
+  "providers": ["anthropic", "openai"],
+  "series": [
+    { "provider": "anthropic", "data": [4.20, 3.85, 0.00, "..."] },
+    { "provider": "openai",    "data": [1.10, 2.30, 0.00, "..."] }
+  ]
+}</pre>
 
 <h2>GET /v1/cross-platform/live</h2>
-<p>Latest OTel events for real-time dashboard feed.</p>
+<p>Last 50 OTel events for the real-time activity feed. Includes provider, model, cost, tokens, and developer email per event.</p>
+<table class="api-table">
+<thead><tr><th>Auth</th><th>Role required</th></tr></thead>
+<tbody><tr><td>Bearer token</td><td>Any member</td></tr></tbody>
+</table>
 <pre>curl -H "Authorization: Bearer vnt_your_key" \\
-  https://api.vantageaiops.com/v1/cross-platform/live?limit=50</pre>
+  https://api.vantageaiops.com/v1/cross-platform/live</pre>
+<p><strong>Response 200</strong></p>
+<pre>{
+  "events": [
+    {
+      "id": "evt_abc123",
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6",
+      "cost_usd": 0.0042,
+      "input_tokens": 1200,
+      "output_tokens": 340,
+      "developer_email": "alice@acme.com",
+      "created_at": "2026-04-14 09:23:11"
+    }
+  ]
+}</pre>
 
 <h2>GET /v1/cross-platform/models</h2>
-<p>Cost by model across all providers.</p>
+<p>Cost and token totals per model across all providers.</p>
+<table class="api-table">
+<thead><tr><th>Auth</th><th>Query params</th></tr></thead>
+<tbody><tr><td>Bearer token</td><td><code>?period=30</code></td></tr></tbody>
+</table>
+<pre>curl -H "Authorization: Bearer vnt_your_key" \\
+  "https://api.vantageaiops.com/v1/cross-platform/models?period=30"</pre>
+<p><strong>Response 200</strong></p>
+<pre>{
+  "models": [
+    { "model": "claude-sonnet-4-6", "provider": "anthropic", "cost_usd": 64.20, "total_tokens": 8100000 },
+    { "model": "gpt-4o",            "provider": "openai",    "cost_usd": 53.28, "total_tokens": 7040000 }
+  ]
+}</pre>
 
 <h2>GET /v1/cross-platform/connections</h2>
-<p>OTel source freshness and billing API connection status.</p>
+<p>List all provider connections with their sync status. Admin/owner role receives full connection details including <code>last_error</code>; other roles receive a summary view.</p>
+<table class="api-table">
+<thead><tr><th>Auth</th><th>Role required</th></tr></thead>
+<tbody><tr><td>Bearer token</td><td>Any (admin/owner for full details)</td></tr></tbody>
+</table>
+<pre>curl -H "Authorization: Bearer vnt_your_key" \\
+  https://api.vantageaiops.com/v1/cross-platform/connections</pre>
+<p><strong>Response 200</strong></p>
+<pre>{
+  "copilot_connections": [
+    {
+      "github_org": "acme-corp",
+      "status": "active",
+      "last_synced_at": "2026-04-14 06:00:00"
+    }
+  ],
+  "datadog_connections": [
+    {
+      "site": "datadoghq.com",
+      "status": "active",
+      "last_synced_at": "2026-04-14 06:00:00"
+    }
+  ]
+}</pre>
 
 <h2>GET /v1/cross-platform/budget</h2>
-<p>Budget policies and current spend per org/team/developer.</p>
+<p>Active budget policies with current spend vs. configured limits.</p>
+<table class="api-table">
+<thead><tr><th>Auth</th><th>Role required</th></tr></thead>
+<tbody><tr><td>Bearer token</td><td>Any member</td></tr></tbody>
+</table>
+<pre>curl -H "Authorization: Bearer vnt_your_key" \\
+  https://api.vantageaiops.com/v1/cross-platform/budget</pre>
+<p><strong>Response 200</strong></p>
+<pre>{
+  "policies": [
+    {
+      "id": "pol_xyz",
+      "scope": "org",
+      "limit_usd": 500.00,
+      "current_spend_usd": 142.38,
+      "percent_used": 28.5,
+      "alert_thresholds": [50, 80, 100],
+      "reset_day": 1
+    }
+  ]
+}</pre>
 
 <h2>POST /v1/otel/v1/metrics</h2>
 <p>OTLP metrics ingestion endpoint. Accepts standard OTLP HTTP/JSON format.</p>
@@ -1681,6 +1793,74 @@ otlp_endpoint = "https://api.vantageaiops.com/v1/otel"</pre>
 
 <h2>POST /v1/otel/v1/logs</h2>
 <p>OTLP logs/events ingestion. Accepts api_request, tool_result, user_prompt events.</p>
+`,
+
+'audit-log': `
+<h1>Audit Log</h1>
+<p>Immutable log of administrative and security-sensitive actions taken within an organisation. Use this for compliance, access reviews, and change tracking. All timestamps are UTC in <code>YYYY-MM-DD HH:MM:SS</code> format.</p>
+
+<div class="warn-box"><strong>Admin/owner only.</strong> This endpoint returns 403 for <code>member</code> and <code>viewer</code> roles.</div>
+
+<h2>GET /v1/audit/log</h2>
+<p>Returns paginated audit events ordered newest-first.</p>
+<table class="api-table">
+<thead><tr><th>Auth</th><th>Role required</th></tr></thead>
+<tbody><tr><td>Bearer token</td><td><code>admin</code> or <code>owner</code></td></tr></tbody>
+</table>
+<pre>curl "https://api.vantageaiops.com/v1/audit/log?limit=50&amp;offset=0" \\
+  -H "Authorization: Bearer vnt_your_key"</pre>
+
+<h3>Query parameters</h3>
+<table class="api-table">
+<thead><tr><th>Param</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>limit</code></td><td>50</td><td>Number of events to return (max 200)</td></tr>
+<tr><td><code>offset</code></td><td>0</td><td>Pagination offset</td></tr>
+</tbody>
+</table>
+
+<h3>Response 200</h3>
+<pre>{
+  "events": [
+    {
+      "id": "aud_01hx...",
+      "actor_email": "admin@acme.com",
+      "action": "member.invite",
+      "target_type": "member",
+      "target_id": "usr_uuid",
+      "event_type": "member_invite",
+      "created_at": "2026-04-14 09:15:00",
+      "metadata": { "invited_email": "new@acme.com", "role": "member" }
+    }
+  ],
+  "total": 142,
+  "limit": 50,
+  "offset": 0
+}</pre>
+
+<h3>event_type values</h3>
+<table class="api-table">
+<thead><tr><th>event_type</th><th>Triggered by</th></tr></thead>
+<tbody>
+<tr><td><code>admin_action</code></td><td>Any privileged change made by an admin or owner</td></tr>
+<tr><td><code>key_rotation</code></td><td>API key created, revoked, or rotated</td></tr>
+<tr><td><code>member_invite</code></td><td>A new member was invited to the org</td></tr>
+<tr><td><code>member_remove</code></td><td>A member was removed from the org</td></tr>
+<tr><td><code>budget_change</code></td><td>Budget policy created, updated, or deleted</td></tr>
+<tr><td><code>alert_config</code></td><td>Alert thresholds or notification channels changed</td></tr>
+</tbody>
+</table>
+
+<h3>Errors</h3>
+<table class="api-table">
+<thead><tr><th>Status</th><th>Cause</th></tr></thead>
+<tbody>
+<tr><td>401</td><td>Missing or invalid Bearer token</td></tr>
+<tr><td>403</td><td>Authenticated role is <code>member</code> or <code>viewer</code></td></tr>
+<tr><td>400</td><td><code>limit</code> exceeds 200 or <code>offset</code> is negative</td></tr>
+</tbody>
+</table>
+<div class="info-box">Audit log events are write-once and cannot be deleted. Retention is 12 months on all plans.</div>
 `,
 
 'vantage-cli': `
