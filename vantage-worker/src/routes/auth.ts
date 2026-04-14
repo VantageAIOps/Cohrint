@@ -25,18 +25,6 @@ function randomHex(bytes = 8): string {
 
 // ── POST /v1/auth/signup — public, creates org + owner key ───────────────────
 auth.post('/signup', async (c) => {
-  // Rate limit signup: 10 per IP per hour (degrade gracefully if KV unavailable)
-  try {
-    const ip = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For') ?? 'unknown';
-    const rlKey = `rl:signup:${ip}`;
-    const count = parseInt(await c.env.KV.get(rlKey) ?? '0', 10);
-    if (count >= 10) {
-      const retryAfter = 3600; // TTL is fixed at 3600s; remaining unknown without stored timestamp
-      return c.json({ error: 'Too many signup attempts. Try again later.' }, 429, { 'Retry-After': String(retryAfter) });
-    }
-    await c.env.KV.put(rlKey, String(count + 1), { expirationTtl: 3600 });
-  } catch { /* KV unavailable — allow signup to proceed */ }
-
   let body: { email?: string; name?: string; org?: string };
   try { body = await c.req.json(); }
   catch { return c.json({ error: 'Invalid JSON body' }, 400); }
