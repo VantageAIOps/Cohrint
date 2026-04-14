@@ -412,7 +412,7 @@ POST /v1/events
 2. Viewer role block (403 if viewer)
 3. checkFreeTierLimit()
    → SELECT COUNT(*) FROM events WHERE org_id=? AND created_at >= start_of_month
-   → If free plan AND count+1 > 10,000 → 429 with upgrade message
+   → If free plan AND count+1 > 50,000 → 429 with upgrade message
 4. Field normalization (buildInsertStmt):
    → Accept both SDK field names (usage_prompt_tokens) and canonical names (prompt_tokens)
    → Accept both cost_total_usd and total_cost_usd
@@ -451,7 +451,7 @@ The SDK versions differ in field naming. The ingest handler accepts all variants
 ### 5.4 Free Tier Enforcement
 
 ```
-FREE_TIER_LIMIT = 10,000 events/month
+FREE_TIER_LIMIT = 50,000 events/month
 
 Algorithm:
   SELECT COUNT(*) FROM events
@@ -1456,7 +1456,7 @@ For enterprise customers running self-hosted models (Llama on GPU): predict when
 
 | Feature | Free | Team ($99/mo) | Enterprise (custom) |
 |---|---|---|---|
-| Events/month | 10,000 | Unlimited | Unlimited |
+| Events/month | 50,000 | Unlimited | Unlimited |
 | Members | — | Up to 10 | Unlimited |
 | Team scoping | — | ✓ | ✓ |
 | Budget alerts | — | ✓ | ✓ |
@@ -1711,7 +1711,7 @@ All date comparisons in cross-platform queries use SQLite-native format: `YYYY-M
 `owner` > `admin` > `member` > `viewer`
 
 ### Free Tier
-10,000 events/calendar-month per org
+50,000 events/calendar-month per org
 
 ### Rate Limit
 1,000 requests/minute/org (configurable via `RATE_LIMIT_RPM`)
