@@ -286,6 +286,48 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:2px 7p
         <strong>Critical distinction:</strong> Your application calls the AI provider directly — VantageAI is never in the network path between your code and the provider. In SDK and OTel modes, the SDK reads token counts and cost from the response object in-process, then queues a metadata event asynchronously. Your production traffic is unaffected by VantageAI's availability.
       </div>
     </div>
+
+    <!-- Claude Code Hook sub-section -->
+    <div style="margin-top:40px;">
+      <div style="font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:12px;">Claude Code Hook — additional isolation guarantee</div>
+      <div class="arch-wrap">
+        <div class="arch-flow" style="justify-content:flex-start;gap:0;">
+          <div class="arch-node">
+            <div class="arch-node-label">Claude Code</div>
+            <div class="arch-node-name">Session JSONL</div>
+            <div class="arch-node-sub">~/.claude/projects/</div>
+          </div>
+
+          <div class="arch-arrow">
+            <div class="arch-arrow-line"></div>
+            <div class="arch-arrow-label">local file read</div>
+            <div class="arch-arrow-sub">no network call</div>
+          </div>
+
+          <div class="arch-node highlight">
+            <div class="arch-node-label">Stop Hook</div>
+            <div class="arch-node-name">vantage-track.js</div>
+            <div class="arch-node-sub">runs after session ends</div>
+          </div>
+
+          <div class="arch-arrow">
+            <div class="arch-arrow-line"></div>
+            <div class="arch-arrow-label">metadata only</div>
+            <div class="arch-arrow-sub">tokens · cost · model</div>
+          </div>
+
+          <div class="arch-node">
+            <div class="arch-node-label">VantageAI API</div>
+            <div class="arch-node-name">/v1/events/batch</div>
+            <div class="arch-node-sub">async · non-blocking</div>
+          </div>
+        </div>
+
+        <div class="arch-note" style="margin-top:20px;">
+          <strong>Strongest isolation mode:</strong> The Stop hook reads files that Claude Code already wrote to disk — it never touches your network traffic, your Anthropic API key, or your prompt content. The JSONL files contain full conversation history, but the hook only reads <code style="font-family:var(--mono);font-size:12px;color:var(--accent)">entry.message.usage</code> (token counts) and <code style="font-family:var(--mono);font-size:12px;color:var(--accent)">entry.message.model</code> from assistant entries. All other fields (<code style="font-family:var(--mono);font-size:12px;color:var(--dim)">messages</code>, <code style="font-family:var(--mono);font-size:12px;color:var(--dim)">content</code>, <code style="font-family:var(--mono);font-size:12px;color:var(--dim)">tool_use</code>) are never accessed. Client-side deduplication uses a local state file (<code style="font-family:var(--mono);font-size:12px;color:var(--dim)">~/.claude/vantage-state.json</code>) — this file is never uploaded.
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- WHAT WE SEE -->
@@ -302,15 +344,15 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:2px 7p
         </div>
         <div class="payload-body">
 <pre>{
-  <span class="json-key">"model"</span>: <span class="json-str">"gpt-4o"</span>,
-  <span class="json-key">"input_tokens"</span>: <span class="json-val">1842</span>,
-  <span class="json-key">"output_tokens"</span>: <span class="json-val">394</span>,
-  <span class="json-key">"latency_ms"</span>: <span class="json-val">1203</span>,
-  <span class="json-key">"cost_usd"</span>: <span class="json-val">0.00284</span>,
+  <span class="json-key">"model"</span>: <span class="json-str">"claude-sonnet-4-6"</span>,
+  <span class="json-key">"prompt_tokens"</span>: <span class="json-val">1842</span>,
+  <span class="json-key">"completion_tokens"</span>: <span class="json-val">394</span>,
+  <span class="json-key">"cache_tokens"</span>: <span class="json-val">210</span>,
+  <span class="json-key">"total_cost_usd"</span>: <span class="json-val">0.00284</span>,
   <span class="json-key">"timestamp"</span>: <span class="json-str">"2026-04-14T09:41:00Z"</span>,
-  <span class="json-key">"org_id"</span>: <span class="json-str">"org_8f3a..."</span>,
-  <span class="json-key">"developer_id"</span>: <span class="json-str">"dev_a1b2..."</span>,
-  <span class="json-key">"tool"</span>: <span class="json-str">"claude-code"</span>
+  <span class="json-key">"agent_name"</span>: <span class="json-str">"claude-code"</span>,
+  <span class="json-key">"event_id"</span>: <span class="json-str">"sess_abc-msg_xyz"</span>,
+  <span class="json-key">"tags"</span>: { <span class="json-key">"tool"</span>: <span class="json-str">"claude-code"</span> }
 }</pre>
         </div>
       </div>
@@ -322,12 +364,12 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:2px 7p
         </div>
         <div class="payload-body">
 <pre>{
-  <span class="json-key">"messages"</span>: <span class="json-null">// your prompt content</span>,
-  <span class="json-key">"system"</span>: <span class="json-null">// system prompt</span>,
-  <span class="json-key">"response"</span>: <span class="json-null">// model response text</span>,
-  <span class="json-key">"api_key"</span>: <span class="json-null">// provider API keys</span>,
-  <span class="json-key">"function_args"</span>: <span class="json-null">// tool call payloads</span>,
-  <span class="json-key">"file_contents"</span>: <span class="json-null">// files in context</span>,
+  <span class="json-key">"messages"</span>: <span class="json-null">// prompt + response text</span>,
+  <span class="json-key">"system"</span>: <span class="json-null">// system prompt / CLAUDE.md</span>,
+  <span class="json-key">"tool_use"</span>: <span class="json-null">// tool call arguments</span>,
+  <span class="json-key">"api_key"</span>: <span class="json-null">// your Anthropic API key</span>,
+  <span class="json-key">"file_contents"</span>: <span class="json-null">// files in context window</span>,
+  <span class="json-key">"vantage-state.json"</span>: <span class="json-null">// local dedup state</span>,
   <span class="json-key">"user_data"</span>: <span class="json-null">// any PII you process</span>
 }</pre>
         </div>
@@ -517,6 +559,20 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:2px 7p
         <div class="control-title">Budget Policy Enforcement</div>
         <div class="control-desc">Budget policies are enforced server-side — they cannot be bypassed by SDK configuration. When a budget threshold is hit, ingest is blocked at the API layer and a Slack webhook alert is dispatched within one minute.</div>
         <span class="control-tag">server-side enforcement · Slack alerts · 1-min latency</span>
+      </div>
+
+      <div class="control-card">
+        <div class="control-icon">📁</div>
+        <div class="control-title">Claude Code Hook — Prompt Isolation</div>
+        <div class="control-desc">The vantage-track.js Stop hook reads only <code style="font-family:var(--mono);font-size:11px;">entry.message.usage</code> and <code style="font-family:var(--mono);font-size:11px;">entry.message.model</code> from Claude Code session files. Prompt text, tool arguments, file contents, and response content are never accessed. Deduplication state is kept in a local file (<code style="font-family:var(--mono);font-size:11px;">~/.claude/vantage-state.json</code>) that is never transmitted. The hook fires after the session ends — it cannot delay or affect Claude Code's operation.</div>
+        <span class="control-tag">local file read · usage fields only · non-blocking · no prompt access</span>
+      </div>
+
+      <div class="control-card">
+        <div class="control-icon">🔁</div>
+        <div class="control-title">Event Deduplication (Two Layers)</div>
+        <div class="control-desc">Duplicate events are prevented at two independent layers: (1) client-side, the hook maintains a local state file capped at 50,000 event IDs and skips any already-uploaded ID; (2) server-side, all batch inserts use <code style="font-family:var(--mono);font-size:11px;">INSERT OR IGNORE</code> keyed on <code style="font-family:var(--mono);font-size:11px;">event_id</code>. Retries and network errors cannot cause double-counting of spend.</div>
+        <span class="control-tag">client state file (50K IDs) · INSERT OR IGNORE · retry-safe</span>
       </div>
     </div>
   </div>

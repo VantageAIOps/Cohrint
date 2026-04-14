@@ -1,12 +1,37 @@
 {
-  "name": "claude-intelligence",
-  "version": "0.1.0",
-  "description": "Plug-and-play Claude Code setup: hooks, agents, settings",
-  "bin": { "claude-intelligence": "./bin/cli.js" },
-  "scripts": {
-    "install-setup": "bash install.sh"
+  "name": "@vantageaiops/claude-code",
+  "version": "1.0.0",
+  "description": "Zero-config Claude Code cost tracking — installs a Stop hook that posts token usage to VantageAI after every session",
+  "private": false,
+  "type": "commonjs",
+  "bin": {
+    "vantageaiops-claude-code": "./bin/cli.js"
   },
-  "keywords": ["claude", "claude-code", "ai", "developer-tools", "hooks", "agents"],
+  "scripts": {
+    "postinstall": "node bin/cli.js --postinstall || true"
+  },
+  "files": [
+    "bin",
+    "hooks/vantage-track.js",
+    "README.md"
+  ],
+  "keywords": [
+    "claude",
+    "claude-code",
+    "ai",
+    "cost-tracking",
+    "developer-tools",
+    "vantageai",
+    "llm",
+    "hooks"
+  ],
+  "homepage": "https://vantageaiops.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Amanjain98/VantageAI"
+  },
   "license": "MIT",
-  "engines": { "node": ">=18" }
+  "engines": {
+    "node": ">=18"
+  }
 }

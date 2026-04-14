@@ -32,11 +32,12 @@
 25. [Cross-Platform OTel Collector (v2)](#25-cross-platform-otel-collector-v2)
 26. [VantageAI CLI — AI Agent Wrapper](#26-vantageai-cli--ai-agent-wrapper)
 27. [Security & Governance](#27-security--governance)
-28. [GitHub Copilot Metrics Adapter](#28-github-copilot-metrics-adapter)
-29. [Datadog Metrics Exporter](#29-datadog-metrics-exporter)
-30. [Anonymized Benchmark System](#30-anonymized-benchmark-system)
-31. [Cross-Platform Console](#31-cross-platform-console)
-32. [Audit Log](#32-audit-log)
+28. [Claude Code Integration (Customer-Facing)](#28-claude-code-integration-customer-facing)
+29. [GitHub Copilot Metrics Adapter](#29-github-copilot-metrics-adapter)
+30. [Datadog Metrics Exporter](#30-datadog-metrics-exporter)
+31. [Anonymized Benchmark System](#31-anonymized-benchmark-system)
+32. [Cross-Platform Console](#32-cross-platform-console)
+33. [Audit Log](#33-audit-log)
 
 ---
 
@@ -680,20 +681,37 @@ All analytics queries share a `teamScope()` helper that appends `AND e.team = ?`
 | `GET /v1/analytics/traces?period=N` | N days (max 30) | agent trace summary (top 100) |
 | `GET /v1/analytics/cost?period=N` | N days + today | CI cost gate (total + today) |
 
-### 6.2 Summary Calculation Detail
+### 6.2 Agent Filtering with ?agent= Parameter
+
+`GET /v1/analytics/summary?agent=<agent_name>` filters all queries by `agent_name` and bypasses KV cache. This enables per-integration status checks without false positives from other event sources.
+
+**Examples:**
+- `?agent=claude-code` — Claude Code hook events only
+- `?agent=github-copilot` — GitHub Copilot adapter events only
+- `?agent=otel-collector` — OTel direct telemetry events only
+
+**Behavior:**
+- All SQL WHERE clauses include `AND agent_name = ?`
+- KV cache is **skipped** (agent-filtered requests are low-volume, targeted lookups)
+- Response includes `last_event_at` timestamp (when this agent last reported)
+- Returns the same response schema as unfiltered `/v1/analytics/summary`
+
+**Dashboard usage:** The Claude Code integration card uses `?agent=claude-code` on its "Check Setup" button to verify the hook is active without being affected by other event streams.
+
+### 6.3 Summary Calculation Detail
 
 ```sql
 -- today_cost_usd / today_tokens / today_requests (last 24h)
 SELECT SUM(cost_usd), SUM(total_tokens), COUNT(*)
-FROM events WHERE org_id=? AND created_at >= (now - 86400) [AND team=? if scoped]
+FROM events WHERE org_id=? AND created_at >= (now - 86400) [AND team=? if scoped] [AND agent_name=? if agent filter]
 
 -- mtd_cost_usd (calendar month-to-date, last 30 days approximation)
 SELECT SUM(cost_usd)
-FROM events WHERE org_id=? AND created_at >= (now - 30*86400)
+FROM events WHERE org_id=? AND created_at >= (now - 30*86400) [AND agent_name=? if agent filter]
 
 -- session_cost_usd (last 30 minutes — "current session" feel)
 SELECT SUM(cost_usd)
-FROM events WHERE org_id=? AND created_at >= (now - 1800)
+FROM events WHERE org_id=? AND created_at >= (now - 1800) [AND agent_name=? if agent filter]
 
 -- budget_pct
 IF scoped: SELECT budget_usd FROM team_budgets WHERE org_id=? AND team=?
@@ -701,7 +719,7 @@ ELSE:      SELECT budget_usd FROM orgs WHERE id=?
 pct = round((mtd_cost / budget) * 100)
 ```
 
-### 6.3 Team Analytics with Budget Join
+### 6.4 Team Analytics with Budget Join
 
 ```sql
 SELECT
@@ -718,7 +736,7 @@ ORDER BY cost_usd DESC
 
 Note: Always qualify `e.team` with table alias to avoid ambiguity with `team_budgets.team` in the JOIN.
 
-### 6.4 Agent Tracing
+### 6.5 Agent Tracing
 
 ```sql
 SELECT
@@ -738,7 +756,7 @@ LIMIT 100
 
 Spans with `parent_event_id IS NULL` are root spans (entry points of an agent workflow). `span_depth` tracks nesting level for tree reconstruction in the UI.
 
-### 6.5 CI Cost Gate: GET /v1/analytics/cost
+### 6.6 CI Cost Gate: GET /v1/analytics/cost
 
 Designed to be called in CI pipelines to enforce cost budgets:
 
@@ -1697,6 +1715,8 @@ cost_usd = (uncached_input / 1M) × input_price + (cached_input / 1M) × cache_p
 **Fuzzy Matching:** If exact model name not in table, the engine tries substring matching (e.g., `claude-sonnet-4-6-20260301` matches `claude-sonnet-4-6`). Unknown models return `cost_usd = 0`.
 
 **Precedence:** If a tool sends both token counts AND an explicit cost metric, the explicit cost takes precedence (auto-estimation only fills in when `cost_usd == 0`).
+
+**Mirror in Claude Code Hook:** The vantage-track.js hook (§28) embeds the same pricing table and cost formula for client-side cost calculation. Hook pricing is updated simultaneously with this worker pricing table to keep them synchronized.
 
 ---
 
@@ -3009,7 +3029,91 @@ The Security & Governance view in `app.html` shows:
 
 ---
 
-## 28. GitHub Copilot Metrics Adapter
+## 28. Claude Code Integration (Customer-Facing)
+
+### What It Is
+
+A **Stop hook** that runs automatically after every Claude Code session. It reads session transcripts from `~/.claude/projects/<slug>/*.jsonl`, deduplicates them, and POSTs token usage + estimated cost to VantageAI for cross-project visibility. No configuration needed after setup.
+
+### Three Installation Methods
+
+1. **Via vantage-mcp (recommended for MCP users)**
+   ```bash
+   npx vantageaiops-mcp setup
+   ```
+   The `setup` subcommand intercepts `process.argv[2] === 'setup'` BEFORE the stdio transport starts. If the transport begins first, stdin is consumed and the process won't exit cleanly. This setup subcommand is part of the vantage-mcp package.
+
+2. **Standalone npm package (new distribution channel)**
+   ```bash
+   npm install --save-dev @vantageaiops/claude-code
+   npx @vantageaiops/claude-code setup
+   ```
+   The package includes `/bin/cli.js` (setup + status commands) and `/hooks/vantage-track.js` (the Stop hook). Installation is idempotent — setup checks if the hook is already registered and skips if present.
+
+3. **Manual install (fallback)**
+   - Copy `vantage-track.js` to `~/.claude/hooks/`
+   - Add to `~/.claude/settings.json`:
+     ```json
+     {
+       "hooks": [
+         {
+           "matcher": "*",
+           "hooks": [
+             { "type": "command", "command": "node ~/.claude/hooks/vantage-track.js" }
+           ]
+         }
+       ]
+     }
+     ```
+
+### Environment Variables
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `VANTAGE_API_KEY` | ✓ | Bearer token for API authentication (get free key at `https://vantageaiops.com/signup.html`) |
+| `VANTAGE_TEAM` | — | Optional tag for grouping events by team name |
+| `VANTAGE_PROJECT` | — | Optional tag for grouping events by project name |
+| `VANTAGE_FEATURE` | — | Optional tag for grouping events by feature name |
+| `VANTAGE_API_BASE` | — | Custom API endpoint (default: `https://api.vantageaiops.com`) |
+
+### What the Hook Does
+
+1. **Parse session files** — reads `~/.claude/projects/<slug>/*.jsonl` for assistant messages with usage metadata
+2. **Client-side deduplication** — loads `~/.claude/vantage-state.json` (capped at 50K event IDs), skips events already uploaded
+3. **Cost calculation** — mirrors `vantage-worker/src/lib/pricing.ts` pricing table; supports 12 models (Claude, GPT-4o, o1, o3-mini, Gemini families)
+4. **Dual-write architecture** — 
+   - POSTs to `/v1/events/batch` (for analytics dashboard)
+   - Emits OTLP JSON to `/v1/otel/v1/metrics` (for cross-platform console)
+   - Fire-and-forget OTel writes use a separate `AbortController` (fire-and-forget should never block analytics writes on slow networks)
+5. **State persistence** — on HTTP 2xx, appends event IDs to `~/.claude/vantage-state.json` (transient failures don't lose IDs)
+6. **Cost summary to stderr** — prints total daily tokens + cost estimate so users see feedback
+
+### Dashboard Integration
+
+Settings → Integrations → Claude Code card shows:
+- **Status badge** — "Active" (green, if events arrived in last 24h), "No Data" (gray, if not set up), "Setup" (yellow, if hook not installed)
+- **Last event timestamp** — when the most recent session was uploaded
+- **Session count** — `today_requests` from `/v1/analytics/summary?agent=claude-code`
+- **"Check Setup" button** — calls `/v1/analytics/summary?agent=claude-code` to verify integration status
+
+### Pricing Table Coverage
+
+The hook's pricing (`claude-intelligence/hooks/vantage-track.js`) mirrors the worker's pricing table at `/vantage-worker/src/lib/pricing.ts`:
+
+| Model | Input | Output | Cache Read | Cache Write |
+|---|---|---|---|---|
+| claude-opus-4-6 | $15.00 | $75.00 | $1.50 | $18.75 |
+| claude-sonnet-4-6 | $3.00 | $15.00 | $0.30 | $3.75 |
+| claude-haiku-4-5 | $0.80 | $4.00 | $0.08 | $1.00 |
+| gpt-4o | $2.50 | $10.00 | $1.25 | $2.50 |
+| o1 | $15.00 | $60.00 | $7.50 | $15.00 |
+| o3-mini | $1.10 | $4.40 | $0.55 | $1.10 |
+| gemini-2.0-flash | $0.10 | $0.40 | $0.025 | $0.10 |
+| gemini-1.5-pro | $1.25 | $5.00 | $0.31 | $1.25 |
+
+---
+
+## 29. GitHub Copilot Metrics Adapter
 
 ### Purpose
 

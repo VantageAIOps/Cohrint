@@ -6,10 +6,20 @@
  * Reads Claude Code session files from ~/.claude/projects/ and posts token
  * usage + estimated cost to VantageAI for cross-project cost visibility.
  *
- * Setup:
+ * Setup (one-time):
+ *   npx vantageaiops-mcp setup
+ *
+ * Or manually:
  *   1. Get a free API key at https://vantageaiops.com
- *   2. Set VANTAGE_API_KEY in your shell profile, OR
- *      run install.sh and enter the key when prompted
+ *   2. Set VANTAGE_API_KEY in your shell profile
+ *   3. Add this script as a Stop hook in ~/.claude/settings.json
+ *
+ * Environment variables:
+ *   VANTAGE_API_KEY   — required; your VantageAI API key
+ *   VANTAGE_API_BASE  — optional; default https://api.vantageaiops.com
+ *   VANTAGE_TEAM      — optional; tag events with a team name
+ *   VANTAGE_PROJECT   — optional; tag events with a project name
+ *   VANTAGE_FEATURE   — optional; tag events with a feature name
  *
  * This script is silent on errors — it will never break Claude Code.
  */
@@ -18,29 +28,46 @@ const { readdir, readFile, writeFile } = require('node:fs/promises');
 const { join } = require('node:path');
 const { homedir } = require('node:os');
 
-// Set VANTAGE_API_KEY in your environment — see Setup above
-const API_KEY  = process.env.VANTAGE_API_KEY ?? '';
-const API_BASE = process.env.VANTAGE_API_BASE ?? 'https://api.vantageaiops.com';
+const API_KEY    = process.env.VANTAGE_API_KEY   ?? '';
+const API_BASE   = process.env.VANTAGE_API_BASE  ?? 'https://api.vantageaiops.com';
+const TEAM       = process.env.VANTAGE_TEAM      ?? null;
+const PROJECT    = process.env.VANTAGE_PROJECT   ?? null;
+const FEATURE    = process.env.VANTAGE_FEATURE   ?? null;
+
 const STATE_FILE = join(homedir(), '.claude', 'vantage-state.json');
 
-// Token prices per million (USD) — update as Anthropic pricing changes
+// Token prices per million (USD) — mirrors vantage-worker/src/lib/pricing.ts
+// input/output/cache = read rate, cacheWrite = creation rate
 const PRICES = {
-  'claude-opus-4-6':   { input: 15.00, output: 75.00, cache: 1.50 },
-  'claude-sonnet-4-6': { input:  3.00, output: 15.00, cache: 0.30 },
-  'claude-haiku-4-5':  { input:  0.80, output:  4.00, cache: 0.08 },
+  'claude-opus-4-6':    { input: 15.00, output: 75.00, cache: 1.50,  cacheWrite: 18.75 },
+  'claude-sonnet-4-6':  { input:  3.00, output: 15.00, cache: 0.30,  cacheWrite:  3.75 },
+  'claude-haiku-4-5':   { input:  0.80, output:  4.00, cache: 0.08,  cacheWrite:  1.00 },
+  'claude-3-5-sonnet':  { input:  3.00, output: 15.00, cache: 0.30,  cacheWrite:  3.75 },
+  'claude-3-haiku':     { input:  0.25, output:  1.25, cache: 0.03,  cacheWrite:  0.31 },
+  'gpt-4o':             { input:  2.50, output: 10.00, cache: 1.25,  cacheWrite:  2.50 },
+  'gpt-4o-mini':        { input:  0.15, output:  0.60, cache: 0.075, cacheWrite:  0.15 },
+  'o1':                 { input: 15.00, output: 60.00, cache: 7.50,  cacheWrite: 15.00 },
+  'o3-mini':            { input:  1.10, output:  4.40, cache: 0.55,  cacheWrite:  1.10 },
+  'gemini-2.0-flash':   { input:  0.10, output:  0.40, cache: 0.025, cacheWrite:  0.10 },
+  'gemini-1.5-pro':     { input:  1.25, output:  5.00, cache: 0.31,  cacheWrite:  1.25 },
+  'gemini-1.5-flash':   { input: 0.075, output:  0.30, cache: 0.018, cacheWrite:  0.075 },
 };
 
-function calcCost(model, inputTokens, outputTokens, cacheRead, cacheWrite) {
-  const key = Object.keys(PRICES).find(k => model.includes(k) || k.includes(model));
-  const p = key ? PRICES[key] : { input: 3, output: 15, cache: 0.3 };
-  return (inputTokens  / 1e6) * p.input
-       + (cacheRead    / 1e6) * p.cache
-       + (cacheWrite   / 1e6) * p.cache
-       + (outputTokens / 1e6) * p.output;
+function lookupPrice(model) {
+  if (!model) return null;
+  if (PRICES[model]) return PRICES[model];
+  const lower = model.toLowerCase();
+  const key = Object.keys(PRICES).find(k => lower.includes(k) || k.includes(lower));
+  return key ? PRICES[key] : null;
 }
 
-function dirToSlug(dir) {
-  return dir.replace(/[^a-zA-Z0-9]/g, '-');
+function calcCost(model, inputTokens, outputTokens, cacheRead, cacheWrite) {
+  const p = lookupPrice(model) ?? { input: 3, output: 15, cache: 0.3, cacheWrite: 3.75 };
+  const regularInput = Math.max(0, inputTokens - cacheRead - cacheWrite);
+  return (regularInput  / 1e6) * p.input
+       + (cacheRead     / 1e6) * p.cache
+       + (cacheWrite    / 1e6) * p.cacheWrite
+       + (outputTokens  / 1e6) * p.output;
 }
 
 async function loadState() {
@@ -55,7 +82,6 @@ async function loadState() {
 
 async function saveState(state) {
   try {
-    // Cap at 50,000 IDs to prevent unbounded growth
     if (state.uploadedIds && state.uploadedIds.length > 50000) {
       state.uploadedIds = state.uploadedIds.slice(-50000);
     }
@@ -66,7 +92,7 @@ async function saveState(state) {
 }
 
 async function findProjectFiles(cwd) {
-  const slug = dirToSlug(cwd);
+  const slug = cwd.replace(/[^a-zA-Z0-9]/g, '-');
   const dir = join(homedir(), '.claude', 'projects', slug);
   try {
     const entries = await readdir(dir, { withFileTypes: true });
@@ -104,6 +130,12 @@ async function parseNewMessages(filePath, uploadedIds) {
 
     events.push({
       eventId,
+      timestamp: entry.timestamp ?? new Date().toISOString(),
+      model,
+      inputTokens,
+      outputTokens,
+      cacheRead,
+      cacheWrite,
       payload: {
         event_id:          eventId,
         provider:          'anthropic',
@@ -117,14 +149,71 @@ async function parseNewMessages(filePath, uploadedIds) {
         agent_name:        'claude-code',
         timestamp:         entry.timestamp ?? new Date().toISOString(),
         tags:              { tool: 'claude-code', hook: 'stop' },
+        team:              TEAM,
+        project:           PROJECT,
+        feature:           FEATURE,
       },
     });
   }
   return events;
 }
 
+/** Build OTLP JSON metrics payload for Cross-Platform Console visibility */
+function buildOtelPayload(events) {
+  const nowNano = String(Date.now() * 1_000_000);
+
+  // Group by model for per-model datapoints
+  const byModel = {};
+  for (const e of events) {
+    if (!byModel[e.model]) byModel[e.model] = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+    byModel[e.model].input     += e.inputTokens;
+    byModel[e.model].output    += e.outputTokens;
+    byModel[e.model].cacheRead += e.cacheRead;
+    byModel[e.model].cacheWrite += e.cacheWrite;
+  }
+
+  const dataPoints = [];
+  for (const [model, totals] of Object.entries(byModel)) {
+    for (const [type, count] of [
+      ['input',  totals.input],
+      ['output', totals.output],
+      ['cache_read',  totals.cacheRead],
+      ['cache_write', totals.cacheWrite],
+    ]) {
+      if (count === 0) continue;
+      dataPoints.push({
+        attributes: [
+          { key: 'gen_ai.token.type', value: { stringValue: type } },
+          { key: 'model',             value: { stringValue: model } },
+        ],
+        asInt: String(count),
+        timeUnixNano: nowNano,
+      });
+    }
+  }
+
+  const resourceAttrs = [
+    { key: 'service.name', value: { stringValue: 'claude-code' } },
+  ];
+  if (TEAM)    resourceAttrs.push({ key: 'team.id',    value: { stringValue: TEAM } });
+  if (PROJECT) resourceAttrs.push({ key: 'project.id', value: { stringValue: PROJECT } });
+
+  return {
+    resourceMetrics: [{
+      resource: { attributes: resourceAttrs },
+      scopeMetrics: [{
+        scope: { name: 'claude-code', version: '1.0' },
+        metrics: [{
+          name: 'gen_ai.client.token.usage',
+          sum: { dataPoints, isMonotonic: true },
+        }],
+      }],
+    }],
+  };
+}
+
 async function main() {
-  if (!API_KEY) return; // No key = no-op
+  if (!API_KEY) return; // No key = silent no-op
 
   const state = await loadState();
   const uploadedIds = new Set(state.uploadedIds ?? []);
@@ -140,8 +229,10 @@ async function main() {
   if (!allNew.length) return;
 
   const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), 5000);
+  const timer = setTimeout(() => ac.abort(), 8000);
+
   try {
+    // 1. Post events to /v1/events/batch
     const res = await fetch(`${API_BASE}/v1/events/batch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${API_KEY}` },
@@ -152,10 +243,27 @@ async function main() {
       }),
       signal: ac.signal,
     });
+
     if (res.ok) {
+      // Update dedup state
       state.uploadedIds = [...(state.uploadedIds ?? []), ...allNew.map(e => e.eventId)];
       state.lastUploadAt = new Date().toISOString();
       await saveState(state);
+
+      // 2. Emit OTel metrics so events appear in Cross-Platform Console
+      // Uses its own AbortController — independent of the batch upload timeout
+      const otelPayload = buildOtelPayload(allNew);
+      fetch(`${API_BASE}/v1/otel/v1/metrics`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${API_KEY}` },
+        body: JSON.stringify(otelPayload),
+      }).catch(() => {}); // fire-and-forget, don't block exit
+
+      // 3. Provide feedback on successful upload
+      const totalCost = allNew.reduce((s, e) => s + (e.payload.total_cost_usd ?? 0), 0);
+      process.stderr.write(
+        `[vantage-track] Tracked ${allNew.length} event(s) — $${totalCost.toFixed(4)} — https://vantageaiops.com\n`
+      );
     }
   } catch {
     // Silent — timeout or network error, never break Claude Code

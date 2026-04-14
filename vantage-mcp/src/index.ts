@@ -31,6 +31,10 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { VERSION } from './_version.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { homedir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -1124,9 +1128,101 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   }
 });
 
+// ── Setup subcommand ──────────────────────────────────────────────────────────
+
+async function runSetup(): Promise<void> {
+  const home = homedir();
+  const claudeDir = join(home, '.claude');
+  const hooksDir = join(claudeDir, 'hooks');
+  const settingsPath = join(claudeDir, 'settings.json');
+
+  // 1. Detect ~/.claude/
+  if (!existsSync(claudeDir)) {
+    process.stderr.write(
+      '✗ ~/.claude/ not found. Install Claude Code first: https://claude.ai/code\n'
+    );
+    process.exit(1);
+  }
+  process.stdout.write('✓ Found ~/.claude/\n');
+
+  // 2. Ensure hooks directory exists
+  if (!existsSync(hooksDir)) {
+    mkdirSync(hooksDir, { recursive: true });
+    process.stdout.write('✓ Created ~/.claude/hooks/\n');
+  } else {
+    process.stdout.write('✓ ~/.claude/hooks/ exists\n');
+  }
+
+  // 3. Copy vantage-track.js (bundled in dist/ alongside this file)
+  const __dirname = dirname(fileURLToPath(import.meta.url));
+  const srcHook = join(__dirname, 'vantage-track.js');
+  const destHook = join(hooksDir, 'vantage-track.js');
+
+  if (!existsSync(srcHook)) {
+    process.stderr.write(`✗ vantage-track.js not found at ${srcHook}\n`);
+    process.exit(1);
+  }
+  copyFileSync(srcHook, destHook);
+  process.stdout.write(`✓ Installed vantage-track.js → ${destHook}\n`);
+
+  // 4. Patch ~/.claude/settings.json — merge Stop hook, never overwrite existing hooks
+  type SettingsJson = Record<string, unknown>;
+  let settings: SettingsJson = {};
+  if (existsSync(settingsPath)) {
+    try {
+      settings = JSON.parse(readFileSync(settingsPath, 'utf-8')) as SettingsJson;
+    } catch {
+      // Corrupt or empty — start fresh but preserve the file path
+    }
+  }
+
+  const hookEntry = {
+    matcher: '*',
+    hooks: [{ type: 'command', command: `node ${destHook}` }],
+  };
+
+  if (!Array.isArray(settings.hooks)) {
+    settings.hooks = [];
+  }
+  const hooksArr = settings.hooks as unknown[];
+  const alreadyInstalled = hooksArr.some(
+    (h) =>
+      typeof h === 'object' &&
+      h !== null &&
+      JSON.stringify((h as Record<string, unknown>).hooks).includes('vantage-track.js')
+  );
+
+  if (!alreadyInstalled) {
+    hooksArr.push(hookEntry);
+    writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+    process.stdout.write('✓ Patched ~/.claude/settings.json with Stop hook\n');
+  } else {
+    process.stdout.write('✓ Stop hook already present in ~/.claude/settings.json — skipped\n');
+  }
+
+  process.stdout.write('\n');
+  process.stdout.write('Setup complete! VantageAI will track costs on every Claude Code session.\n');
+  process.stdout.write('\n');
+  process.stdout.write('Next step: set your API key in your shell profile:\n');
+  process.stdout.write('  export VANTAGE_API_KEY=vnt_...\n');
+  process.stdout.write('\n');
+  process.stdout.write('Get your free key at: https://vantageaiops.com/signup.html\n');
+  process.stdout.write('\n');
+  process.stdout.write('Optional env vars:\n');
+  process.stdout.write('  VANTAGE_TEAM=<team>      — tag all events with a team name\n');
+  process.stdout.write('  VANTAGE_PROJECT=<project> — tag all events with a project name\n');
+}
+
 // ── Start ─────────────────────────────────────────────────────────────────────
 
 async function main() {
+  // Handle CLI subcommands before starting the MCP stdio server
+  const subcommand = process.argv[2];
+  if (subcommand === 'setup') {
+    await runSetup();
+    process.exit(0);
+  }
+
   if (!API_KEY) {
     process.stderr.write('[vantage-mcp] WARNING: VANTAGE_API_KEY is not set. Tools will fail until a key is provided.\n');
     process.stderr.write('[vantage-mcp] Get your key at: https://vantageaiops.com/signup.html\n');

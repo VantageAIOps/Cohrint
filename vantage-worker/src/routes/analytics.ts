@@ -22,12 +22,19 @@ analytics.get('/summary', async (c) => {
   const scopeTeam = c.get('scopeTeam');
   const { clause, args } = teamScope(scopeTeam);
 
-  // KV cache — 5 min TTL, invalidated on new event insert
+  // Optional agent_name filter — e.g. ?agent=claude-code for integration status checks
+  const agentFilter = c.req.query('agent') ?? null;
+  const agentClause = agentFilter ? ' AND agent_name = ?' : '';
+  const agentArgs   = agentFilter ? [agentFilter] : [];
+
+  // KV cache — 5 min TTL. Agent-filtered requests bypass cache (low-volume, targeted).
   const cacheKey = `analytics:summary:${orgId}:${scopeTeam ?? 'all'}`;
-  try {
-    const cached = await c.env.KV.get(cacheKey);
-    if (cached) return c.json(JSON.parse(cached));
-  } catch { /* KV unavailable — continue to DB */ }
+  if (!agentFilter) {
+    try {
+      const cached = await c.env.KV.get(cacheKey);
+      if (cached) return c.json(JSON.parse(cached));
+    } catch { /* KV unavailable — continue to DB */ }
+  }
 
   const now        = Math.floor(Date.now() / 1000);
   // Align to UTC midnight so "today" is a calendar day, not a rolling 24-hour window
@@ -40,19 +47,20 @@ analytics.get('/summary', async (c) => {
       SELECT
         COALESCE(SUM(cost_usd), 0)     AS today_cost_usd,
         COALESCE(SUM(total_tokens), 0) AS today_tokens,
-        COALESCE(COUNT(*), 0)          AS today_requests
-      FROM events WHERE org_id = ? AND created_at >= ?${clause}
-    `).bind(orgId, today, ...args),
+        COALESCE(COUNT(*), 0)          AS today_requests,
+        MAX(created_at)                AS last_event_at
+      FROM events WHERE org_id = ? AND created_at >= ?${clause}${agentClause}
+    `).bind(orgId, today, ...args, ...agentArgs),
     c.env.DB.prepare(`
       SELECT COALESCE(SUM(cost_usd), 0) AS session_cost_usd
-      FROM events WHERE org_id = ? AND created_at >= ?${clause}
-    `).bind(orgId, thirty, ...args),
+      FROM events WHERE org_id = ? AND created_at >= ?${clause}${agentClause}
+    `).bind(orgId, thirty, ...args, ...agentArgs),
   ]);
 
   const mtd = await c.env.DB.prepare(`
     SELECT COALESCE(SUM(cost_usd), 0) AS mtd_cost_usd
-    FROM events WHERE org_id = ? AND created_at >= ?${clause}
-  `).bind(orgId, month, ...args).first<{ mtd_cost_usd: number }>();
+    FROM events WHERE org_id = ? AND created_at >= ?${clause}${agentClause}
+  `).bind(orgId, month, ...args, ...agentArgs).first<{ mtd_cost_usd: number }>();
 
   // Budget: per-team when scoped, org-wide otherwise
   let budgetUsd = 0;
@@ -83,6 +91,7 @@ analytics.get('/summary', async (c) => {
     today_cost_usd:   t?.today_cost_usd   ?? 0,
     today_tokens:     t?.today_tokens     ?? 0,
     today_requests:   t?.today_requests   ?? 0,
+    last_event_at:    t?.last_event_at    ?? null,
     // Aliases used by SDK privacy tests and cross-platform clients
     total_cost_usd:   t?.today_cost_usd   ?? 0,
     total_tokens:     t?.today_tokens     ?? 0,
@@ -94,7 +103,9 @@ analytics.get('/summary', async (c) => {
     plan:             orgPlan,
     scope_team:       scopeTeam ?? null,
   };
-  try { await c.env.KV.put(cacheKey, JSON.stringify(result), { expirationTtl: 300 }); } catch { /* best-effort */ }
+  if (!agentFilter) {
+    try { await c.env.KV.put(cacheKey, JSON.stringify(result), { expirationTtl: 300 }); } catch { /* best-effort */ }
+  }
   logAudit(c, { event_type: 'data_access', event_name: 'data_access.analytics', resource_type: 'analytics', metadata: { endpoint: '/v1/analytics/summary' } });
   return c.json(result);
 });
