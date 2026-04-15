@@ -17,7 +17,7 @@
 
 import { Hono } from 'hono';
 import type { Bindings, Variables } from '../types';
-import { authMiddleware } from '../middleware/auth';
+import { authMiddleware, hasRole } from '../middleware/auth';
 
 const crossplatform = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -271,7 +271,6 @@ crossplatform.get('/developers', async (c) => {
 
   // Calculate ROI metrics per developer
   // Superadmin/CEO/owner/admin see full emails; member/viewer get redacted
-  const { hasRole } = await import('../middleware/auth');
   const isPrivileged = hasRole(role, 'admin');
   const devList = (developers.results ?? []).map((d: any) => {
     const costPerPR = d.pull_requests > 0 ? (d.total_cost / d.pull_requests) : null;
@@ -316,8 +315,8 @@ crossplatform.get('/developer/:id', async (c) => {
   }
 
   // Access control: admin+ see all; member/viewer may only view their own data
-  const { hasRole: hr } = await import('../middleware/auth');
-  if (!hr(role, 'admin')) {
+  
+  if (!hasRole(role, 'admin')) {
     const memberEmail = c.get('memberEmail');
     const owns = await c.env.DB.prepare(`
       SELECT 1 FROM cross_platform_usage
@@ -409,7 +408,6 @@ function redactEmail(email: string | null): string | null {
 crossplatform.get('/active-developers', async (c) => {
   const orgId = c.get('orgId');
   const role  = c.get('role');
-  const { hasRole } = await import('../middleware/auth');
   const isPrivileged = hasRole(role, 'admin');
 
   const windowSec = Math.max(30, Math.min(300, parseInt(c.req.query('window_sec') ?? '60', 10)));
@@ -462,7 +460,6 @@ crossplatform.get('/active-developers', async (c) => {
 crossplatform.get('/live', async (c) => {
   const orgId  = c.get('orgId');
   const role   = c.get('role');
-  const { hasRole } = await import('../middleware/auth');
   const isPrivileged = hasRole(role, 'admin'); // superadmin/ceo/admin/owner see full emails
   const rawLimit = parseInt(c.req.query('limit') ?? '50', 10);
   const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 200) : 50;
