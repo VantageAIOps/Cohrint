@@ -352,6 +352,19 @@ auth.patch('/members/:id', authMiddleware, adminOnly, async (c) => {
   await c.env.DB.prepare(
     `UPDATE org_members SET ${updates.join(', ')} WHERE id = ? AND org_id = ?`
   ).bind(...params).run();
+
+  logAudit(c, {
+    event_type:    'admin_action',
+    event_name:    'admin_action.member_updated',
+    resource_type: 'member',
+    resource_id:   memberId,
+    metadata:      {
+      updated_fields: updates,
+      new_role:       body.role ?? null,
+      new_scope_team: 'scope_team' in body ? (body.scope_team ?? null) : undefined,
+    },
+  });
+
   return c.json({ ok: true });
 });
 

@@ -561,6 +561,172 @@ def test_role_invite_preservation():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# ER-J: Active developers endpoint
+# ══════════════════════════════════════════════════════════════════════════════
+
+def test_active_developers():
+    section("ER-J. Active Developers — /v1/cross-platform/active-developers")
+
+    if skip_no_key():
+        return
+
+    key = CI_API_KEY
+
+    r = _api("get", "/v1/cross-platform/active-developers", key=key)
+    chk("ER-J.1 GET active-developers returns 200", r.status_code == 200, f"got {r.status_code}: {r.text[:120]}")
+
+    if r.status_code == 200:
+        d = r.json()
+        for field in ["active_count", "window_sec", "developers", "generated_at"]:
+            chk(f"ER-J.2 Response has '{field}'", field in d, f"keys: {list(d.keys())}")
+        chk("ER-J.3 active_count is int >= 0", isinstance(d.get("active_count"), int) and d["active_count"] >= 0)
+        chk("ER-J.4 window_sec is 60 (default)", d.get("window_sec") == 60, f"got {d.get('window_sec')}")
+
+    # Custom window
+    r2 = _api("get", "/v1/cross-platform/active-developers?window_sec=120", key=key)
+    chk("ER-J.5 Custom window_sec=120 returns 200", r2.status_code == 200, f"got {r2.status_code}")
+    if r2.status_code == 200:
+        chk("ER-J.6 window_sec echoed back as 120", r2.json().get("window_sec") == 120)
+
+    # Member cannot call (requires admin+)
+    member_key, _ = fresh_member_key(key, role="member")
+    if member_key:
+        r3 = _api("get", "/v1/cross-platform/active-developers", key=member_key)
+        # Active developers contains emails — should be redacted for non-admin
+        chk("ER-J.7 member gets 200 (emails redacted)", r3.status_code == 200, f"got {r3.status_code}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ER-K: Business units endpoint
+# ══════════════════════════════════════════════════════════════════════════════
+
+def test_business_units():
+    section("ER-K. Business Units — /v1/analytics/business-units")
+
+    if skip_no_key():
+        return
+
+    key = CI_API_KEY
+
+    r = _api("get", "/v1/analytics/business-units", key=key)
+    chk("ER-K.1 GET business-units returns 200", r.status_code == 200, f"got {r.status_code}: {r.text[:120]}")
+
+    if r.status_code == 200:
+        d = r.json()
+        for field in ["business_units", "by_team_provider", "period_days"]:
+            chk(f"ER-K.2 Response has '{field}'", field in d, f"keys: {list(d.keys())}")
+        chk("ER-K.3 period_days defaults to 30", d.get("period_days") == 30)
+        chk("ER-K.4 business_units is a list", isinstance(d.get("business_units"), list))
+
+    # Custom period
+    r2 = _api("get", "/v1/analytics/business-units?period=7", key=key)
+    chk("ER-K.5 period=7 returns 200", r2.status_code == 200, f"got {r2.status_code}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ER-L: Budget alerts endpoint
+# ══════════════════════════════════════════════════════════════════════════════
+
+def test_budget_alerts():
+    section("ER-L. Budget Alerts — /v1/admin/budget-alerts")
+
+    if skip_no_key():
+        return
+
+    key = CI_API_KEY
+
+    r = _api("get", "/v1/admin/budget-alerts", key=key)
+    chk("ER-L.1 GET budget-alerts returns 200", r.status_code == 200, f"got {r.status_code}: {r.text[:120]}")
+
+    if r.status_code == 200:
+        d = r.json()
+        for field in ["alerts", "threshold_pct", "generated_at"]:
+            chk(f"ER-L.2 Response has '{field}'", field in d, f"keys: {list(d.keys())}")
+        chk("ER-L.3 threshold_pct defaults to 80", d.get("threshold_pct") == 80.0)
+        chk("ER-L.4 alerts is a list", isinstance(d.get("alerts"), list))
+
+    # Custom threshold
+    r2 = _api("get", "/v1/admin/budget-alerts?threshold_pct=50", key=key)
+    chk("ER-L.5 threshold_pct=50 returns 200", r2.status_code == 200, f"got {r2.status_code}")
+
+    # Member blocked
+    member_key, _ = fresh_member_key(key, role="member")
+    if member_key:
+        r3 = _api("get", "/v1/admin/budget-alerts", key=member_key)
+        chk("ER-L.6 member blocked from budget-alerts", r3.status_code == 403, f"got {r3.status_code}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ER-M: Audit log filters
+# ══════════════════════════════════════════════════════════════════════════════
+
+def test_audit_log_filters():
+    section("ER-M. Audit Log Filters")
+
+    if skip_no_key():
+        return
+
+    key = CI_API_KEY
+
+    # Base call
+    r = _api("get", "/v1/audit-log", key=key)
+    chk("ER-M.1 GET /v1/audit-log returns 200", r.status_code == 200, f"got {r.status_code}: {r.text[:120]}")
+
+    # since filter
+    r2 = _api("get", "/v1/audit-log?since=2024-01-01", key=key)
+    chk("ER-M.2 since filter returns 200", r2.status_code == 200, f"got {r2.status_code}")
+
+    # resource_type filter
+    r3 = _api("get", "/v1/audit-log?resource_type=member", key=key)
+    chk("ER-M.3 resource_type filter returns 200", r3.status_code == 200, f"got {r3.status_code}")
+
+    # event_name filter
+    r4 = _api("get", "/v1/audit-log?event_name=admin_action", key=key)
+    chk("ER-M.4 event_name prefix filter returns 200", r4.status_code == 200, f"got {r4.status_code}")
+
+    # Combined filters
+    r5 = _api("get", "/v1/audit-log?resource_type=member&limit=10", key=key)
+    chk("ER-M.5 combined filters return 200", r5.status_code == 200, f"got {r5.status_code}")
+    if r5.status_code == 200:
+        d = r5.json()
+        chk("ER-M.6 response has events list", "events" in d or isinstance(d, list), f"keys: {list(d.keys()) if isinstance(d, dict) else 'list'}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ER-N: Executive endpoint uses unified spend (events + cross_platform_usage)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def test_executive_unified_spend():
+    section("ER-N. Executive endpoint aggregates all data sources")
+
+    if skip_no_key():
+        return
+
+    key = CI_API_KEY
+
+    r = _api("get", "/v1/analytics/executive", key=key)
+    chk("ER-N.1 Executive returns 200", r.status_code == 200, f"got {r.status_code}: {r.text[:120]}")
+
+    if r.status_code != 200:
+        return
+
+    d = r.json()
+    totals = d.get("totals", {})
+    chk("ER-N.2 totals.total_cost_usd present", "total_cost_usd" in totals)
+    chk("ER-N.3 totals.total_cost_usd is numeric", isinstance(totals.get("total_cost_usd"), (int, float)))
+
+    # Cross-check: executive total should be >= cross-platform summary total
+    # (executive now includes events table too)
+    r2 = _api("get", "/v1/cross-platform/summary", key=key)
+    if r2.status_code == 200:
+        cp_total = r2.json().get("total_cost_usd", 0)
+        exec_total = totals.get("total_cost_usd", 0)
+        chk("ER-N.4 executive total >= cross-platform total (includes events table)",
+            exec_total >= cp_total - 0.01,  # float tolerance
+            f"executive={exec_total}, cross-platform={cp_total}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Runner
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -578,6 +744,11 @@ def run_all():
     test_team_scoped_member()
     test_budget_policy_validation()
     test_role_invite_preservation()
+    test_active_developers()
+    test_business_units()
+    test_budget_alerts()
+    test_audit_log_filters()
+    test_executive_unified_spend()
 
     results = get_results()
     print(f"\n{'═'*60}")

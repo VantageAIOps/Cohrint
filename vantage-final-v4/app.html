@@ -1047,7 +1047,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
           </div>
           <table class="members-table">
             <thead>
-              <tr><th>Email</th><th>Name</th><th>Role</th><th>Team</th><th>API Key</th><th>Actions</th></tr>
+              <tr><th>Email</th><th>Name</th><th>Role</th><th>Team</th><th>Spend MTD</th><th>Rec</th><th>API Key</th><th>Actions</th></tr>
             </thead>
             <tbody id="membersTableBody">
               <tr><td colspan="6" class="empty-state">Loading...</td></tr>
@@ -1483,6 +1483,15 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
           <div id="cp-dev-error" class="card-error"></div>
         </div>
 
+        <div id="active-now-card" style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px;margin-bottom:16px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+            <span id="active-now-dot" style="width:8px;height:8px;border-radius:50%;background:#4ade80;display:inline-block"></span>
+            <span style="font-size:13px;font-weight:600">Active Now</span>
+            <span id="active-now-count" style="font-size:11px;opacity:.5;margin-left:auto">0 developers</span>
+          </div>
+          <div id="active-now-list" style="display:flex;flex-direction:column;gap:6px;font-size:11px"></div>
+        </div>
+
         <div class="grid-2">
           <div class="card">
             <div class="card-title">
@@ -1583,6 +1592,8 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
       <select id="inviteRole">
         <option value="member">Member</option>
         <option value="admin">Admin</option>
+        <option value="ceo" class="invite-elevated-role">CEO</option>
+        <option value="superadmin" class="invite-elevated-role">Superadmin</option>
       </select>
     </div>
     <div class="form-group">
@@ -1954,6 +1965,7 @@ function loadViewData(view) {
     case 'cross-platform':
       if (window.cpConsoleLoadPeriod) window.cpConsoleLoadPeriod(period);
       else if (window.cpConsoleInit) window.cpConsoleInit();
+      loadActiveDevelopers();
       break;
     case 'models': updateModelCalc(); break;
     case 'members': loadMembers(); break;
@@ -2945,9 +2957,13 @@ function loadMembers() {
   Promise.all([
     apiFetch('/v1/admin/overview').catch(function() { return null; }),
     apiFetch('/v1/auth/members').catch(function() { return null; }),
+    apiFetch('/v1/cross-platform/developers').catch(function() { return null; }),
+    apiFetch('/v1/admin/developers/recommendations').catch(function() { return null; }),
   ]).then(function(results) {
     var overview = results[0];
-    var members = results[1];
+    var members  = results[1];
+    var devsData = results[2];
+    var recsData = results[3];
 
     var memberList = (members && members.members) || (members && members.data) || [];
     document.getElementById('memberCount').textContent = fmtNum(memberList.length);
@@ -2958,6 +2974,16 @@ function loadMembers() {
       document.getElementById('memberBudget').textContent = budgetLimit > 0 ? fmt(budgetLimit) : 'Not set';
     }
 
+    // Build spend + recommendations lookup maps
+    var spendByEmail = {};
+    ((devsData && devsData.developers) || []).forEach(function(d) {
+      spendByEmail[d.developer_email] = d;
+    });
+    var recsByEmail = {};
+    ((recsData && recsData.recommendations) || []).forEach(function(r) {
+      recsByEmail[r.developer_email] = r;
+    });
+
     // Members table — DOM safe
     var tbody = document.getElementById('membersTableBody');
     tbody.textContent = '';
@@ -2965,7 +2991,7 @@ function loadMembers() {
     if (memberList.length === 0) {
       var tr = document.createElement('tr');
       var td = document.createElement('td');
-      td.colSpan = 6;
+      td.colSpan = 8;
       td.className = 'empty-state';
       td.textContent = members === null ? 'Failed to load members \u2014 check your connection' : 'No members yet. Invite your team above.';
       tr.appendChild(td);
@@ -2998,6 +3024,29 @@ function loadMembers() {
         td4.textContent = m.scope_team || m.team || '-';
         tr.appendChild(td4);
 
+        // Spend MTD cell
+        var tdSpend = document.createElement('td');
+        var devEntry = spendByEmail[m.email];
+        var spendVal = devEntry ? (devEntry.cost || devEntry.total_cost) : null;
+        tdSpend.textContent = spendVal != null ? '$' + Number(spendVal).toFixed(2) : '\u2014';
+        tdSpend.style.cssText = 'color:#4ade80;font-size:11px';
+        tr.appendChild(tdSpend);
+
+        // Recommendations badge cell
+        var tdRec = document.createElement('td');
+        var recEntry = recsByEmail[m.email];
+        if (recEntry && recEntry.savings_opportunity_usd > 0) {
+          var recBadge = document.createElement('span');
+          recBadge.title = 'Est. savings: $' + Number(recEntry.savings_opportunity_usd).toFixed(2) + '/mo';
+          recBadge.style.cssText = 'background:rgba(74,222,128,.15);color:#4ade80;border-radius:4px;padding:2px 5px;font-size:10px;cursor:default;white-space:nowrap';
+          recBadge.textContent = '\uD83D\uDCA1 $' + Number(recEntry.savings_opportunity_usd).toFixed(0);
+          tdRec.appendChild(recBadge);
+        } else {
+          tdRec.textContent = '\u2014';
+          tdRec.style.opacity = '0.3';
+        }
+        tr.appendChild(tdRec);
+
         var td5 = document.createElement('td');
         td5.style.fontFamily = 'var(--font-mono)';
         td5.style.fontSize = '10px';
@@ -3029,6 +3078,49 @@ function loadMembers() {
   }).catch(function(e) {
     console.error('[vantage] members error:', e);
   });
+}
+
+function loadActiveDevelopers() {
+  apiFetch('/v1/cross-platform/active-developers?window_sec=60').then(function(data) {
+    if (!data) return;
+    var list  = document.getElementById('active-now-list');
+    var count = document.getElementById('active-now-count');
+    var dot   = document.getElementById('active-now-dot');
+    if (!list) return;
+
+    count.textContent = data.active_count + ' developer' + (data.active_count !== 1 ? 's' : '');
+    dot.style.background = data.active_count > 0 ? '#4ade80' : 'rgba(255,255,255,.2)';
+    list.textContent = '';
+
+    if (!data.active_count) {
+      var empty = document.createElement('span');
+      empty.textContent = 'No activity in the last 60 seconds';
+      empty.style.opacity = '.4';
+      list.appendChild(empty);
+      return;
+    }
+
+    (data.developers || []).forEach(function(dev) {
+      var row = document.createElement('div');
+      row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)';
+
+      var left = document.createElement('span');
+      var label = (dev.developer_email || 'unknown');
+      if (dev.team) label += ' \u00b7 ' + dev.team;
+      if (dev.agent_name && dev.agent_name !== dev.provider) label += ' [' + dev.agent_name + ']';
+      left.textContent = label;
+      left.style.opacity = '.8';
+
+      var right = document.createElement('span');
+      var rate = dev.token_rate_per_sec ? dev.token_rate_per_sec.toFixed(0) + ' tok/s \u00b7 ' : '';
+      right.textContent = rate + '$' + Number(dev.session_cost || 0).toFixed(2);
+      right.style.color = '#4ade80';
+
+      row.appendChild(left);
+      row.appendChild(right);
+      list.appendChild(row);
+    });
+  }).catch(function() { /* endpoint may not exist yet — fail silently */ });
 }
 
 function renderTeamBudgets(overview) {
@@ -3090,6 +3182,12 @@ function renderTeamBudgets(overview) {
 
 function showInviteModal() {
   document.getElementById('inviteModal').classList.add('active');
+  // Show elevated role options only to owners/superadmins
+  var currentRole = (_session && (_session.role || (_session.user && _session.user.role))) || 'member';
+  var elevatedOpts = document.querySelectorAll('.invite-elevated-role');
+  elevatedOpts.forEach(function(el) {
+    el.style.display = hasRole(currentRole, 'superadmin') ? '' : 'none';
+  });
 }
 
 function closeModal(id) {

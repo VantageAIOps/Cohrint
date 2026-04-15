@@ -352,13 +352,13 @@
 
     var days = (typeof period !== 'undefined' ? period : 30);
     apiFetch('/v1/cross-platform/developer/' + encodeURIComponent(devId) + '?days=' + days)
-      .then(function (data) { renderDevModalBody(body, data); })
+      .then(function (data) { renderDevModalBody(body, data, devEmail); })
       .catch(function (e) {
         body.textContent = '\u26A0 ' + (e.message || 'Failed to load');
       });
   }
 
-  function renderDevModalBody(body, data) {
+  function renderDevModalBody(body, data, devEmail) {
     body.textContent = '';
 
     // 1. By-tool cost table
@@ -448,6 +448,60 @@
       prodGrid.appendChild(box);
     });
     body.appendChild(prodGrid);
+
+    // 4. Recommendations section
+    var recsSection = document.createElement('div');
+    recsSection.style.cssText = 'margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08)';
+    var recsTitle = document.createElement('div');
+    recsTitle.style.cssText = 'font-size:12px;font-weight:600;margin-bottom:8px;opacity:.7';
+    recsTitle.textContent = 'COST RECOMMENDATIONS';
+    recsSection.appendChild(recsTitle);
+    body.appendChild(recsSection);
+
+    apiFetch('/v1/admin/developers/recommendations').then(function(recData) {
+      var recs   = (recData && recData.recommendations) || [];
+      var devRec = recs.find(function(r) { return r.developer_email === devEmail; });
+
+      function appendNote(text) {
+        var p = document.createElement('p');
+        p.style.cssText = 'font-size:11px;opacity:.4;margin:0';
+        p.textContent = text;
+        recsSection.appendChild(p);
+      }
+
+      if (!devRec) { appendNote('No optimization opportunities found.'); return; }
+
+      var itemDefs = [];
+      if (devRec.savings_opportunity_usd > 0) {
+        itemDefs.push({ prefix: '\u2022 Est. monthly savings: ', highlight: '$' + fmt2(devRec.savings_opportunity_usd) });
+      }
+      if (devRec.cache_hit_rate_pct < 20) {
+        itemDefs.push({ prefix: '\u2022 Low cache hit rate (' + Number(devRec.cache_hit_rate_pct).toFixed(1) + '%) \u2014 consider prompt caching' });
+      }
+      if (devRec.cost_per_pr > 5) {
+        itemDefs.push({ prefix: '\u2022 High cost per PR ($' + fmt2(devRec.cost_per_pr) + ') \u2014 review prompt length' });
+      }
+
+      if (!itemDefs.length) { appendNote('No optimization opportunities found.'); return; }
+
+      itemDefs.forEach(function(item) {
+        var p = document.createElement('p');
+        p.style.cssText = 'font-size:11px;margin:4px 0;opacity:.8';
+        p.appendChild(document.createTextNode(item.prefix));
+        if (item.highlight) {
+          var span = document.createElement('span');
+          span.style.color = '#4ade80';
+          span.textContent = item.highlight;
+          p.appendChild(span);
+        }
+        recsSection.appendChild(p);
+      });
+    }).catch(function() {
+      var err = document.createElement('p');
+      err.style.cssText = 'font-size:11px;opacity:.4;margin:0';
+      err.textContent = 'Recommendations unavailable.';
+      recsSection.appendChild(err);
+    });
   }
 
   // ── Live feed ─────────────────────────────────────────────────────────────
@@ -526,6 +580,10 @@
             cpLiveRestart = setTimeout(startCpLivePoll, 120000);
           }
         });
+      // Also refresh Active Now panel on each live poll tick
+      if (typeof window.loadActiveDevelopers === 'function') {
+        window.loadActiveDevelopers();
+      }
     }
 
     tick(); // fire immediately; don't wait 15s for first update

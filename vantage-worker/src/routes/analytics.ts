@@ -271,6 +271,79 @@ analytics.get('/teams', async (c) => {
   return c.json({ teams: results });
 });
 
+// ── GET /v1/analytics/business-units — spend per business unit ────────────────
+analytics.get('/business-units', async (c) => {
+  const orgId  = c.get('orgId');
+  const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
+  const sinceIso  = new Date(Date.now() - period * 86_400_000).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+  const sinceUnix = Math.floor(Date.now() / 1000) - period * 86_400;
+
+  // UNION events + cross_platform_usage for complete picture
+  const { results } = await c.env.DB.prepare(`
+    WITH all_usage AS (
+      SELECT
+        COALESCE(business_unit, cost_center, 'unassigned') AS business_unit,
+        team,
+        provider,
+        cost_usd,
+        input_tokens + output_tokens AS tokens,
+        lines_added,
+        commits,
+        pull_requests
+      FROM cross_platform_usage
+      WHERE org_id = ? AND created_at >= ?
+      UNION ALL
+      SELECT
+        COALESCE(business_unit, 'unassigned') AS business_unit,
+        team,
+        model AS provider,
+        cost_usd,
+        prompt_tokens + completion_tokens AS tokens,
+        0 AS lines_added,
+        0 AS commits,
+        0 AS pull_requests
+      FROM events
+      WHERE org_id = ? AND created_at >= ? AND cost_usd > 0
+    )
+    SELECT
+      business_unit,
+      COALESCE(SUM(cost_usd), 0)            AS cost_usd,
+      COALESCE(SUM(tokens), 0)              AS tokens,
+      COUNT(*)                              AS records,
+      COALESCE(SUM(commits), 0)            AS commits,
+      COALESCE(SUM(pull_requests), 0)      AS pull_requests,
+      COALESCE(SUM(lines_added), 0)        AS lines_added,
+      COUNT(DISTINCT team)                  AS team_count
+    FROM all_usage
+    GROUP BY business_unit
+    ORDER BY cost_usd DESC
+    LIMIT 50
+  `).bind(orgId, sinceIso, orgId, sinceUnix).all();
+
+  // Per-business-unit team breakdown
+  const { results: byTeam } = await c.env.DB.prepare(`
+    WITH all_usage AS (
+      SELECT COALESCE(business_unit, cost_center, 'unassigned') AS business_unit,
+             team, provider, cost_usd
+      FROM cross_platform_usage WHERE org_id = ? AND created_at >= ?
+      UNION ALL
+      SELECT COALESCE(business_unit, 'unassigned') AS business_unit,
+             team, model AS provider, cost_usd
+      FROM events WHERE org_id = ? AND created_at >= ? AND cost_usd > 0
+    )
+    SELECT business_unit,
+           COALESCE(team, 'unassigned') AS team,
+           provider,
+           SUM(cost_usd) AS cost_usd
+    FROM all_usage
+    GROUP BY business_unit, team, provider
+    ORDER BY cost_usd DESC
+    LIMIT 200
+  `).bind(orgId, sinceIso, orgId, sinceUnix).all();
+
+  return c.json({ business_units: results, by_team_provider: byTeam, period_days: period });
+});
+
 // ── GET /v1/analytics/traces?period=1 ────────────────────────────────────────
 analytics.get('/traces', async (c) => {
   const orgId     = c.get('orgId');

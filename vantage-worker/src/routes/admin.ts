@@ -111,16 +111,37 @@ admin.get('/audit', async (c) => {
     return c.json({ error: 'Audit log requires admin or higher role' }, 403);
   }
 
-  const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10), 200);
+  const limit        = Math.min(parseInt(c.req.query('limit') ?? '50', 10), 500);
+  const since        = c.req.query('since') ?? null;
+  const until        = c.req.query('until') ?? null;
+  const actorRole    = c.req.query('actor_role') ?? null;
+  const resourceType = c.req.query('resource_type') ?? null;
+  const eventName    = c.req.query('event_name') ?? null;
+
+  const conditions: string[] = ['org_id = ?'];
+  const params: unknown[]    = [orgId];
+
+  if (since)        { conditions.push('created_at >= ?'); params.push(since); }
+  if (until)        { conditions.push('created_at <= ?'); params.push(until); }
+  if (actorRole)    { conditions.push('actor_role = ?');  params.push(actorRole); }
+  if (resourceType) { conditions.push('resource = ?');    params.push(resourceType); }
+  if (eventName)    { conditions.push('action LIKE ?');   params.push(eventName + '%'); }
+
+  params.push(limit);
   const { results } = await c.env.DB.prepare(`
-    SELECT action, actor_email, actor_role, resource, detail, ip_address, created_at
+    SELECT actor_email, actor_role, event_type, action, resource,
+           detail, ip_address, created_at
     FROM audit_events
-    WHERE org_id = ?
+    WHERE ${conditions.join(' AND ')}
     ORDER BY created_at DESC
     LIMIT ?
-  `).bind(orgId, limit).all();
+  `).bind(...params).all();
 
-  return c.json({ events: results });
+  return c.json({
+    events: results,
+    count: results.length,
+    filters: { since, until, actor_role: actorRole, resource_type: resourceType, event_name: eventName },
+  });
 });
 
 // ── GET /v1/admin/security — security overview stats (admin+ only) ────────
@@ -521,6 +542,76 @@ admin.get('/developers/recommendations', async (c) => {
   recs.sort((a, b) => b.savings_opportunity_usd - a.savings_opportunity_usd);
 
   return c.json({ period_days: days, recommendations: recs });
+});
+
+// ── GET /v1/admin/budget-alerts — individuals/teams that hit thresholds ────────
+admin.get('/budget-alerts', async (c) => {
+  const orgId    = c.get('orgId');
+  const threshold = Math.max(0, Math.min(100, parseFloat(c.req.query('threshold_pct') ?? '80')));
+
+  // Get all budget policies with their current MTD spend
+  const startOfMonth = new Date();
+  startOfMonth.setUTCDate(1); startOfMonth.setUTCHours(0, 0, 0, 0);
+  const monthStartIso  = startOfMonth.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+  const monthStartUnix = Math.floor(startOfMonth.getTime() / 1000);
+
+  const { results: policies } = await c.env.DB.prepare(`
+    SELECT id, scope, scope_target, monthly_limit_usd, enforcement
+    FROM budget_policies
+    WHERE org_id = ?
+  `).bind(orgId).all<{ id: string; scope: string; scope_target: string | null; monthly_limit_usd: number; enforcement: string }>();
+
+  const alerts: unknown[] = [];
+
+  for (const p of policies) {
+    let mtdCost = 0;
+
+    if (p.scope === 'org') {
+      const row = await c.env.DB.prepare(`
+        SELECT COALESCE(SUM(cost_usd),0) AS t FROM cross_platform_usage WHERE org_id = ? AND created_at >= ?
+      `).bind(orgId, monthStartIso).first<{ t: number }>();
+      const row2 = await c.env.DB.prepare(`
+        SELECT COALESCE(SUM(cost_usd),0) AS t FROM events WHERE org_id = ? AND created_at >= ?
+      `).bind(orgId, monthStartUnix).first<{ t: number }>();
+      mtdCost = (row?.t ?? 0) + (row2?.t ?? 0);
+    } else if (p.scope === 'team' && p.scope_target) {
+      const row = await c.env.DB.prepare(`
+        SELECT COALESCE(SUM(cost_usd),0) AS t FROM cross_platform_usage WHERE org_id = ? AND team = ? AND created_at >= ?
+      `).bind(orgId, p.scope_target, monthStartIso).first<{ t: number }>();
+      mtdCost = row?.t ?? 0;
+    } else if (p.scope === 'developer' && p.scope_target) {
+      const row = await c.env.DB.prepare(`
+        SELECT COALESCE(SUM(cost_usd),0) AS t FROM cross_platform_usage WHERE org_id = ? AND developer_email = ? AND created_at >= ?
+      `).bind(orgId, p.scope_target, monthStartIso).first<{ t: number }>();
+      const row2 = await c.env.DB.prepare(`
+        SELECT COALESCE(SUM(cost_usd),0) AS t FROM events WHERE org_id = ? AND developer_email = ? AND created_at >= ?
+      `).bind(orgId, p.scope_target, monthStartUnix).first<{ t: number }>();
+      mtdCost = (row?.t ?? 0) + (row2?.t ?? 0);
+    } else if (p.scope === 'provider' && p.scope_target) {
+      const row = await c.env.DB.prepare(`
+        SELECT COALESCE(SUM(cost_usd),0) AS t FROM cross_platform_usage WHERE org_id = ? AND provider = ? AND created_at >= ?
+      `).bind(orgId, p.scope_target, monthStartIso).first<{ t: number }>();
+      mtdCost = row?.t ?? 0;
+    }
+
+    const pct = p.monthly_limit_usd > 0 ? Math.round((mtdCost / p.monthly_limit_usd) * 100) : 0;
+    if (pct >= threshold) {
+      alerts.push({
+        policy_id:          p.id,
+        scope:              p.scope,
+        scope_target:       p.scope_target,
+        monthly_limit_usd:  p.monthly_limit_usd,
+        mtd_cost_usd:       Math.round(mtdCost * 10000) / 10000,
+        budget_pct:         pct,
+        enforcement:        p.enforcement,
+        status:             pct >= 100 ? 'exceeded' : 'warning',
+      });
+    }
+  }
+
+  alerts.sort((a: any, b: any) => b.budget_pct - a.budget_pct);
+
+  return c.json({ alerts, threshold_pct: threshold, generated_at: new Date().toISOString() });
 });
 
 export { admin };
