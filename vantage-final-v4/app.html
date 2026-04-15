@@ -622,8 +622,11 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
   .usage-inputs { grid-template-columns: 1fr; }
 }
 
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
 @media (max-width: 600px) {
   .kpi-grid { grid-template-columns: 1fr; }
+  .grid-2 { grid-template-columns: 1fr; }
   .topbar { flex-direction: column; gap: 8px; }
   .tool-tabs { padding: 8px 12px; }
   .dashboard { padding: 12px; }
@@ -1424,7 +1427,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
 
 <!-- ── Developer detail modal ──────────────────────────────────────────── -->
 <div id="devDetailModal" class="modal-overlay" role="dialog" aria-modal="true">
-  <div class="modal-content" style="max-width:600px;width:100%">
+  <div class="modal" style="max-width:600px;width:100%">
     <button class="modal-close" onclick="closeModal('devDetailModal')" aria-label="Close">&times;</button>
     <h3 id="devDetailTitle" style="margin-bottom:16px"></h3>
     <div id="devDetailBody"></div>
@@ -1784,6 +1787,7 @@ function loadViewData(view) {
   switch (view) {
     case 'overview': loadOverview(); break;
     case 'spend': loadSpend(); break;
+    case 'cross-platform': if (window.cpConsoleInit) window.cpConsoleInit(); break;
     case 'models': updateModelCalc(); break;
     case 'members': loadMembers(); break;
     case 'budgets': loadBudgets(); break;
@@ -1979,8 +1983,15 @@ function renderDailyChart(summary, timeseries) {
 
   if (daily.length === 0 && byProvider.length === 0) {
     if (_dailyChart) { _dailyChart.destroy(); _dailyChart = null; }
+    canvas.style.display = 'none';
+    var msg = canvas.parentElement.querySelector('.chart-empty-msg');
+    if (!msg) { msg = document.createElement('div'); msg.className = 'chart-empty-msg empty-state'; canvas.parentElement.appendChild(msg); }
+    msg.textContent = 'No spend data for this period.';
     return;
   }
+  canvas.style.display = '';
+  var existingMsg = canvas.parentElement.querySelector('.chart-empty-msg');
+  if (existingMsg) existingMsg.remove();
 
   var providers = [];
   var seen = {};
@@ -2401,8 +2412,15 @@ function renderSpendTrend(timeseries) {
   var data = (timeseries && (timeseries.series || timeseries.data || timeseries.timeseries)) || [];
   if (data.length === 0) {
     if (_spendChart) { _spendChart.destroy(); _spendChart = null; }
+    canvas.style.display = 'none';
+    var msg = canvas.parentElement.querySelector('.chart-empty-msg');
+    if (!msg) { msg = document.createElement('div'); msg.className = 'chart-empty-msg empty-state'; canvas.parentElement.appendChild(msg); }
+    msg.textContent = 'No spend data for this period.';
     return;
   }
+  canvas.style.display = '';
+  var existingMsg = canvas.parentElement.querySelector('.chart-empty-msg');
+  if (existingMsg) existingMsg.remove();
 
   var labels = data.map(function(d) {
     var raw = d.date || d.day || '';
@@ -2447,6 +2465,7 @@ function renderTodayHourly(todayData) {
   if (!canvas) return;
 
   var hours = (todayData && todayData.hours) || [];
+  if (!todayData || !hours.length) return;
   var dateStr = todayData && todayData.date;
   if (dateStr) {
     var badge = document.getElementById('todayDateBadge');
@@ -2795,7 +2814,7 @@ function loadMembers() {
         var rotateBtn = document.createElement('button');
         rotateBtn.className = 'btn btn-sm';
         rotateBtn.textContent = 'Rotate';
-        rotateBtn.onclick = function() { rotateMemberKey(m.email); };
+        rotateBtn.onclick = function() { rotateMemberKey(m.id, m.email); };
         td6.appendChild(rotateBtn);
 
         td6.appendChild(document.createTextNode(' '));
@@ -2803,7 +2822,7 @@ function loadMembers() {
         var revokeBtn = document.createElement('button');
         revokeBtn.className = 'btn btn-danger btn-sm';
         revokeBtn.textContent = 'Revoke';
-        revokeBtn.onclick = function() { revokeMember(m.email); };
+        revokeBtn.onclick = function() { revokeMember(m.id, m.email); };
         td6.appendChild(revokeBtn);
         tr.appendChild(td6);
 
@@ -2908,11 +2927,11 @@ function inviteMember() {
   });
 }
 
-function rotateMemberKey(email) {
+function rotateMemberKey(memberId, email) {
   if (!confirm('Rotate API key for ' + email + '?')) return;
-  apiFetch('/v1/auth/members/rotate', {
+  apiFetch('/v1/auth/members/' + memberId + '/rotate', {
     method: 'POST',
-    body: JSON.stringify({ email: email }),
+    body: JSON.stringify({}),
   }).then(function() {
     loadMembers();
   }).catch(function(e) {
@@ -2920,11 +2939,10 @@ function rotateMemberKey(email) {
   });
 }
 
-function revokeMember(email) {
+function revokeMember(memberId, email) {
   if (!confirm('Revoke access for ' + email + '?')) return;
-  apiFetch('/v1/auth/members', {
+  apiFetch('/v1/auth/members/' + memberId, {
     method: 'DELETE',
-    body: JSON.stringify({ email: email }),
   }).then(function() {
     loadMembers();
   }).catch(function(e) {
@@ -2994,6 +3012,14 @@ function loadBudgets() {
       document.getElementById('slackAnomaly').checked = !!(alerts.trigger_anomaly || (alerts.triggers && alerts.triggers.anomaly));
       document.getElementById('slackDaily').checked = !!(alerts.trigger_daily || (alerts.triggers && alerts.triggers.daily));
     }
+
+    // Pre-fill org budget input if a budget exists
+    apiFetch('/v1/analytics/summary').then(function(s) {
+      var inp = document.getElementById('orgBudgetInput');
+      if (inp && s && s.budget && s.budget.monthly_limit_usd) {
+        inp.placeholder = '$' + s.budget.monthly_limit_usd.toFixed(0) + ' (current)';
+      }
+    }).catch(function(){});
 
   }).catch(function(e) {
     console.error('[vantage] budgets error:', e);
