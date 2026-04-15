@@ -92,7 +92,7 @@
       "name": "How do I track OpenAI API costs?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Install the Cohrint SDK with one line: pip install vantage-ai. Wrap your OpenAI client with createOpenAIProxy() and every call is automatically tracked with cost, tokens, latency and model details."
+        "text": "Install the Cohrint SDK with one line: pip install cohrint. Wrap your OpenAI client with createOpenAIProxy() and every call is automatically tracked with cost, tokens, latency and model details."
       }
     },
     {
@@ -450,7 +450,7 @@ footer a:hover{color:var(--text)}
 <body>
 
 <nav>
-  <a href="#" class="nav-logo"><span class="logo-dot"></span>VANTAGE</a>
+  <a href="#" class="nav-logo"><span class="logo-dot"></span>COHRINT</a>
   <div class="nav-links">
     <a href="/calculator.html">Calculator</a>
     <a href="/docs.html">Docs</a>
@@ -503,8 +503,8 @@ footer a:hover{color:var(--text)}
     <span>$</span> npm install cohrint
     <button class="copy-btn" onclick="copyInstall('npm install cohrint', this)">copy</button>
     <span class="install-sep" style="color:var(--dim)">·</span>
-    <span>$</span> npx vantageai-cli
-    <button class="copy-btn" onclick="copyInstall('npx vantageai-cli', this)">copy</button>
+    <span>$</span> npx cohrint-cli
+    <button class="copy-btn" onclick="copyInstall('npx cohrint-cli', this)">copy</button>
   </div>
   <p style="font-size:11px;color:var(--dim);margin-top:12px;font-family:var(--mono);animation:fadeUp .7s .5s ease both">↗ Open source · Free forever · No credit card</p>
 </div>
@@ -573,7 +573,7 @@ footer a:hover{color:var(--text)}
   <div class="feat-panel" id="feat-tooling">
     <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(167,139,250,.1)">🤖</div><div class="feat-title">MCP — query costs from your IDE</div><div class="feat-kpi">12 tools</div><div class="feat-desc">Native integration with Claude Code, VS Code, and any MCP-compatible editor. Ask cost questions in natural language and receive actionable insights without leaving your development environment.</div><div class="feat-tag">→ Claude Code native · VS Code · any MCP editor · zero configuration</div></div>
     <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(167,139,250,.1)">⌨️</div><div class="feat-title">Cohrint CLI agent</div><div class="feat-kpi">instant visibility</div><div class="feat-desc">A lightweight terminal companion for AI-assisted development. Tracks spend, surfaces cost insights, and provides real-time feedback — all without interrupting your existing workflow.</div><div class="feat-tag">→ works with any AI CLI · real-time tracking · zero friction</div></div>
-    <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(0,152,255,.1)">🔒</div><div class="feat-title">Local proxy — zero trust</div><div class="feat-kpi">3 privacy modes</div><div class="feat-desc">Run the Cohrint proxy on your machine. API keys and prompts never leave your environment — only token counts and costs reach the dashboard. Strict / standard / relaxed modes.</div><div class="feat-tag">→ strict · standard · relaxed · npm install vantage-local-proxy</div></div>
+    <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(0,152,255,.1)">🔒</div><div class="feat-title">Local proxy — zero trust</div><div class="feat-kpi">3 privacy modes</div><div class="feat-desc">Run the Cohrint proxy on your machine. API keys and prompts never leave your environment — only token counts and costs reach the dashboard. Strict / standard / relaxed modes.</div><div class="feat-tag">→ strict · standard · relaxed · npm install cohrint-local-proxy</div></div>
     <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(0,212,161,.1)">🌐</div><div class="feat-title">Cross-platform OTel collector</div><div class="feat-kpi">10+ tools</div><div class="feat-desc">Unified cost visibility across every AI coding tool your team uses. Plug in once and Cohrint automatically consolidates spend, tokens, and usage data from all connected tools into a single dashboard.</div><div class="feat-tag">→ Claude Code · GitHub Copilot · Gemini · Codex · and more</div></div>
     <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(0,152,255,.1)">🔗</div><div class="feat-title">Agent trace explorer</div><div class="feat-kpi">end-to-end visibility</div><div class="feat-desc">Visualize multi-step AI agent workflows end-to-end. Understand cost and latency distribution across every step in a pipeline — enabling precise optimization at the workflow level, not just the call level.</div><div class="feat-tag">→ workflow visualization · cost per step · latency breakdown</div></div>
     <div class="feat-card reveal"><div class="feat-icon" style="background:rgba(0,212,161,.1)">💡</div><div class="feat-title">Live recommendations</div><div class="feat-kpi">actionable</div><div class="feat-desc">Continuous, automated analysis of your AI usage patterns. Cohrint surfaces prioritized cost-reduction opportunities and notifies your team via Slack before overspend reaches your invoice.</div><div class="feat-tag">→ model optimization · proactive alerts · Slack notifications</div></div>
@@ -625,13 +625,13 @@ footer a:hover{color:var(--text)}
 <span class="c-keyword">from</span> openai <span class="c-keyword">import</span> <span class="c-var">OpenAI</span>
 
 <span class="c-comment"># After — only 2 lines changed</span>
-<span class="c-keyword">import</span> vantage
-<span class="c-keyword">from</span> vantage.proxy.openai_proxy <span class="c-keyword">import</span> <span class="c-var">OpenAI</span>
+<span class="c-keyword">import</span> cohrint
+<span class="c-keyword">from</span> cohrint.proxy.openai_proxy <span class="c-keyword">import</span> <span class="c-var">OpenAI</span>
 
-vantage.<span class="c-func">init</span>(<span class="c-var">api_key</span>=<span class="c-string">"crt_your_key"</span>)
+cohrint.<span class="c-func">init</span>(<span class="c-var">api_key</span>=<span class="c-string">"crt_your_key"</span>)
 client = <span class="c-var">OpenAI</span>(<span class="c-var">api_key</span>=<span class="c-string">"sk-..."</span>)
 
-<span class="c-comment"># Everything else is identical — Vantage wraps transparently</span>
+<span class="c-comment"># Everything else is identical — Cohrint wraps transparently</span>
 response = client.chat.completions.<span class="c-func">create</span>(
     <span class="c-var">model</span>=<span class="c-string">"gpt-4o"</span>,
     <span class="c-var">messages</span>=[{<span class="c-string">"role"</span>: <span class="c-string">"user"</span>, <span class="c-string">"content"</span>: <span class="c-string">"Hello!"</span>}],
@@ -642,13 +642,13 @@ response = client.chat.completions.<span class="c-func">create</span>(
 <span class="c-keyword">import</span> <span class="c-var">OpenAI</span> <span class="c-keyword">from</span> <span class="c-string">"openai"</span>;
 
 <span class="c-comment">// After — only 2 lines changed</span>
-<span class="c-keyword">import</span> { <span class="c-var">init</span>, <span class="c-var">createOpenAIProxy</span> } <span class="c-keyword">from</span> <span class="c-string">"vantage-ai"</span>;
+<span class="c-keyword">import</span> { <span class="c-var">init</span>, <span class="c-var">createOpenAIProxy</span> } <span class="c-keyword">from</span> <span class="c-string">"cohrint"</span>;
 <span class="c-keyword">import</span> <span class="c-var">OpenAI</span> <span class="c-keyword">from</span> <span class="c-string">"openai"</span>;
 
 <span class="c-func">init</span>({ <span class="c-var">apiKey</span>: <span class="c-string">"crt_your_key"</span> });
 <span class="c-keyword">const</span> openai = <span class="c-func">createOpenAIProxy</span>(<span class="c-keyword">new</span> <span class="c-var">OpenAI</span>());
 
-<span class="c-comment">// Identical API — Vantage wraps every call automatically</span>
+<span class="c-comment">// Identical API — Cohrint wraps every call automatically</span>
 <span class="c-keyword">const</span> response = <span class="c-keyword">await</span> openai.chat.completions.<span class="c-func">create</span>({
   <span class="c-var">model</span>: <span class="c-string">"gpt-4o"</span>,
   <span class="c-var">messages</span>: [{ <span class="c-var">role</span>: <span class="c-string">"user"</span>, <span class="c-var">content</span>: <span class="c-string">"Hello!"</span> }],
@@ -657,12 +657,12 @@ response = client.chat.completions.<span class="c-func">create</span>(
       <div class="code-snippet" id="tab-mcp"><pre><span class="c-comment">// ~/.claude/mcp.json  (or claude-code / VS Code equivalent)</span>
 {
   <span class="c-string">"mcpServers"</span>: {
-    <span class="c-string">"vantage"</span>: {
+    <span class="c-string">"cohrint"</span>: {
       <span class="c-string">"command"</span>: <span class="c-string">"npx"</span>,
-      <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"vantage-ai-mcp"</span>],
+      <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"cohrint-mcp"</span>],
       <span class="c-string">"env"</span>: {
-        <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"crt_your_key"</span>,
-        <span class="c-string">"VANTAGE_ORG_ID"</span>: <span class="c-string">"your_org_id"</span>
+        <span class="c-string">"COHRINT_API_KEY"</span>: <span class="c-string">"crt_your_key"</span>,
+        <span class="c-string">"COHRINT_ORG_ID"</span>: <span class="c-string">"your_org_id"</span>
       }
     }
   }
@@ -673,10 +673,10 @@ response = client.chat.completions.<span class="c-func">create</span>(
 <span class="c-comment">// "Which model is cheapest for my summarisation workflow?"</span>
 <span class="c-comment">// "Show requests wasting the most tokens"</span></pre></div>
       <div class="code-snippet" id="tab-cli"><pre><span class="c-comment"># Install globally</span>
-<span class="c-keyword">$</span> npx vantageai-cli
+<span class="c-keyword">$</span> npx cohrint-cli
 
 <span class="c-comment"># Pipe mode — optimize + forward to Claude</span>
-<span class="c-keyword">$</span> echo <span class="c-string">"Could you please explain kubernetes pods"</span> | vantage
+<span class="c-keyword">$</span> echo <span class="c-string">"Could you please explain kubernetes pods"</span> | cohrint
 <span class="c-comment">  ⚡ Optimized: 16 → 12 tokens (saved 4, -25%)</span>
 
 <span class="c-comment">  A Kubernetes pod is the smallest deployable unit...</span>
@@ -684,12 +684,12 @@ response = client.chat.completions.<span class="c-func">create</span>(
 <span class="c-comment">  💰 Cost: $0.0065 | 💾 Saved: 4 tokens</span>
 
 <span class="c-comment"># REPL mode — switch agents on the fly</span>
-<span class="c-keyword">$</span> vantage
-<span class="c-var">vantage</span> [claude] ▸ explain load balancers
-<span class="c-var">vantage</span> [claude] ▸ <span class="c-keyword">/gemini</span> summarize this in 2 lines
-<span class="c-var">vantage</span> [claude] ▸ <span class="c-keyword">/compare</span> what is DNS
-<span class="c-var">vantage</span> [claude] ▸ <span class="c-keyword">/session</span>  <span class="c-comment"># interactive mode with /compact, /clear</span>
-<span class="c-var">vantage</span> [claude] ▸ <span class="c-keyword">/summary</span> <span class="c-comment"># dashboard stats in terminal</span></pre></div>
+<span class="c-keyword">$</span> cohrint
+<span class="c-var">cohrint</span> [claude] ▸ explain load balancers
+<span class="c-var">cohrint</span> [claude] ▸ <span class="c-keyword">/gemini</span> summarize this in 2 lines
+<span class="c-var">cohrint</span> [claude] ▸ <span class="c-keyword">/compare</span> what is DNS
+<span class="c-var">cohrint</span> [claude] ▸ <span class="c-keyword">/session</span>  <span class="c-comment"># interactive mode with /compact, /clear</span>
+<span class="c-var">cohrint</span> [claude] ▸ <span class="c-keyword">/summary</span> <span class="c-comment"># dashboard stats in terminal</span></pre></div>
     </div>
   </div>
 </section>
@@ -748,7 +748,7 @@ response = client.chat.completions.<span class="c-func">create</span>(
         <!-- CLI tab -->
         <div class="demo-panel" id="dp-cli" style="display:none">
           <div style="background:#0d1117;border-radius:8px;padding:16px;font-family:var(--mono);font-size:12px;line-height:1.8;color:#e6edf3">
-            <div style="color:#7d8590">$ echo "Could you please explain kubernetes" | vantage</div>
+            <div style="color:#7d8590">$ echo "Could you please explain kubernetes" | cohrint</div>
             <div style="color:#3fb950">  ⚡ Optimized: 8 → 6 tokens (saved 2, -25%)</div>
             <div style="margin:8px 0;color:#e6edf3">A Kubernetes pod is the smallest deployable unit...</div>
             <div style="color:#7d8590;border-top:1px solid #21262d;margin-top:8px;padding-top:8px">
@@ -760,12 +760,12 @@ response = client.chat.completions.<span class="c-func">create</span>(
               Tokens saved:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span style="color:#3fb950">2 tokens</span><br>
               +-------------------------------+
             </div>
-            <div style="margin-top:12px;color:#7d8590">$ vantage</div>
-            <div><span style="color:#58a6ff">vantage</span> <span style="color:#7d8590">[claude]</span> ▸ /gemini what is DNS<br>
+            <div style="margin-top:12px;color:#7d8590">$ cohrint</div>
+            <div><span style="color:#58a6ff">cohrint</span> <span style="color:#7d8590">[claude]</span> ▸ /gemini what is DNS<br>
             <span style="color:#7d8590">[Gemini responds...]</span><br>
-            <span style="color:#58a6ff">vantage</span> <span style="color:#7d8590">[claude]</span> ▸ /compare explain caching<br>
+            <span style="color:#58a6ff">cohrint</span> <span style="color:#7d8590">[claude]</span> ▸ /compare explain caching<br>
             <span style="color:#7d8590">[Runs on all agents, shows cost comparison table]</span><br>
-            <span style="color:#58a6ff">vantage</span> <span style="color:#7d8590">[claude]</span> ▸ /session<br>
+            <span style="color:#58a6ff">cohrint</span> <span style="color:#7d8590">[claude]</span> ▸ /session<br>
             <span style="color:#3fb950">  Starting Claude Code session...</span><br>
             <span style="color:#7d8590">  claude></span> /compact<br>
             <span style="color:#7d8590">  claude></span> explain this codebase
@@ -803,7 +803,7 @@ response = client.chat.completions.<span class="c-func">create</span>(
         </div>
         <!-- Compare tab -->
         <div class="demo-panel" id="dp-compare" style="display:none">
-          <div style="font-size:12px;color:var(--muted);margin-bottom:10px">$ vantage /compare "explain kubernetes pods"</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:10px">$ cohrint /compare "explain kubernetes pods"</div>
           <table style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)">
             <thead><tr style="border-bottom:1px solid var(--border);text-align:left">
               <th style="padding:6px 8px;color:var(--muted)">Agent</th>
@@ -891,7 +891,7 @@ response = client.chat.completions.<span class="c-func">create</span>(
 <!-- COMPARISON -->
 <section id="compare" style="padding-top:0">
   <div class="sec-label">// vs the alternatives</div>
-  <div class="sec-title">Why teams choose <em>Vantage</em></div>
+  <div class="sec-title">Why teams choose <em>Cohrint</em></div>
   <div class="compare-wrap reveal">
     <table class="compare-tbl">
       <thead>
@@ -940,24 +940,24 @@ response = client.chat.completions.<span class="c-func">create</span>(
   <div class="sec-title">Common <em>questions</em></div>
   <div class="faq-list reveal">
     <div class="faq-item">
-      <div class="faq-q" onclick="toggleFaq(this)">Does Vantage store my prompts and responses? <span class="faq-arrow">+</span></div>
-      <div class="faq-a"><div class="faq-a-inner">Vantage stores a short preview of your request and response (first 500 chars) to help you debug expensive or low-quality calls. You can disable this entirely in your SDK config. We never train models on your data, and you can request deletion at any time.</div></div>
+      <div class="faq-q" onclick="toggleFaq(this)">Does Cohrint store my prompts and responses? <span class="faq-arrow">+</span></div>
+      <div class="faq-a"><div class="faq-a-inner">Cohrint stores a short preview of your request and response (first 500 chars) to help you debug expensive or low-quality calls. You can disable this entirely in your SDK config. We never train models on your data, and you can request deletion at any time.</div></div>
     </div>
     <div class="faq-item">
-      <div class="faq-q" onclick="toggleFaq(this)">Does adding the Vantage SDK add latency to my calls? <span class="faq-arrow">+</span></div>
-      <div class="faq-a"><div class="faq-a-inner">No measurable latency is added. Vantage captures event data after your LLM call completes and sends it to our ingest API in a background thread. Your main request path is completely unaffected — zero added latency.</div></div>
+      <div class="faq-q" onclick="toggleFaq(this)">Does adding the Cohrint SDK add latency to my calls? <span class="faq-arrow">+</span></div>
+      <div class="faq-a"><div class="faq-a-inner">No measurable latency is added. Cohrint captures event data after your LLM call completes and sends it to our ingest API in a background thread. Your main request path is completely unaffected — zero added latency.</div></div>
     </div>
     <div class="faq-item">
-      <div class="faq-q" onclick="toggleFaq(this)">What happens if the Vantage ingest API is down? <span class="faq-arrow">+</span></div>
-      <div class="faq-a"><div class="faq-a-inner">Your AI calls continue to work normally — Vantage is not in the critical path. Events are queued locally and retried when connectivity is restored. Your production traffic is never affected by Vantage availability.</div></div>
+      <div class="faq-q" onclick="toggleFaq(this)">What happens if the Cohrint ingest API is down? <span class="faq-arrow">+</span></div>
+      <div class="faq-a"><div class="faq-a-inner">Your AI calls continue to work normally — Cohrint is not in the critical path. Events are queued locally and retried when connectivity is restored. Your production traffic is never affected by Cohrint availability.</div></div>
     </div>
     <div class="faq-item">
       <div class="faq-q" onclick="toggleFaq(this)">Which LLM providers and models are supported? <span class="faq-arrow">+</span></div>
-      <div class="faq-a"><div class="faq-a-inner">Vantage supports models across 3 providers: OpenAI (GPT-4o, o1, o3, Codex), Anthropic (Claude 3.5/4 family), and Google (Gemini 1.5/2.0). New models are added within 24 hours of launch.</div></div>
+      <div class="faq-a"><div class="faq-a-inner">Cohrint supports models across 3 providers: OpenAI (GPT-4o, o1, o3, Codex), Anthropic (Claude 3.5/4 family), and Google (Gemini 1.5/2.0). New models are added within 24 hours of launch.</div></div>
     </div>
     <div class="faq-item">
-      <div class="faq-q" onclick="toggleFaq(this)">Can I self-host Vantage on my own infrastructure? <span class="faq-arrow">+</span></div>
-      <div class="faq-a"><div class="faq-a-inner">Yes. The Vantage server is open-source and deployable on Railway, Render, or any VPS in under 10 minutes. Enterprise customers get a Docker Compose package and Kubernetes Helm chart for air-gapped deployments where data never leaves your VPC.</div></div>
+      <div class="faq-q" onclick="toggleFaq(this)">Can I self-host Cohrint on my own infrastructure? <span class="faq-arrow">+</span></div>
+      <div class="faq-a"><div class="faq-a-inner">Yes. The Cohrint server is open-source and deployable on Railway, Render, or any VPS in under 10 minutes. Enterprise customers get a Docker Compose package and Kubernetes Helm chart for air-gapped deployments where data never leaves your VPC.</div></div>
     </div>
     <div class="faq-item">
       <div class="faq-q" onclick="toggleFaq(this)">How does the free tier compare to paid plans? <span class="faq-arrow">+</span></div>
