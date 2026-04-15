@@ -3472,3 +3472,70 @@ cohrint-agent --api-key sk-ant-...      # Provide API key
 cohrint-agent --vantage-key crt_...     # Enable dashboard telemetry
 cohrint-agent --debug                   # Enable debug output
 ```
+
+---
+
+## Search Engine Verification & Sitemap Submission
+
+After deploying, complete these steps **once** to register cohrint.com with each search engine. Verification files are already committed — you just need to replace the placeholder content with real codes from each console.
+
+### 1. Google Search Console
+1. Go to [search.google.com/search-console](https://search.google.com/search-console)
+2. Click **Add Property** → enter `https://cohrint.com`
+3. Choose **HTML file** verification method
+4. Download the file Google provides (e.g., `googleabc123.html`)
+5. Replace `vantage-final-v4/google-site-verification.html` with the downloaded file (rename file to match Google's filename)
+6. Update `<meta name="google-site-verification" content="...">` in `vantage-final-v4/index.html` with your verification code
+7. Deploy, then click **Verify** in Search Console
+8. After verification: go to **Sitemaps** → Submit `https://cohrint.com/sitemap.xml`
+
+### 2. Bing Webmaster Tools
+Covers: **Bing, DuckDuckGo, Yahoo, Microsoft Edge, Safari Spotlight**
+1. Go to [bing.com/webmasters](https://www.bing.com/webmasters)
+2. Click **Add Site** → enter `https://cohrint.com`
+3. Choose **XML file** verification
+4. Replace `vantage-final-v4/BingSiteAuth.xml` with the file Bing provides
+5. Update `<meta name="msvalidate.01" content="...">` in `index.html` with your code
+6. Deploy, then click **Verify**
+7. After verification: go to **Sitemaps** → Submit `https://cohrint.com/sitemap.xml`
+
+### 3. Yandex Webmaster
+1. Go to [webmaster.yandex.com](https://webmaster.yandex.com)
+2. Click **Add site** → enter `https://cohrint.com`
+3. Choose **HTML file** verification
+4. Replace `vantage-final-v4/yandex-verification.html` with Yandex's file (rename to match)
+5. Update `<meta name="yandex-verification" content="...">` in `index.html` with your code
+6. Deploy, then verify and submit sitemap
+
+### 4. IndexNow (instant indexing — Bing + Yandex)
+The IndexNow key is already set up. After each deploy, ping the IndexNow API to notify search engines of new/updated pages:
+
+```bash
+curl -X POST "https://api.indexnow.org/indexnow" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "host": "cohrint.com",
+    "key": "70af20b77cca5851f1d94b24e39f4ce400a1966b08b8d0f08abc14e169ae120f",
+    "keyLocation": "https://cohrint.com/70af20b77cca5851f1d94b24e39f4ce400a1966b08b8d0f08abc14e169ae120f.txt",
+    "urlList": [
+      "https://cohrint.com/",
+      "https://cohrint.com/docs",
+      "https://cohrint.com/calculator",
+      "https://cohrint.com/blog",
+      "https://cohrint.com/claude-code-cost",
+      "https://cohrint.com/gemini-cli-cost",
+      "https://cohrint.com/copilot-cost",
+      "https://cohrint.com/ai-coding-cost"
+    ]
+  }'
+```
+
+### 5. DuckDuckGo & Safari
+- **DuckDuckGo** uses Bing's index — no separate console needed. Bing Webmaster Tools covers it.
+- **Safari** uses Bing for Spotlight and browser suggestions — also covered by Bing Webmaster Tools.
+
+### Notes
+- First indexing takes 1–4 weeks after verification even with IndexNow
+- Check Search Console weekly for crawl errors or manual actions
+- Update `sitemap.xml` `lastmod` dates whenever pages change significantly
+- The `vantageaiops.com` redirect project must be deployed separately — see Task 1 in the implementation plan
