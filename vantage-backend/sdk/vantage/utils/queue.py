@@ -4,7 +4,7 @@ Zero latency impact on the application.
 """
 from __future__ import annotations
 import json, logging, queue, threading, time, urllib.error, urllib.request
-from vantage.models.event import VantageEvent
+from vantage.models.event import CohrintEvent
 
 logger = logging.getLogger("vantage.queue")
 SDK_VERSION = "1.0.0"
@@ -18,14 +18,14 @@ class EventQueue:
         self.flush_interval = flush_interval
         self.batch_size     = batch_size
         self.debug          = debug
-        self._q: queue.Queue[VantageEvent] = queue.Queue(maxsize=10_000)
+        self._q: queue.Queue[CohrintEvent] = queue.Queue(maxsize=10_000)
         self._thread: threading.Thread | None = None
 
     def start(self) -> None:
         self._thread = threading.Thread(target=self._run, daemon=True, name="vantage-flush")
         self._thread.start()
 
-    def enqueue(self, event: VantageEvent) -> None:
+    def enqueue(self, event: CohrintEvent) -> None:
         try:
             self._q.put_nowait(event)
             qsize = self._q.qsize()
@@ -44,7 +44,7 @@ class EventQueue:
             logger.warning("Vantage queue full (10000) — event dropped")
 
     def flush_sync(self) -> None:
-        batch: list[VantageEvent] = []
+        batch: list[CohrintEvent] = []
         try:
             while len(batch) < self.batch_size:
                 batch.append(self._q.get_nowait())
@@ -61,7 +61,7 @@ class EventQueue:
             except Exception as e:
                 logger.warning("Flush error: %s", e)
 
-    def _send(self, events: list[VantageEvent]) -> None:
+    def _send(self, events: list[CohrintEvent]) -> None:
         payload = json.dumps({
             "events": [e.to_dict() for e in events],
             "sdk_version": SDK_VERSION,

@@ -1,7 +1,7 @@
 {
   "name": "vantageai",
   "version": "1.0.0",
-  "description": "VantageAI — AI Cost Intelligence Platform",
+  "description": "Cohrint — AI Cost Intelligence Platform",
   "private": true,
   "scripts": {
     "dev": "wrangler pages dev --port=8788 --live-reload",
@@ -16,7 +16,7 @@
     "test": "python3 tests/run_suite.py --fast --no-report",
     "test:all": "python3 tests/run_suite.py --all --fast --no-report",
     "test:ci": "HEADLESS=1 python3 tests/run_suite.py --fast --no-report",
-    "test:smoke": "curl -sf https://api.vantageaiops.com/v1/health | python3 -c \"import sys,json;d=json.load(sys.stdin);print('API:',d.get('status','ok'))\" && curl -sf -o /dev/null -w 'Frontend: HTTP %{http_code}\\n' https://vantageaiops.com/"
+    "test:smoke": "curl -sf https://api.cohrint.com/v1/health | python3 -c \"import sys,json;d=json.load(sys.stdin);print('API:',d.get('status','ok'))\" && curl -sf -o /dev/null -w 'Frontend: HTTP %{http_code}\\n' https://cohrint.com/"
   },
   "devDependencies": {
     "wrangler": "^3.101.0"

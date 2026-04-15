@@ -1,4 +1,4 @@
-# VantageAI — Developer Admin Guide
+# Cohrint — Developer Admin Guide
 **Version 1.0 · March 2026 · INTERNAL — NOT FOR PUBLIC DISTRIBUTION**
 
 ---
@@ -30,7 +30,7 @@
 23. [Claude Code Auto-Tracking](#23-claude-code-auto-tracking)
 24. [SDK Privacy Modes](#24-sdk-privacy-modes)
 25. [Cross-Platform OTel Collector (v2)](#25-cross-platform-otel-collector-v2)
-26. [VantageAI CLI — AI Agent Wrapper](#26-vantageai-cli--ai-agent-wrapper)
+26. [Cohrint CLI — AI Agent Wrapper](#26-vantageai-cli--ai-agent-wrapper)
 27. [Security & Governance](#27-security--governance)
 28. [Claude Code Integration (Customer-Facing)](#28-claude-code-integration-customer-facing)
 29. [GitHub Copilot Metrics Adapter](#29-github-copilot-metrics-adapter)
@@ -43,10 +43,10 @@
 
 ## 1. Product Overview
 
-VantageAI is an **AI cost intelligence and observability platform**. It gives engineering teams real-time visibility into LLM API spending, token efficiency, model performance, and output quality through a two-line SDK integration.
+Cohrint is an **AI cost intelligence and observability platform**. It gives engineering teams real-time visibility into LLM API spending, token efficiency, model performance, and output quality through a two-line SDK integration.
 
 ### What It Does (One Paragraph)
-An application integrates the VantageAI SDK (Python or JS). Every LLM API call the app makes is transparently intercepted; the SDK extracts cost, token, latency, and metadata from the response and POSTs it to `api.vantageaiops.com`. The Worker stores it in D1 (SQLite). The dashboard (`app.html`) polls or streams from the same API to render charts, KPI cards, and team breakdowns. Admins set budgets, alerts fire via Slack when thresholds are crossed, and team members each get scoped keys so they see only their team's data.
+An application integrates the Cohrint SDK (Python or JS). Every LLM API call the app makes is transparently intercepted; the SDK extracts cost, token, latency, and metadata from the response and POSTs it to `api.cohrint.com`. The Worker stores it in D1 (SQLite). The dashboard (`app.html`) polls or streams from the same API to render charts, KPI cards, and team breakdowns. Admins set budgets, alerts fire via Slack when thresholds are crossed, and team members each get scoped keys so they see only their team's data.
 
 ### Technology Stack
 
@@ -57,8 +57,8 @@ An application integrates the VantageAI SDK (Python or JS). Every LLM API call t
 | Cache/Pub-Sub | Cloudflare KV | Rate limiting counters, SSE broadcast, alert throttle, session tokens |
 | Frontend | Cloudflare Pages | Static hosting, global CDN, auto-deploys from `main` |
 | Email | Resend API | Transactional email, 3k/month free, custom domain |
-| SDK (Python) | `vantageaiops` on PyPI | OpenAI + Anthropic proxy wrappers |
-| SDK (JS) | `vantageaiops` on npm | OpenAI + Anthropic proxy wrappers, streaming support |
+| SDK (Python) | `cohrint` on PyPI | OpenAI + Anthropic proxy wrappers |
+| SDK (JS) | `cohrint` on npm | OpenAI + Anthropic proxy wrappers, streaming support |
 | MCP Server | `vantage-mcp/` | VS Code, Cursor, Windsurf integration |
 | CI/CD | GitHub Actions | Deploy on push to `main`, test on every branch |
 
@@ -74,13 +74,13 @@ An application integrates the VantageAI SDK (Python or JS). Every LLM API call t
 SDK / Direct API call
         │
         ▼
-  Bearer vnt_... token
+  Bearer crt_... token
   POST /v1/events
         │
         ▼
 ┌─────────────────────────────────┐
 │     Cloudflare Worker           │
-│   api.vantageaiops.com          │
+│   api.cohrint.com          │
 │                                 │
 │  corsMiddleware → authMiddleware│
 │       → rate limiter (KV)       │
@@ -116,8 +116,8 @@ Every authenticated request goes through this pipeline:
    → Return 204 with CORS headers if OPTIONS
 
 2. Auth resolution (authMiddleware)
-   a. Cookie path:  vantage_session → sessions table → org_id, role, member_id
-   b. Bearer path:  Authorization: Bearer vnt_... → SHA-256 hash → orgs or org_members table
+   a. Cookie path:  cohrint_session → sessions table → org_id, role, member_id
+   b. Bearer path:  Authorization: Bearer crt_... → SHA-256 hash → orgs or org_members table
    → Set context vars: orgId, role, scopeTeam, memberId
 
 3. Rate limit check (KV, per-org, per-minute window)
@@ -139,7 +139,7 @@ Every authenticated request goes through this pipeline:
 ```toml
 # Worker name
 name = "vantageai-api"
-routes = [{ pattern = "api.vantageaiops.com/*", zone_name = "vantageaiops.com" }]
+routes = [{ pattern = "api.cohrint.com/*", zone_name = "cohrint.com" }]
 
 # D1 SQLite — binding name only; actual database_id in wrangler.toml (not committed)
 binding = "DB"
@@ -149,7 +149,7 @@ binding = "KV"
 
 # Env vars (non-secret)
 ENVIRONMENT = "production"
-ALLOWED_ORIGINS = "https://vantageaiops.com,https://www.vantageaiops.com,https://vantageai.pages.dev"
+ALLOWED_ORIGINS = "https://cohrint.com,https://www.cohrint.com,https://vantageai.pages.dev"
 RATE_LIMIT_RPM = "1000"
 
 # Secrets (set via: wrangler secret put)
@@ -162,7 +162,7 @@ RESEND_API_KEY   — email sending
 
 ## 3. Database Schema & Data Model
 
-VantageAI uses Cloudflare D1 (SQLite). Core tables plus extended tables added in v2.
+Cohrint uses Cloudflare D1 (SQLite). Core tables plus extended tables added in v2.
 
 ### 3.1 `orgs` — One row per organization (account owner)
 
@@ -170,7 +170,7 @@ VantageAI uses Cloudflare D1 (SQLite). Core tables plus extended tables added in
 CREATE TABLE orgs (
   id            TEXT PRIMARY KEY,     -- slug: "mycompany", "mycompany-a3f2"
   api_key_hash  TEXT NOT NULL,         -- SHA-256 of raw key (never store raw)
-  api_key_hint  TEXT,                  -- "vnt_mycompa..." (first 12 chars + ...)
+  api_key_hint  TEXT,                  -- "crt_mycompa..." (first 12 chars + ...)
   name          TEXT,
   email         TEXT UNIQUE,
   plan          TEXT DEFAULT 'free',   -- 'free' | 'team' | 'enterprise'
@@ -182,7 +182,7 @@ CREATE TABLE orgs (
 
 **Key design decisions:**
 - `id` is a human-readable slug derived from org name/email via `toSlug()`. If collision, append 3-char hex suffix.
-- API key format: `vnt_{orgId}_{16-hex-random}`. The org_id is embedded for fast routing (extract without DB lookup).
+- API key format: `crt_{orgId}_{16-hex-random}`. The org_id is embedded for fast routing (extract without DB lookup).
 - Only the SHA-256 hash is stored. The raw key is shown exactly once at signup.
 - `budget_usd = 0` means no budget set (not zero budget).
 
@@ -472,23 +472,23 @@ CREATE TABLE datadog_connections (
 ### 4.1 API Key Format
 
 ```
-vnt_{orgId}_{16-hex-random}
+crt_{orgId}_{16-hex-random}
  ^     ^          ^
  |     |          └── 16 bytes of crypto.getRandomValues() = 128 bits of entropy
  |     └───────────── org slug embedded (for fast routing)
- └─────────────────── VantageAI namespace prefix
+ └─────────────────── Cohrint namespace prefix
 ```
 
 **Storage:** Only `SHA-256(rawKey)` is stored. The raw key is shown once and never retrievable.
 
-**Hint:** First 12 characters + `...` → `vnt_mycompa...`. Used in UI to identify which key is active.
+**Hint:** First 12 characters + `...` → `crt_mycompa...`. Used in UI to identify which key is active.
 
 ### 4.2 Auth Middleware Flow
 
 ```
 Request arrives
       │
-      ├── Has Cookie: vantage_session=TOKEN ?
+      ├── Has Cookie: cohrint_session=TOKEN ?
       │       │
       │       ├── YES → SELECT from sessions WHERE token=? AND expires_at > now()
       │       │           → If found: set orgId, role, memberId, scopeTeam
@@ -496,7 +496,7 @@ Request arrives
       │       │
       │       └── NO → continue
       │
-      ├── Has Authorization: Bearer vnt_... ?
+      ├── Has Authorization: Bearer crt_... ?
       │       │
       │       ├── YES → Extract orgId from key format (parts[1])
       │       │       → SHA-256 hash the key
@@ -533,7 +533,7 @@ Role checks:
 | Property | Value | Reason |
 |---|---|---|
 | Cookie flags | `HttpOnly; SameSite=Lax; Secure` | XSS protection, CSRF protection, HTTPS-only |
-| `Domain` | `vantageaiops.com` (prod only) | Shared across `api.` and `app.` subdomains |
+| `Domain` | `cohrint.com` (prod only) | Shared across `api.` and `app.` subdomains |
 | TTL | 30 days | Balance UX vs. security; owner can rotate key to invalidate all sessions |
 | Token entropy | 256 bits (32 random bytes → 64 hex chars) | Unguessable |
 | Storage | D1 `sessions` table | Not in KV — D1 provides consistent expiry and deletion |
@@ -551,7 +551,7 @@ POST /v1/auth/recover { email }
         ├── If email exists in orgs:
         │     → Generate 48-char hex token (24 random bytes)
         │     → KV.put("recover:{token}", {orgId, type:'owner'}, TTL=3600s)
-        │     → Build redeem URL: api.vantageaiops.com/v1/auth/recover/redeem?token=...
+        │     → Build redeem URL: api.cohrint.com/v1/auth/recover/redeem?token=...
         │     → Send email via Resend (keyRecoveryEmail template)
         │
         └── If email exists in org_members:
@@ -643,7 +643,7 @@ Algorithm:
       error: "Free tier limit reached",
       events_used: N,
       events_limit: 50000,
-      upgrade_url: "https://vantageaiops.com/signup.html"
+      upgrade_url: "https://cohrint.com/signup.html"
     }
 ```
 
@@ -769,7 +769,7 @@ Designed to be called in CI pipelines to enforce cost budgets:
 ```bash
 # In GitHub Actions:
 COST=$(curl -s -H "Authorization: Bearer $VANTAGE_KEY" \
-  "https://api.vantageaiops.com/v1/analytics/cost?period=1" \
+  "https://api.cohrint.com/v1/analytics/cost?period=1" \
   | jq '.today_cost_usd')
 if (( $(echo "$COST > 10.0" | bc -l) )); then
   echo "❌ Cost exceeded $10 today — failing pipeline"
@@ -840,7 +840,7 @@ The SSE endpoint can't use `Authorization` headers (browser `EventSource` API do
 
 1. **`?sse_token=`** (dashboard/browser): 32-char hex token, stored in KV with 120s TTL. Generated in `GET /v1/auth/session`, returned as `sse_token`. One-time use (deleted on connect). This prevents replay attacks from URL logs.
 
-2. **`?token=vnt_...`** (SDK/direct callers): Legacy bearer token in query param. Accepted without KV lookup (SDK use case, less sensitive than browser).
+2. **`?token=crt_...`** (SDK/direct callers): Legacy bearer token in query param. Accepted without KV lookup (SDK use case, less sensitive than browser).
 
 ### 8.3 KV Broadcast Channel
 
@@ -910,8 +910,8 @@ Email is sent via [Resend](https://resend.com). The `RESEND_API_KEY` is stored a
 
 ```typescript
 const senders = [
-  'VantageAI <noreply@vantageaiops.com>',    // custom domain (requires DNS verification)
-  'VantageAI <onboarding@resend.dev>',       // Resend shared domain (always works)
+  'Cohrint <noreply@cohrint.com>',    // custom domain (requires DNS verification)
+  'Cohrint <onboarding@resend.dev>',       // Resend shared domain (always works)
 ];
 for (const from of senders) {
   const res = await fetch('https://api.resend.com/emails', { ... body: { from, ... } });
@@ -953,7 +953,7 @@ POST /v1/auth/members (adminOnly)
 
 1. Validate email format
 2. Check for duplicate (409 if already a member)
-3. Generate: memberId (8-char hex), rawKey (vnt_...), hash it
+3. Generate: memberId (8-char hex), rawKey (crt_...), hash it
 4. INSERT INTO org_members
 5. Fire-and-forget email invite (c.executionCtx.waitUntil)
 6. Return { member_id, api_key (shown once), hint, role, scope_team }
@@ -1056,7 +1056,7 @@ vantage-final-v4/
 Single-file SPA. No build step, no bundler. Raw HTML/CSS/JavaScript.
 
 **State management:** Global variables + localStorage
-- `window.vantage_session` — cached session JSON
+- `window.cohrint_session` — cached session JSON
 - `localStorage.getItem('vantage_api_key')` — persisted key
 - `localStorage.getItem('vantage_theme')` — dark/light preference
 
@@ -1072,7 +1072,7 @@ function nav(view) {
 }
 ```
 
-**Auth gate:** On load, reads `vantage_session` cookie via `GET /v1/auth/session`. If 401, redirects to `/auth`.
+**Auth gate:** On load, reads `cohrint_session` cookie via `GET /v1/auth/session`. If 401, redirects to `/auth`.
 
 **Theme system:**
 ```javascript
@@ -1100,7 +1100,7 @@ Permissions-Policy: camera=(), microphone=(), geolocation=()
 Cache-Control: no-cache, no-store, must-revalidate
 Content-Security-Policy:
   default-src 'self' 'unsafe-inline' [fonts, CDN]
-  connect-src 'self' https://api.vantageaiops.com wss://api.vantageaiops.com [cloudflare]
+  connect-src 'self' https://api.cohrint.com wss://api.cohrint.com [cloudflare]
   img-src 'self' data:
   worker-src 'self'
 ```
@@ -1111,9 +1111,9 @@ Content-Security-Policy:
 
 ## 13. Client Types & Integration Patterns
 
-> **Interactive Diagram:** [SDK Architecture (Python + JavaScript)](https://excalidraw.com/#json=Tv6Kcu6jof1GZlHAFQMP2,DT4JGkvQJqxQ1EL2IoudbA) — open in Excalidraw to see how the SDK proxy wrappers intercept LLM calls, extract metadata, and POST events to the VantageAI API.
+> **Interactive Diagram:** [SDK Architecture (Python + JavaScript)](https://excalidraw.com/#json=Tv6Kcu6jof1GZlHAFQMP2,DT4JGkvQJqxQ1EL2IoudbA) — open in Excalidraw to see how the SDK proxy wrappers intercept LLM calls, extract metadata, and POST events to the Cohrint API.
 
-VantageAI serves four distinct client archetypes. Each has different integration patterns, auth needs, and data characteristics.
+Cohrint serves four distinct client archetypes. Each has different integration patterns, auth needs, and data characteristics.
 
 ---
 
@@ -1123,24 +1123,24 @@ VantageAI serves four distinct client archetypes. Each has different integration
 
 **Integration:**
 ```python
-# pip install vantageaiops
-from vantageaiops import OpenAIProxy
+# pip install cohrint
+from cohrint import OpenAIProxy
 
-client = OpenAIProxy(api_key="vnt_myorg_...")
+client = OpenAIProxy(api_key="crt_myorg_...")
 response = client.chat.completions.create(
     model="gpt-4o",
     messages=[{"role": "user", "content": "Hello"}]
 )
-# SDK silently posts event to api.vantageaiops.com/v1/events
+# SDK silently posts event to api.cohrint.com/v1/events
 ```
 
 **What the SDK does:**
 1. Wraps the OpenAI/Anthropic client
 2. Intercepts the response
 3. Extracts tokens, cost (from pricing table), latency
-4. POSTs to VantageAI API in a background thread (non-blocking)
+4. POSTs to Cohrint API in a background thread (non-blocking)
 
-**Auth:** Bearer key, set as env var `VANTAGE_API_KEY`
+**Auth:** Bearer key, set as env var `COHRINT_API_KEY`
 
 **Data characteristics:** High volume, regular cadence, automated (no human in loop)
 
@@ -1154,10 +1154,10 @@ response = client.chat.completions.create(
 
 **Integration:**
 ```typescript
-// npm install vantageaiops
-import { OpenAIProxy } from 'vantageaiops';
+// npm install cohrint
+import { OpenAIProxy } from 'cohrint';
 
-const client = new OpenAIProxy({ apiKey: 'vnt_myorg_...' });
+const client = new OpenAIProxy({ apiKey: 'crt_myorg_...' });
 const response = await client.chat.completions.create({ ... });
 ```
 
@@ -1166,7 +1166,7 @@ const response = await client.chat.completions.create({ ... });
 **Team tagging pattern:**
 ```typescript
 const client = new OpenAIProxy({
-  apiKey: 'vnt_myorg_...',
+  apiKey: 'crt_myorg_...',
   defaultTags: { team: 'frontend', feature: 'chat', user_id: userId }
 });
 ```
@@ -1184,7 +1184,7 @@ import requests, uuid
 trace_id = str(uuid.uuid4())
 
 # Root span
-requests.post("https://api.vantageaiops.com/v1/events", json={
+requests.post("https://api.cohrint.com/v1/events", json={
   "event_id": str(uuid.uuid4()),
   "provider": "anthropic",
   "model": "claude-3-5-sonnet-20241022",
@@ -1196,10 +1196,10 @@ requests.post("https://api.vantageaiops.com/v1/events", json={
   "agent_name": "ResearchAgent",
   "span_depth": 0,
   "team": "ai-platform"
-}, headers={"Authorization": "Bearer vnt_..."})
+}, headers={"Authorization": "Bearer crt_..."})
 
 # Child span
-requests.post("https://api.vantageaiops.com/v1/events", json={
+requests.post("https://api.cohrint.com/v1/events", json={
   "event_id": str(uuid.uuid4()),
   "trace_id": trace_id,
   "parent_event_id": parent_id,
@@ -1217,7 +1217,7 @@ requests.post("https://api.vantageaiops.com/v1/events", json={
 
 ### 13.4 Client Type D: VS Code / Cursor / AI Coding Tool (MCP Client)
 
-**Profile:** Developer using an AI coding assistant. Every code completion, chat, or inline edit is an LLM call. VantageAI MCP server surfaces cost data directly in the IDE.
+**Profile:** Developer using an AI coding assistant. Every code completion, chat, or inline edit is an LLM call. Cohrint MCP server surfaces cost data directly in the IDE.
 
 **How it works:**
 ```
@@ -1265,7 +1265,7 @@ VS Code / Cursor / Windsurf
 - name: Check AI cost gate
   run: |
     COST=$(curl -sf -H "Authorization: Bearer $VANTAGE_KEY" \
-      "https://api.vantageaiops.com/v1/analytics/cost?period=1" \
+      "https://api.cohrint.com/v1/analytics/cost?period=1" \
       | jq '.today_cost_usd')
     echo "Today's AI cost: $COST"
     python -c "import sys; sys.exit(1 if float('$COST') > 5.0 else 0)"
@@ -1424,7 +1424,7 @@ Every test file:
 ### 16.1 API Key Security
 
 - **Never stored in plaintext.** Only SHA-256 hash in DB. Attack vector: hash collision (computationally infeasible with SHA-256).
-- **Format encoding:** `vnt_{orgId}_{hex}` — the org_id in the key allows fast routing (extract before DB lookup) but doesn't reduce entropy (the 16-hex-random component provides 128 bits of entropy).
+- **Format encoding:** `crt_{orgId}_{hex}` — the org_id in the key allows fast routing (extract before DB lookup) but doesn't reduce entropy (the 16-hex-random component provides 128 bits of entropy).
 - **One-way:** There is no "decrypt the key" path. Forgotten = must rotate.
 - **Rotation is instant:** No grace period for the old key (unless you implement one). Update before rotating.
 
@@ -1437,9 +1437,9 @@ For scoped members, `teamScope()` appends `AND team = ?` to every analytics quer
 ### 16.3 CORS Policy
 
 ```typescript
-ALLOWED_ORIGINS = "https://vantageaiops.com,https://www.vantageaiops.com,https://vantageai.pages.dev"
+ALLOWED_ORIGINS = "https://cohrint.com,https://www.cohrint.com,https://vantageai.pages.dev"
 
-// Pattern matching supports wildcard suffix: "https://*.vantageaiops.com"
+// Pattern matching supports wildcard suffix: "https://*.cohrint.com"
 const isAllowed = allowed.includes(origin) ||
   allowed.some(p => p.endsWith('*') && origin.startsWith(p.slice(0, -1)));
 ```
@@ -1452,7 +1452,7 @@ For the SSE endpoint, `Access-Control-Allow-Origin: *` is used (no credentials i
 
 - **Chart.js CDN:** SRI hash enforced (`integrity="sha384-..."` + `crossorigin="anonymous"`) — CDN compromise cannot execute unsigned JS
 - **`apiFetch` isolation:** The auth-bearing fetch function is not exposed on `window`. External scripts use a one-time `window.__cpRegister` callback that self-nulls after `cp-console.js` claims it
-- **`api_base` override:** `localStorage.api_base` is validated against an explicit allowlist (`api.vantageaiops.com`, `localhost`) — arbitrary `https://` hosts are rejected
+- **`api_base` override:** `localStorage.api_base` is validated against an explicit allowlist (`api.cohrint.com`, `localhost`) — arbitrary `https://` hosts are rejected
 - **XSS prevention:** All dynamic DOM writes use `textContent` — no `innerHTML` anywhere in `app.html` or `cp-console.js`
 - **CSP:** `Content-Security-Policy` set in `_headers` for `/app.html`; `unsafe-inline` is present due to inline `<script>` blocks (known trade-off until scripts are fully externalised)
 
@@ -1461,7 +1461,7 @@ For the SSE endpoint, `Access-Control-Allow-Origin: *` is used (no credentials i
 `app.html` CSP (`_headers`):
 ```
 default-src 'self' 'unsafe-inline' [trusted CDNs]
-connect-src 'self' https://api.vantageaiops.com wss://api.vantageaiops.com
+connect-src 'self' https://api.cohrint.com wss://api.cohrint.com
 ```
 
 `'unsafe-inline'` is a known weakness. Mitigated by the strict `connect-src` (scripts can't exfiltrate data to unknown origins). Full mitigation requires moving to a build step with nonce-based CSP.
@@ -1469,19 +1469,19 @@ connect-src 'self' https://api.vantageaiops.com wss://api.vantageaiops.com
 ### 16.5 Session Cookie Security
 
 ```
-Set-Cookie: vantage_session=TOKEN; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000; Secure; Domain=vantageaiops.com
+Set-Cookie: cohrint_session=TOKEN; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000; Secure; Domain=cohrint.com
 ```
 
 - `HttpOnly` — not accessible to JavaScript (XSS protection)
 - `SameSite=Lax` — not sent on cross-site POST requests (CSRF protection)
 - `Secure` — HTTPS only (production only; omitted in dev/preview environments)
-- `Domain=vantageaiops.com` — shared across `api.` and `www.` subdomains
+- `Domain=cohrint.com` — shared across `api.` and `www.` subdomains
 
 ---
 
 ## 16.5 Token Optimizer
 
-VantageAI includes an integrated **AI Token Optimizer** that reduces LLM costs by compressing prompts before they are sent to providers.
+Cohrint includes an integrated **AI Token Optimizer** that reduces LLM costs by compressing prompts before they are sent to providers.
 
 ### Architecture
 
@@ -1503,7 +1503,7 @@ vantage_optimizer/          # Core Python module
 
 ```python
 import vantage
-vantage.init(api_key="vnt_...", enable_optimizer=True, compression_rate=0.5)
+vantage.init(api_key="crt_...", enable_optimizer=True, compression_rate=0.5)
 
 from vantage.proxy.openai_proxy import OpenAI
 client = OpenAI(api_key="sk-...")
@@ -1681,7 +1681,7 @@ GROUP BY user_id
 ORDER BY cost DESC
 ```
 
-**Business model opportunity:** VantageAI becomes the billing engine for AI-first SaaS companies. They use VantageAI to measure and invoice their own customers for AI usage.
+**Business model opportunity:** Cohrint becomes the billing engine for AI-first SaaS companies. They use Cohrint to measure and invoice their own customers for AI usage.
 
 **Research:** [FinOps Foundation: AI Cost Attribution](https://www.finops.org/) — chargeback/showback methodologies from cloud FinOps adapted to AI APIs.
 
@@ -1741,7 +1741,7 @@ For enterprise customers running self-hosted models (Llama on GPU): predict when
 
 ### 18.4 OTel Pricing Engine (Auto Cost Estimation)
 
-When AI tools send only token counts via OTel (no explicit cost metric), VantageAI auto-calculates `cost_usd` using its internal pricing table. This is critical for tools like GitHub Copilot and Gemini CLI that emit token counts but not costs.
+When AI tools send only token counts via OTel (no explicit cost metric), Cohrint auto-calculates `cost_usd` using its internal pricing table. This is critical for tools like GitHub Copilot and Gemini CLI that emit token counts but not costs.
 
 **Pricing Table** (maintained in `vantage-worker/src/routes/otel.ts` → `MODEL_PRICES`):
 
@@ -1778,7 +1778,7 @@ cost_usd = (uncached_input / 1M) × input_price + (cached_input / 1M) × cache_p
 ```bash
 # Deploy frontend
 cd vantageai
-npx wrangler pages deploy ./vantage-final-v4 --project-name=vantageai --branch=main
+npx wrangler pages deploy ./vantage-final-v4 --project-name=cohrint --branch=main
 
 # Deploy worker
 cd vantage-worker
@@ -1837,7 +1837,7 @@ npx wrangler kv key delete --namespace-id=... "alert:myorg:budget_80"
 **Incident: Email not sending**
 1. Check `RESEND_API_KEY` is set: `wrangler secret list` (shows names, not values)
 2. Check Resend dashboard for delivery failures
-3. Verify `vantageaiops.com` domain is verified in Resend
+3. Verify `cohrint.com` domain is verified in Resend
 4. If domain not verified: emails fallback to `onboarding@resend.dev` automatically
 
 **Incident: Analytics showing wrong data**
@@ -1846,7 +1846,7 @@ npx wrangler kv key delete --namespace-id=... "alert:myorg:budget_80"
 3. Check `org_id` in `events` table matches expected org
 
 **Incident: Session not persisting**
-1. Verify `Domain=vantageaiops.com` is set on cookie (production only)
+1. Verify `Domain=cohrint.com` is set on cookie (production only)
 2. Verify request is HTTPS (Secure cookie flag)
 3. Check `sessions` table for expired session: `SELECT expires_at FROM sessions WHERE token=?`
 4. Session expiry is 30 days from creation, not 30 days from last use
@@ -1937,7 +1937,7 @@ All date comparisons in cross-platform queries use SQLite-native format: `YYYY-M
 
 | Resource | Why Read | Link |
 |---|---|---|
-| **LangSmith** (LangChain) | How they instrument agent traces — study their trace model for VantageAI Traces feature | [smith.langchain.com](https://smith.langchain.com) |
+| **LangSmith** (LangChain) | How they instrument agent traces — study their trace model for Cohrint Traces feature | [smith.langchain.com](https://smith.langchain.com) |
 | **OpenTelemetry for LLMs** (OpenLLMetry) | Open standard for LLM spans — we should be compatible | [github.com/traceloop/openllmetry](https://github.com/traceloop/openllmetry) |
 | **ReAct: Reasoning + Acting** (Yao et al., 2022) | Foundation paper for tool-using agents — understand what we're tracing | [arxiv.org/abs/2210.03629](https://arxiv.org/abs/2210.03629) |
 | **HumanEval + SWE-Bench** | How to benchmark coding agent quality — relevant for IDE/MCP integration | [github.com/openai/human-eval](https://github.com/openai/human-eval) |
@@ -1988,7 +1988,7 @@ All date comparisons in cross-platform queries use SQLite-native format: `YYYY-M
 ## Quick Reference Card
 
 ### API Key Format
-`vnt_{orgId}_{16-hex-random}` — 128-bit entropy, SHA-256 hashed for storage
+`crt_{orgId}_{16-hex-random}` — 128-bit entropy, SHA-256 hashed for storage
 
 ### Role Hierarchy
 `owner` > `superadmin` > `ceo` > `admin` > `member` > `viewer`
@@ -2024,7 +2024,7 @@ All date comparisons in cross-platform queries use SQLite-native format: `YYYY-M
 `65b5609ad5b747c9b416632a19529f24`
 
 ### Workers Route
-`api.vantageaiops.com/*` → zone `vantageaiops.com`
+`api.cohrint.com/*` → zone `cohrint.com`
 
 ### SSE Architecture
 Polling-over-SSE: 2s poll interval, 25s max connection, auto-reconnect
@@ -2046,7 +2046,7 @@ Polling-over-SSE: 2s poll interval, 25s max connection, auto-reconnect
 
 ## 21. MCP Server — Tools Reference & Examples
 
-The VantageAI MCP Server exposes all analytics and optimization tools to AI coding assistants (Claude Desktop, Cursor, Windsurf, VS Code Copilot, Cline). Once configured, your AI assistant can query costs, track calls, optimize prompts, and check budgets — all from natural language.
+The Cohrint MCP Server exposes all analytics and optimization tools to AI coding assistants (Claude Desktop, Cursor, Windsurf, VS Code Copilot, Cline). Once configured, your AI assistant can query costs, track calls, optimize prompts, and check budgets — all from natural language.
 
 ### 21.1 Setup
 
@@ -2057,9 +2057,9 @@ Add to your `.mcp.json` (Claude Desktop) or IDE MCP config:
   "mcpServers": {
     "vantage": {
       "command": "npx",
-      "args": ["-y", "vantageaiops-mcp"],
+      "args": ["-y", "cohrint-mcp"],
       "env": {
-        "VANTAGE_API_KEY": "vnt_yourorg_abc123def456"
+        "COHRINT_API_KEY": "crt_yourorg_abc123def456"
       }
     }
   }
@@ -2070,8 +2070,8 @@ Add to your `.mcp.json` (Claude Desktop) or IDE MCP config:
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `VANTAGE_API_KEY` | Yes | — | Your Vantage API key (`vnt_...`) |
-| `VANTAGE_API_BASE` | No | `https://api.vantageaiops.com` | Custom API endpoint |
+| `COHRINT_API_KEY` | Yes | — | Your Vantage API key (`crt_...`) |
+| `VANTAGE_API_BASE` | No | `https://api.cohrint.com` | Custom API endpoint |
 | `VANTAGE_ORG` | No | Parsed from key | Override org ID |
 
 ### 21.2 Analytics Tools (require API key + real data)
@@ -2404,13 +2404,13 @@ Traditional LLM observability requires routing API keys and prompts through a th
 
 ### 22.2 The Solution: Local Proxy
 
-The VantageAI Local Proxy runs **on the client's machine** (localhost). It:
+The Cohrint Local Proxy runs **on the client's machine** (localhost). It:
 
 1. Intercepts LLM API calls locally
 2. Forwards them directly to OpenAI/Anthropic/Google using **your keys**
 3. Extracts **only statistics** (tokens, cost, latency, model, status code)
 4. Strips ALL sensitive data (prompts, responses, API keys)
-5. Sends only anonymized stats to the VantageAI dashboard
+5. Sends only anonymized stats to the Cohrint dashboard
 
 ```
 Your App → localhost:4891 → Real LLM API (OpenAI/Anthropic)
@@ -2419,12 +2419,12 @@ Your App → localhost:4891 → Real LLM API (OpenAI/Anthropic)
                 ↓
         Strip ALL sensitive data
                 ↓
-        Send ONLY numbers → api.vantageaiops.com/v1/events
+        Send ONLY numbers → api.cohrint.com/v1/events
 ```
 
 ### 22.3 What Stays Local vs What Is Sent
 
-| Stays on your machine (NEVER sent) | Sent to VantageAI dashboard |
+| Stays on your machine (NEVER sent) | Sent to Cohrint dashboard |
 |---|---|
 | Your LLM API keys (OpenAI, Anthropic, etc.) | Model name (e.g., `gpt-4o`) |
 | Full prompt text and content | Provider (e.g., `openai`) |
@@ -2447,11 +2447,11 @@ Your App → localhost:4891 → Real LLM API (OpenAI/Anthropic)
 #### Install and run:
 ```bash
 # Via npx (no install needed)
-VANTAGE_API_KEY=vnt_yourorg_abc123 npx vantageai-local-proxy
+COHRINT_API_KEY=crt_yourorg_abc123 npx vantageai-local-proxy
 
 # Or install globally
 npm install -g vantageai-local-proxy
-vantage-proxy --api-key vnt_yourorg_abc123 --privacy strict
+vantage-proxy --api-key crt_yourorg_abc123 --privacy strict
 ```
 
 #### Point your LLM client to the local proxy:
@@ -2507,12 +2507,12 @@ response = client.messages.create(
 
 | Flag | Env Var | Default | Description |
 |------|---------|---------|-------------|
-| `--api-key` | `VANTAGE_API_KEY` | — | Your Vantage key (required) |
+| `--api-key` | `COHRINT_API_KEY` | — | Your Vantage key (required) |
 | `--port` | `VANTAGE_PROXY_PORT` | `4891` | Local proxy port |
 | `--privacy` | `VANTAGE_PRIVACY` | `strict` | Privacy level |
 | `--team` | `VANTAGE_TEAM` | — | Team tag for all events |
 | `--env` | `VANTAGE_ENV` | `production` | Environment tag |
-| `--api-base` | `VANTAGE_API_BASE` | `https://api.vantageaiops.com` | Vantage API endpoint |
+| `--api-base` | `VANTAGE_API_BASE` | `https://api.cohrint.com` | Vantage API endpoint |
 | `--debug` | `VANTAGE_DEBUG` | `false` | Enable debug logging |
 | `--redact-models` | — | `false` | Redact model names to generic tiers |
 | `--batch-size` | — | `20` | Stats batch size |
@@ -2529,7 +2529,7 @@ curl http://localhost:4891/health
 
 ### 22.6 Security Guarantees
 
-1. **API keys are never forwarded to VantageAI** — they're used locally to call the real LLM API
+1. **API keys are never forwarded to Cohrint** — they're used locally to call the real LLM API
 2. **Prompts/responses are sanitized immediately** — text is stripped before queuing, never lingers in memory
 3. **The proxy validates its own output** — `assertNoSensitiveData()` checks for API key patterns in sanitized events
 4. **No external dependencies for privacy logic** — sanitization runs entirely in-process
@@ -2607,7 +2607,7 @@ Pricing table (in `~/.claude/hooks/vantage-track.js`):
     "matcher": "",
     "hooks": [{
       "type": "command",
-      "command": "VANTAGE_API_KEY=vnt_... node ~/.claude/hooks/vantage-track.js"
+      "command": "COHRINT_API_KEY=crt_... node ~/.claude/hooks/vantage-track.js"
     }]
   }]
 }
@@ -2645,7 +2645,7 @@ Pricing table (in `~/.claude/hooks/vantage-track.js`):
 Upload all historical Claude Code sessions at once:
 
 ```bash
-VANTAGE_API_KEY=vnt_your_key \
+COHRINT_API_KEY=crt_your_key \
   npx vantageai-local-proxy scan --tool claude-code --push
 ```
 
@@ -2701,16 +2701,16 @@ D1 events table → /v1/analytics/* endpoints → Dashboard
 
 ## 24. SDK Privacy Modes
 
-For teams using the JS/Python SDK directly (not the local proxy), the SDK now supports privacy modes that control what data is sent to VantageAI.
+For teams using the JS/Python SDK directly (not the local proxy), the SDK now supports privacy modes that control what data is sent to Cohrint.
 
 ### 24.1 Configuration
 
 ```javascript
-import { VantageClient, createOpenAIProxy } from "vantageaiops";
+import { VantageClient, createOpenAIProxy } from "cohrint";
 import OpenAI from "openai";
 
 const vantage = new VantageClient({
-  apiKey: "vnt_yourorg_abc123",
+  apiKey: "crt_yourorg_abc123",
   privacy: "stats-only",   // ← NEW: no prompt/response text sent
 });
 
@@ -2750,7 +2750,7 @@ const response = await openai.chat.completions.create({
 
 ### Overview
 
-VantageAI v2 introduces a **4-layer architecture** for tracking ALL AI spending across an organization:
+Cohrint v2 introduces a **4-layer architecture** for tracking ALL AI spending across an organization:
 
 1. **Layer 1 — OTel Telemetry** (real-time): Receives live OpenTelemetry from 7+ AI coding tools
 2. **Layer 2 — Local File Scanner** (near real-time): CLI agent reads tool session files from developer machines
@@ -2764,7 +2764,7 @@ VantageAI v2 introduces a **4-layer architecture** for tracking ALL AI spending 
 - `POST /v1/otel/v1/logs` — OTLP event/log ingestion (HTTP/JSON)
 - `POST /v1/otel/v1/traces` — OTLP traces (placeholder for future)
 
-**Auth:** `Authorization: Bearer vnt_your_key` via `OTEL_EXPORTER_OTLP_HEADERS`
+**Auth:** `Authorization: Bearer crt_your_key` via `OTEL_EXPORTER_OTLP_HEADERS`
 
 **Supported Tools (Native OTel):**
 
@@ -2814,7 +2814,7 @@ VantageAI v2 introduces a **4-layer architecture** for tracking ALL AI spending 
 
 For enterprise admins deploying OTel across all developers:
 
-1. **Create a VantageAI API key** in the dashboard
+1. **Create a Cohrint API key** in the dashboard
 2. **Distribute via MDM** (for Claude Code):
    ```json
    {
@@ -2823,8 +2823,8 @@ For enterprise admins deploying OTel across all developers:
        "OTEL_METRICS_EXPORTER": "otlp",
        "OTEL_LOGS_EXPORTER": "otlp",
        "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
-       "OTEL_EXPORTER_OTLP_ENDPOINT": "https://api.vantageaiops.com/v1/otel",
-       "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer vnt_ORG_KEY",
+       "OTEL_EXPORTER_OTLP_ENDPOINT": "https://api.cohrint.com/v1/otel",
+       "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer crt_ORG_KEY",
        "OTEL_RESOURCE_ATTRIBUTES": "team.id=TEAM,cost_center=CC"
      }
    }
@@ -2879,7 +2879,7 @@ The dashboard (`app.html`) has been restructured to use **only real API data**. 
 
 ## 26. Vantage Agent — Python AI Coding Agent
 
-The `vantageai-agent` package (`vantageai-agent/`) is a standalone Python AI coding agent that calls the Anthropic API directly. It provides per-tool permissions, cost tracking, prompt optimization, and dashboard telemetry — no external CLI dependency required.
+The `cohrint-agent` package (`cohrint-agent/`) is a standalone Python AI coding agent that calls the Anthropic API directly. It provides per-tool permissions, cost tracking, prompt optimization, and dashboard telemetry — no external CLI dependency required.
 
 > **Note:** This replaces the previous `vantage-cli` TypeScript wrapper (deleted). All unique features have been ported to Python with full test parity.
 
@@ -2893,9 +2893,9 @@ The `vantageai-agent` package (`vantageai-agent/`) is a standalone Python AI cod
 7. Tracks cost from real API usage, sends telemetry to dashboard
 
 **3 Modes:**
-- **REPL**: `vantageai-agent` — interactive with `/commands`
-- **One-shot**: `vantageai-agent "prompt"` — run and exit
-- **Pipe**: `echo "prompt" | vantageai-agent` — scriptable
+- **REPL**: `cohrint-agent` — interactive with `/commands`
+- **One-shot**: `cohrint-agent "prompt"` — run and exit
+- **Pipe**: `echo "prompt" | cohrint-agent` — scriptable
 
 **REPL commands:**
 - `/help` — show commands
@@ -2911,7 +2911,7 @@ The `vantageai-agent` package (`vantageai-agent/`) is a standalone Python AI cod
 - Safe tools auto-approved: Read, Glob, Grep
 - Dangerous tools prompt user: Bash, Write, Edit
 - User responds: `[y]es once / [a]lways / [n]o`
-- Persisted to `~/.vantageai-agent/permissions.json`
+- Persisted to `~/.cohrint-agent/permissions.json`
 
 **6 local tools:**
 | Tool | Description |
@@ -3069,14 +3069,14 @@ The Security & Governance view in `app.html` shows:
 - `tests/suites/18_sdk_privacy/test_sdk_privacy.py` — 50+ checks (privacy modes, pricing engine, date format, dual-write)
 - `tests/suites/19_local_proxy/test_local_proxy.py` — 42+ checks (privacy engine, pricing accuracy, proxy integration, scanner coverage)
 - `tests/suites/20_dashboard_real_data/test_dashboard_real_data.py` — 42+ checks (enterprise reporting, cost intelligence, no fake data, cross-platform integration)
-- `vantageai-agent/tests/` — 273 checks across 11 files (optimizer, pricing, classifier, recommendations, permissions, tools, rendering, cost tracking, anomaly detection, telemetry, API tool loop)
+- `cohrint-agent/tests/` — 273 checks across 11 files (optimizer, pricing, classifier, recommendations, permissions, tools, rendering, cost tracking, anomaly detection, telemetry, API tool loop)
 - `tests/suites/22_landing_page/test_landing_page.py` — 41 checks (landing page content, v2 feature coverage, HTML structure)
 - `tests/suites/23_security_governance/` — audit logging, security overview API, RBAC, data retention
 - Total: **567+ checks** across suites covering OTel + cross-platform + privacy + pricing + dashboard + Python agent (273) + landing page + security & governance features
 
 ---
 
-*Last updated: 7 April 2026 — v2.4 consolidated Python agent (vantage-cli deleted, all features ported to vantageai-agent). 273 agent tests + 294 backend tests = 567+ total checks.*
+*Last updated: 7 April 2026 — v2.4 consolidated Python agent (vantage-cli deleted, all features ported to cohrint-agent). 273 agent tests + 294 backend tests = 567+ total checks.*
 
 ---
 
@@ -3084,20 +3084,20 @@ The Security & Governance view in `app.html` shows:
 
 ### What It Is
 
-A **Stop hook** that runs automatically after every Claude Code session. It reads session transcripts from `~/.claude/projects/<slug>/*.jsonl`, deduplicates them, and POSTs token usage + estimated cost to VantageAI for cross-project visibility. No configuration needed after setup.
+A **Stop hook** that runs automatically after every Claude Code session. It reads session transcripts from `~/.claude/projects/<slug>/*.jsonl`, deduplicates them, and POSTs token usage + estimated cost to Cohrint for cross-project visibility. No configuration needed after setup.
 
 ### Three Installation Methods
 
 1. **Via vantage-mcp (recommended for MCP users)**
    ```bash
-   npx vantageaiops-mcp setup
+   npx cohrint-mcp setup
    ```
    The `setup` subcommand intercepts `process.argv[2] === 'setup'` BEFORE the stdio transport starts. If the transport begins first, stdin is consumed and the process won't exit cleanly. This setup subcommand is part of the vantage-mcp package.
 
 2. **Standalone npm package (new distribution channel)**
    ```bash
-   npm install --save-dev @vantageaiops/claude-code
-   npx @vantageaiops/claude-code setup
+   npm install --save-dev @cohrint/claude-code
+   npx @cohrint/claude-code setup
    ```
    The package includes `/bin/cli.js` (setup + status commands) and `/hooks/vantage-track.js` (the Stop hook). Installation is idempotent — setup checks if the hook is already registered and skips if present.
 
@@ -3121,11 +3121,11 @@ A **Stop hook** that runs automatically after every Claude Code session. It read
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `VANTAGE_API_KEY` | ✓ | Bearer token for API authentication (get free key at `https://vantageaiops.com/signup.html`) |
+| `COHRINT_API_KEY` | ✓ | Bearer token for API authentication (get free key at `https://cohrint.com/signup.html`) |
 | `VANTAGE_TEAM` | — | Optional tag for grouping events by team name |
 | `VANTAGE_PROJECT` | — | Optional tag for grouping events by project name |
 | `VANTAGE_FEATURE` | — | Optional tag for grouping events by feature name |
-| `VANTAGE_API_BASE` | — | Custom API endpoint (default: `https://api.vantageaiops.com`) |
+| `VANTAGE_API_BASE` | — | Custom API endpoint (default: `https://api.cohrint.com`) |
 
 ### What the Hook Does
 
@@ -3450,7 +3450,7 @@ Audit events are created by the following routes (using `waitUntil` for non-bloc
 Vantage Agent persists per-tool approvals:
 
 ```
-~/.vantageai-agent/
+~/.cohrint-agent/
 ├── permissions.json         # { "always_approved": ["Bash", "Write", "Edit"] }
 ```
 
@@ -3463,12 +3463,12 @@ Vantage Agent persists per-tool approvals:
 ### CLI Arguments
 
 ```
-vantageai-agent                           # Start interactive REPL
-vantageai-agent "fix the bug"             # One-shot mode
-echo "fix the bug" | vantageai-agent      # Pipe mode
-vantageai-agent --model claude-opus-4-6   # Use specific model
-vantageai-agent --no-optimize             # Disable prompt optimization
-vantageai-agent --api-key sk-ant-...      # Provide API key
-vantageai-agent --vantage-key vnt_...     # Enable dashboard telemetry
-vantageai-agent --debug                   # Enable debug output
+cohrint-agent                           # Start interactive REPL
+cohrint-agent "fix the bug"             # One-shot mode
+echo "fix the bug" | cohrint-agent      # Pipe mode
+cohrint-agent --model claude-opus-4-6   # Use specific model
+cohrint-agent --no-optimize             # Disable prompt optimization
+cohrint-agent --api-key sk-ant-...      # Provide API key
+cohrint-agent --vantage-key crt_...     # Enable dashboard telemetry
+cohrint-agent --debug                   # Enable debug output
 ```

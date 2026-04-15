@@ -8,8 +8,8 @@ BEFORE:
     client = OpenAI(api_key="sk-...")
 
 AFTER (literally 2 lines changed):
-    import vantage; vantage.init("vnt_...")
-    from vantageaiops.proxy.openai_proxy import OpenAI
+    import vantage; vantage.init("crt_...")
+    from cohrint.proxy.openai_proxy import OpenAI
     client = OpenAI(api_key="sk-...")
 
 Supports: chat.completions, embeddings, streaming, async
@@ -20,8 +20,8 @@ from __future__ import annotations
 import time
 from typing import Any, Iterator, AsyncIterator, Optional
 
-from vantageaiops.proxy.universal import _build_event, _CTX_TAGS, _CTX_FEATURE, _CTX_PROJECT
-from vantageaiops.models.event import VantageEvent
+from cohrint.proxy.universal import _build_event, _CTX_TAGS, _CTX_FEATURE, _CTX_PROJECT
+from cohrint.models.event import CohrintEvent
 
 try:
     import openai as _oai

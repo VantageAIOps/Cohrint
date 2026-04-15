@@ -64,12 +64,12 @@ alerts.post('/slack/:orgId/test', async (c) => {
   }
 
   const sent = await sendSlackMessage(cfg.slack_url, {
-    text: '✅ *VantageAI* — test alert from your workspace. Webhooks are working!',
+    text: '✅ *Cohrint* — test alert from your workspace. Webhooks are working!',
     blocks: [{
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: '*✅ VantageAI — Test Alert*\nYour Slack integration is working correctly.\nYou\'ll receive alerts here when budget thresholds or anomalies are detected.',
+        text: '*✅ Cohrint — Test Alert*\nYour Slack integration is working correctly.\nYou\'ll receive alerts here when budget thresholds or anomalies are detected.',
       },
     }],
   });
@@ -149,12 +149,12 @@ export async function maybeSendBudgetAlert(
 
   const emoji = pct >= 100 ? '🚨' : '⚠️';
   await sendSlackMessage(slackUrl, {
-    text: `${emoji} VantageAI budget alert for org ${orgId}`,
+    text: `${emoji} Cohrint budget alert for org ${orgId}`,
     blocks: [{
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `${emoji} *Budget Alert — ${Math.round(pct)}% used*\nOrg *${orgId}* has spent *$${mtdCost.toFixed(2)}* of *$${budgetUsd.toFixed(2)}* this month.\n<https://vantageaiops.com/app.html|View dashboard →>`,
+        text: `${emoji} *Budget Alert — ${Math.round(pct)}% used*\nOrg *${orgId}* has spent *$${mtdCost.toFixed(2)}* of *$${budgetUsd.toFixed(2)}* this month.\n<https://cohrint.com/app.html|View dashboard →>`,
       },
     }],
   });

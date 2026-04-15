@@ -1,10 +1,10 @@
 """
-telemetry.py — Non-blocking OTel metrics/logs exporter for vantage-agent.
+telemetry.py — Non-blocking OTel metrics/logs exporter for cohrint-agent.
 
 Controlled by:
-  VANTAGE_OTEL_ENABLED=true           — activates export (default: off)
-  OTEL_EXPORTER_OTLP_ENDPOINT         — collector base URL (default: https://api.vantageaiops.com)
-  VANTAGE_API_KEY                     — Bearer token for auth
+  COHRINT_OTEL_ENABLED=true           — activates export (default: off)
+  OTEL_EXPORTER_OTLP_ENDPOINT         — collector base URL (default: https://api.cohrint.com)
+  COHRINT_API_KEY                     — Bearer token for auth
 
 All errors are silently swallowed — this is best-effort, fire-and-forget telemetry.
 """
@@ -17,7 +17,7 @@ import time
 from typing import Any
 
 
-_DEFAULT_ENDPOINT = "https://api.vantageaiops.com"
+_DEFAULT_ENDPOINT = "https://api.cohrint.com"
 
 
 def _str_attr(key: str, value: str) -> dict[str, Any]:
@@ -29,17 +29,17 @@ def _int_attr(key: str, value: int) -> dict[str, Any]:
 
 
 class OTelExporter:
-    """Exports LLM usage as OTLP metrics + logs to the VantageAI backend."""
+    """Exports LLM usage as OTLP metrics + logs to the Cohrint backend."""
 
     def __init__(self) -> None:
-        self.enabled = os.environ.get("VANTAGE_OTEL_ENABLED", "false").lower() == "true"
+        self.enabled = os.environ.get("COHRINT_OTEL_ENABLED", "false").lower() == "true"
         self.endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", _DEFAULT_ENDPOINT).rstrip("/")
-        self.api_key = os.environ.get("VANTAGE_API_KEY", "")
-        self.org_id = os.environ.get("VANTAGE_ORG_ID", "")
+        self.api_key = os.environ.get("COHRINT_API_KEY", "")
+        self.org_id = os.environ.get("COHRINT_ORG_ID", "")
 
     def _headers(self) -> dict[str, str]:
         from . import __version__
-        h = {"Content-Type": "application/json", "User-Agent": f"vantage-agent/{__version__}"}
+        h = {"Content-Type": "application/json", "User-Agent": f"cohrint-agent/{__version__}"}
         if self.api_key:
             h["Authorization"] = f"Bearer {self.api_key}"
         return h
@@ -50,7 +50,7 @@ class OTelExporter:
         output_tokens = int(event.get("completion_tokens", 0))
         cost_usd = float(event.get("cost_usd", event.get("total_cost_usd", 0.0)))
 
-        resource_attrs = [_str_attr("service.name", "vantageai-agent")]
+        resource_attrs = [_str_attr("service.name", "cohrint-agent")]
         if self.org_id:
             resource_attrs.append(_str_attr("org_id", self.org_id))
 
@@ -100,7 +100,7 @@ class OTelExporter:
             "session_id": event.get("session_id", ""),
         }
 
-        resource_attrs = [_str_attr("service.name", "vantageai-agent")]
+        resource_attrs = [_str_attr("service.name", "cohrint-agent")]
 
         return {
             "resourceLogs": [

@@ -1,4 +1,4 @@
-# VantageAI — Complete Git History
+# Cohrint — Complete Git History
 _Last updated: 2026-04-14 · 440 commits on main · 56 merged PRs_
 
 ---
@@ -84,14 +84,14 @@ _Last updated: 2026-04-14 · 440 commits on main · 56 merged PRs_
 
 | Hash | Subject |
 |------|---------|
-| `99f4db4` | Merge pull request #56 from VantageAIOps/fix/ui-finetune-dashboard |
+| `99f4db4` | Merge pull request #56 from CohrintOps/fix/ui-finetune-dashboard |
 | `dea95d0` | docs: comprehensive update — PRODUCT_STRATEGY v7.0, ADMIN_GUIDE +503 lines, docs.html new endpoints |
 | `2587b40` | fix(ui): stack install-box commands vertically on mobile to prevent line breaks |
 | `e975937` | chore: update GIT_MEMORY.md — PR #56 state, branch fix/ui-finetune-dashboard |
 | `b681a78` | fix(ui): close modal via closeModal() on Escape/overlay to reset form fields |
 | `999fec8` | fix(ui): dashboard polish — layout, UX, accessibility, mobile fixes |
 | `5fcae70` | fix(ui): cross-platform tab layout + full data rendering implementation |
-| `73c089f` | Merge pull request #55 from VantageAIOps/feat/free-tier-50k |
+| `73c089f` | Merge pull request #55 from CohrintOps/feat/free-tier-50k |
 | `bcf8362` | fix: eliminate benchmark N+1 query bomb + test quality fixes |
 | `bc75328` | fix: post-audit security and correctness fixes (round 3) |
 | `36e176f` | fix: remove dead kv_key column + surface Copilot/Datadog in connections panel |
@@ -103,12 +103,12 @@ _Last updated: 2026-04-14 · 440 commits on main · 56 merged PRs_
 | `a035691` | feat(p2): Copilot UI, report nav, benchmark schema, Datadog exporter |
 | `5a49eca` | fix(security): address 8 code review issues in Copilot adapter + platform |
 | `c92ec9f` | feat(p2): Copilot adapter, enterprise pricing, report page |
-| `f88d064` | feat(trust): add trust.vantageaiops.com security page + P1 fixes |
+| `f88d064` | feat(trust): add trust.cohrint.com security page + P1 fixes |
 | `8370400` | docs(strategy): v6.0 — competitive intel update + priority reorder |
-| `3e42e59` | Merge pull request #54 from VantageAIOps/feat/free-tier-50k |
+| `3e42e59` | Merge pull request #54 from CohrintOps/feat/free-tier-50k |
 | `0d2f499` | feat(pricing): raise free tier copy from 10K to 50K events/month |
-| `c08f5c5` | Merge pull request #53 from VantageAIOps/fix/ci-signup-rate-limit |
-| `b64accc` | Merge pull request #52 from VantageAIOps/fix/otel-developer-id-attribute |
+| `c08f5c5` | Merge pull request #53 from CohrintOps/fix/ci-signup-rate-limit |
+| `b64accc` | Merge pull request #52 from CohrintOps/fix/otel-developer-id-attribute |
 | `ea242c7` | fix(auth): remove duplicate rate-limit block that bypassed CI bypass |
 
 ### 2026-04-13
@@ -122,7 +122,7 @@ _Last updated: 2026-04-14 · 440 commits on main · 56 merged PRs_
 
 | Hash | Subject |
 |------|---------|
-| `073d96d` | Merge pull request #51 from VantageAIOps/feat/vega-chatbot |
+| `073d96d` | Merge pull request #51 from CohrintOps/feat/vega-chatbot |
 | `5b7b56d` | fix(test): update test_unknown_model_uses_default_pricing for new contract |
 | `a03916a` | fix(test): CL.25 use regex instead of tomllib for Python <3.11 compat |
 | `bb21ee3` | fix(ci): resolve 4 CI failures — FC.07a, ON.7, CL.20, SC.6/7/8 |
@@ -143,7 +143,7 @@ _Last updated: 2026-04-14 · 440 commits on main · 56 merged PRs_
 | `04b7fd0` | docs(spec): fix 6 re-audit issues — apiFetch exposure, developer_id migration, modal element, live poll tick, suite discovery |
 | `a916c5b` | docs(spec): apply security + architecture audit fixes to AI Spend Console spec |
 | `51f5e3d` | docs(spec): AI Spend Console MVP design — cross-platform dashboard tab |
-| `2833b7c` | Merge pull request #50 from VantageAIOps/feat/vega-chatbot |
+| `2833b7c` | Merge pull request #50 from CohrintOps/feat/vega-chatbot |
 | `e9dad11` | chore: schedule KV upload for 2026-04-13 in GIT_MEMORY |
 | `bd121dd` | fix(chatbot): bundle all KV chunks into 1 write op instead of 117 |
 | `13db719` | chore: update GIT_MEMORY.md — Vega chatbot PR #50 state |
@@ -160,7 +160,7 @@ _Last updated: 2026-04-14 · 440 commits on main · 56 merged PRs_
 | `9158198` | feat(chatbot): scaffold Vega Worker with health endpoint |
 | `857a001` | feat(dashboard): hold-to-reveal insight tooltips on all 31 cards |
 | `c0813c7` | feat(frontend): hold-to-reveal card insight tooltip (4.5s hover) |
-| `af09d35` | Merge pull request #49 from VantageAIOps/fix/webkit-session-ci-warn |
+| `af09d35` | Merge pull request #49 from CohrintOps/fix/webkit-session-ci-warn |
 | `bf16999` | fix(tests): patch vantage_agent.cli.auto_detect_backend not vantage_agent.backends |
 | `dd8006e` | fix(cli): remove duplicate --version argument causing argparse conflict |
 | `076e379` | feat(agent): add --version flag, docs upgrade/rollback section, bump to 0.2.4 |
@@ -168,7 +168,7 @@ _Last updated: 2026-04-14 · 440 commits on main · 56 merged PRs_
 | `3e1b4f3` | fix(setup-wizard): skip wizard if permissions.json exists (returning user) |
 | `efde568` | fix(cli): skip wizard when stdin not tty, guard EOFError on --backend claude startup |
 | `4f84aca` | chore(vantage-agent): bump version to 0.2.0 |
-| `e9183a3` | Merge pull request #48 from VantageAIOps/fix/webkit-session-ci-warn |
+| `e9183a3` | Merge pull request #48 from CohrintOps/fix/webkit-session-ci-warn |
 | `98e0960` | chore: untrack egg-info dirs, awesome-claude-plugins, TODO.md + gitignore them |
 | `fc7f6a9` | chore: gitignore egg-info dirs and scripts/pkg.sh |
 | `f44ae7d` | fix(claude-backend): remove --no-session-persistence, add live integration tests |
@@ -186,10 +186,10 @@ _Last updated: 2026-04-14 · 440 commits on main · 56 merged PRs_
 | Hash | Subject |
 |------|---------|
 | `7124bd4` | chore(todo): add competitive moat — hide proprietary features from public website |
-| `139fae3` | Merge pull request #47 from VantageAIOps/fix/webkit-session-ci-warn |
+| `139fae3` | Merge pull request #47 from CohrintOps/fix/webkit-session-ci-warn |
 | `21e421f` | feat(benchmark): add benchmark opt-in toggle to settings page |
 | `0c27110` | feat(free-tier): raise free tier limit from 10K to 50K events/month |
-| `4e5fdb1` | Merge pull request #46 from VantageAIOps/fix/webkit-session-ci-warn |
+| `4e5fdb1` | Merge pull request #46 from CohrintOps/fix/webkit-session-ci-warn |
 | `19081d9` | docs(agent): sync vantage-agent.md v2 fixes to docs/agents/ |
 | `4f1b91a` | docs: add 10-year war room strategy, agent reference, and task dependency graph |
 
@@ -199,13 +199,13 @@ _Last updated: 2026-04-14 · 440 commits on main · 56 merged PRs_
 |------|---------|
 | `b25ec3b` | chore: update GIT_MEMORY.md — PR #46 state, vantage-agent, PRODUCT_STRATEGY v4.0 |
 | `80a2544` | fix(agent): fix all 12 flaws in vantage-agent.md |
-| `451e099` | feat(agent): add vantage-agent.md — expert agent for VantageAI codebase |
+| `451e099` | feat(agent): add vantage-agent.md — expert agent for Cohrint codebase |
 | `e8ebab6` | docs(strategy): rewrite PRODUCT_STRATEGY.md to enterprise v4.0 |
 | `5744c8f` | feat(landing): replace static feature grid with tabbed panel system |
-| `98afa0b` | Merge pull request #45 from VantageAIOps/fix/webkit-session-ci-warn |
+| `98afa0b` | Merge pull request #45 from CohrintOps/fix/webkit-session-ci-warn |
 | `8873cc8` | fix(ci): downgrade WebKit session-reload check to warn until SameSite=None deploys |
 | `8d7f0d1` | fix(ci): downgrade WebKit session-reload check to warn until SameSite=None deploys |
-| `f1cba2c` | Merge pull request #44 from VantageAIOps/feat/semantic-cache-analytics |
+| `f1cba2c` | Merge pull request #44 from CohrintOps/feat/semantic-cache-analytics |
 | `72e3001` | fix(auth): use SameSite=None for session cookie to fix Safari ITP |
 | `4e80bab` | fix(security): address 6 code review issues from PR #44 |
 | `071b534` | chore: update GIT_MEMORY.md — website overhaul PR #44 state |
@@ -217,7 +217,7 @@ _Last updated: 2026-04-14 · 440 commits on main · 56 merged PRs_
 | `a75c7e9` | feat(website): Phase 1 content — remove fake reviews, tool names, false claims; fix pricing CTAs |
 | `be7839b` | docs: remove Windsurf/Zed/JetBrains, redact pricing algorithm and MD5 from public docs |
 | `343da10` | docs: add website enterprise overhaul design spec |
-| `65d565e` | Merge pull request #43 from VantageAIOps/feat/semantic-cache-analytics |
+| `65d565e` | Merge pull request #43 from CohrintOps/feat/semantic-cache-analytics |
 | `85fb67b` | fix(cache-analytics): resolve 4 code review issues |
 | `856969b` | chore: update GIT_MEMORY.md — semantic cache analytics + PR #43 state |
 | `e8996c2` | test(dr43): mark xfail pending analytics.ts timeseries production deploy |
@@ -568,7 +568,7 @@ _Last updated: 2026-04-14 · 440 commits on main · 56 merged PRs_
 | `dd19d6a` | fix: handle Cloudflare KV daily write limit (free tier error 10048) |
 | `eabe734` | fix: correct sidebar nav selectors in test_04_dashboard.py |
 | `29ed052` | fix: wrap KV.put in recovery token generation with try/catch |
-| `a60ed53` | fix: make KV operations resilient + fix worker routing for api.vantageaiops.com |
+| `a60ed53` | fix: make KV operations resilient + fix worker routing for api.cohrint.com |
 | `5f5c5ef` | fix: filter console noise in tests + fix test_04 selectors |
 | `4e72549` | feat: test suite 21 + CSP fix for Cloudflare Insights beacon |
 | `d211c5f` | fix: syntax error in loadMembersView broke all nav buttons |
@@ -576,7 +576,7 @@ _Last updated: 2026-04-14 · 440 commits on main · 56 merged PRs_
 | `65eca7e` | fix: upgrade GitHub Actions to Node.js 24 |
 | `88502b4` | fix: add root package-lock.json + cache node_modules in Pages deploy |
 | `eac211f` | fix: Cloudflare deploy config + TypeScript errors in vantageai-api |
-| `d399fcc` | fix: unify brand name to VantageAI everywhere |
+| `d399fcc` | fix: unify brand name to Cohrint everywhere |
 | `f519970` | fix: stability — SW network-first, browser logger, account/settings bugs |
 | `74d0243` | fix: account view, settings view, duplicate dashboard button |
 | `e4a05bb` | feat: comprehensive test suite (tests/11-20) + logging infrastructure |
@@ -587,7 +587,7 @@ _Last updated: 2026-04-14 · 440 commits on main · 56 merged PRs_
 |------|---------|
 | `edba8ea` | fix: protect recovery token from email link scanners (Gmail/Outlook) |
 | `06447b0` | feat: one-time recovery token — click email link to get new key instantly |
-| `f252f33` | fix: add api.vantageaiops.com to CSP connect-src + fix nav button timeout |
+| `f252f33` | fix: add api.cohrint.com to CSP connect-src + fix nav button timeout |
 | `99d76b2` | fix: bump SDK to v0.3.1, add User-Agent header, add full E2E test suite |
 | `5f2504d` | fix: accept all SDK field name variants in event ingest + E2E test suite |
 | `a379e4b` | fix: prevent Worker crashes from killing CORS headers on errors |
@@ -616,7 +616,7 @@ _Last updated: 2026-04-14 · 440 commits on main · 56 merged PRs_
 | `3ee29b8` | Add TypeScript/JS SDK and update UI with multi-language support |
 | `5e6e1ab` | Add Cloudflare Pages + VS Code integration |
 | `7b9669c` | Add product strategy doc and improve landing/dashboard UI |
-| `64aafd9` | Initial commit: VantageAI project |
+| `64aafd9` | Initial commit: Cohrint project |
 
 ---
 

@@ -8,7 +8,7 @@ BEFORE:
     client = anthropic.Anthropic(api_key="sk-ant-...")
 
 AFTER:
-    import vantage; vantage.init("vnt_...")
+    import vantage; vantage.init("crt_...")
     from vantage.proxy.anthropic_proxy import Anthropic
     client = Anthropic(api_key="sk-ant-...")
 """

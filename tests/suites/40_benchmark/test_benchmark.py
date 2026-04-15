@@ -87,7 +87,7 @@ class TestBenchmarkContributeAuth:
 
     def test_bm02_bad_key_returns_401(self):
         r = requests.post(CONTRIBUTE_URL, json={},
-                          headers={"Authorization": "Bearer vnt_bad_key"},
+                          headers={"Authorization": "Bearer crt_bad_key"},
                           timeout=10)
         chk("BM.2  POST /benchmark/contribute bad key -> 401",
             r.status_code == 401, f"got {r.status_code}")

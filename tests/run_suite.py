@@ -1,5 +1,5 @@
 """
-run_suite.py — VantageAI test suite runner (CI/CD only)
+run_suite.py — Cohrint test suite runner (CI/CD only)
 =======================================================
 Discovers suites from tests/suites/NN_category/test_*.py
 Runs each file as a subprocess, streams output, writes artifacts.
@@ -50,8 +50,8 @@ try:
 except Exception:
     ARTIFACTS_DIR = Path(os.environ.get("VANTAGE_TEST_ARTIFACTS_DIR",
                                         str(TESTS_ROOT / "artifacts")))
-    SITE_URL = os.environ.get("VANTAGE_SITE_URL", "https://vantageaiops.com")
-    API_URL  = os.environ.get("VANTAGE_API_URL",  "https://api.vantageaiops.com")
+    SITE_URL = os.environ.get("VANTAGE_SITE_URL", "https://cohrint.com")
+    API_URL  = os.environ.get("VANTAGE_API_URL",  "https://api.cohrint.com")
 
 try:
     from infra.structured_logger import get_logger
@@ -137,7 +137,7 @@ def run_suite_file(filepath: Path, pythonpath: str) -> dict:
 
 def parse_args():
     p = argparse.ArgumentParser(
-        description="VantageAI test suite runner (CI/CD only)"
+        description="Cohrint test suite runner (CI/CD only)"
     )
     p.add_argument("--category", type=str, default=None,
                    help="Run only suites in suites/NN_NAME/ (e.g. 01_api)")
@@ -235,7 +235,7 @@ def main():
             print(f"  {W}  Cleanup error (non-fatal): {e}")
 
     print(f"\n{'═'*66}")
-    print(f"  {BOLD}VantageAI Test Suite Runner{RESET}")
+    print(f"  {BOLD}Cohrint Test Suite Runner{RESET}")
     print(f"  Run:   {run_label}")
     print(f"  Site:  {SITE_URL}")
     print(f"  API:   {API_URL}")

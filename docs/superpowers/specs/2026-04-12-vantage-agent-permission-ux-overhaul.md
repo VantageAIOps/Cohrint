@@ -67,7 +67,7 @@ Path B (broken):
 | C5 | `--backend` flag parsed in cli.py but never passed to `_build_client()` — dead code | High | cli.py:61-65, 84-92 |
 | C6 | First-run message says "Claude.ai subscription does NOT grant API access" — wrong for Claude Max / Claude Code CLI users | High | api_client.py:44-46 |
 | C7 | Cost display shows fabricated API-equivalent numbers without labelling them as estimates | Medium | backends/claude_backend.py:43 |
-| C8 | `--bare` flag not used when spawning claude subprocess — VantageAI hooks fire twice (once from claude subprocess, once from main process) | Medium | — |
+| C8 | `--bare` flag not used when spawning claude subprocess — Cohrint hooks fire twice (once from claude subprocess, once from main process) | Medium | — |
 
 ### 2.3 — Installation & First-Run
 
@@ -76,7 +76,7 @@ Path B (broken):
 | I1 | API key saved as plaintext to `~/.vantage-agent/api_key` with mode 0o600 — no encryption | Critical | api_client.py:54-58 |
 | I2 | No first-run wizard — user hits a ValueError error message, not a guided setup | High | api_client.py:89-101 |
 | I3 | Config directory split across `~/.vantage` and `~/.vantage-agent` — inconsistent | Medium | session_store.py:11, permissions.py:21 |
-| I4 | Config paths hardcoded — no `VANTAGE_CONFIG_DIR` override, fails on read-only home dirs | Medium | session_store.py:11 |
+| I4 | Config paths hardcoded — no `COHRINT_CONFIG_DIR` override, fails on read-only home dirs | Medium | session_store.py:11 |
 | I5 | No XDG Base Directory support (`$XDG_CONFIG_HOME`, `$XDG_DATA_HOME`) | Low | — |
 | I6 | Backend auto-detection (`auto_detect_backend()`) never called — Claude Max users can't get in | Critical | backends/__init__.py:21-45 |
 
@@ -331,7 +331,7 @@ User's existing hooks run first. Vantage hook appended last.
 - Always label cost as "API-equivalent" for claude backend
 - Show actual charge as $0.00 for Max users
 - Session summary shows both: "API-equivalent total: $0.42 | Actual paid: $0.00"
-- Positions it as a value metric for VantageAI: "Your Max subscription saved you $X this session"
+- Positions it as a value metric for Cohrint: "Your Max subscription saved you $X this session"
 
 ### 3.9 — `--permission-mode bypassPermissions` Rationale
 
@@ -402,7 +402,7 @@ These flaws must be resolved first, as they affect the foundation:
 | P1 | Implement PreToolUse hook script at `~/.vantage-agent/perm-hook.sh` |
 | P3 | Bash never in auto-approve — always shows command preview |
 | P4 | `/allow` writes to `permissions.json`, hook reads on next call |
-| P6 | Org policy: check VantageAI API if `VANTAGE_API_KEY` set |
+| P6 | Org policy: check Cohrint API if `COHRINT_API_KEY` set |
 | P7 | Audit log appended on every permission decision |
 
 ### Priority 4 — Stability & Config
@@ -411,7 +411,7 @@ These flaws must be resolved first, as they affect the foundation:
 |----|-------------|
 | V1 | Single version source in `__init__.py`, read dynamically in BANNER and telemetry |
 | I3 | Consolidate config to single `~/.vantage-agent/` directory |
-| I4 | Add `VANTAGE_CONFIG_DIR` env var override |
+| I4 | Add `COHRINT_CONFIG_DIR` env var override |
 | R2 | Fix rate limiter file init race — acquire lock before opening file |
 | R4 | Cache `get_global_budget_used()` result with 10s TTL instead of per-prompt scan |
 | S3 | Cache budget total, invalidate on session save |
@@ -426,7 +426,7 @@ These flaws must be resolved first, as they affect the foundation:
 | I1 | API key encryption (keychain integration or symmetric encryption) |
 | S4 | Session JSON message encryption (optional, off by default) |
 | S1 | Session retention policy — auto-delete sessions older than N days |
-| V4 | Pricing auto-refresh from VantageAI API |
+| V4 | Pricing auto-refresh from Cohrint API |
 | CL9 | readline/history support in REPL |
 | TE1-TE10 | Test coverage for all identified gaps |
 
@@ -437,7 +437,7 @@ These flaws must be resolved first, as they affect the foundation:
 - The API backend (`AgentClient`) and its `PermissionManager` remain unchanged
 - All existing CLI flags remain (backward compatible additions only)
 - Session file format gains `schema_version` field but existing fields unchanged
-- `VANTAGE_API_KEY` telemetry path unchanged
+- `COHRINT_API_KEY` telemetry path unchanged
 - All existing tests must continue to pass
 
 ---
@@ -485,7 +485,7 @@ The combined design achieves:
 | Safe tools fast-path (no prompt) | ✅ | ✅ (hook reads always_approved) |
 | `/allow` takes effect immediately | ✅ | ✅ (via permissions.json) |
 | Consistent store across backends | after fix | after fix |
-| Org-level policy enforcement | ❌ | ✅ (if VANTAGE_API_KEY) |
+| Org-level policy enforcement | ❌ | ✅ (if COHRINT_API_KEY) |
 | Audit log | ❌ | ✅ |
 | Works without API key | ❌ | ✅ |
 | API-equivalent cost display | n/a | ✅ (labelled) |

@@ -135,7 +135,7 @@ try:
                 captured_key = key_el.inner_text().strip()
                 NEW_KEY = captured_key
                 chk("P2.3 API key displayed in success state",
-                    bool(captured_key) and captured_key.startswith("vnt_"),
+                    bool(captured_key) and captured_key.startswith("crt_"),
                     f"key={captured_key[:20] if captured_key else 'empty'}")
 
                 chk("P2.4 'Shown once' warning present",

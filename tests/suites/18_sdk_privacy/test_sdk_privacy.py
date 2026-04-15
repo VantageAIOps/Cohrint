@@ -761,7 +761,7 @@ def run():
     reset_results()
 
     info("=" * 60)
-    info("  VantageAI — SDK Privacy & OTel Pricing Engine Tests")
+    info("  Cohrint — SDK Privacy & OTel Pricing Engine Tests")
     info("  Endpoints: /v1/events, /v1/otel/*, /v1/cross-platform/*")
     info("=" * 60)
 

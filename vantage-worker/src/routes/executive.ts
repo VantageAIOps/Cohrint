@@ -1,5 +1,5 @@
 /**
- * VantageAI — Executive Dashboard API
+ * Cohrint — Executive Dashboard API
  *
  * Single endpoint returning org-wide cost intelligence for CEO/Superadmin roles.
  * Designed for the 32-person, 3-team business case where a CEO needs:

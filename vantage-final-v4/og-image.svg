@@ -122,7 +122,7 @@
   </g>
 
   <!-- URL -->
-  <text x="80" y="575" font-family="monospace, 'Courier New'" font-size="14" fill="#6b7b8a">vantageaiops.com</text>
+  <text x="80" y="575" font-family="monospace, 'Courier New'" font-size="14" fill="#6b7b8a">cohrint.com</text>
 
   <!-- Border -->
   <rect x="0.5" y="0.5" width="1199" height="629" rx="0" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>

@@ -1,5 +1,5 @@
 """
-Test Suite 22 — VantageAI Landing Page
+Test Suite 22 — Cohrint Landing Page
 Verifies the landing page content reflects all v2 features.
 Reads index.html from local file (not deployed site) and checks HTML content.
 """
@@ -37,19 +37,19 @@ class TestHeroAndInstall:
         section("A — Hero & Install")
         html = get_html()
         cond = _has(html, "<title>") and _has(html, "vantageai")
-        chk("LP.1 page title contains VantageAI", cond)
+        chk("LP.1 page title contains Cohrint", cond)
         assert cond
 
     def test_lp02_hero_pip_install(self):
         html = get_html()
-        cond = _has(html, "pip install vantageaiops")
-        chk("LP.2 hero has 'pip install vantageaiops'", cond)
+        cond = _has(html, "pip install cohrint")
+        chk("LP.2 hero has 'pip install cohrint'", cond)
         assert cond
 
     def test_lp03_hero_npm_install(self):
         html = get_html()
-        cond = _has(html, "npm install vantageaiops")
-        chk("LP.3 hero has 'npm install vantageaiops'", cond)
+        cond = _has(html, "npm install cohrint")
+        chk("LP.3 hero has 'npm install cohrint'", cond)
         assert cond
 
     def test_lp04_hero_npx_cli(self):
@@ -77,8 +77,8 @@ class TestFeatures:
 
     def test_lp07_vantageai_cli(self):
         html = get_html()
-        cond = _has(html, "VantageAI CLI")
-        chk("LP.7 has 'VantageAI CLI' feature card", cond)
+        cond = _has(html, "Cohrint CLI")
+        chk("LP.7 has 'Cohrint CLI' feature card", cond)
         assert cond
 
     def test_lp08_local_proxy(self):
@@ -153,8 +153,8 @@ class TestIntegrations:
     def test_lp18_vantageai_cli_integration(self):
         html = get_html()
         integrations_section = html[html.find('id="integrations"'):html.find("<!-- CODE EXAMPLES -->")]
-        cond = _has(integrations_section, ">VantageAI CLI<")
-        chk("LP.18 has VantageAI CLI integration card", cond)
+        cond = _has(integrations_section, ">Cohrint CLI<")
+        chk("LP.18 has Cohrint CLI integration card", cond)
         assert cond
 
     def test_lp19_otel_collector_integration(self):
@@ -264,8 +264,8 @@ class TestComparisonAndFaq:
     def test_lp33_faq_vantageai_cli(self):
         html = get_html()
         faq_section = html[html.find('id="faq"'):]
-        cond = _has(faq_section, "VantageAI CLI")
-        chk("LP.33 FAQ has 'VantageAI CLI' question", cond)
+        cond = _has(faq_section, "Cohrint CLI")
+        chk("LP.33 FAQ has 'Cohrint CLI' question", cond)
         assert cond
 
     def test_lp34_faq_cross_platform_otel_tracking(self):

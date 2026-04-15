@@ -1,4 +1,4 @@
-"""Token-bucket rate limiter with persistent state in ~/.vantage-agent/rate_state.json."""
+"""Token-bucket rate limiter with persistent state in ~/.cohrint-agent/rate_state.json."""
 from __future__ import annotations
 
 import fcntl
@@ -9,7 +9,7 @@ import threading
 from pathlib import Path
 from dataclasses import dataclass, asdict
 
-_STATE_FILE = Path(os.environ.get("VANTAGE_CONFIG_DIR", Path.home() / ".vantage-agent")) / "rate_state.json"
+_STATE_FILE = Path(os.environ.get("COHRINT_CONFIG_DIR", Path.home() / ".cohrint-agent")) / "rate_state.json"
 _LOCK = threading.Lock()  # in-process guard; file lock (below) covers cross-process
 
 # TTL cache for get_global_budget_used

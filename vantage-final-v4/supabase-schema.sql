@@ -1,5 +1,5 @@
 -- ============================================================
--- VantageAI — Complete Supabase Schema
+-- Cohrint — Complete Supabase Schema
 -- Project: oyljzpvwdfktrkeotmon
 -- Run in: Supabase Dashboard → SQL Editor → New Query → Run All
 -- ============================================================

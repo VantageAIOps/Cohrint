@@ -74,8 +74,8 @@ try:
         MEMBER_ID  = body.get("id") or body.get("member_id")
         MEMBER_KEY = body.get("api_key")
         chk("1.2  Member: api_key in response", bool(MEMBER_KEY), str(body))
-        chk("1.3  Member key starts with vnt_",
-            bool(MEMBER_KEY) and MEMBER_KEY.startswith("vnt_"), MEMBER_KEY)
+        chk("1.3  Member key starts with crt_",
+            bool(MEMBER_KEY) and MEMBER_KEY.startswith("crt_"), MEMBER_KEY)
         chk("1.4  Member: id in response", bool(MEMBER_ID), str(body))
         log.info("Member invited", member_id=MEMBER_ID, org=ORG_ID)
 except Exception as e:
@@ -139,7 +139,7 @@ if MEMBER_ID:
         if r.ok:
             new_key = r.json().get("api_key")
             chk("1.12 Rotated key is new (different from original)",
-                new_key and new_key != MEMBER_KEY and new_key.startswith("vnt_"),
+                new_key and new_key != MEMBER_KEY and new_key.startswith("crt_"),
                 f"new={new_key[:20] if new_key else 'None'}")
             if new_key:
                 MEMBER_KEY = new_key  # keep MEMBER_KEY current for section 2 tests

@@ -296,7 +296,7 @@ try:
                 for c in sr.cookies:
                     ctx.add_cookies([{
                         "name": c.name, "value": c.value,
-                        "domain": "vantageaiops.com", "path": "/",
+                        "domain": "cohrint.com", "path": "/",
                     }])
 
             try:
@@ -383,7 +383,7 @@ try:
                 for c in sr2.cookies:
                     ctx.add_cookies([{
                         "name": c.name, "value": c.value,
-                        "domain": "vantageaiops.com", "path": "/",
+                        "domain": "cohrint.com", "path": "/",
                     }])
             try:
                 page.goto(f"{SITE_URL}/app", wait_until="networkidle", timeout=30_000)
@@ -428,7 +428,7 @@ try:
                 for c in sr0.cookies:
                     ctx.add_cookies([{
                         "name": c.name, "value": c.value,
-                        "domain": "vantageaiops.com", "path": "/",
+                        "domain": "cohrint.com", "path": "/",
                     }])
 
             try:

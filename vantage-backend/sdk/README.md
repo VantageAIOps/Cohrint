@@ -4,18 +4,18 @@
 
 Track token usage, cost, latency and quality for OpenAI, Anthropic, Google and Mistral — with one line of code.
 
-[![PyPI](https://img.shields.io/pypi/v/vantageaiops)](https://pypi.org/project/vantageaiops/)
-[![Python](https://img.shields.io/pypi/pyversions/vantageaiops)](https://pypi.org/project/vantageaiops/)
+[![PyPI](https://img.shields.io/pypi/v/cohrint)](https://pypi.org/project/cohrint/)
+[![Python](https://img.shields.io/pypi/pyversions/cohrint)](https://pypi.org/project/cohrint/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
 ## Install
 
 ```bash
-pip install vantageaiops            # core only
-pip install vantageaiops[openai]    # + OpenAI proxy
-pip install vantageaiops[anthropic] # + Anthropic proxy
-pip install vantageaiops[google]    # + Gemini proxy
-pip install vantageaiops[all]       # everything
+pip install cohrint            # core only
+pip install cohrint[openai]    # + OpenAI proxy
+pip install cohrint[anthropic] # + Anthropic proxy
+pip install cohrint[google]    # + Gemini proxy
+pip install cohrint[all]       # everything
 ```
 
 ## Quickstart
@@ -38,7 +38,7 @@ response = client.chat.completions.create(
 )
 ```
 
-Every call is logged to your [VantageAI dashboard](https://vantageaiops.com/app.html) with:
+Every call is logged to your [Cohrint dashboard](https://cohrint.com/app.html) with:
 - Token counts (prompt + completion)
 - Cost in USD
 - Latency (ms)
@@ -107,7 +107,7 @@ vantage.init(
     org="acme",                  # auto-parsed from key if omitted
     team="platform",             # default team tag
     environment="production",    # default: "production"
-    ingest_url="https://api.vantageaiops.com",
+    ingest_url="https://api.cohrint.com",
     flush_interval=2.0,          # seconds between auto-flush
     batch_size=50,               # events per HTTP request
     debug=False,
@@ -116,7 +116,7 @@ vantage.init(
 
 ## Links
 
-- [Dashboard](https://vantageaiops.com/app.html)
-- [Full docs](https://vantageaiops.com/docs.html)
-- [REST API reference](https://vantageaiops.com/docs.html#api)
+- [Dashboard](https://cohrint.com/app.html)
+- [Full docs](https://cohrint.com/docs.html)
+- [REST API reference](https://cohrint.com/docs.html#api)
 - [GitHub](https://github.com/amanjain/vantageai)

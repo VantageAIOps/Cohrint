@@ -113,7 +113,7 @@ async def require_org(request: Request, creds: Optional[HTTPAuthorizationCredent
         raise HTTPException(401, "Missing API key")
     sb = get_supabase()
     if not sb:
-        if raw.startswith("vnt_"):
+        if raw.startswith("crt_"):
             parts = raw.split("_")
             return parts[1] if len(parts) >= 3 else "dev"
         raise HTTPException(401, "Invalid key")
@@ -276,7 +276,7 @@ async def live_stream(org_id: str, org: str = Depends(require_org)):
 # ── OpenTelemetry OTLP/HTTP ingest ────────────────────────────────────────────
 @app.post("/v1/traces", status_code=202)
 async def ingest_otel(request: Request, bg: BackgroundTasks, org: str = Depends(require_org)):
-    """Accept OTLP/HTTP JSON traces and convert to VantageEvents."""
+    """Accept OTLP/HTTP JSON traces and convert to CohrintEvents."""
     try:
         body = await request.json()
     except Exception:

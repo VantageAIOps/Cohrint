@@ -94,8 +94,8 @@ class TestSDKInit:
     def test_sk03_api_key_format(self):
         d = signup_api()
         key = d["api_key"]
-        chk("SK.3 api_key starts with vnt_", key.startswith("vnt_"))
-        assert key.startswith("vnt_")
+        chk("SK.3 api_key starts with crt_", key.startswith("crt_"))
+        assert key.startswith("crt_")
 
     def test_sk04_invalid_key_rejected(self):
         r = requests.get(

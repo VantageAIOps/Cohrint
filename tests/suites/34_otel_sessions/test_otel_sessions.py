@@ -3,7 +3,7 @@ Suite 34 — OTel session rollup
 Tests that OTel ingest creates/accumulates otel_sessions rows
 and that GET /v1/sessions returns correct data.
 Covers: claude-code, gemini-cli, codex-cli service.name variants.
-Hits live API at https://api.vantageaiops.com.
+Hits live API at https://api.cohrint.com.
 """
 import os
 import sys
@@ -37,7 +37,7 @@ def otel_payload(session_id: str, tokens_in: int = 100, tokens_out: int = 20) ->
                 "attributes": [
                     {"key": "service.name",  "value": {"stringValue": "claude-code"}},
                     {"key": "session.id",    "value": {"stringValue": session_id}},
-                    {"key": "user.email",    "value": {"stringValue": "test@vantageaiops.com"}},
+                    {"key": "user.email",    "value": {"stringValue": "test@cohrint.com"}},
                 ]
             },
             "scopeMetrics": [{
@@ -185,13 +185,13 @@ class TestOtelSessionRollup:
 
         sessions_res = requests.get(
             f"{API_BASE}/v1/sessions",
-            params={"developer_email": "test@vantageaiops.com"},
+            params={"developer_email": "test@cohrint.com"},
             headers=HEADERS, timeout=10,
         )
         assert sessions_res.status_code == 200
         data = sessions_res.json()
         for s in data["sessions"]:
-            assert s["developer_email"] == "test@vantageaiops.com"
+            assert s["developer_email"] == "test@cohrint.com"
 
     def test_get_sessions_limit_respected(self):
         """GET /v1/sessions?limit=2 returns at most 2 sessions."""
@@ -231,7 +231,7 @@ def gemini_otel_payload(session_id: str, tokens_in: int = 9000, tokens_out: int 
             "resource": {
                 "attributes": [
                     {"key": "service.name", "value": {"stringValue": "gemini-cli"}},
-                    {"key": "user.email",   "value": {"stringValue": "test@vantageaiops.com"}},
+                    {"key": "user.email",   "value": {"stringValue": "test@cohrint.com"}},
                     {"key": "session.id",   "value": {"stringValue": session_id}},
                     {"key": "terminal.type","value": {"stringValue": "iTerm.app"}},
                 ]
@@ -290,7 +290,7 @@ def codex_otel_payload(session_id: str, tokens_in: int = 5000, tokens_out: int =
             "resource": {
                 "attributes": [
                     {"key": "service.name", "value": {"stringValue": "codex-cli"}},
-                    {"key": "user.email",   "value": {"stringValue": "test@vantageaiops.com"}},
+                    {"key": "user.email",   "value": {"stringValue": "test@cohrint.com"}},
                     {"key": "session.id",   "value": {"stringValue": session_id}},
                     {"key": "terminal.type","value": {"stringValue": "tmux"}},
                 ]

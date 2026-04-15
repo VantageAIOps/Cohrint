@@ -1,5 +1,5 @@
 """
-helpers.py — Shared test infrastructure for VantageAI test suite
+helpers.py — Shared test infrastructure for Cohrint test suite
 ================================================================
 Provides:
   - Constants (SITE_URL, API_URL)
@@ -32,8 +32,8 @@ import requests
 from typing import Optional, Tuple
 
 # ── URLs ─────────────────────────────────────────────────────────────────────
-SITE_URL = "https://vantageaiops.com"
-API_URL  = "https://api.vantageaiops.com"
+SITE_URL = "https://cohrint.com"
+API_URL  = "https://api.cohrint.com"
 
 # ── Console colour helpers ────────────────────────────────────────────────────
 G  = "\033[32m✓\033[0m"

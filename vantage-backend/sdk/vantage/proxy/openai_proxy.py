@@ -8,7 +8,7 @@ BEFORE:
     client = OpenAI(api_key="sk-...")
 
 AFTER (literally 2 lines changed):
-    import vantage; vantage.init("vnt_...")
+    import vantage; vantage.init("crt_...")
     from vantage.proxy.openai_proxy import OpenAI
     client = OpenAI(api_key="sk-...")
 
@@ -21,7 +21,7 @@ import time
 from typing import Any, Iterator, AsyncIterator, Optional
 
 from vantage.proxy.universal import _build_event, _compress_if_enabled, _CTX_TAGS, _CTX_FEATURE, _CTX_PROJECT
-from vantage.models.event import VantageEvent
+from vantage.models.event import CohrintEvent
 
 try:
     import openai as _oai

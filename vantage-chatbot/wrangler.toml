@@ -11,8 +11,8 @@ id = "3711f2ed67a04f7a981eb1ab33634313"
 preview_id = "8ad5c76d2e4b469096e2800dfa071948"
 
 [vars]
-RESEND_FROM = "vega@vantageaiops.com"
-SUPPORT_EMAIL = "support@vantageaiops.com"
+RESEND_FROM = "vega@cohrint.com"
+SUPPORT_EMAIL = "support@cohrint.com"
 # Required secrets (set via `npx wrangler secret put <NAME>` — never commit values):
 #   RESEND_API_KEY   — Resend API key for outbound ticket emails
-#   VANTAGE_API_URL  — Base URL of the Vantage API (e.g. https://api.vantageaiops.com)
+#   VANTAGE_API_URL  — Base URL of the Vantage API (e.g. https://api.cohrint.com)

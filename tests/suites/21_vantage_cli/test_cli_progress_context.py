@@ -1,5 +1,5 @@
 """
-Test Suite 21b — VantageAI Agent: Source Structure & Module Contracts
+Test Suite 21b — Cohrint Agent: Source Structure & Module Contracts
 Source-code verification tests for optimizer, backends, session, and renderer.
 Replaces the old TypeScript vantage-cli progress/context tests.
 """

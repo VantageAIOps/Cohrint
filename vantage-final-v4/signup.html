@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
-<title>Get your free API key — VantageAI</title>
-<meta name="description" content="Create your free VantageAI account and get your API key instantly. Start tracking LLM costs in 2 minutes.">
+<title>Get your free API key — Cohrint</title>
+<meta name="description" content="Create your free Cohrint account and get your API key instantly. Start tracking LLM costs in 2 minutes.">
 <meta name="robots" content="index, follow">
-<link rel="canonical" href="https://vantageaiops.com/signup.html">
+<link rel="canonical" href="https://cohrint.com/signup.html">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#00d4a1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -127,7 +127,7 @@ footer a:hover{color:var(--text)}
 <body>
 
 <nav>
-  <a href="/" class="logo"><span class="dot"></span>VantageAI</a>
+  <a href="/" class="logo"><span class="dot"></span>Cohrint</a>
   <div class="nav-links">
     <a href="/calculator.html">Calculator</a>
     <a href="/docs.html">Docs</a>
@@ -158,7 +158,7 @@ footer a:hover{color:var(--text)}
         <div class="field">
           <label>COMPANY / PROJECT <span style="color:var(--dim)">(optional)</span></label>
           <input type="text" id="inp-org" placeholder="Acme Corp">
-          <div class="field-hint">Becomes your org ID prefix — e.g. <span style="font-family:var(--mono);font-size:11px;color:var(--accent)">vnt_acme_...</span></div>
+          <div class="field-hint">Becomes your org ID prefix — e.g. <span style="font-family:var(--mono);font-size:11px;color:var(--accent)">crt_acme_...</span></div>
         </div>
 
         <button class="submit-btn" id="submit-btn" onclick="doSignup()">Create free account →</button>
@@ -198,14 +198,14 @@ footer a:hover{color:var(--text)}
             <div class="step-num">1</div>
             <div class="step-body">
               <strong>Install the SDK</strong><br>
-              <code>pip install vantageaiops[openai]</code> or <code>npm install vantageaiops</code>
+              <code>pip install cohrint[openai]</code> or <code>npm install cohrint</code>
             </div>
           </div>
           <div class="step-item">
             <div class="step-num">2</div>
             <div class="step-body">
               <strong>Add two lines to your code</strong><br>
-              <code>import vantageaiops as vantage; vantage.init(api_key="<span id="key-inline">vnt_...</span>")</code>
+              <code>import cohrint as vantage; vantage.init(api_key="<span id="key-inline">crt_...</span>")</code>
             </div>
           </div>
           <div class="step-item">
@@ -268,8 +268,8 @@ footer a:hover{color:var(--text)}
         <li>Audit log</li>
         <li>Email support</li>
       </ul>
-      <a href="mailto:sales@vantageaiops.com?subject=Team%20plan" class="tier-cta primary">Start Team trial</a>
-      <div class="tier-note" style="margin-top:8px;font-size:12px;color:var(--muted);">or email <a href="mailto:sales@vantageaiops.com" style="color:inherit;">sales@vantageaiops.com</a></div>
+      <a href="mailto:sales@cohrint.com?subject=Team%20plan" class="tier-cta primary">Start Team trial</a>
+      <div class="tier-note" style="margin-top:8px;font-size:12px;color:var(--muted);">or email <a href="mailto:sales@cohrint.com" style="color:inherit;">sales@cohrint.com</a></div>
     </div>
 
     <!-- Enterprise -->
@@ -290,7 +290,7 @@ footer a:hover{color:var(--text)}
         <li>Audit log export</li>
         <li>Priority onboarding</li>
       </ul>
-      <a href="mailto:sales@vantageaiops.com?subject=Enterprise%20inquiry" class="tier-cta outline">Talk to sales</a>
+      <a href="mailto:sales@cohrint.com?subject=Enterprise%20inquiry" class="tier-cta outline">Talk to sales</a>
       <div class="tier-note">
         We respond within 1 business day<br>
         <a href="/trust.html">Review our security architecture →</a>
@@ -301,17 +301,17 @@ footer a:hover{color:var(--text)}
 </section>
 
 <footer>
-  <a href="/">VantageAI</a>
+  <a href="/">Cohrint</a>
   <div style="display:flex;gap:24px">
     <a href="/docs.html">Docs</a>
     <a href="/privacy.html">Privacy</a>
     <a href="/terms.html">Terms</a>
   </div>
-  <span>© 2026 VantageAI · Free forever</span>
+  <span>© 2026 Cohrint · Free forever</span>
 </footer>
 
 <script>
-const API = 'https://api.vantageaiops.com';
+const API = 'https://api.cohrint.com';
 let _apiKey = '';
 
 async function doSignup() {

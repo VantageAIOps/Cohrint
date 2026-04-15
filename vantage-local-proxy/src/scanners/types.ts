@@ -1,5 +1,5 @@
 /**
- * Local File Scanner — Layer 2 of VantageAI's 4-layer architecture.
+ * Local File Scanner — Layer 2 of Cohrint's 4-layer architecture.
  *
  * Every AI coding tool stores session data in local files.
  * These types define the unified interface for parsing them all.

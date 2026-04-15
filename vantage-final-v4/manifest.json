@@ -1,6 +1,6 @@
 {
-  "name": "VantageAI",
-  "short_name": "VantageAI",
+  "name": "Cohrint",
+  "short_name": "Cohrint",
   "description": "AI cost intelligence — track LLM spend, tokens, and model performance",
   "start_url": "/app.html",
   "display": "standalone",

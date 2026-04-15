@@ -71,7 +71,7 @@ def test_auth_errors():
 
     # SI.8 Wrong key → 401
     r = requests.post(f"{API_URL}/v1/auth/session",
-                      json={"api_key": "vnt_wrongkey_abc123xyz"}, timeout=15)
+                      json={"api_key": "crt_wrongkey_abc123xyz"}, timeout=15)
     chk("SI.8  Wrong key → 401", r.status_code == 401, f"got {r.status_code}")
 
     # SI.9 Empty key → 401 or 400

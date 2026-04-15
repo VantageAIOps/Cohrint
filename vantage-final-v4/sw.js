@@ -1,10 +1,10 @@
 /**
- * VantageAI — Service Worker v4
+ * Cohrint — Service Worker v4
  *
  * Strategy:
  *   HTML pages   → network-first (always get fresh content, fall back to cache)
  *   Static assets → cache-first (JS, CSS, fonts — fast, versioned by SW cache name)
- *   API calls    → bypass (never intercept api.vantageaiops.com or /v1/ paths)
+ *   API calls    → bypass (never intercept api.cohrint.com or /v1/ paths)
  *
  * Auto-update: when a new SW activates, it sends a 'reload' message to all
  * open tabs so they pick up the latest HTML without the user clearing cache.

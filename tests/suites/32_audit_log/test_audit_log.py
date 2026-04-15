@@ -36,7 +36,7 @@ from config.settings import API_URL
 from helpers.api import fresh_account, get_headers
 from helpers.output import chk, fail, get_results, reset_results, section
 
-FRONTEND_URL = "https://vantageaiops.com"
+FRONTEND_URL = "https://cohrint.com"
 AUDIT_URL    = f"{API_URL}/v1/audit-log"
 _WAIT        = 2   # seconds for waitUntil writes to flush to D1
 
@@ -153,7 +153,7 @@ class TestAuthEvents:
 
     def test_al10_auth_failed_key_not_found(self, org_id):
         """A well-formed but non-existent key must return 401."""
-        fake_key = f"vnt_{org_id}_ffffffffffffffffffffffffffffffff"
+        fake_key = f"crt_{org_id}_ffffffffffffffffffffffffffffffff"
         r = requests.get(f"{API_URL}/v1/analytics/summary",
                          headers=get_headers(fake_key), timeout=10)
         chk("AL.10 key-not-found -> 401", r.status_code == 401, f"got {r.status_code}")
@@ -593,7 +593,7 @@ def member_key(account):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  Standalone runner  (python test_audit_log.py [--key vnt_...])
+#  Standalone runner  (python test_audit_log.py [--key crt_...])
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def run(api_key: str | None = None):
@@ -667,6 +667,6 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="SOC2 audit log live tests")
     parser.add_argument("--key", default=None,
-                        help="Owner API key (vnt_...). Omit to create a fresh account.")
+                        help="Owner API key (crt_...). Omit to create a fresh account.")
     args = parser.parse_args()
     sys.exit(run(api_key=args.key))

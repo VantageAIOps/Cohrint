@@ -33,7 +33,7 @@ def test_valid_signup():
         chk("SU.2  Response has api_key",  "api_key" in d)
         chk("SU.3  Response has org_id",   "org_id"  in d)
         chk("SU.4  Response has hint",     "hint"    in d)
-        chk("SU.5  api_key starts vnt_",   d.get("api_key", "").startswith("vnt_"),
+        chk("SU.5  api_key starts crt_",   d.get("api_key", "").startswith("crt_"),
             f"got: {d.get('api_key', '')[:15]}")
         chk("SU.6  api_key length > 20",   len(d.get("api_key", "")) > 20)
         chk("SU.7  org_id is non-empty",   bool(d.get("org_id", "")))

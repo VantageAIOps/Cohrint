@@ -1,4 +1,4 @@
-# VantageAI — Enterprise Documentation
+# Cohrint — Enterprise Documentation
 
 > AI cost intelligence platform — token tracking, model pricing comparison,
 > efficiency scoring and budget governance for developers and organisations.
@@ -124,10 +124,10 @@ Additional redirect URLs:
 
 ### Step 1 — Google Cloud Console
 1. Go to https://console.cloud.google.com
-2. Create project → **VantageAI**
+2. Create project → **Cohrint**
 3. APIs & Services → **OAuth consent screen**
    - User type: **External**
-   - App name: VantageAI
+   - App name: Cohrint
    - Save and continue (skip scopes and test users)
 4. APIs & Services → **Credentials → Create Credentials → OAuth 2.0 Client ID**
    - Application type: **Web application**
@@ -267,7 +267,7 @@ Charts:   Chart.js (loaded from cdnjs.cloudflare.com)
 ### Data flow — SDK captures an AI call
 ```
 1. Developer wraps OpenAI/Anthropic client with Vantage proxy
-2. vantage.init("vnt_your_key") called once at startup
+2. vantage.init("crt_your_key") called once at startup
 3. Every API call intercepted → tokens, cost, latency captured
 4. Event queued in memory (async, zero latency impact)
 5. Background thread flushes batch every 2 seconds
@@ -354,7 +354,7 @@ auth.html
 5. Add 2 lines to existing code:
      import vantage
      from vantage.proxy.openai_proxy import OpenAI
-     vantage.init("vnt_your_key")
+     vantage.init("crt_your_key")
 6. All API calls tracked automatically
 7. Dashboard populates with real data
 ```
@@ -474,7 +474,7 @@ The bottom-up growth engine.
 # 1. Push files to GitHub
 git init
 git add .
-git commit -m "Initial VantageAI deployment"
+git commit -m "Initial Cohrint deployment"
 git remote add origin https://github.com/YOUR_USERNAME/vantage-ai
 git push -u origin main
 

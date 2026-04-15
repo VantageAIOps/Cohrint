@@ -96,7 +96,7 @@ def test_bad_keys_server_stable():
                                 "provider": "openai", "model": "gpt-4o",
                                 "total_cost_usd": 0.001,
                                 "prompt_tokens": 50, "completion_tokens": 25},
-                          headers={"Authorization": f"Bearer vnt_badkey_{rand_tag()}"},
+                          headers={"Authorization": f"Bearer crt_badkey_{rand_tag()}"},
                           timeout=10)
         statuses.append(r.status_code)
 

@@ -1,9 +1,9 @@
 /**
- * Privacy Engine — strips sensitive data before forwarding stats to VantageAI.
+ * Privacy Engine — strips sensitive data before forwarding stats to Cohrint.
  *
  * SECURITY MODEL:
  *   - API keys NEVER leave the local machine
- *   - Prompts/responses are NEVER sent to VantageAI servers
+ *   - Prompts/responses are NEVER sent to Cohrint servers
  *   - Only anonymized statistics are forwarded:
  *     model, provider, token counts, cost, latency, status code, team, environment
  *   - Optional: send hashed prompt fingerprints (SHA-256) for dedup detection

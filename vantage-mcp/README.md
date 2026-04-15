@@ -1,18 +1,18 @@
-# vantageaiops-mcp
+# cohrint-mcp
 
-MCP server for [VantageAI](https://vantageaiops.com) — track LLM costs and query analytics directly from your AI coding assistant.
+MCP server for [Cohrint](https://cohrint.com) — track LLM costs and query analytics directly from your AI coding assistant.
 
-[![npm](https://img.shields.io/npm/v/vantageaiops-mcp)](https://www.npmjs.com/package/vantageaiops-mcp)
+[![npm](https://img.shields.io/npm/v/cohrint-mcp)](https://www.npmjs.com/package/cohrint-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
 ## Quick start
 
 ```bash
 # 1. Get your API key (free)
-# → https://vantageaiops.com/signup.html
+# → https://cohrint.com/signup.html
 
 # 2. Test the server works
-VANTAGE_API_KEY=vnt_your_key npx -y vantageaiops-mcp
+COHRINT_API_KEY=crt_your_key npx -y cohrint-mcp
 
 # 3. Add to your editor (see below)
 ```
@@ -43,7 +43,7 @@ VANTAGE_API_KEY=vnt_your_key npx -y vantageaiops-mcp
 
 ### Prerequisites
 - **Node.js 18+** required (`node --version` to check)
-- All editors use `npx -y vantageaiops-mcp` — no local install needed
+- All editors use `npx -y cohrint-mcp` — no local install needed
 
 ---
 
@@ -56,16 +56,16 @@ VANTAGE_API_KEY=vnt_your_key npx -y vantageaiops-mcp
   "mcpServers": {
     "vantage": {
       "command": "npx",
-      "args": ["-y", "vantageaiops-mcp"],
+      "args": ["-y", "cohrint-mcp"],
       "env": {
-        "VANTAGE_API_KEY": "vnt_your_key_here"
+        "COHRINT_API_KEY": "crt_your_key_here"
       }
     }
   }
 }
 ```
 
-**After saving:** Fully quit Claude Desktop (menu bar → Quit, not just close window) and reopen it. Click the hammer icon to see VantageAI tools.
+**After saving:** Fully quit Claude Desktop (menu bar → Quit, not just close window) and reopen it. Click the hammer icon to see Cohrint tools.
 
 > **macOS tip:** If `npx` is not found, use the full path. Run `which npx` in Terminal and use that (e.g. `/opt/homebrew/bin/npx`).
 
@@ -81,9 +81,9 @@ VANTAGE_API_KEY=vnt_your_key npx -y vantageaiops-mcp
     "vantage": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "vantageaiops-mcp"],
+      "args": ["-y", "cohrint-mcp"],
       "env": {
-        "VANTAGE_API_KEY": "vnt_your_key_here"
+        "COHRINT_API_KEY": "crt_your_key_here"
       }
     }
   }
@@ -105,9 +105,9 @@ VANTAGE_API_KEY=vnt_your_key npx -y vantageaiops-mcp
   "mcpServers": {
     "vantage": {
       "command": "npx",
-      "args": ["-y", "vantageaiops-mcp"],
+      "args": ["-y", "cohrint-mcp"],
       "env": {
-        "VANTAGE_API_KEY": "vnt_your_key_here"
+        "COHRINT_API_KEY": "crt_your_key_here"
       }
     }
   }
@@ -127,16 +127,16 @@ VANTAGE_API_KEY=vnt_your_key npx -y vantageaiops-mcp
   "mcpServers": {
     "vantage": {
       "command": "npx",
-      "args": ["-y", "vantageaiops-mcp"],
+      "args": ["-y", "cohrint-mcp"],
       "env": {
-        "VANTAGE_API_KEY": "vnt_your_key_here"
+        "COHRINT_API_KEY": "crt_your_key_here"
       }
     }
   }
 }
 ```
 
-**After saving:** Restart Windsurf. Cascade will have access to all VantageAI tools.
+**After saving:** Restart Windsurf. Cascade will have access to all Cohrint tools.
 
 ---
 
@@ -150,9 +150,9 @@ VANTAGE_API_KEY=vnt_your_key npx -y vantageaiops-mcp
     "vantage": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "vantageaiops-mcp"],
+      "args": ["-y", "cohrint-mcp"],
       "env": {
-        "VANTAGE_API_KEY": "vnt_your_key_here"
+        "COHRINT_API_KEY": "crt_your_key_here"
       }
     }
   }
@@ -169,9 +169,9 @@ Open Cline → MCP Servers → Add Server → paste:
 {
   "vantage": {
     "command": "npx",
-    "args": ["-y", "vantageaiops-mcp"],
+    "args": ["-y", "cohrint-mcp"],
     "env": {
-      "VANTAGE_API_KEY": "vnt_your_key_here"
+      "COHRINT_API_KEY": "crt_your_key_here"
     }
   }
 }
@@ -189,9 +189,9 @@ Add to Zed `settings.json` (Zed → Settings → Open Settings):
     "vantage": {
       "command": {
         "path": "npx",
-        "args": ["-y", "vantageaiops-mcp"],
+        "args": ["-y", "cohrint-mcp"],
         "env": {
-          "VANTAGE_API_KEY": "vnt_your_key_here"
+          "COHRINT_API_KEY": "crt_your_key_here"
         }
       }
     }
@@ -205,8 +205,8 @@ Add to Zed `settings.json` (Zed → Settings → Open Settings):
 
 Settings → Tools → AI Assistant → Model Context Protocol → Add server:
 - **Command:** `npx`
-- **Arguments:** `-y vantageaiops-mcp`
-- **Environment:** `VANTAGE_API_KEY=vnt_your_key_here`
+- **Arguments:** `-y cohrint-mcp`
+- **Environment:** `COHRINT_API_KEY=crt_your_key_here`
 
 ---
 
@@ -214,9 +214,9 @@ Settings → Tools → AI Assistant → Model Context Protocol → Add server:
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `VANTAGE_API_KEY` | Yes | — | Your `vnt_...` API key ([get one free](https://vantageaiops.com/signup.html)) |
-| `VANTAGE_ORG` | No | auto-parsed from key | Org ID override |
-| `VANTAGE_API_BASE` | No | `https://api.vantageaiops.com` | Custom API base URL |
+| `COHRINT_API_KEY` | Yes | — | Your `crt_...` API key ([get one free](https://cohrint.com/signup.html)) |
+| `COHRINT_ORG` | No | auto-parsed from key | Org ID override |
+| `COHRINT_API_BASE` | No | `https://api.cohrint.com` | Custom API base URL |
 
 ## Example prompts
 
@@ -248,10 +248,10 @@ Once connected, try these in your AI assistant:
 |---------|-----|
 | Server not showing up | 1. Check `node --version` is 18+ <br> 2. Verify JSON syntax (no trailing commas) <br> 3. Fully restart the editor (quit + reopen) |
 | "npx not found" on macOS | Use full path: `/opt/homebrew/bin/npx` or `/usr/local/bin/npx` (run `which npx`) |
-| "VANTAGE_API_KEY is not set" | Add the `env` block with your key to the config |
-| Tools fail with 401 | Your API key is invalid or expired — get a new one at [signup](https://vantageaiops.com/signup.html) |
+| "COHRINT_API_KEY is not set" | Add the `env` block with your key to the config |
+| Tools fail with 401 | Your API key is invalid or expired — get a new one at [signup](https://cohrint.com/signup.html) |
 | Tools return empty data | You haven't sent any events yet — use `track_llm_call` or integrate the SDK |
-| Timeout errors | Check internet connection; the API is at `api.vantageaiops.com` |
+| Timeout errors | Check internet connection; the API is at `api.cohrint.com` |
 
 ## Supported models (for cost estimation)
 
@@ -262,8 +262,8 @@ Others: llama-3.3-70b, deepseek-v3, deepseek-r1, mistral-large, mistral-small
 
 ## Links
 
-- [Dashboard](https://vantageaiops.com/app.html)
-- [Full docs](https://vantageaiops.com/docs.html)
-- [Python SDK](https://pypi.org/project/vantageaiops/)
-- [JavaScript SDK](https://www.npmjs.com/package/vantageaiops)
-- [GitHub](https://github.com/Amanjain98/VantageAI)
+- [Dashboard](https://cohrint.com/app.html)
+- [Full docs](https://cohrint.com/docs.html)
+- [Python SDK](https://pypi.org/project/cohrint/)
+- [JavaScript SDK](https://www.npmjs.com/package/cohrint)
+- [GitHub](https://github.com/Amanjain98/Cohrint)

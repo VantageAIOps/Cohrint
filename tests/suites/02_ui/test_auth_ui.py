@@ -53,7 +53,7 @@ def test_auth_flow(api_key):
                 fail("AU.4  API key input #inp-key not found")
 
             # AU.5 Invalid key shows error (not blank)
-            page.fill("#inp-key", "vnt_invalidkey_abc123")
+            page.fill("#inp-key", "crt_invalidkey_abc123")
             try:
                 with page.expect_response(
                     lambda r: "/v1/auth/session" in r.url and r.request.method == "POST",

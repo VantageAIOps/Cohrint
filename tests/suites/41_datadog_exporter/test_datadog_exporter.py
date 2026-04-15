@@ -90,7 +90,7 @@ class TestDatadogAuth:
 
     def test_dd04_bad_key_returns_401(self):
         r = requests.get(STATUS_URL,
-                         headers={"Authorization": "Bearer vnt_bad_key"},
+                         headers={"Authorization": "Bearer crt_bad_key"},
                          timeout=10)
         chk("DD.4  GET /datadog/status bad key -> 401",
             r.status_code == 401, f"got {r.status_code}")

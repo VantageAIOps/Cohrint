@@ -145,23 +145,23 @@ class TestQuickstartContent:
 class TestInstallationContent:
     """Verify all package installation instructions appear."""
 
-    def test_dc11_install_pip_vantageaiops(self):
+    def test_dc11_install_pip_cohrint(self):
         section("C — Installation Content")
         html = get_docs()
-        cond = _has(html, "pip install vantageaiops") or _has(html, "pip install vantageaiops")
-        chk("DC.11 Install has vantageaiops pip package", cond)
+        cond = _has(html, "pip install cohrint") or _has(html, "pip install cohrint")
+        chk("DC.11 Install has cohrint pip package", cond)
         assert cond
 
-    def test_dc12_install_npm_vantageaiops(self):
+    def test_dc12_install_npm_cohrint(self):
         html = get_docs()
-        cond = _has(html, "npm install vantageaiops") or _has(html, "npm i vantageaiops")
-        chk("DC.12 Install has vantageaiops npm package", cond)
+        cond = _has(html, "npm install cohrint") or _has(html, "npm i cohrint")
+        chk("DC.12 Install has cohrint npm package", cond)
         assert cond
 
     def test_dc13_install_mcp_package(self):
         html = get_docs()
-        cond = _has(html, "vantageaiops-mcp")
-        chk("DC.13 Install has vantageaiops-mcp MCP package", cond)
+        cond = _has(html, "cohrint-mcp")
+        chk("DC.13 Install has cohrint-mcp MCP package", cond)
         assert cond
 
     def test_dc14_install_cli_package(self):

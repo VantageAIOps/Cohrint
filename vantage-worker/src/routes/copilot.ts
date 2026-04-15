@@ -1,5 +1,5 @@
 /**
- * VantageAI — GitHub Copilot Metrics API Adapter
+ * Cohrint — GitHub Copilot Metrics API Adapter
  *
  * Polls the GitHub Copilot Metrics API (GA Feb 2026) for per-developer usage
  * and upserts normalised records into cross_platform_usage.
@@ -148,7 +148,7 @@ async function fetchCopilotMetrics(
       Authorization: `Bearer ${token}`,
       Accept: 'application/vnd.github+json',
       'X-GitHub-Api-Version': '2022-11-28',
-      'User-Agent': 'VantageAI/1.0',
+      'User-Agent': 'Cohrint/1.0',
     },
   });
   if (!resp.ok) {
@@ -171,7 +171,7 @@ async function fetchCopilotSeats(
         Authorization: `Bearer ${token}`,
         Accept: 'application/vnd.github+json',
         'X-GitHub-Api-Version': '2022-11-28',
-        'User-Agent': 'VantageAI/1.0',
+        'User-Agent': 'Cohrint/1.0',
       },
     });
     if (!resp.ok) break; // best-effort; metrics still work without seat details
@@ -459,7 +459,7 @@ copilot.post('/connect', async (c) => {
         Authorization: `Bearer ${token}`,
         Accept: 'application/vnd.github+json',
         'X-GitHub-Api-Version': '2022-11-28',
-        'User-Agent': 'VantageAI/1.0',
+        'User-Agent': 'Cohrint/1.0',
       },
     },
   );

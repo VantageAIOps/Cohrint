@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * CLI entry point for VantageAI Local Proxy.
+ * CLI entry point for Cohrint Local Proxy.
  *
  * Usage:
  *   vantage-proxy                                # proxy mode (default)
@@ -10,9 +10,9 @@
  *   vantage-proxy scan --tool claude-code         # scan specific tool
  *   vantage-proxy scan --since 2026-03-01         # filter by date
  *   vantage-proxy scan --json                     # output raw JSON
- *   vantage-proxy scan --push                     # scan + push to VantageAI API
+ *   vantage-proxy scan --push                     # scan + push to Cohrint API
  *   vantage-proxy --port 4891 --privacy strict    # proxy with options
- *   VANTAGE_API_KEY=vnt_... vantage-proxy
+ *   COHRINT_API_KEY=crt_... vantage-proxy
  */
 
 import { readFile, writeFile } from "node:fs/promises";
@@ -48,13 +48,13 @@ const command = args._command ?? "";
 (async () => {
   try {
     const current = VERSION;
-    const res = await fetch("https://registry.npmjs.org/vantageai-local-proxy/latest",
+    const res = await fetch("https://registry.npmjs.org/cohrint-local-proxy/latest",
       { signal: AbortSignal.timeout(2000) });
     if (!res.ok) return;
     const { version } = await res.json() as { version: string };
     if (version !== current) {
-      console.error(`\n  Update available: vantageai-local-proxy ${current} → ${version}`);
-      console.error(`  Run: npm install -g vantageai-local-proxy\n`);
+      console.error(`\n  Update available: cohrint-local-proxy ${current} → ${version}`);
+      console.error(`  Run: npm install -g cohrint-local-proxy\n`);
     }
   } catch { /* silent */ }
 })();
@@ -69,43 +69,43 @@ if (command === "scan") {
 } else {
   // ── PROXY command (default) ──────────────────────────────────────────────
 
-  const vantageApiKey = args["api-key"] ?? process.env.VANTAGE_API_KEY ?? "";
+  const vantageApiKey = args["api-key"] ?? process.env.COHRINT_API_KEY ?? process.env.VANTAGE_API_KEY ?? "";
   if (!vantageApiKey) {
     console.error(`
-ERROR: VANTAGE_API_KEY is required.
+ERROR: COHRINT_API_KEY is required.
 
 Set it via environment variable or --api-key flag:
 
-  export VANTAGE_API_KEY=vnt_yourorg_abc123
+  export COHRINT_API_KEY=crt_yourorg_abc123
   vantage-proxy
 
   # or
-  vantage-proxy --api-key vnt_yourorg_abc123
+  vantage-proxy --api-key crt_yourorg_abc123
 
-Get your key at: https://vantageaiops.com/signup.html
+Get your key at: https://cohrint.com/signup.html
 
 TIP: Use "vantage-proxy scan" to scan local AI tool sessions (no API key needed).
 `);
     process.exit(1);
   }
 
-  const privacyLevel = (args["privacy"] ?? process.env.VANTAGE_PRIVACY ?? "strict") as PrivacyLevel;
+  const privacyLevel = (args["privacy"] ?? process.env.COHRINT_PRIVACY ?? process.env.VANTAGE_PRIVACY ?? "strict") as PrivacyLevel;
   if (!["strict", "standard", "relaxed"].includes(privacyLevel)) {
     console.error(`Invalid privacy level: ${privacyLevel}. Use: strict | standard | relaxed`);
     process.exit(1);
   }
 
   startProxyServer({
-    port: parseInt(args["port"] ?? process.env.VANTAGE_PROXY_PORT ?? "4891", 10),
+    port: parseInt(args["port"] ?? process.env.COHRINT_PROXY_PORT ?? process.env.VANTAGE_PROXY_PORT ?? "4891", 10),
     vantageApiKey,
-    vantageApiBase: args["api-base"] ?? process.env.VANTAGE_API_BASE ?? "https://api.vantageaiops.com",
+    vantageApiBase: args["api-base"] ?? process.env.COHRINT_API_BASE ?? process.env.VANTAGE_API_BASE ?? "https://api.cohrint.com",
     privacy: {
       level: privacyLevel,
       redactModelNames: args["redact-models"] === "true",
     },
-    team: args["team"] ?? process.env.VANTAGE_TEAM ?? "",
-    environment: args["env"] ?? process.env.VANTAGE_ENV ?? "production",
-    debug: args["debug"] === "true" || process.env.VANTAGE_DEBUG === "true",
+    team: args["team"] ?? process.env.COHRINT_TEAM ?? process.env.VANTAGE_TEAM ?? "",
+    environment: args["env"] ?? process.env.COHRINT_ENV ?? process.env.VANTAGE_ENV ?? "production",
+    debug: args["debug"] === "true" || process.env.COHRINT_DEBUG === "true" || process.env.VANTAGE_DEBUG === "true",
     batchSize: parseInt(args["batch-size"] ?? "20", 10),
     flushInterval: parseInt(args["flush-interval"] ?? "5000", 10),
     resumeSessionId: args["resume"] ?? undefined,
@@ -125,7 +125,7 @@ async function runScan(): Promise<void> {
   const limit = args["limit"] ? parseInt(args["limit"], 10) : undefined;
 
   if (!jsonOutput) {
-    console.log("\n  VantageAI Local File Scanner");
+    console.log("\n  Cohrint Local File Scanner");
     console.log("  Scanning local AI tool sessions...\n");
 
     // Show which tools we're looking for
@@ -149,14 +149,14 @@ async function runScan(): Promise<void> {
 
   printScanReport(result);
 
-  // Push to VantageAI API if requested
+  // Push to Cohrint API if requested
   if (pushToApi) {
-    const apiKey = args["api-key"] ?? process.env.VANTAGE_API_KEY ?? "";
+    const apiKey = args["api-key"] ?? process.env.COHRINT_API_KEY ?? process.env.VANTAGE_API_KEY ?? "";
     if (!apiKey) {
-      console.error("\n  ERROR: --push requires VANTAGE_API_KEY to be set.\n");
+      console.error("\n  ERROR: --push requires COHRINT_API_KEY to be set.\n");
       process.exit(1);
     }
-    await pushScanResults(result, apiKey, args["api-base"] ?? process.env.VANTAGE_API_BASE ?? "https://api.vantageaiops.com");
+    await pushScanResults(result, apiKey, args["api-base"] ?? process.env.COHRINT_API_BASE ?? process.env.VANTAGE_API_BASE ?? "https://api.cohrint.com");
   }
 }
 
@@ -246,7 +246,7 @@ async function pushScanResults(
   apiKey: string,
   apiBase: string,
 ): Promise<void> {
-  console.log("  Pushing scan results to VantageAI...");
+  console.log("  Pushing scan results to Cohrint...");
 
   // Load dedup state — skip turns already uploaded
   const stateFile = join(homedir(), ".claude", "vantage-state.json");

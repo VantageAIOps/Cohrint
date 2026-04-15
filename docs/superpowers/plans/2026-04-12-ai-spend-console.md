@@ -1055,7 +1055,7 @@ git commit -m "feat(ui): cp-console.js — full Cross-Platform tab implementatio
 
 ```bash
 #!/usr/bin/env bash
-# run-tests.sh — VantageAI local test runner
+# run-tests.sh — Cohrint local test runner
 # Usage: scripts/run-tests.sh [--suite NAME] [--file FILE] [--test EXPR] [-- PYTEST_ARGS]
 set -euo pipefail
 

@@ -15,12 +15,12 @@ import urllib.error
 import urllib.request
 from typing import Any, Optional
 
-from vantageaiops.models.event import VantageEvent
+from cohrint.models.event import CohrintEvent
 
-logger = logging.getLogger("vantageaiops")
+logger = logging.getLogger("cohrint")
 
 
-class VantageClient:
+class CohrintClient:
     def __init__(
         self,
         api_key:              str,
@@ -53,7 +53,7 @@ class VantageClient:
         self._local = threading.local()
 
         # Event queue — bounded to prevent OOM
-        self._queue: queue.Queue[VantageEvent] = queue.Queue(maxsize=10_000)
+        self._queue: queue.Queue[CohrintEvent] = queue.Queue(maxsize=10_000)
 
         # Async event loop for hallucination scoring (runs in background thread)
         self._loop: Optional[asyncio.AbstractEventLoop] = None
@@ -65,7 +65,7 @@ class VantageClient:
 
         if debug:
             logging.basicConfig(level=logging.DEBUG)
-            logger.debug("VantageClient ready — org=%s env=%s", org, environment)
+            logger.debug("CohrintClient ready — org=%s env=%s", org, environment)
 
     # ── Tag management ────────────────────────────────────────────────────────
 
@@ -82,7 +82,7 @@ class VantageClient:
 
     # ── Capture ───────────────────────────────────────────────────────────────
 
-    def capture(self, event: VantageEvent) -> None:
+    def capture(self, event: CohrintEvent) -> None:
         """
         Enqueue event for async ingest. Never blocks the caller.
         Merges org/team/project context + thread-local tags.
@@ -139,14 +139,14 @@ class VantageClient:
 
     # ── Async hallucination scoring ───────────────────────────────────────────
 
-    async def _score_hallucination(self, event: VantageEvent) -> None:
+    async def _score_hallucination(self, event: CohrintEvent) -> None:
         """
         Calls Claude Opus 4.6 to score hallucination + quality.
         Runs concurrently — never blocks the main event loop.
         Updates the event in-place then re-queues it for patch upload.
         """
         try:
-            from vantageaiops.analysis.hallucination import evaluate_response
+            from cohrint.analysis.hallucination import evaluate_response
             scores = await evaluate_response(
                 user_query    = event.request_preview,
                 ai_response   = event.response_preview,
@@ -168,7 +168,7 @@ class VantageClient:
         except Exception as e:
             logger.debug("[vantage] Hallucination scoring error: %s", e)
 
-    async def _patch_event_async(self, event: VantageEvent) -> None:
+    async def _patch_event_async(self, event: CohrintEvent) -> None:
         """PATCH /v1/events/{id}/scores with quality metrics."""
         patch_url = self.ingest_url.replace("/events", f"/events/{event.event_id}/scores")
         payload = json.dumps({
@@ -217,7 +217,7 @@ class VantageClient:
     # ── Sync flush ────────────────────────────────────────────────────────────
 
     def flush(self) -> None:
-        batch: list[VantageEvent] = []
+        batch: list[CohrintEvent] = []
         try:
             while len(batch) < self.batch_size:
                 batch.append(self._queue.get_nowait())
@@ -226,7 +226,7 @@ class VantageClient:
         if batch:
             self._send_batch(batch)
 
-    def _send_batch(self, events: list[VantageEvent]) -> None:
+    def _send_batch(self, events: list[CohrintEvent]) -> None:
         payload = json.dumps({
             "events": [e.to_dict() for e in events],
             "sdk_version": "0.2.0",
@@ -264,6 +264,6 @@ class VantageClient:
 
     def __repr__(self) -> str:
         return (
-            f"VantageClient(org={self.org!r}, env={self.environment!r}, "
+            f"CohrintClient(org={self.org!r}, env={self.environment!r}, "
             f"queue={self._queue.qsize()}, hall={self.enable_hallucination})"
         )

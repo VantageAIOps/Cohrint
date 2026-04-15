@@ -142,7 +142,7 @@ from .tools import SAFE_TOOLS
 
 console = Console()
 
-_DEFAULT_CONFIG_DIR = Path(os.environ.get("VANTAGE_CONFIG_DIR", Path.home() / ".vantage-agent"))
+_DEFAULT_CONFIG_DIR = Path(os.environ.get("COHRINT_CONFIG_DIR", Path.home() / ".vantage-agent"))
 _PERM_FILE_NAME = "permissions.json"
 
 
@@ -667,7 +667,7 @@ def build_session_settings_file(
             "command": str(Path(_cfg) / "perm-hook.sh"),
             "env": {
                 "VANTAGE_SOCKET": socket_path,
-                "VANTAGE_CONFIG_DIR": _cfg,
+                "COHRINT_CONFIG_DIR": _cfg,
             },
         }],
     }
@@ -690,7 +690,7 @@ _HOOK_SCRIPT = r"""#!/bin/bash
 # Exits 0 = allow, 2 = block (stdout message goes to model as tool_result).
 
 SOCKET_PATH="${VANTAGE_SOCKET:-}"
-CONFIG_DIR="${VANTAGE_CONFIG_DIR:-$HOME/.vantage-agent}"
+CONFIG_DIR="${COHRINT_CONFIG_DIR:-$HOME/.vantage-agent}"
 PERMISSIONS_FILE="$CONFIG_DIR/permissions.json"
 
 # Read stdin (tool info JSON)
@@ -732,7 +732,7 @@ if [ -z "$SOCKET_PATH" ] || [ ! -S "$SOCKET_PATH" ]; then
     # No socket available — apply fail policy
     POLICY=$(python3 -c "
 import json, os
-cfg = os.path.join(os.environ.get('VANTAGE_CONFIG_DIR', os.path.expanduser('~/.vantage-agent')), 'config.json')
+cfg = os.path.join(os.environ.get('COHRINT_CONFIG_DIR', os.path.expanduser('~/.vantage-agent')), 'config.json')
 d = json.load(open(cfg)) if os.path.exists(cfg) else {}
 print(d.get('hook_fail_policy', 'allow'))
 " 2>/dev/null || echo "allow")
@@ -934,7 +934,7 @@ TIER_TOOLS: dict[int, list[str]] = {
 
 
 def _config_dir(config_dir: Path | None) -> Path:
-    return config_dir or Path(os.environ.get("VANTAGE_CONFIG_DIR", Path.home() / ".vantage-agent"))
+    return config_dir or Path(os.environ.get("COHRINT_CONFIG_DIR", Path.home() / ".vantage-agent"))
 
 
 def needs_setup(config_dir: Path | None = None) -> bool:
@@ -1222,7 +1222,7 @@ class ClaudeCliBackend(Backend):
     ) -> None:
         self._model = model
         self._config_dir = config_dir or Path(
-            os.environ.get("VANTAGE_CONFIG_DIR", Path.home() / ".vantage-agent")
+            os.environ.get("COHRINT_CONFIG_DIR", Path.home() / ".vantage-agent")
         )
         self._permission_server = permission_server
         self._claude_session_id: str | None = None
@@ -1552,7 +1552,7 @@ def _handle_tier_command(
 In `_build_client`, after the existing `permissions = PermissionManager()` line, add:
 
 ```python
-    config_dir = Path(os.environ.get("VANTAGE_CONFIG_DIR", Path.home() / ".vantage-agent"))
+    config_dir = Path(os.environ.get("COHRINT_CONFIG_DIR", Path.home() / ".vantage-agent"))
     backend_name = _detect_backend(
         api_key=args.api_key,
         requested_backend=getattr(args, "backend", None),
@@ -1623,7 +1623,7 @@ In `_handle_command`, add before the final `return False`:
 ```python
     if stripped == "/tier":
         from pathlib import Path
-        config_dir = Path(os.environ.get("VANTAGE_CONFIG_DIR", Path.home() / ".vantage-agent"))
+        config_dir = Path(os.environ.get("COHRINT_CONFIG_DIR", Path.home() / ".vantage-agent"))
         _handle_tier_command(client.permissions, config_dir=config_dir)
         return True
 ```

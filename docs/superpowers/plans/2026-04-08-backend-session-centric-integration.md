@@ -279,7 +279,7 @@ The constructor uses `loadSync` synchronously (needed during class construction 
   // Find the StatsQueue instantiation inside startProxyServer and add the two new args:
   const queue = new StatsQueue(
     config.vantageApiKey,
-    config.vantageApiBase ?? "https://api.vantageaiops.com",
+    config.vantageApiBase ?? "https://api.cohrint.com",
     config.batchSize ?? 20,
     config.flushInterval ?? 5000,
     config.privacy ?? { level: "strict", redactModelNames: false },
@@ -301,7 +301,7 @@ The constructor uses `loadSync` synchronously (needed during class construction 
   startProxyServer({
     port: parseInt(args["port"] ?? process.env.VANTAGE_PROXY_PORT ?? "4891", 10),
     vantageApiKey,
-    vantageApiBase: args["api-base"] ?? process.env.VANTAGE_API_BASE ?? "https://api.vantageaiops.com",
+    vantageApiBase: args["api-base"] ?? process.env.VANTAGE_API_BASE ?? "https://api.cohrint.com",
     privacy: {
       level: privacyLevel,
       redactModelNames: args["redact-models"] === "true",
@@ -317,7 +317,7 @@ The constructor uses `loadSync` synchronously (needed during class construction 
   startProxyServer({
     port: parseInt(args["port"] ?? process.env.VANTAGE_PROXY_PORT ?? "4891", 10),
     vantageApiKey,
-    vantageApiBase: args["api-base"] ?? process.env.VANTAGE_API_BASE ?? "https://api.vantageaiops.com",
+    vantageApiBase: args["api-base"] ?? process.env.VANTAGE_API_BASE ?? "https://api.cohrint.com",
     privacy: {
       level: privacyLevel,
       redactModelNames: args["redact-models"] === "true",
@@ -336,7 +336,7 @@ The constructor uses `loadSync` synchronously (needed during class construction 
 
   ```typescript
   /**
-   * CLI entry point for VantageAI Local Proxy.
+   * CLI entry point for Cohrint Local Proxy.
    *
    * Usage:
    *   vantage-proxy                                       # proxy mode (default)
@@ -737,7 +737,7 @@ The constructor uses `loadSync` synchronously (needed during class construction 
   Suite 34 — OTel session rollup
   Tests that OTel ingest creates/accumulates otel_sessions rows
   and that GET /v1/sessions returns correct data.
-  Hits live API at https://api.vantageaiops.com.
+  Hits live API at https://api.cohrint.com.
   """
   import os
   import time
@@ -746,12 +746,12 @@ The constructor uses `loadSync` synchronously (needed during class construction 
   import pytest
   import requests
 
-  API_BASE = os.environ.get("VANTAGE_API_BASE", "https://api.vantageaiops.com")
-  API_KEY  = os.environ.get("VANTAGE_API_KEY", "")
+  API_BASE = os.environ.get("VANTAGE_API_BASE", "https://api.cohrint.com")
+  API_KEY  = os.environ.get("COHRINT_API_KEY", "")
   HEADERS  = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
 
   if not API_KEY:
-      pytest.skip("VANTAGE_API_KEY not set", allow_module_level=True)
+      pytest.skip("COHRINT_API_KEY not set", allow_module_level=True)
 
 
   def otel_payload(session_id: str, tokens_in: int = 100, tokens_out: int = 20) -> dict:
@@ -762,7 +762,7 @@ The constructor uses `loadSync` synchronously (needed during class construction 
                   "attributes": [
                       {"key": "service.name",  "value": {"stringValue": "claude-code"}},
                       {"key": "session.id",    "value": {"stringValue": session_id}},
-                      {"key": "user.email",    "value": {"stringValue": "test@vantageaiops.com"}},
+                      {"key": "user.email",    "value": {"stringValue": "test@cohrint.com"}},
                   ]
               },
               "scopeMetrics": [{
@@ -913,14 +913,14 @@ The constructor uses `loadSync` synchronously (needed during class construction 
 
           sessions_res = requests.get(
               f"{API_BASE}/v1/sessions",
-              params={"developer_email": "test@vantageaiops.com"},
+              params={"developer_email": "test@cohrint.com"},
               headers=HEADERS, timeout=10,
           )
           assert sessions_res.status_code == 200
           data = sessions_res.json()
           # All returned sessions must match the filter
           for s in data["sessions"]:
-              assert s["developer_email"] == "test@vantageaiops.com"
+              assert s["developer_email"] == "test@cohrint.com"
 
       def test_get_sessions_limit_respected(self):
           """GET /v1/sessions?limit=2 returns at most 2 sessions."""

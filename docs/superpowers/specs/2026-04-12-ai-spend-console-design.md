@@ -445,7 +445,7 @@ WHERE org_id = ? AND developer_id = ? AND developer_email = ? LIMIT 1
 
 **Original:** Accepts any `https://` URL.
 **Security issue:** Attacker who sets `localStorage.api_base = 'https://attacker.com'` redirects all authenticated API traffic.
-**Decision:** Validate against explicit allowlist: `['api.vantageaiops.com', 'localhost', '127.0.0.1']` using `new URL()` hostname check.
+**Decision:** Validate against explicit allowlist: `['api.cohrint.com', 'localhost', '127.0.0.1']` using `new URL()` hostname check.
 
 ### 6f. Email Redaction Scope
 

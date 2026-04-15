@@ -455,7 +455,7 @@ class TestErrorStatusContract:
 
     def test_fc47_wrong_api_key_returns_401(self):
         """FC.47: Invalid Bearer token returns 401 with error field."""
-        bad = {"Authorization": "Bearer vnt_totallyinvalid"}
+        bad = {"Authorization": "Bearer crt_totallyinvalid"}
         r = requests.get(f"{API_URL}/v1/cross-platform/summary", headers=bad, timeout=10)
         chk("FC.47a wrong key → 401", r.status_code == 401, f"got {r.status_code}")
         body = r.json()
@@ -463,7 +463,7 @@ class TestErrorStatusContract:
 
     def test_fc48_otel_wrong_key_returns_401(self):
         """FC.48: OTel endpoint with invalid key returns 401."""
-        bad = {"Authorization": "Bearer vnt_invalid", "Content-Type": "application/json"}
+        bad = {"Authorization": "Bearer crt_invalid", "Content-Type": "application/json"}
         r = requests.post(f"{API_URL}/v1/otel/v1/metrics",
                           json={"resourceMetrics": []}, headers=bad, timeout=10)
         chk("FC.48a otel bad key → 401", r.status_code == 401, f"got {r.status_code}")
@@ -484,7 +484,7 @@ class TestErrorStatusContract:
         """FC.50: 401 responses include CORS headers so browser JS can read them."""
         r = requests.options(f"{API_URL}/v1/cross-platform/summary",
                              headers={
-                                 "Origin": "https://vantageaiops.com",
+                                 "Origin": "https://cohrint.com",
                                  "Access-Control-Request-Method": "GET",
                              }, timeout=10)
         chk("FC.50a CORS preflight → 200/204", r.status_code in (200, 204), f"got {r.status_code}")

@@ -2,36 +2,36 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Docs — VantageAI AI Coding Tool Cost Intelligence SDK & API</title>
-<meta name="description" content="Integration guides, SDK reference and API docs for VantageAI. Track AI coding agent costs across Claude Code, Codex CLI, and Gemini CLI. Python, TypeScript, OTel and CLI setup in 2 minutes.">
-<meta name="keywords" content="AI coding agent cost SDK, Claude Code cost tracking, Codex CLI spend monitoring, Gemini CLI cost tracking, VantageAI SDK, AI developer tools FinOps, OTel AI tools, coding agent cost tracking">
+<title>Docs — Cohrint AI Coding Tool Cost Intelligence SDK & API</title>
+<meta name="description" content="Integration guides, SDK reference and API docs for Cohrint. Track AI coding agent costs across Claude Code, Codex CLI, and Gemini CLI. Python, TypeScript, OTel and CLI setup in 2 minutes.">
+<meta name="keywords" content="AI coding agent cost SDK, Claude Code cost tracking, Codex CLI spend monitoring, Gemini CLI cost tracking, Cohrint SDK, AI developer tools FinOps, OTel AI tools, coding agent cost tracking">
 <meta name="robots" content="index, follow">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="VantageAI">
-<meta property="og:title" content="VantageAI Docs — AI Coding Tool Cost Intelligence SDK & API">
+<meta property="og:site_name" content="Cohrint">
+<meta property="og:title" content="Cohrint Docs — AI Coding Tool Cost Intelligence SDK & API">
 <meta property="og:description" content="Track AI coding agent costs across Claude Code, Codex CLI, and Gemini CLI. Python, TypeScript, OTel and CLI setup in 2 minutes.">
-<meta property="og:url" content="https://vantageaiops.com/docs.html">
-<meta property="og:image" content="https://vantageaiops.com/og-image.png">
+<meta property="og:url" content="https://cohrint.com/docs.html">
+<meta property="og:image" content="https://cohrint.com/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="VantageAI Docs — AI Coding Tool Cost Intelligence SDK & API">
+<meta name="twitter:title" content="Cohrint Docs — AI Coding Tool Cost Intelligence SDK & API">
 <meta name="twitter:description" content="Track AI coding agent costs across Claude Code, Codex CLI, and Gemini CLI.">
-<meta name="twitter:image" content="https://vantageaiops.com/og-image.png">
-<link rel="canonical" href="https://vantageaiops.com/docs.html">
+<meta name="twitter:image" content="https://cohrint.com/og-image.png">
+<link rel="canonical" href="https://cohrint.com/docs.html">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#00d4a1">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "TechArticle",
-  "headline": "VantageAI SDK & API Documentation",
-  "description": "Integration guides and API reference for VantageAI LLM cost tracking. Supports Claude Code, Codex CLI (OpenAI), and Gemini CLI.",
-  "url": "https://vantageaiops.com/docs.html",
-  "publisher": { "@type": "Organization", "name": "VantageAI", "url": "https://vantageaiops.com" },
+  "headline": "Cohrint SDK & API Documentation",
+  "description": "Integration guides and API reference for Cohrint LLM cost tracking. Supports Claude Code, Codex CLI (OpenAI), and Gemini CLI.",
+  "url": "https://cohrint.com/docs.html",
+  "publisher": { "@type": "Organization", "name": "Cohrint", "url": "https://cohrint.com" },
   "breadcrumb": {
     "@type": "BreadcrumbList",
     "itemListElement": [
-      { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://vantageaiops.com" },
-      { "@type": "ListItem", "position": 2, "name": "Docs", "item": "https://vantageaiops.com/docs.html" }
+      { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://cohrint.com" },
+      { "@type": "ListItem", "position": 2, "name": "Docs", "item": "https://cohrint.com/docs.html" }
     ]
   }
 }
@@ -235,7 +235,7 @@ pre{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;pad
 
     <div class="docs-nav-group">
       <div class="docs-nav-sec" onclick="toggleNavGroup(this)">CLI</div>
-      <a class="docs-nav-item" onclick="show('vantage-cli',this)">VantageAI Agent</a>
+      <a class="docs-nav-item" onclick="show('vantage-cli',this)">Cohrint Agent</a>
     </div>
 
     <div class="docs-nav-group">
@@ -261,9 +261,9 @@ pre{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;pad
 </div>
 
 <footer>
-  <a href="/">VantageAI</a>
+  <a href="/">Cohrint</a>
   <div style="display:flex;gap:24px"><a href="/docs.html">Docs</a><a href="/calculator.html">Calculator</a></div>
-  <span>© 2026 VantageAI</span>
+  <span>© 2026 Cohrint</span>
 </footer>
 
 <script>
@@ -276,12 +276,12 @@ quickstart: `
 <h2>Path 1 — SDK (2 lines of code)</h2>
 <p>Best for: API-based apps using OpenAI, Anthropic, or Google SDKs directly.</p>
 <div class="tab-row"><div class="tab active" onclick="switchTab('qs',this,'qs-py')">Python</div><div class="tab" onclick="switchTab('qs',this,'qs-ts')">TypeScript</div></div>
-<div id="qs-py" class="tab-content active"><pre>pip install vantageaiops
+<div id="qs-py" class="tab-content active"><pre>pip install cohrint
 
-<span class="c-kw">import</span> vantageaiops <span class="c-kw">as</span> vantage
-<span class="c-kw">from</span> vantageaiops.proxy.openai_proxy <span class="c-kw">import</span> OpenAI
+<span class="c-kw">import</span> cohrint <span class="c-kw">as</span> vantage
+<span class="c-kw">from</span> cohrint.proxy.openai_proxy <span class="c-kw">import</span> OpenAI
 
-vantage.<span class="c-fn">init</span>(api_key=<span class="c-str">"vnt_your_key"</span>)
+vantage.<span class="c-fn">init</span>(api_key=<span class="c-str">"crt_your_key"</span>)
 client = OpenAI(api_key=<span class="c-str">"sk-..."</span>)
 
 <span class="c-cm"># Every call is now tracked automatically</span>
@@ -290,12 +290,12 @@ response = client.chat.completions.<span class="c-fn">create</span>(
     messages=[{<span class="c-str">"role"</span>: <span class="c-str">"user"</span>, <span class="c-str">"content"</span>: <span class="c-str">"Hello!"</span>}],
 )
 <span class="c-cm"># ✓ Cost: $0.000110  ✓ Tokens: 12+8  ✓ Latency: 423ms</span></pre></div>
-<div id="qs-ts" class="tab-content"><pre>npm install vantageaiops
+<div id="qs-ts" class="tab-content"><pre>npm install cohrint
 
-<span class="c-kw">import</span> { init, createOpenAIProxy } <span class="c-kw">from</span> <span class="c-str">"vantageaiops"</span>;
+<span class="c-kw">import</span> { init, createOpenAIProxy } <span class="c-kw">from</span> <span class="c-str">"cohrint"</span>;
 <span class="c-kw">import</span> OpenAI <span class="c-kw">from</span> <span class="c-str">"openai"</span>;
 
-<span class="c-fn">init</span>({ apiKey: <span class="c-str">"vnt_your_key"</span> });
+<span class="c-fn">init</span>({ apiKey: <span class="c-str">"crt_your_key"</span> });
 <span class="c-kw">const</span> openai = <span class="c-fn">createOpenAIProxy</span>(<span class="c-kw">new</span> OpenAI());
 
 <span class="c-cm">// Every call tracked — cost, tokens, latency, model</span></pre></div>
@@ -304,8 +304,8 @@ response = client.chat.completions.<span class="c-fn">create</span>(
 <p>Best for: tracking AI coding agents (Claude Code, Codex CLI, Gemini CLI) across your org.</p>
 <pre><span class="c-cm"># Set 3 env vars on any developer machine</span>
 <span class="c-kw">export</span> CLAUDE_CODE_ENABLE_TELEMETRY=1
-<span class="c-kw">export</span> OTEL_EXPORTER_OTLP_ENDPOINT=<span class="c-str">https://api.vantageaiops.com/v1/otel</span>
-<span class="c-kw">export</span> OTEL_EXPORTER_OTLP_HEADERS=<span class="c-str">"Authorization=Bearer vnt_your_key"</span>
+<span class="c-kw">export</span> OTEL_EXPORTER_OTLP_ENDPOINT=<span class="c-str">https://api.cohrint.com/v1/otel</span>
+<span class="c-kw">export</span> OTEL_EXPORTER_OTLP_HEADERS=<span class="c-str">"Authorization=Bearer crt_your_key"</span>
 
 <span class="c-cm"># Now all Claude Code usage is tracked automatically</span>
 <span class="c-cm"># Works with: Claude Code, Codex CLI, Gemini CLI</span></pre>
@@ -338,9 +338,9 @@ install: `
 <table class="api-table">
 <thead><tr><th>Package</th><th>Install</th><th>Use case</th></tr></thead>
 <tbody>
-<tr><td><code>vantageaiops</code></td><td><code>pip install vantageaiops</code></td><td>Python SDK — wrap OpenAI/Anthropic clients</td></tr>
-<tr><td><code>vantageaiops</code></td><td><code>npm install vantageaiops</code></td><td>TypeScript/JS SDK — wrap any LLM client</td></tr>
-<tr><td><code>vantageaiops-mcp</code></td><td><code>npx -y vantageaiops-mcp</code></td><td>MCP server for Claude Code, Codex CLI, Gemini CLI</td></tr>
+<tr><td><code>cohrint</code></td><td><code>pip install cohrint</code></td><td>Python SDK — wrap OpenAI/Anthropic clients</td></tr>
+<tr><td><code>cohrint</code></td><td><code>npm install cohrint</code></td><td>TypeScript/JS SDK — wrap any LLM client</td></tr>
+<tr><td><code>cohrint-mcp</code></td><td><code>npx -y cohrint-mcp</code></td><td>MCP server for Claude Code, Codex CLI, Gemini CLI</td></tr>
 <tr><td><code>vantageai-agent</code></td><td><code>pip install vantageai-agent</code></td><td>Python CLI agent — interactive REPL with cost tracking + optimization</td></tr>
 <tr><td><code>vantageai-local-proxy</code></td><td><code>npx vantageai-local-proxy</code></td><td>Local privacy proxy — zero-trust tracking</td></tr>
 </tbody>
@@ -350,16 +350,16 @@ install: `
 <p>For AI coding tools, just set environment variables:</p>
 <pre><span class="c-cm"># Claude Code</span>
 CLAUDE_CODE_ENABLE_TELEMETRY=1
-OTEL_EXPORTER_OTLP_ENDPOINT=https://api.vantageaiops.com/v1/otel
-OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer vnt_your_key"
+OTEL_EXPORTER_OTLP_ENDPOINT=https://api.cohrint.com/v1/otel
+OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer crt_your_key"
 
 <span class="c-cm"># Gemini CLI (~/.gemini/settings.json)</span>
-{ "telemetry": { "enabled": true, "otlpEndpoint": "https://api.vantageaiops.com/v1/otel" } }
+{ "telemetry": { "enabled": true, "otlpEndpoint": "https://api.cohrint.com/v1/otel" } }
 
 <span class="c-cm"># Codex CLI (~/.codex/config.toml)</span>
 [telemetry]
 enabled = true
-otlp_endpoint = "https://api.vantageaiops.com/v1/otel"</pre>
+otlp_endpoint = "https://api.cohrint.com/v1/otel"</pre>
 
 <h2>Requirements</h2>
 <ul>
@@ -367,7 +367,7 @@ otlp_endpoint = "https://api.vantageaiops.com/v1/otel"</pre>
 <li><strong>TypeScript SDK:</strong> Node.js 18+ (zero npm dependencies)</li>
 <li><strong>CLI agent:</strong> Python 3.11+</li>
 <li><strong>OTel:</strong> No requirements — tools already emit telemetry</li>
-<li><strong>API key:</strong> Get one free at <a href="/signup.html">vantageaiops.com/signup</a></li>
+<li><strong>API key:</strong> Get one free at <a href="/signup.html">cohrint.com/signup</a></li>
 </ul>
 `,
 
@@ -375,7 +375,7 @@ concepts: `
 <h1>Core Concepts</h1>
 
 <h2>4-Layer Architecture</h2>
-<p>VantageAI uses a 4-layer approach to capture <strong>100% of AI spend</strong> across your organization:</p>
+<p>Cohrint uses a 4-layer approach to capture <strong>100% of AI spend</strong> across your organization:</p>
 
 <table class="api-table">
 <thead><tr><th>Layer</th><th>How</th><th>Coverage</th><th>Latency</th></tr></thead>
@@ -388,7 +388,7 @@ concepts: `
 </table>
 
 <h2>Data Flow</h2>
-<pre>Developer machine                    VantageAI
+<pre>Developer machine                    Cohrint
 ┌──────────────┐                    ┌──────────────┐
 │ Claude Code  │──OTel──────────────▸│              │
 │ Codex CLI    │──OTel──────────────▸│  /v1/otel    │
@@ -444,10 +444,10 @@ concepts: `
 python: `
 <h1>Python SDK</h1>
 <h2>OpenAI proxy</h2>
-<pre><span class="c-keyword">import</span> vantageaiops <span class="c-keyword">as</span> vantage
-<span class="c-keyword">from</span> vantageaiops.proxy.openai_proxy <span class="c-keyword">import</span> <span class="c-var">OpenAI</span>
+<pre><span class="c-keyword">import</span> cohrint <span class="c-keyword">as</span> vantage
+<span class="c-keyword">from</span> cohrint.proxy.openai_proxy <span class="c-keyword">import</span> <span class="c-var">OpenAI</span>
 
-vantage.<span class="c-func">init</span>(<span class="c-var">api_key</span>=<span class="c-string">"vnt_your_key"</span>, <span class="c-var">environment</span>=<span class="c-string">"production"</span>)
+vantage.<span class="c-func">init</span>(<span class="c-var">api_key</span>=<span class="c-string">"crt_your_key"</span>, <span class="c-var">environment</span>=<span class="c-string">"production"</span>)
 client = <span class="c-var">OpenAI</span>(<span class="c-var">api_key</span>=<span class="c-string">"sk-..."</span>)
 
 <span class="c-comment"># Non-streaming</span>
@@ -462,7 +462,7 @@ response = client.chat.completions.<span class="c-func">create</span>(
         <span class="c-func">print</span>(chunk.choices[<span class="c-num">0</span>].delta.content, end=<span class="c-string">""</span>)</pre>
 
 <h2>Anthropic proxy</h2>
-<pre><span class="c-keyword">from</span> vantageaiops.proxy.anthropic_proxy <span class="c-keyword">import</span> <span class="c-var">Anthropic</span>
+<pre><span class="c-keyword">from</span> cohrint.proxy.anthropic_proxy <span class="c-keyword">import</span> <span class="c-var">Anthropic</span>
 
 claude = <span class="c-var">Anthropic</span>(<span class="c-var">api_key</span>=<span class="c-string">"sk-ant-..."</span>)
 message = claude.messages.<span class="c-func">create</span>(
@@ -472,7 +472,7 @@ message = claude.messages.<span class="c-func">create</span>(
 
 <h2>init() options</h2>
 <table class="api-table"><thead><tr><th>Parameter</th><th>Default</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>api_key</code></td><td>required</td><td>Your Vantage API key (vnt_…)</td></tr>
+<tr><td><code>api_key</code></td><td>required</td><td>Your Vantage API key (crt_…)</td></tr>
 <tr><td><code>environment</code></td><td>"production"</td><td>Tag events: production | staging | development</td></tr>
 <tr><td><code>flush_interval</code></td><td>2.0</td><td>Seconds between background flushes</td></tr>
 <tr><td><code>batch_size</code></td><td>50</td><td>Max events per HTTP request</td></tr>
@@ -485,12 +485,12 @@ typescript: `
 <p>Full-featured SDK for Node.js 18+. Supports ESM and CommonJS. Zero required dependencies — provider packages are optional.</p>
 
 <h2>Install</h2>
-<pre>npm install vantageaiops          <span class="c-comment"># core SDK</span>
+<pre>npm install cohrint          <span class="c-comment"># core SDK</span>
 npm install openai               <span class="c-comment"># if using OpenAI proxy</span>
 npm install @anthropic-ai/sdk    <span class="c-comment"># if using Anthropic proxy</span></pre>
 
 <h2>Quickstart — OpenAI</h2>
-<pre><span class="c-keyword">import</span> * <span class="c-keyword">as</span> <span class="c-var">vantage</span> <span class="c-keyword">from</span> <span class="c-string">"vantageaiops"</span>;
+<pre><span class="c-keyword">import</span> * <span class="c-keyword">as</span> <span class="c-var">vantage</span> <span class="c-keyword">from</span> <span class="c-string">"cohrint"</span>;
 <span class="c-keyword">import</span> <span class="c-var">OpenAI</span> <span class="c-keyword">from</span> <span class="c-string">"openai"</span>;
 
 <span class="c-comment">// 1. Initialise once at app startup</span>
@@ -508,7 +508,7 @@ npm install @anthropic-ai/sdk    <span class="c-comment"># if using Anthropic pr
 // ✓ Cheapest alternative: gemini-2.0-flash — save 94%</span></pre>
 
 <h2>Quickstart — Anthropic</h2>
-<pre><span class="c-keyword">import</span> * <span class="c-keyword">as</span> <span class="c-var">vantage</span> <span class="c-keyword">from</span> <span class="c-string">"vantageaiops"</span>;
+<pre><span class="c-keyword">import</span> * <span class="c-keyword">as</span> <span class="c-var">vantage</span> <span class="c-keyword">from</span> <span class="c-string">"cohrint"</span>;
 <span class="c-keyword">import</span> <span class="c-var">Anthropic</span> <span class="c-keyword">from</span> <span class="c-string">"@anthropic-ai/sdk"</span>;
 
 <span class="c-var">vantage</span>.<span class="c-func">init</span>({ <span class="c-var">apiKey</span>: process.env.<span class="c-var">VANTAGE_API_KEY</span>! });
@@ -534,10 +534,10 @@ npm install @anthropic-ai/sdk    <span class="c-comment"># if using Anthropic pr
 <span class="c-comment">// ✓ TTFT, total latency, and token cost all captured</span></pre>
 
 <h2>Universal / manual tracking with trace()</h2>
-<pre><span class="c-keyword">import</span> { <span class="c-func">trace</span> } <span class="c-keyword">from</span> <span class="c-string">"vantageaiops"</span>;
+<pre><span class="c-keyword">import</span> { <span class="c-func">trace</span> } <span class="c-keyword">from</span> <span class="c-string">"cohrint"</span>;
 
 <span class="c-comment">// Wrap any async LLM call — tracked even without a proxy</span>
-<span class="c-keyword">const</span> result = <span class="c-keyword">await</span> <span class="c-func">trace</span>(myLLMCall, { <span class="c-var">apiKey</span>: <span class="c-string">"vnt_yourorg_..."</span> });
+<span class="c-keyword">const</span> result = <span class="c-keyword">await</span> <span class="c-func">trace</span>(myLLMCall, { <span class="c-var">apiKey</span>: <span class="c-string">"crt_yourorg_..."</span> });
 
 <span class="c-comment">// Or wrap an async block to tag all AI calls inside with context</span>
 <span class="c-keyword">await</span> <span class="c-func">trace</span>({
@@ -552,19 +552,19 @@ npm install @anthropic-ai/sdk    <span class="c-comment"># if using Anthropic pr
 
 <h2>Full init options</h2>
 <pre><span class="c-func">init</span>({
-  <span class="c-var">apiKey</span>:       <span class="c-string">"vnt_your_key"</span>,        <span class="c-comment">// required</span>
+  <span class="c-var">apiKey</span>:       <span class="c-string">"crt_your_key"</span>,        <span class="c-comment">// required</span>
   <span class="c-var">org</span>:          <span class="c-string">"your_org_id"</span>,         <span class="c-comment">// optional — parsed from key if omitted</span>
   <span class="c-var">environment</span>:  <span class="c-string">"production"</span>,          <span class="c-comment">// default: "production"</span>
   <span class="c-var">team</span>:         <span class="c-string">"platform"</span>,            <span class="c-comment">// default team tag</span>
   <span class="c-var">project</span>:      <span class="c-string">"my-app"</span>,              <span class="c-comment">// default project tag</span>
-  <span class="c-var">ingestUrl</span>:    <span class="c-string">"https://api.vantageaiops.com"</span>,
+  <span class="c-var">ingestUrl</span>:    <span class="c-string">"https://api.cohrint.com"</span>,
   <span class="c-var">flushInterval</span>: <span class="c-num">2</span>,                   <span class="c-comment">// seconds between auto-flush</span>
   <span class="c-var">batchSize</span>:    <span class="c-num">50</span>,                    <span class="c-comment">// events per HTTP request</span>
   <span class="c-var">debug</span>:        <span class="c-keyword">false</span>,                 <span class="c-comment">// log events to console</span>
 });</pre>
 
 <h2>Pricing utilities</h2>
-<pre><span class="c-keyword">import</span> { <span class="c-func">calculateCost</span>, <span class="c-func">findCheapest</span>, <span class="c-var">PRICES</span> } <span class="c-keyword">from</span> <span class="c-string">"vantageaiops"</span>;
+<pre><span class="c-keyword">import</span> { <span class="c-func">calculateCost</span>, <span class="c-func">findCheapest</span>, <span class="c-var">PRICES</span> } <span class="c-keyword">from</span> <span class="c-string">"cohrint"</span>;
 
 <span class="c-comment">// Cost for a specific model + token count</span>
 <span class="c-keyword">const</span> cost = <span class="c-func">calculateCost</span>(<span class="c-string">"gpt-4o"</span>, <span class="c-num">10_000</span>, <span class="c-num">2_000</span>);
@@ -578,7 +578,7 @@ console.<span class="c-func">log</span>(<span class="c-string">"Switch to " + al
 console.<span class="c-func">log</span>(<span class="c-var">PRICES</span>[<span class="c-string">"claude-sonnet-4-6"</span>]); <span class="c-comment">// → { provider: "anthropic", input: 3, output: 15, ... }</span></pre>
 
 <h2>Graceful shutdown</h2>
-<pre><span class="c-keyword">import</span> { <span class="c-func">shutdown</span> } <span class="c-keyword">from</span> <span class="c-string">"vantageaiops"</span>;
+<pre><span class="c-keyword">import</span> { <span class="c-func">shutdown</span> } <span class="c-keyword">from</span> <span class="c-string">"cohrint"</span>;
 
 <span class="c-comment">// Flush remaining events before process exits</span>
 process.<span class="c-func">on</span>(<span class="c-string">"SIGTERM"</span>, <span class="c-keyword">async</span> () => {
@@ -592,7 +592,7 @@ mcp: `
 
 <h2>No install required</h2>
 <p>All editors use <code>npx</code>. The server runs on-demand from the npm registry:</p>
-<pre>npx -y vantageaiops-mcp</pre>
+<pre>npx -y cohrint-mcp</pre>
 
 <h2>Available tools</h2>
 <table class="api-table"><thead><tr><th>Tool</th><th>What it answers</th></tr></thead><tbody>
@@ -612,16 +612,16 @@ mcp: `
 </tbody></table>
 
 <h2>Claude Desktop setup (step by step)</h2>
-<div class="step-row"><div class="step-num">1</div><div class="step-body">Get your API key from <a href="/signup.html">vantageaiops.com/signup</a>. It starts with <code>vnt_</code>.</div></div>
+<div class="step-row"><div class="step-num">1</div><div class="step-body">Get your API key from <a href="/signup.html">cohrint.com/signup</a>. It starts with <code>crt_</code>.</div></div>
 <div class="step-row"><div class="step-num">2</div><div class="step-body">Open the config file: <code>~/Library/Application Support/Claude/claude_desktop_config.json</code><br>(On Windows: <code>%APPDATA%\\Claude\\claude_desktop_config.json</code>)</div></div>
-<div class="step-row"><div class="step-num">3</div><div class="step-body">Add the VantageAI server (create the file if it doesn't exist):</div></div>
+<div class="step-row"><div class="step-num">3</div><div class="step-body">Add the Cohrint server (create the file if it doesn't exist):</div></div>
 <pre>{
   <span class="c-string">"mcpServers"</span>: {
     <span class="c-string">"vantage"</span>: {
       <span class="c-string">"command"</span>: <span class="c-string">"npx"</span>,
-      <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"vantageaiops-mcp"</span>],
+      <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"cohrint-mcp"</span>],
       <span class="c-string">"env"</span>: {
-        <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"vnt_your_key_here"</span>
+        <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"crt_your_key_here"</span>
       }
     }
   }
@@ -630,9 +630,9 @@ mcp: `
 
 <h2>Environment variables</h2>
 <table class="api-table"><thead><tr><th>Variable</th><th>Required</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>VANTAGE_API_KEY</code></td><td>Yes</td><td>Your <code>vnt_...</code> API key from signup</td></tr>
+<tr><td><code>VANTAGE_API_KEY</code></td><td>Yes</td><td>Your <code>crt_...</code> API key from signup</td></tr>
 <tr><td><code>VANTAGE_ORG</code></td><td>No</td><td>Org ID override (auto-parsed from key)</td></tr>
-<tr><td><code>VANTAGE_API_BASE</code></td><td>No</td><td>Custom API base (default: <code>https://api.vantageaiops.com</code>)</td></tr>
+<tr><td><code>VANTAGE_API_BASE</code></td><td>No</td><td>Custom API base (default: <code>https://api.cohrint.com</code>)</td></tr>
 </tbody></table>
 
 <h2>Example prompts</h2>
@@ -655,21 +655,21 @@ mcp: `
 1. Make sure <code>node</code> (v18+) is installed: run <code>node --version</code> in terminal<br>
 2. Verify your config JSON is valid (no trailing commas, correct path)<br>
 3. Fully quit and restart the app (not just close the window)<br>
-4. Check if <code>npx -y vantageaiops-mcp</code> works in terminal (you should see no errors)<br>
+4. Check if <code>npx -y cohrint-mcp</code> works in terminal (you should see no errors)<br>
 5. On macOS: Claude Desktop may need <code>/usr/local/bin/npx</code> as the full path instead of just <code>npx</code>
 </div>
 <div class="warn-box" style="margin-top:8px">
 <strong>Tools fail with auth error?</strong><br>
-Make sure your <code>VANTAGE_API_KEY</code> is correct and starts with <code>vnt_</code>. Get a new key at <a href="/signup.html">signup</a> if needed.
+Make sure your <code>VANTAGE_API_KEY</code> is correct and starts with <code>crt_</code>. Get a new key at <a href="/signup.html">signup</a> if needed.
 </div>
 <div class="doc-section" style="margin-top:24px;padding:16px;background:var(--bg2);border:1px solid var(--border);border-radius:8px">
   <strong>Other MCP-compatible editors</strong>
-  <p style="margin-top:8px;color:var(--muted)">VantageAI MCP works with any editor that supports the Model Context Protocol. Refer to your editor's documentation for MCP server configuration instructions.</p>
+  <p style="margin-top:8px;color:var(--muted)">Cohrint MCP works with any editor that supports the Model Context Protocol. Refer to your editor's documentation for MCP server configuration instructions.</p>
 </div>`,
 
 claudecode: `
 <h1>Claude Code</h1>
-<p>VantageAI tracks every Claude Code response automatically — tokens, cost, model — with no manual calls required.</p>
+<p>Cohrint tracks every Claude Code response automatically — tokens, cost, model — with no manual calls required.</p>
 
 <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
   <button class="tab active" onclick="switchTab('cc',this,'cc-auto')" style="padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer;font-size:13px">Auto-track (recommended)</button>
@@ -680,7 +680,7 @@ claudecode: `
 <h2>Automatic tracking via Stop hook</h2>
 <p>Reads Claude Code's local session files and uploads token usage after every response. <strong>Zero code changes required.</strong></p>
 
-<div class="step-row"><div class="step-num">1</div><div class="step-body">Create <code>~/.claude/hooks/vantage-track.js</code> — <a href="https://github.com/Amanjain98/VantageAI/blob/main/.claude/hooks/vantage-track.js" style="color:var(--accent)">get the script from GitHub</a> or copy from ADMIN_GUIDE §23.4</div></div>
+<div class="step-row"><div class="step-num">1</div><div class="step-body">Create <code>~/.claude/hooks/vantage-track.js</code> — <a href="https://github.com/Amanjain98/Cohrint/blob/main/.claude/hooks/vantage-track.js" style="color:var(--accent)">get the script from GitHub</a> or copy from ADMIN_GUIDE §23.4</div></div>
 
 <div class="step-row"><div class="step-num">2</div><div class="step-body">Register it as a Stop hook in <code>~/.claude/settings.json</code></div></div>
 <pre>{
@@ -689,7 +689,7 @@ claudecode: `
       <span class="c-string">"matcher"</span>: <span class="c-string">""</span>,
       <span class="c-string">"hooks"</span>: [{
         <span class="c-string">"type"</span>: <span class="c-string">"command"</span>,
-        <span class="c-string">"command"</span>: <span class="c-string">"VANTAGE_API_KEY=vnt_your_key node ~/.claude/hooks/vantage-track.js"</span>
+        <span class="c-string">"command"</span>: <span class="c-string">"VANTAGE_API_KEY=crt_your_key node ~/.claude/hooks/vantage-track.js"</span>
       }]
     }]
   }
@@ -697,7 +697,7 @@ claudecode: `
 
 <div class="step-row"><div class="step-num">3</div><div class="step-body">Backfill all historical sessions (one-time)</div></div>
 <pre><span class="c-comment"># Upload all past Claude Code sessions — safe to run multiple times</span>
-VANTAGE_API_KEY=<span class="c-string">vnt_your_key</span> npx vantageai-local-proxy scan --tool claude-code --push</pre>
+VANTAGE_API_KEY=<span class="c-string">crt_your_key</span> npx vantageai-local-proxy scan --tool claude-code --push</pre>
 
 <div class="info-box">✅ <strong style="color:var(--text)">Privacy.</strong> Claude Code writes sessions to <code>~/.claude/projects/*/uuid.jsonl</code>. The hook reads these files locally and uploads only token counts + model name + calculated cost. Prompt text and responses never leave your machine.</div>
 
@@ -713,7 +713,7 @@ VANTAGE_API_KEY=<span class="c-string">vnt_your_key</span> npx vantageai-local-p
 
 <div id="cc-mcp" class="tab-content">
 <h2>MCP server setup</h2>
-<p>Add VantageAI as an MCP server to query costs and manually track calls from within Claude Code conversations.</p>
+<p>Add Cohrint as an MCP server to query costs and manually track calls from within Claude Code conversations.</p>
 
 <h3>Project-level setup</h3>
 <p>Create <code>.mcp.json</code> in your project root:</p>
@@ -722,8 +722,8 @@ VANTAGE_API_KEY=<span class="c-string">vnt_your_key</span> npx vantageai-local-p
     <span class="c-string">"vantage"</span>: {
       <span class="c-string">"type"</span>: <span class="c-string">"stdio"</span>,
       <span class="c-string">"command"</span>: <span class="c-string">"npx"</span>,
-      <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"vantageaiops-mcp"</span>],
-      <span class="c-string">"env"</span>: { <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"vnt_your_key"</span> }
+      <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"cohrint-mcp"</span>],
+      <span class="c-string">"env"</span>: { <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"crt_your_key"</span> }
     }
   }
 }</pre>
@@ -735,8 +735,8 @@ VANTAGE_API_KEY=<span class="c-string">vnt_your_key</span> npx vantageai-local-p
     <span class="c-string">"vantage"</span>: {
       <span class="c-string">"type"</span>: <span class="c-string">"stdio"</span>,
       <span class="c-string">"command"</span>: <span class="c-string">"npx"</span>,
-      <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"vantageaiops-mcp"</span>],
-      <span class="c-string">"env"</span>: { <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"vnt_your_key"</span> }
+      <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"cohrint-mcp"</span>],
+      <span class="c-string">"env"</span>: { <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"crt_your_key"</span> }
     }
   }
 }</pre>
@@ -754,7 +754,7 @@ VANTAGE_API_KEY=<span class="c-string">vnt_your_key</span> npx vantageai-local-p
 
 vscode: `
 <h1>VS Code (MCP)</h1>
-<p>VantageAI integrates with VS Code through the <strong>Model Context Protocol (MCP)</strong>, available in VS Code 1.99+.</p>
+<p>Cohrint integrates with VS Code through the <strong>Model Context Protocol (MCP)</strong>, available in VS Code 1.99+.</p>
 
 <h2>Setup</h2>
 <div class="step-row"><div class="step-num">1</div><div class="step-body">Create <code>.vscode/mcp.json</code> in your project root:</div></div>
@@ -763,8 +763,8 @@ vscode: `
     <span class="c-string">"vantage"</span>: {
       <span class="c-string">"type"</span>: <span class="c-string">"stdio"</span>,
       <span class="c-string">"command"</span>: <span class="c-string">"npx"</span>,
-      <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"vantageaiops-mcp"</span>],
-      <span class="c-string">"env"</span>: { <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"vnt_your_key"</span> }
+      <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"cohrint-mcp"</span>],
+      <span class="c-string">"env"</span>: { <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"crt_your_key"</span> }
     }
   }
 }</pre>
@@ -806,7 +806,7 @@ vantage.<span class="c-func">tag</span>(<span class="c-string">"user_id"</span>,
 
 <span class="c-keyword">with</span> <span class="c-func">vantage_feature</span>(<span class="c-string">"doc_summary"</span>, team=<span class="c-string">"content"</span>):
     response = client.chat.completions.<span class="c-func">create</span>(...)</pre></div>
-<div id="tag-ts" class="tab-content"><pre><span class="c-keyword">import</span> { <span class="c-func">tag</span>, <span class="c-func">getClient</span> } <span class="c-keyword">from</span> <span class="c-string">"vantageaiops"</span>;
+<div id="tag-ts" class="tab-content"><pre><span class="c-keyword">import</span> { <span class="c-func">tag</span>, <span class="c-func">getClient</span> } <span class="c-keyword">from</span> <span class="c-string">"cohrint"</span>;
 
 <span class="c-func">tag</span>(<span class="c-string">"feature"</span>, <span class="c-string">"chat"</span>);
 <span class="c-func">tag</span>(<span class="c-string">"team"</span>, <span class="c-string">"product"</span>);
@@ -819,7 +819,7 @@ vantage.<span class="c-func">tag</span>(<span class="c-string">"user_id"</span>,
 alerts: `
 <h1>Budget alerts</h1>
 <h2>Dashboard configuration</h2>
-<p>Configure alerts at <a href="/app.html" style="color:var(--accent)">vantageaiops.com/app.html</a> — no code required. Set thresholds by team, feature, or total org spend.</p>
+<p>Configure alerts at <a href="/app.html" style="color:var(--accent)">cohrint.com/app.html</a> — no code required. Set thresholds by team, feature, or total org spend.</p>
 <h2>Alert types</h2>
 <table class="api-table"><thead><tr><th>Type</th><th>Triggers when</th></tr></thead><tbody>
 <tr><td>Budget threshold</td><td>MTD spend exceeds X% of set budget</td></tr>
@@ -833,9 +833,9 @@ alerts: `
 api: `
 <h1>REST API</h1>
 <h2>Base URL</h2>
-<pre>https://api.vantageaiops.com</pre>
+<pre>https://api.cohrint.com</pre>
 <h2>Authentication</h2>
-<pre>Authorization: Bearer vnt_your_key</pre>
+<pre>Authorization: Bearer crt_your_key</pre>
 <p>All endpoints except <code>POST /v1/auth/signup</code> require a Bearer token. The org is inferred from your key — no separate org header needed.</p>
 
 <h2>Ingest</h2>
@@ -859,7 +859,7 @@ api: `
 
 <h2>Account</h2>
 <table class="api-table"><thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>POST</code></td><td><code>/v1/auth/signup</code></td><td>Create account, returns <code>vnt_…</code> key (public)</td></tr>
+<tr><td><code>POST</code></td><td><code>/v1/auth/signup</code></td><td>Create account, returns <code>crt_…</code> key (public)</td></tr>
 <tr><td><code>POST</code></td><td><code>/v1/auth/members</code></td><td>Invite member — generates scoped API key (admin)</td></tr>
 <tr><td><code>GET</code></td><td><code>/v1/auth/members</code></td><td>List all members (admin)</td></tr>
 <tr><td><code>PATCH</code></td><td><code>/v1/auth/members/:id</code></td><td>Update member role or scope_team (admin)</td></tr>
@@ -876,8 +876,8 @@ api: `
 </tbody></table>
 
 <h2>Example: invite a member</h2>
-<pre>curl -X POST https://api.vantageaiops.com/v1/auth/members \\
-  -H "Authorization: Bearer vnt_your_owner_key" \\
+<pre>curl -X POST https://api.cohrint.com/v1/auth/members \\
+  -H "Authorization: Bearer crt_your_owner_key" \\
   -H "Content-Type: application/json" \\
   -d '{
     "email": "alice@acme.com",
@@ -890,7 +890,7 @@ api: `
 {
   "ok": true,
   "member_id": "abc123",
-  "api_key": "vnt_acme_...",   <span class="c-comment">// ← share this with Alice</span>
+  "api_key": "crt_acme_...",   <span class="c-comment">// ← share this with Alice</span>
   "role": "member",
   "scope_team": "backend"
 }</pre>`,
@@ -1006,7 +1006,7 @@ The code should be maintainable and readable. Review each function."
 
 members: `
 <h1>Team members</h1>
-<p>Each team member gets their own <code>vnt_…</code> API key. Member keys can be scoped to a specific team — they will only see and ingest events for that team.</p>
+<p>Each team member gets their own <code>crt_…</code> API key. Member keys can be scoped to a specific team — they will only see and ingest events for that team.</p>
 
 <h2>Roles</h2>
 <table class="api-table"><thead><tr><th>Role</th><th>Ingest events</th><th>Read analytics</th><th>Executive dashboard</th><th>Manage members</th></tr></thead><tbody>
@@ -1020,8 +1020,8 @@ members: `
 
 <h2>Invite a member (API)</h2>
 <pre><span class="c-comment"># POST /v1/auth/members — admin or owner key required</span>
-curl -X POST https://api.vantageaiops.com/v1/auth/members \\
-  -H "Authorization: Bearer vnt_your_owner_key" \\
+curl -X POST https://api.cohrint.com/v1/auth/members \\
+  -H "Authorization: Bearer crt_your_owner_key" \\
   -H "Content-Type: application/json" \\
   -d '{
     "email": "alice@acme.com",
@@ -1034,7 +1034,7 @@ curl -X POST https://api.vantageaiops.com/v1/auth/members \\
 
 <h2>List members</h2>
 <pre>GET /v1/auth/members
-Authorization: Bearer vnt_your_owner_key</pre>
+Authorization: Bearer crt_your_owner_key</pre>
 
 <h2>Update role or scope</h2>
 <pre>PATCH /v1/auth/members/:id
@@ -1048,8 +1048,8 @@ Authorization: Bearer vnt_your_owner_key</pre>
 
 <h2>Team budgets</h2>
 <pre><span class="c-comment"># Set a $50/month budget for the backend team</span>
-curl -X PUT https://api.vantageaiops.com/v1/admin/team-budgets/backend \\
-  -H "Authorization: Bearer vnt_your_owner_key" \\
+curl -X PUT https://api.cohrint.com/v1/admin/team-budgets/backend \\
+  -H "Authorization: Bearer crt_your_owner_key" \\
   -H "Content-Type: application/json" \\
   -d '{"budget_usd": 50}'
 
@@ -1062,8 +1062,8 @@ GET /v1/admin/overview</pre>
 <h2>Budget policies (CRUD)</h2>
 <p>Fine-grained budget rules scoped to org, team, or individual developer. Requires <code>admin</code> or <code>owner</code> key.</p>
 <pre><span class="c-comment"># Create a policy — block ingest when backend team exceeds $500/month</span>
-curl -X POST https://api.vantageaiops.com/v1/admin/budget-policies \\
-  -H "Authorization: Bearer vnt_your_owner_key" \\
+curl -X POST https://api.cohrint.com/v1/admin/budget-policies \\
+  -H "Authorization: Bearer crt_your_owner_key" \\
   -H "Content-Type: application/json" \\
   -d '{
     "scope": "team",
@@ -1081,13 +1081,13 @@ DELETE /v1/admin/budget-policies/:id      <span class="c-comment"># remove</span
 <h2>Executive dashboard</h2>
 <p>Requires <code>ceo</code>, <code>superadmin</code>, or <code>owner</code> role. Returns a cross-source spend roll-up.</p>
 <pre>GET /v1/analytics/executive
-Authorization: Bearer vnt_your_ceo_key</pre>`,
+Authorization: Bearer crt_your_ceo_key</pre>`,
 
 "local-proxy": `
 <h1>Local Proxy — Privacy-First LLM Tracking</h1>
-<p>The VantageAI Local Proxy runs <strong>on your machine</strong>. Your API keys and prompts <strong>never leave your environment</strong> — only anonymized statistics (token counts, costs, latency) are sent to the dashboard.</p>
+<p>The Cohrint Local Proxy runs <strong>on your machine</strong>. Your API keys and prompts <strong>never leave your environment</strong> — only anonymized statistics (token counts, costs, latency) are sent to the dashboard.</p>
 
-<div class="info-box">🔒 <strong style="color:var(--text)">Zero-trust architecture.</strong> Your LLM API keys, prompt content, response text, and PII stay on your machine. VantageAI only receives numbers — model name, token counts, cost in USD, and latency in milliseconds.</div>
+<div class="info-box">🔒 <strong style="color:var(--text)">Zero-trust architecture.</strong> Your LLM API keys, prompt content, response text, and PII stay on your machine. Cohrint only receives numbers — model name, token counts, cost in USD, and latency in milliseconds.</div>
 
 <h2>How it works</h2>
 <pre><span class="c-comment">Your App</span>
@@ -1102,11 +1102,11 @@ Authorization: Bearer vnt_your_ceo_key</pre>`,
     │              <span class="c-keyword">Strip ALL text & keys</span>
     │                    │
     ▼                    ▼
-<span class="c-string">Full response</span>      <span class="c-comment">Only numbers</span> → api.vantageaiops.com
+<span class="c-string">Full response</span>      <span class="c-comment">Only numbers</span> → api.cohrint.com
 back to your app        (tokens, cost, latency)</pre>
 
 <h2>What stays local vs what is sent</h2>
-<table class="api-table"><thead><tr><th>🔒 Stays on your machine (NEVER sent)</th><th>📊 Sent to VantageAI dashboard</th></tr></thead><tbody>
+<table class="api-table"><thead><tr><th>🔒 Stays on your machine (NEVER sent)</th><th>📊 Sent to Cohrint dashboard</th></tr></thead><tbody>
 <tr><td>Your LLM API keys (sk-..., sk-ant-...)</td><td>Model name (e.g., gpt-4o)</td></tr>
 <tr><td>Full prompt text and content</td><td>Provider (e.g., openai)</td></tr>
 <tr><td>Full response text and content</td><td>Token counts (prompt, completion)</td></tr>
@@ -1118,10 +1118,10 @@ back to your app        (tokens, cost, latency)</pre>
 <h2>Quick start (2 minutes)</h2>
 <div class="step-row"><div class="step-num">1</div><div class="step-body">Start the local proxy</div></div>
 <pre><span class="c-comment"># No install needed — runs via npx</span>
-VANTAGE_API_KEY=<span class="c-string">vnt_your_key</span> npx vantageai-local-proxy
+VANTAGE_API_KEY=<span class="c-string">crt_your_key</span> npx vantageai-local-proxy
 
 <span class="c-comment"># Or with options</span>
-npx vantageai-local-proxy --api-key <span class="c-string">vnt_your_key</span> --privacy <span class="c-string">strict</span> --team <span class="c-string">backend</span></pre>
+npx vantageai-local-proxy --api-key <span class="c-string">crt_your_key</span> --privacy <span class="c-string">strict</span> --team <span class="c-string">backend</span></pre>
 
 <div class="step-row"><div class="step-num">2</div><div class="step-body">Point your LLM client to localhost — <strong>one line change</strong></div></div>
 <div class="tab-row"><div class="tab active" onclick="switchTab('lp',this,'lp-py')">Python (OpenAI)</div><div class="tab" onclick="switchTab('lp',this,'lp-ts')">TypeScript (OpenAI)</div><div class="tab" onclick="switchTab('lp',this,'lp-ant')">Python (Anthropic)</div><div class="tab" onclick="switchTab('lp',this,'lp-curl')">cURL</div></div>
@@ -1184,7 +1184,7 @@ curl http://localhost:<span class="c-num">4891</span>/privacy
 curl http://localhost:<span class="c-num">4891</span>/health</pre></div>
 
 <div class="step-row"><div class="step-num">3</div><div class="step-body">View stats on your dashboard — no text, only numbers</div></div>
-<p>Open <a href="/app.html" style="color:var(--accent)">vantageaiops.com/app.html</a>. You'll see cost, tokens, latency, and model data — but <strong>never</strong> your prompt or response content.</p>
+<p>Open <a href="/app.html" style="color:var(--accent)">cohrint.com/app.html</a>. You'll see cost, tokens, latency, and model data — but <strong>never</strong> your prompt or response content.</p>
 
 <h2>Privacy levels</h2>
 <table class="api-table"><thead><tr><th>Level</th><th>Text sent?</th><th>Prompt hash?</th><th>Best for</th></tr></thead><tbody>
@@ -1218,7 +1218,7 @@ curl http://localhost:<span class="c-num">4891</span>/health</pre></div>
 
 "privacy-modes": `
 <h1>SDK Privacy Modes</h1>
-<p>If you use the VantageAI SDK directly (not the Local Proxy), you can control exactly what data is sent to the dashboard using <strong>privacy modes</strong>.</p>
+<p>If you use the Cohrint SDK directly (not the Local Proxy), you can control exactly what data is sent to the dashboard using <strong>privacy modes</strong>.</p>
 
 <h2>Three modes</h2>
 <table class="api-table"><thead><tr><th>Mode</th><th>Prompt text</th><th>Response text</th><th>Prompt hash</th><th>Best for</th></tr></thead><tbody>
@@ -1230,12 +1230,12 @@ curl http://localhost:<span class="c-num">4891</span>/health</pre></div>
 <h2>Usage — one line change</h2>
 <div class="tab-row"><div class="tab active" onclick="switchTab('pm',this,'pm-ts')">TypeScript</div><div class="tab" onclick="switchTab('pm',this,'pm-py')">Python</div></div>
 
-<div id="pm-ts" class="tab-content active"><pre><span class="c-keyword">import</span> * <span class="c-keyword">as</span> <span class="c-var">vantage</span> <span class="c-keyword">from</span> <span class="c-string">"vantageaiops"</span>;
+<div id="pm-ts" class="tab-content active"><pre><span class="c-keyword">import</span> * <span class="c-keyword">as</span> <span class="c-var">vantage</span> <span class="c-keyword">from</span> <span class="c-string">"cohrint"</span>;
 <span class="c-keyword">import</span> <span class="c-var">OpenAI</span> <span class="c-keyword">from</span> <span class="c-string">"openai"</span>;
 
 <span class="c-comment">// Add privacy: "stats-only" — that's it</span>
 <span class="c-var">vantage</span>.<span class="c-func">init</span>({
-  <span class="c-var">apiKey</span>: <span class="c-string">"vnt_your_key"</span>,
+  <span class="c-var">apiKey</span>: <span class="c-string">"crt_your_key"</span>,
   <span class="c-var">privacy</span>: <span class="c-string">"stats-only"</span>,   <span class="c-comment">// ← no prompt/response text sent</span>
 });
 
@@ -1250,12 +1250,12 @@ curl http://localhost:<span class="c-num">4891</span>/health</pre></div>
 <span class="c-comment">// Dashboard sees: gpt-4o | 45→120 tokens | $0.0034 | 780ms</span>
 <span class="c-comment">// Dashboard does NOT see: "Sensitive business data here..."</span></pre></div>
 
-<div id="pm-py" class="tab-content"><pre><span class="c-keyword">import</span> vantageaiops <span class="c-keyword">as</span> vantage
-<span class="c-keyword">from</span> vantageaiops.proxy.openai_proxy <span class="c-keyword">import</span> <span class="c-var">OpenAI</span>
+<div id="pm-py" class="tab-content"><pre><span class="c-keyword">import</span> cohrint <span class="c-keyword">as</span> vantage
+<span class="c-keyword">from</span> cohrint.proxy.openai_proxy <span class="c-keyword">import</span> <span class="c-var">OpenAI</span>
 
 <span class="c-comment"># Add privacy="stats-only"</span>
 vantage.<span class="c-func">init</span>(
-    <span class="c-var">api_key</span>=<span class="c-string">"vnt_your_key"</span>,
+    <span class="c-var">api_key</span>=<span class="c-string">"crt_your_key"</span>,
     <span class="c-var">privacy</span>=<span class="c-string">"stats-only"</span>,   <span class="c-comment"># ← no text sent</span>
 )
 
@@ -1296,7 +1296,7 @@ response = client.chat.completions.<span class="c-func">create</span>(
 <table class="api-table"><thead><tr><th>Feature</th><th>Local Proxy (strict)</th><th>SDK (stats-only)</th></tr></thead><tbody>
 <tr><td>Code changes needed</td><td>Change <code>base_url</code> only</td><td>Add <code>privacy: "stats-only"</code></td></tr>
 <tr><td>Prompt text sent</td><td>❌ Never</td><td>❌ Never</td></tr>
-<tr><td>API key sent to Vantage</td><td>❌ Never</td><td>❌ Never (only vnt_ key)</td></tr>
+<tr><td>API key sent to Vantage</td><td>❌ Never</td><td>❌ Never (only crt_ key)</td></tr>
 <tr><td>Streaming support</td><td>Pass-through (basic stats)</td><td>Full (accurate token counts)</td></tr>
 <tr><td>Works with all providers</td><td>✅ Any HTTP LLM API</td><td>OpenAI + Anthropic proxies</td></tr>
 <tr><td>Runs as separate process</td><td>Yes (localhost server)</td><td>No (in-process)</td></tr>
@@ -1308,14 +1308,14 @@ response = client.chat.completions.<span class="c-func">create</span>(
 
 "mcp-workflows": `
 <h1>MCP Workflow Examples</h1>
-<p>Real-world conversation examples showing how to use VantageAI MCP tools effectively in your AI assistant. Copy these patterns for your daily workflow.</p>
+<p>Real-world conversation examples showing how to use Cohrint MCP tools effectively in your AI assistant. Copy these patterns for your daily workflow.</p>
 
 <h2>🌅 Morning cost check</h2>
 <p>Start your day by understanding where your AI budget stands.</p>
 <pre><span class="c-comment">You:</span> <span class="c-string">"Good morning. How's our AI spend looking?"</span>
 <span class="c-comment">→ MCP calls:</span> <span class="c-func">get_summary</span>
 
-📊 <strong>VantageAI Summary</strong>
+📊 <strong>Cohrint Summary</strong>
 | Metric            | Value       |
 |-------------------|-------------|
 | MTD Spend         | $145.23     |
@@ -1488,10 +1488,10 @@ How much will it cost? Is there a cheaper option?"</span>
 
 "otel-setup": `
 <h1>Cross-Platform OTel Setup</h1>
-<p>VantageAI receives <strong>live telemetry</strong> from your AI coding tools via <a href="https://opentelemetry.io/">OpenTelemetry</a>. No proxy. No SDK wrapper. Just point your tools at our collector endpoint.</p>
+<p>Cohrint receives <strong>live telemetry</strong> from your AI coding tools via <a href="https://opentelemetry.io/">OpenTelemetry</a>. No proxy. No SDK wrapper. Just point your tools at our collector endpoint.</p>
 
 <div class="callout callout-green">
-<strong>How it works:</strong> AI coding agents (Claude Code, Codex CLI, Gemini CLI) have built-in OpenTelemetry export. You set one environment variable to send telemetry to VantageAI. We receive tokens, cost, model, and developer identity — in real-time.
+<strong>How it works:</strong> AI coding agents (Claude Code, Codex CLI, Gemini CLI) have built-in OpenTelemetry export. You set one environment variable to send telemetry to Cohrint. We receive tokens, cost, model, and developer identity — in real-time.
 </div>
 
 <h2>Supported Tools (Native OTel)</h2>
@@ -1504,13 +1504,13 @@ How much will it cost? Is there a cheaper option?"</span>
 </table>
 
 <h2>Endpoint</h2>
-<pre>OTLP HTTP/JSON:  https://api.vantageaiops.com/v1/otel/v1/metrics
-OTLP HTTP/JSON:  https://api.vantageaiops.com/v1/otel/v1/logs
-Auth header:     Authorization: Bearer vnt_your_key</pre>
+<pre>OTLP HTTP/JSON:  https://api.cohrint.com/v1/otel/v1/metrics
+OTLP HTTP/JSON:  https://api.cohrint.com/v1/otel/v1/logs
+Auth header:     Authorization: Bearer crt_your_key</pre>
 
 <h2>Quick Setup (All Tools)</h2>
-<pre>export OTEL_EXPORTER_OTLP_ENDPOINT=https://api.vantageaiops.com/v1/otel
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer vnt_your_key"
+<pre>export OTEL_EXPORTER_OTLP_ENDPOINT=https://api.cohrint.com/v1/otel
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer crt_your_key"
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/json</pre>
 <p>Then enable telemetry per tool (see tool-specific pages).</p>
 `,
@@ -1525,8 +1525,8 @@ export CLAUDE_CODE_ENABLE_TELEMETRY=1
 export OTEL_METRICS_EXPORTER=otlp
 export OTEL_LOGS_EXPORTER=otlp
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
-export OTEL_EXPORTER_OTLP_ENDPOINT=https://api.vantageaiops.com/v1/otel
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer vnt_your_key"
+export OTEL_EXPORTER_OTLP_ENDPOINT=https://api.cohrint.com/v1/otel
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer crt_your_key"
 
 # Optional: tag by team/department
 export OTEL_RESOURCE_ATTRIBUTES="team.id=backend,cost_center=eng-100"</pre>
@@ -1539,8 +1539,8 @@ export OTEL_RESOURCE_ATTRIBUTES="team.id=backend,cost_center=eng-100"</pre>
     "OTEL_METRICS_EXPORTER": "otlp",
     "OTEL_LOGS_EXPORTER": "otlp",
     "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
-    "OTEL_EXPORTER_OTLP_ENDPOINT": "https://api.vantageaiops.com/v1/otel",
-    "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer vnt_your_key"
+    "OTEL_EXPORTER_OTLP_ENDPOINT": "https://api.cohrint.com/v1/otel",
+    "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer crt_your_key"
   }
 }</pre>
 
@@ -1578,12 +1578,12 @@ export OTEL_RESOURCE_ATTRIBUTES="team.id=backend,cost_center=eng-100"</pre>
   "telemetry": {
     "enabled": true,
     "useCollector": true,
-    "otlpEndpoint": "https://api.vantageaiops.com/v1/otel",
+    "otlpEndpoint": "https://api.cohrint.com/v1/otel",
     "otlpProtocol": "http"
   }
 }</pre>
 <p>Set auth via environment variable:</p>
-<pre>export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer vnt_your_key"</pre>
+<pre>export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer crt_your_key"</pre>
 
 <h2>Metrics Received</h2>
 <table class="doc-table">
@@ -1603,9 +1603,9 @@ export OTEL_RESOURCE_ATTRIBUTES="team.id=backend,cost_center=eng-100"</pre>
 <h2>Setup (~/.codex/config.toml)</h2>
 <pre>[telemetry]
 enabled = true
-otlp_endpoint = "https://api.vantageaiops.com/v1/otel"</pre>
+otlp_endpoint = "https://api.cohrint.com/v1/otel"</pre>
 <p>Set auth via environment variable:</p>
-<pre>export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer vnt_your_key"</pre>
+<pre>export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer crt_your_key"</pre>
 
 <h2>Metrics Received</h2>
 <p>Codex uses GenAI semantic conventions plus custom metrics for productivity:</p>
@@ -1619,11 +1619,11 @@ otlp_endpoint = "https://api.vantageaiops.com/v1/otel"</pre>
 
 "otel-pricing": `
 <h1>OTel Pricing Engine — Auto Cost Estimation</h1>
-<p>When AI agents send only token counts via OTel (no explicit cost metric), VantageAI <strong>automatically calculates cost in USD</strong> using its internal pricing table. This is critical for tools like Gemini CLI that emit token counts but not dollar costs.</p>
+<p>When AI agents send only token counts via OTel (no explicit cost metric), Cohrint <strong>automatically calculates cost in USD</strong> using its internal pricing table. This is critical for tools like Gemini CLI that emit token counts but not dollar costs.</p>
 
 <h2>How It Works</h2>
 <div class="step-row"><div class="step-num">1</div><div class="step-body">Tool sends OTel metrics with token counts (e.g., <code>copilot_chat.token.usage</code>)</div></div>
-<div class="step-row"><div class="step-num">2</div><div class="step-body">VantageAI checks if <code>cost_usd == 0</code> for the record</div></div>
+<div class="step-row"><div class="step-num">2</div><div class="step-body">Cohrint checks if <code>cost_usd == 0</code> for the record</div></div>
 <div class="step-row"><div class="step-num">3</div><div class="step-body">Looks up model in the pricing table (exact match, then fuzzy substring match)</div></div>
 <div class="step-row"><div class="step-num">4</div><div class="step-body">Calculates: <code>cost = (uncached_input / 1M) × input_price + (cached / 1M) × cache_price + (output / 1M) × output_price</code></div></div>
 
@@ -1656,7 +1656,7 @@ otlp_endpoint = "https://api.vantageaiops.com/v1/otel"</pre>
 
 "xp-api": `
 <h1>Cross-Platform API Reference</h1>
-<p>Query aggregated data from all connected AI tools. All endpoints require <code>Authorization: Bearer vnt_your_key</code>. All responses are <code>Content-Type: application/json</code>. Errors return <code>{"error": "message"}</code> with an appropriate HTTP status code.</p>
+<p>Query aggregated data from all connected AI tools. All endpoints require <code>Authorization: Bearer crt_your_key</code>. All responses are <code>Content-Type: application/json</code>. Errors return <code>{"error": "message"}</code> with an appropriate HTTP status code.</p>
 
 <h2>GET /v1/cross-platform/summary</h2>
 <p>Total spend across all platforms with provider and tool-type breakdown.</p>
@@ -1664,8 +1664,8 @@ otlp_endpoint = "https://api.vantageaiops.com/v1/otel"</pre>
 <thead><tr><th>Auth</th><th>Query params</th></tr></thead>
 <tbody><tr><td>Bearer token</td><td><code>?period=30</code> — look-back window in days (default 30)</td></tr></tbody>
 </table>
-<pre>curl -H "Authorization: Bearer vnt_your_key" \\
-  "https://api.vantageaiops.com/v1/cross-platform/summary?period=30"</pre>
+<pre>curl -H "Authorization: Bearer crt_your_key" \\
+  "https://api.cohrint.com/v1/cross-platform/summary?period=30"</pre>
 <p><strong>Response 200</strong></p>
 <pre>{
   "total_cost_usd": 142.38,
@@ -1687,8 +1687,8 @@ otlp_endpoint = "https://api.vantageaiops.com/v1/otel"</pre>
 <thead><tr><th>Auth</th><th>Query params</th></tr></thead>
 <tbody><tr><td>Bearer token</td><td><code>?period=30</code></td></tr></tbody>
 </table>
-<pre>curl -H "Authorization: Bearer vnt_your_key" \\
-  "https://api.vantageaiops.com/v1/cross-platform/developers?period=30"</pre>
+<pre>curl -H "Authorization: Bearer crt_your_key" \\
+  "https://api.cohrint.com/v1/cross-platform/developers?period=30"</pre>
 <p><strong>Response 200</strong></p>
 <pre>{
   "developers": [
@@ -1708,8 +1708,8 @@ otlp_endpoint = "https://api.vantageaiops.com/v1/otel"</pre>
 <thead><tr><th>Auth</th><th>Query params</th></tr></thead>
 <tbody><tr><td>Bearer token</td><td><code>?period=30</code> — valid values: <code>7</code>, <code>30</code>, <code>90</code>. Any other value returns 400.</td></tr></tbody>
 </table>
-<pre>curl -H "Authorization: Bearer vnt_your_key" \\
-  "https://api.vantageaiops.com/v1/cross-platform/trend?period=30"</pre>
+<pre>curl -H "Authorization: Bearer crt_your_key" \\
+  "https://api.cohrint.com/v1/cross-platform/trend?period=30"</pre>
 <p><strong>Response 200</strong></p>
 <pre>{
   "period_days": 30,
@@ -1727,8 +1727,8 @@ otlp_endpoint = "https://api.vantageaiops.com/v1/otel"</pre>
 <thead><tr><th>Auth</th><th>Role required</th></tr></thead>
 <tbody><tr><td>Bearer token</td><td>Any member</td></tr></tbody>
 </table>
-<pre>curl -H "Authorization: Bearer vnt_your_key" \\
-  https://api.vantageaiops.com/v1/cross-platform/live</pre>
+<pre>curl -H "Authorization: Bearer crt_your_key" \\
+  https://api.cohrint.com/v1/cross-platform/live</pre>
 <p><strong>Response 200</strong></p>
 <pre>{
   "events": [
@@ -1751,8 +1751,8 @@ otlp_endpoint = "https://api.vantageaiops.com/v1/otel"</pre>
 <thead><tr><th>Auth</th><th>Query params</th></tr></thead>
 <tbody><tr><td>Bearer token</td><td><code>?period=30</code></td></tr></tbody>
 </table>
-<pre>curl -H "Authorization: Bearer vnt_your_key" \\
-  "https://api.vantageaiops.com/v1/cross-platform/models?period=30"</pre>
+<pre>curl -H "Authorization: Bearer crt_your_key" \\
+  "https://api.cohrint.com/v1/cross-platform/models?period=30"</pre>
 <p><strong>Response 200</strong></p>
 <pre>{
   "models": [
@@ -1767,8 +1767,8 @@ otlp_endpoint = "https://api.vantageaiops.com/v1/otel"</pre>
 <thead><tr><th>Auth</th><th>Role required</th></tr></thead>
 <tbody><tr><td>Bearer token</td><td>Any (admin/owner for full details)</td></tr></tbody>
 </table>
-<pre>curl -H "Authorization: Bearer vnt_your_key" \\
-  https://api.vantageaiops.com/v1/cross-platform/connections</pre>
+<pre>curl -H "Authorization: Bearer crt_your_key" \\
+  https://api.cohrint.com/v1/cross-platform/connections</pre>
 <p><strong>Response 200</strong></p>
 <pre>{
   "copilot_connections": [
@@ -1793,8 +1793,8 @@ otlp_endpoint = "https://api.vantageaiops.com/v1/otel"</pre>
 <thead><tr><th>Auth</th><th>Role required</th></tr></thead>
 <tbody><tr><td>Bearer token</td><td>Any member</td></tr></tbody>
 </table>
-<pre>curl -H "Authorization: Bearer vnt_your_key" \\
-  https://api.vantageaiops.com/v1/cross-platform/budget</pre>
+<pre>curl -H "Authorization: Bearer crt_your_key" \\
+  https://api.cohrint.com/v1/cross-platform/budget</pre>
 <p><strong>Response 200</strong></p>
 <pre>{
   "policies": [
@@ -1812,10 +1812,10 @@ otlp_endpoint = "https://api.vantageaiops.com/v1/otel"</pre>
 
 <h2>POST /v1/otel/v1/metrics</h2>
 <p>OTLP metrics ingestion endpoint. Accepts standard OTLP HTTP/JSON format.</p>
-<pre>curl -X POST -H "Authorization: Bearer vnt_your_key" \\
+<pre>curl -X POST -H "Authorization: Bearer crt_your_key" \\
   -H "Content-Type: application/json" \\
   -d '{"resourceMetrics": [...]}' \\
-  https://api.vantageaiops.com/v1/otel/v1/metrics</pre>
+  https://api.cohrint.com/v1/otel/v1/metrics</pre>
 
 <h2>POST /v1/otel/v1/logs</h2>
 <p>OTLP logs/events ingestion. Accepts api_request, tool_result, user_prompt events.</p>
@@ -1833,8 +1833,8 @@ otlp_endpoint = "https://api.vantageaiops.com/v1/otel"</pre>
 <thead><tr><th>Auth</th><th>Role required</th></tr></thead>
 <tbody><tr><td>Bearer token</td><td><code>admin</code> or <code>owner</code></td></tr></tbody>
 </table>
-<pre>curl "https://api.vantageaiops.com/v1/audit/log?limit=50&amp;offset=0" \\
-  -H "Authorization: Bearer vnt_your_key"</pre>
+<pre>curl "https://api.cohrint.com/v1/audit/log?limit=50&amp;offset=0" \\
+  -H "Authorization: Bearer crt_your_key"</pre>
 
 <h3>Query parameters</h3>
 <table class="api-table">
@@ -1890,7 +1890,7 @@ otlp_endpoint = "https://api.vantageaiops.com/v1/otel"</pre>
 `,
 
 'vantage-cli': `
-<h1>VantageAI Agent — Python CLI</h1>
+<h1>Cohrint Agent — Python CLI</h1>
 <p>A Python-based interactive REPL and one-shot CLI with <strong>per-tool permissions</strong>, <strong>exact cost tracking</strong>, and support for both Anthropic API keys and <strong>Claude Max subscriptions</strong> (no API key required).</p>
 
 <h2>Install & Run</h2>
@@ -1964,7 +1964,7 @@ vantageai-agent --backend claude
 <p>1. You type a prompt → 2. Agent optimizes it locally (&lt;1ms) → 3. Sends to backend → 4. Streams output with tool use → 5. Exact token cost extracted from response</p>
 
 <h2>Dashboard Integration</h2>
-<p>When configured with a VantageAI API key, the agent pushes cost data to your dashboard automatically.</p>
+<p>When configured with a Cohrint API key, the agent pushes cost data to your dashboard automatically.</p>
 <div class="info-box">Set <code>VANTAGE_API_KEY</code> or save to <code>~/.vantage-agent/api_key</code>.</div>
 
 <h2>Anomaly Detection</h2>
@@ -1973,18 +1973,18 @@ vantageai-agent --backend claude
 
 'copilot-api': `
 <h1>GitHub Copilot Metrics API</h1>
-<p>Connect a GitHub organisation to pull Copilot seat usage and daily active-user counts into your VantageAI cross-platform dashboard. Metrics sync once per day via a scheduled cron. Tokens are AES-256-GCM encrypted at rest and never written to the database in plain text.</p>
+<p>Connect a GitHub organisation to pull Copilot seat usage and daily active-user counts into your Cohrint cross-platform dashboard. Metrics sync once per day via a scheduled cron. Tokens are AES-256-GCM encrypted at rest and never written to the database in plain text.</p>
 
 <div class="info-box"><strong>Required GitHub PAT scopes:</strong> <code>read:org</code> and <code>manage_billing:copilot</code>. Classic tokens (<code>ghp_*</code>) and fine-grained tokens (<code>github_pat_*</code>) are both supported. Service tokens (<code>ghs_*</code>) are not.</div>
 
 <h2>POST /v1/copilot/connect</h2>
-<p>Store a GitHub organisation and PAT. VantageAI validates the token against the GitHub Copilot Billing API before saving it.</p>
+<p>Store a GitHub organisation and PAT. Cohrint validates the token against the GitHub Copilot Billing API before saving it.</p>
 <table class="api-table">
 <thead><tr><th>Auth</th><th>Role required</th></tr></thead>
 <tbody><tr><td>Bearer token</td><td><code>admin</code> or <code>owner</code></td></tr></tbody>
 </table>
-<pre>curl -X POST https://api.vantageaiops.com/v1/copilot/connect \\
-  -H "Authorization: Bearer vnt_your_key" \\
+<pre>curl -X POST https://api.cohrint.com/v1/copilot/connect \\
+  -H "Authorization: Bearer crt_your_key" \\
   -H "Content-Type: application/json" \\
   -d '{"github_org": "acme-corp", "token": "ghp_xxxxxxxxxxxxxxxxxxxx"}'</pre>
 <p><strong>Request body</strong></p>
@@ -2016,8 +2016,8 @@ vantageai-agent --backend claude
 <tbody><tr><td>Bearer token</td><td><code>admin</code> or <code>owner</code></td></tr></tbody>
 </table>
 <pre>curl -X DELETE \\
-  "https://api.vantageaiops.com/v1/copilot/connect?github_org=acme-corp" \\
-  -H "Authorization: Bearer vnt_your_key"</pre>
+  "https://api.cohrint.com/v1/copilot/connect?github_org=acme-corp" \\
+  -H "Authorization: Bearer crt_your_key"</pre>
 <p><strong>Query parameters</strong></p>
 <table class="api-table">
 <thead><tr><th>Param</th><th>Required</th><th>Description</th></tr></thead>
@@ -2035,8 +2035,8 @@ vantageai-agent --backend claude
 <thead><tr><th>Auth</th><th>Role required</th></tr></thead>
 <tbody><tr><td>Bearer token</td><td>Any (non-admin gets <code>last_error</code> redacted)</td></tr></tbody>
 </table>
-<pre>curl https://api.vantageaiops.com/v1/copilot/status \\
-  -H "Authorization: Bearer vnt_your_key"</pre>
+<pre>curl https://api.cohrint.com/v1/copilot/status \\
+  -H "Authorization: Bearer crt_your_key"</pre>
 <p><strong>Response 200</strong></p>
 <pre>{
   "connections": [
@@ -2054,7 +2054,7 @@ vantageai-agent --backend claude
 
 'datadog-api': `
 <h1>Datadog Export</h1>
-<p>Push VantageAI cost and token metrics into your own Datadog account as custom metrics. Once connected, a daily cron exports the previous 24 hours of <code>cross_platform_usage</code> data as two Datadog gauge series:</p>
+<p>Push Cohrint cost and token metrics into your own Datadog account as custom metrics. Once connected, a daily cron exports the previous 24 hours of <code>cross_platform_usage</code> data as two Datadog gauge series:</p>
 <ul style="font-size:14px;color:var(--muted);line-height:2;margin:0 0 16px 20px">
   <li><code>vantage.ai.cost_usd</code> — tagged by <code>provider</code>, <code>model</code>, <code>developer_id</code>, <code>org_id</code></li>
   <li><code>vantage.ai.tokens</code> — same tags; only emitted when <code>input_tokens + output_tokens &gt; 0</code></li>
@@ -2067,8 +2067,8 @@ vantageai-agent --backend claude
 <thead><tr><th>Auth</th><th>Role required</th></tr></thead>
 <tbody><tr><td>Bearer token</td><td><code>admin</code> or <code>owner</code></td></tr></tbody>
 </table>
-<pre>curl -X POST https://api.vantageaiops.com/v1/datadog/connect \\
-  -H "Authorization: Bearer vnt_your_key" \\
+<pre>curl -X POST https://api.cohrint.com/v1/datadog/connect \\
+  -H "Authorization: Bearer crt_your_key" \\
   -H "Content-Type: application/json" \\
   -d '{"api_key": "dd_api_xxxxxxxxxxxx", "site": "datadoghq.eu"}'</pre>
 <p><strong>Request body</strong></p>
@@ -2089,8 +2089,8 @@ vantageai-agent --backend claude
 <thead><tr><th>Auth</th><th>Role required</th></tr></thead>
 <tbody><tr><td>Bearer token</td><td><code>admin</code> or <code>owner</code></td></tr></tbody>
 </table>
-<pre>curl -X DELETE https://api.vantageaiops.com/v1/datadog/connect \\
-  -H "Authorization: Bearer vnt_your_key"</pre>
+<pre>curl -X DELETE https://api.cohrint.com/v1/datadog/connect \\
+  -H "Authorization: Bearer crt_your_key"</pre>
 <p><strong>Response 200</strong></p>
 <pre>{ "disconnected": true }</pre>
 <p><strong>Errors:</strong> 404 if no Datadog connection exists for the org.</p>
@@ -2101,8 +2101,8 @@ vantageai-agent --backend claude
 <thead><tr><th>Auth</th><th>Role required</th></tr></thead>
 <tbody><tr><td>Bearer token</td><td><code>admin</code> or <code>owner</code></td></tr></tbody>
 </table>
-<pre>curl https://api.vantageaiops.com/v1/datadog/status \\
-  -H "Authorization: Bearer vnt_your_key"</pre>
+<pre>curl https://api.cohrint.com/v1/datadog/status \\
+  -H "Authorization: Bearer crt_your_key"</pre>
 <p><strong>Response — not connected</strong></p>
 <pre>{ "connected": false }</pre>
 <p><strong>Response — connected</strong></p>
@@ -2129,8 +2129,8 @@ vantageai-agent --backend claude
 <thead><tr><th>Auth</th><th>Role required</th></tr></thead>
 <tbody><tr><td>Bearer token</td><td><code>admin</code> or <code>owner</code></td></tr></tbody>
 </table>
-<pre>curl -X POST https://api.vantageaiops.com/v1/benchmark/contribute \\
-  -H "Authorization: Bearer vnt_your_key"</pre>
+<pre>curl -X POST https://api.cohrint.com/v1/benchmark/contribute \\
+  -H "Authorization: Bearer crt_your_key"</pre>
 <p><strong>Response 200 — contributed</strong></p>
 <pre>{ "ok": true }</pre>
 <p><strong>Response 200 — skipped</strong></p>
@@ -2149,7 +2149,7 @@ vantageai-agent --backend claude
 <thead><tr><th>Auth</th><th>Role required</th></tr></thead>
 <tbody><tr><td>None</td><td>Public</td></tr></tbody>
 </table>
-<pre>curl "https://api.vantageaiops.com/v1/benchmark/percentiles?metric=cost_per_token&model=gpt-4o"</pre>
+<pre>curl "https://api.cohrint.com/v1/benchmark/percentiles?metric=cost_per_token&model=gpt-4o"</pre>
 <p><strong>Query parameters</strong></p>
 <table class="api-table">
 <thead><tr><th>Param</th><th>Required</th><th>Description</th></tr></thead>
@@ -2178,7 +2178,7 @@ vantageai-agent --backend claude
 <thead><tr><th>Auth</th><th>Role required</th></tr></thead>
 <tbody><tr><td>None</td><td>Public</td></tr></tbody>
 </table>
-<pre>curl https://api.vantageaiops.com/v1/benchmark/summary</pre>
+<pre>curl https://api.cohrint.com/v1/benchmark/summary</pre>
 <p><strong>Response 200</strong></p>
 <pre>{
   "available": [
@@ -2192,15 +2192,15 @@ vantageai-agent --backend claude
 
 'platform-api': `
 <h1>Platform API</h1>
-<p>Lightweight public endpoints used by the VantageAI frontend. No authentication is required.</p>
+<p>Lightweight public endpoints used by the Cohrint frontend. No authentication is required.</p>
 
 <h2>POST /v1/platform/report-signup</h2>
-<p>Register an email address for the VantageAI benchmark report waitlist. Idempotent — submitting the same email a second time returns <code>ok: true</code> silently without re-counting the IP quota.</p>
+<p>Register an email address for the Cohrint benchmark report waitlist. Idempotent — submitting the same email a second time returns <code>ok: true</code> silently without re-counting the IP quota.</p>
 <table class="api-table">
 <thead><tr><th>Auth</th><th>Rate limit</th></tr></thead>
 <tbody><tr><td>None (public)</td><td>5 attempts per IP per hour</td></tr></tbody>
 </table>
-<pre>curl -X POST https://api.vantageaiops.com/v1/platform/report-signup \\
+<pre>curl -X POST https://api.cohrint.com/v1/platform/report-signup \\
   -H "Content-Type: application/json" \\
   -d '{"email": "you@example.com"}'</pre>
 <p><strong>Request body</strong></p>
@@ -2255,23 +2255,23 @@ document.getElementById("docs-content").innerHTML = DOCS.quickstart;
 // ── Optional: pre-fill org hint in code blocks if user is signed in ──
 (async function() {
   try {
-    const res = await fetch('https://api.vantageaiops.com/v1/auth/session', {
+    const res = await fetch('https://api.cohrint.com/v1/auth/session', {
       credentials: 'include',
     });
     if (!res.ok) return; // Not signed in — docs are public, no redirect needed
     const sess = await res.json();
     // Replace placeholder text nodes safely (no innerHTML) to prevent XSS
     const safeOrgId = String(sess.org_id || '').replace(/[^a-zA-Z0-9_-]/g, '');
-    const orgHint = `vnt_${safeOrgId}_…`;
+    const orgHint = `crt_${safeOrgId}_…`;
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     const toReplace = [];
     let node = walker.nextNode();
     while (node) {
-      if (node.nodeValue && node.nodeValue.includes('vnt_your_key')) toReplace.push(node);
+      if (node.nodeValue && node.nodeValue.includes('crt_your_key')) toReplace.push(node);
       node = walker.nextNode();
     }
     toReplace.forEach(tn => {
-      const parts = (tn.nodeValue || '').split('vnt_your_key');
+      const parts = (tn.nodeValue || '').split('crt_your_key');
       const frag = document.createDocumentFragment();
       parts.forEach(function(part, i) {
         frag.appendChild(document.createTextNode(part));

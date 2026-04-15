@@ -1,5 +1,5 @@
 """
-reporter.py — Test run reporter for VantageAI test suite
+reporter.py — Test run reporter for Cohrint test suite
 =========================================================
 Collects test results across all test modules and writes:
   1. A colour-coded summary to stdout
@@ -154,7 +154,7 @@ class TestReporter:
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>VantageAI Test Report — {self.run_label}</title>
+<title>Cohrint Test Report — {self.run_label}</title>
 <style>
   body {{ font-family: -apple-system, monospace; background: #0d1318; color: #e8edf2; margin: 0; padding: 20px }}
   h1 {{ color: #00d4a1; font-size: 18px; margin-bottom: 4px }}
@@ -173,7 +173,7 @@ class TestReporter:
 </style>
 </head>
 <body>
-<h1>VantageAI Test Report</h1>
+<h1>Cohrint Test Report</h1>
 <div class="stats">
   Run: {self.run_label} &nbsp;|&nbsp;
   <span style="color:#00d4a1">{self.passed} passed</span> &nbsp;

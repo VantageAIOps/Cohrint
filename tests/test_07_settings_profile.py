@@ -66,8 +66,8 @@ try:
         f"{r.status_code}: {r.text[:100]}")
     if r.ok:
         rotated_key = r.json().get("api_key")
-        chk("1.2  Rotated key starts with vnt_",
-            bool(rotated_key) and rotated_key.startswith("vnt_"), str(rotated_key))
+        chk("1.2  Rotated key starts with crt_",
+            bool(rotated_key) and rotated_key.startswith("crt_"), str(rotated_key))
         chk("1.3  Rotated key different from original", rotated_key != KEY1,
             "key unchanged — rotation may have failed silently")
         KEY1 = rotated_key  # use new key for remaining tests
@@ -158,7 +158,7 @@ try:
                         base_el = page.locator("#set-base-input, #sm-base-input")
                         base_val = base_el.get_attribute("value") or "" if base_el.count() > 0 else ""
                         chk("2.6  Settings shows API base URL",
-                            "vantageaiops.com" in base_val, f"base='{base_val}'")
+                            "cohrint.com" in base_val, f"base='{base_val}'")
 
                         # 2.7 Key input field is empty (key not pre-filled for security)
                         key_el = page.locator("#set-key-input, #sm-key-input")
