@@ -489,15 +489,25 @@ auth.post('/session', async (c) => {
   // SameSite=None is required because the API (api.vantageaiops.com) and the
   // frontend (vantageaiops.com) are different origins; Safari ITP drops
   // SameSite=Lax cookies set cross-origin, breaking session persistence on reload.
+  // Non-prod: use Lax so cookie works on localhost without Secure.
   const isProd = (c.env.ENVIRONMENT ?? 'production') === 'production';
-  const cookieParts = [
-    `vantage_session=${token}`,
-    `Path=/`,
-    `HttpOnly`,
-    `SameSite=None`,
-    `Max-Age=${30 * 86_400}`,
-  ];
-  if (isProd) cookieParts.push(`Secure`, `Domain=vantageaiops.com`);
+  const cookieParts = isProd
+    ? [
+        `vantage_session=${token}`,
+        `Path=/`,
+        `HttpOnly`,
+        `SameSite=None`,
+        `Max-Age=${30 * 86_400}`,
+        `Secure`,
+        `Domain=vantageaiops.com`,
+      ]
+    : [
+        `vantage_session=${token}`,
+        `Path=/`,
+        `HttpOnly`,
+        `Max-Age=${30 * 86_400}`,
+        `SameSite=Lax`,
+      ];
 
   const res = c.json({ ok: true, org_id: orgId, role, expires_at: expiresAt });
   (await res).headers.set('Set-Cookie', cookieParts.join('; '));

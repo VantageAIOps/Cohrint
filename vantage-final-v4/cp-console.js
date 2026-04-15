@@ -204,7 +204,11 @@
 
     apiFetch('/v1/cross-platform/summary?days=' + period)
       .then(function (d) { renderCpKpis(d); renderCpDonut(d); })
-      .catch(function (e) { showCardError('cp-donut-error', 'Load failed: ' + String(e.message)); });
+      .catch(function (e) {
+        showCardError('cp-donut-error', 'Load failed: ' + String(e.message));
+        var kpiEl = document.getElementById('cp-kpis');
+        if (kpiEl) { kpiEl.textContent = ''; var err = document.createElement('div'); err.className = 'empty-state'; err.textContent = 'Failed to load metrics.'; kpiEl.appendChild(err); }
+      });
 
     apiFetch('/v1/cross-platform/trend?days=' + period)
       .then(renderCpTrend)
@@ -232,6 +236,9 @@
   window.cpConsoleInit = function () {
     loadCrossplatform(getSavedPeriod());
     startCpLivePoll();
+  };
+  window.cpConsoleLoadPeriod = function (p) {
+    loadCrossplatform(p);
   };
   window.cpConsoleDestroy = function () {
     stopCpLivePoll();

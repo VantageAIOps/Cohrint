@@ -637,7 +637,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
 /* Card insight tooltip */
 #card-insight-tip{
   position:fixed;
-  z-index:9999;
+  z-index:10001;
   max-width:280px;
   background:rgba(15,17,26,.96);
   border:1px solid rgba(99,102,241,.35);
@@ -673,12 +673,18 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
 [data-theme="light"] #card-insight-tip strong{color:#4f46e5}
 [data-theme="light"] #card-insight-tip p{color:rgba(0,0,0,.7)}
 .card-error{color:#f87171;font-size:12px;padding:8px 0;display:none}
+.hamburger { display: none; background: none; border: none; cursor: pointer; padding: 8px; color: var(--text-primary); font-size: 20px; }
+@media (max-width: 900px) { .hamburger { display: flex; align-items: center; } }
+.sidebar.mobile-open { display: flex !important; position: fixed; top: 0; left: 0; height: 100vh; z-index: 1000; box-shadow: 4px 0 24px rgba(0,0,0,.5); }
+.sidebar-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 999; }
+.sidebar-backdrop.active { display: block; }
 </style>
 </head>
 <body>
 
 <div id="offlineBanner">&#9888; You are offline &mdash; showing last cached data. Dashboard will refresh when reconnected.</div>
 
+<div class="sidebar-backdrop" id="sidebar-backdrop" onclick="closeSidebar()"></div>
 <div class="app">
   <!-- ══════════ Sidebar ══════════ -->
   <nav id="sidebar" class="sidebar">
@@ -745,6 +751,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
     <!-- Top bar -->
     <div class="topbar">
       <div class="topbar-left">
+        <button class="hamburger" id="hamburger-btn" onclick="toggleSidebar()" aria-label="Menu">&#9776;</button>
         <div class="topbar-title">AI Coding Tool Intelligence</div>
         <div class="period-selector">
           <button class="period-btn" onclick="setPeriod(7, this)">7D</button>
@@ -759,6 +766,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
         </div>
         <a href="/docs.html" target="_blank" rel="noopener" style="font-size:12px;color:var(--text-muted);text-decoration:none;padding:6px 12px;border:1px solid var(--border);border-radius:6px;transition:color .2s,border-color .2s" onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border)'">Docs ↗</a>
         <span class="topbar-user" id="topbarUser"></span>
+        <button onclick="signOut()" style="font-size:11px;color:var(--text-muted);background:none;border:1px solid var(--border);border-radius:6px;padding:5px 10px;cursor:pointer;font-family:var(--font-mono)" onmouseover="this.style.borderColor='var(--accent-red)';this.style.color='var(--accent-red)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">Sign out</button>
         <button id="theme-toggle" data-theme-toggle onclick="vantageTheme.toggle()">&#9789;</button>
       </div>
     </div>
@@ -1703,6 +1711,7 @@ function initKeyAuth() {
         return true;
       }).catch(function(e) {
         console.error('[vantage] bad session JSON', e);
+        window.location.href = '/auth.html';
         return false;
       });
     });
@@ -1771,6 +1780,7 @@ function nav(view, btn) {
   } else {
     if (window.cpConsoleDestroy) window.cpConsoleDestroy();
   }
+  closeSidebar();
   loadViewData(view);
 }
 
@@ -1787,7 +1797,10 @@ function loadViewData(view) {
   switch (view) {
     case 'overview': loadOverview(); break;
     case 'spend': loadSpend(); break;
-    case 'cross-platform': if (window.cpConsoleInit) window.cpConsoleInit(); break;
+    case 'cross-platform':
+      if (window.cpConsoleLoadPeriod) window.cpConsoleLoadPeriod(period);
+      else if (window.cpConsoleInit) window.cpConsoleInit();
+      break;
     case 'models': updateModelCalc(); break;
     case 'members': loadMembers(); break;
     case 'budgets': loadBudgets(); break;
@@ -2465,7 +2478,21 @@ function renderTodayHourly(todayData) {
   if (!canvas) return;
 
   var hours = (todayData && todayData.hours) || [];
-  if (!todayData || !hours.length) return;
+  if (!todayData || !hours.length) {
+    if (canvas) canvas.style.display = 'none';
+    var wrap = canvas && canvas.parentElement;
+    if (wrap) {
+      var msg = wrap.querySelector('.chart-empty-msg');
+      if (!msg) { msg = document.createElement('div'); msg.className = 'chart-empty-msg empty-state'; wrap.appendChild(msg); }
+      msg.textContent = 'No activity today yet.';
+    }
+    return;
+  }
+  // When data exists, ensure canvas is visible and remove any prior empty-state
+  var cEl = document.getElementById('todayHourlyChart');
+  if (cEl) cEl.style.display = '';
+  var wEl = cEl && cEl.parentElement;
+  if (wEl) { var oldMsg = wEl.querySelector('.chart-empty-msg'); if (oldMsg) oldMsg.remove(); }
   var dateStr = todayData && todayData.date;
   if (dateStr) {
     var badge = document.getElementById('todayDateBadge');
@@ -2571,8 +2598,18 @@ function renderTeamPie(teams) {
   var data = (teams && teams.teams) || (teams && teams.data) || [];
   if (data.length === 0) {
     if (_teamPieChart) { _teamPieChart.destroy(); _teamPieChart = null; }
+    canvas.style.display = 'none';
+    var twrap = canvas.parentElement;
+    if (twrap) {
+      var tmsg = twrap.querySelector('.chart-empty-msg');
+      if (!tmsg) { tmsg = document.createElement('div'); tmsg.className = 'chart-empty-msg empty-state'; twrap.appendChild(tmsg); }
+      tmsg.textContent = 'No team data for this period.';
+    }
     return;
   }
+  canvas.style.display = '';
+  var twrap2 = canvas.parentElement;
+  if (twrap2) { var oldTmsg = twrap2.querySelector('.chart-empty-msg'); if (oldTmsg) oldTmsg.remove(); }
 
   var colors = ['#34d399', '#60a5fa', '#f472b6', '#fbbf24', '#a78bfa', '#fb923c', '#22d3ee', '#ef4444'];
 
@@ -3664,6 +3701,17 @@ function rotateApiKey() {
   }).catch(function(e) {
     alert('Failed: ' + e.message);
   });
+}
+
+function toggleSidebar() {
+  var sidebar = document.querySelector('.sidebar');
+  var backdrop = document.getElementById('sidebar-backdrop');
+  sidebar.classList.toggle('mobile-open');
+  backdrop.classList.toggle('active');
+}
+function closeSidebar() {
+  document.querySelector('.sidebar').classList.remove('mobile-open');
+  document.getElementById('sidebar-backdrop').classList.remove('active');
 }
 
 function signOut() {
