@@ -388,6 +388,14 @@ admin.post('/budget-policies', async (c) => {
     return c.json({ error: 'provider_target is required when scope = team_provider' }, 400);
   }
 
+  const countResult = await c.env.DB.prepare(
+    'SELECT COUNT(*) as cnt FROM budget_policies WHERE org_id = ?'
+  ).bind(orgId).first<{ cnt: number }>();
+
+  if ((countResult?.cnt ?? 0) >= 100) {
+    return c.json({ error: 'Budget policy limit reached (max 100 per org)' }, 429);
+  }
+
   const id = crypto.randomUUID();
   await c.env.DB.prepare(`
     INSERT INTO budget_policies

@@ -19,6 +19,7 @@ import os
 import sys
 import uuid
 import requests
+import pytest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -28,6 +29,8 @@ from helpers.output import ok, fail, warn, info, section, chk, get_results
 
 BASE    = API_URL
 TIMEOUT = 20
+
+CI = os.environ.get('CI', '').lower() in ('true', '1', 'yes')
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -42,7 +45,10 @@ def _api(method, path, key=None, **kwargs):
 
 def skip_no_key():
     if not CI_API_KEY:
-        warn("VANTAGE_CI_API_KEY not set — skipping authenticated tests")
+        if CI:
+            pytest.fail("VANTAGE_CI_API_KEY is required in CI but not set")
+        else:
+            pytest.skip("VANTAGE_CI_API_KEY not set — skipping")
         return True
     return False
 
