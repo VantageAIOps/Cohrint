@@ -81,6 +81,22 @@ export async function authMiddleware(
       c.set('memberId',    session.member_id);
       c.set('memberEmail', memberEmail);
 
+      // Resolve accountType for session
+      const orgMeta = await c.env.DB.prepare(
+        'SELECT account_type FROM orgs WHERE id = ?'
+      ).bind(session.org_id).first<{ account_type: string }>();
+      c.set('accountType', (orgMeta?.account_type ?? 'organization') as import('../types').AccountType);
+
+      // Resolve teamId if member has one
+      let sessionTeamId: string | null = null;
+      if (session.member_id) {
+        const tm = await c.env.DB.prepare(
+          'SELECT team_id FROM org_members WHERE id = ?'
+        ).bind(session.member_id).first<{ team_id: string | null }>();
+        sessionTeamId = tm?.team_id ?? null;
+      }
+      c.set('teamId', sessionTeamId);
+
       const rpm     = parseInt(c.env.RATE_LIMIT_RPM ?? '1000', 10);
       const allowed = await checkRateLimit(c.env.KV, session.org_id, rpm);
       if (!allowed) {
@@ -120,20 +136,22 @@ export async function authMiddleware(
 
   // 2a. Check owner key (orgs table)
   const org = await c.env.DB.prepare(
-    'SELECT id, plan FROM orgs WHERE api_key_hash = ?'
-  ).bind(hash).first<{ id: string; plan: string }>();
+    'SELECT id, plan, account_type FROM orgs WHERE api_key_hash = ?'
+  ).bind(hash).first<{ id: string; plan: string; account_type: string }>();
 
   if (org) {
     c.set('orgId',       org.id);
     c.set('role',        'owner' as OrgRole);
+    c.set('accountType', (org.account_type ?? 'organization') as import('../types').AccountType);
     c.set('scopeTeam',   null);
+    c.set('teamId',      null);
     c.set('memberId',    null);
     c.set('memberEmail', null);
   } else {
     // 2b. Check member key (org_members table)
     const member = await c.env.DB.prepare(
-      'SELECT id, org_id, role, scope_team, email FROM org_members WHERE api_key_hash = ?'
-    ).bind(hash).first<{ id: string; org_id: string; role: string; scope_team: string | null; email: string | null }>();
+      'SELECT id, org_id, role, scope_team, email, team_id FROM org_members WHERE api_key_hash = ?'
+    ).bind(hash).first<{ id: string; org_id: string; role: string; scope_team: string | null; email: string | null; team_id: string | null }>();
 
     if (!member) {
       const ip = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For') ?? '';
@@ -148,8 +166,14 @@ export async function authMiddleware(
       c.set('orgId',       member.org_id);
       c.set('role',        (member.role as OrgRole) || 'member');
       c.set('scopeTeam',   member.scope_team ?? null);
+      c.set('teamId',      member.team_id ?? null);
       c.set('memberId',    member.id);
       c.set('memberEmail', member.email ?? null);
+
+      const orgMeta2 = await c.env.DB.prepare(
+        'SELECT account_type FROM orgs WHERE id = ?'
+      ).bind(member.org_id).first<{ account_type: string }>();
+      c.set('accountType', (orgMeta2?.account_type ?? 'organization') as import('../types').AccountType);
     }
   }
 
