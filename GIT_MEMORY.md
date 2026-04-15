@@ -12,6 +12,8 @@ _Last updated: 2026-04-15_
 
 ## Latest 15 Commits
 ```
+f470821 feat(enterprise): implement all P0/P1 gaps from business case analysis
+8ec0ef7 chore: update GIT_MEMORY.md — all P1/P2 items complete, PR #60 ready for review
 629635e feat(enterprise): P1/P2 gaps — budget enforcement, policy CRUD UI, live feed, alerts
 6974fab chore: update GIT_MEMORY.md — PR #60 P0 fixes, outstanding P1/P2 items
 0664316 fix(enterprise): P0 gaps — role allowlist, otel enriched fields, developer team
@@ -25,8 +27,6 @@ ba0aa10 fix(dashboard): 75/25 split layout for spend trend + donut cards
 c4380ba fix(dashboard): chart proportions, connected tools stale dates, vega bot overlap
 f8028ff fix(landing): fix footer wrapping on mobile
 d394858 fix(landing): strip security implementation details + replace gmail with sales email
-30df133 fix(landing): fix orphaned </div> + grammatically incomplete subheadline
-93c6ea4 docs: add VantageAI guidebook v1.1 (PDF + DOCX)
 ```
 
 ## Recent Merged PRs
@@ -43,24 +43,30 @@ d394858 fix(landing): strip security implementation details + replace gmail with
 | vantage-js-sdk | 1.0.1 |
 | vantage-mcp | 1.1.1 |
 
-## PR #60 — Enterprise RBAC Feature (feat/enterprise-rbac-multiuser)
+## PR #60 Status — Enterprise RBAC (feat/enterprise-rbac-multiuser)
+All P0 + P1 gaps implemented. Ready for review + merge.
 
-### All items completed
-- Role hierarchy: owner > superadmin > ceo > admin > member > viewer (ROLE_RANK)
-- auth.ts: role allowlist fixed (ceo/superadmin no longer silently downgraded)
-- auth.ts: privilege escalation guard on invite + PATCH member
-- otel.ts: agent_name, team, business_unit extracted + stored in otel_events
-- crossplatform.ts: /developer/:id returns team field; /live returns agent_name, team, token_rate_per_sec
-- executive.ts: GET /v1/analytics/executive (ceo/superadmin/owner only)
-- admin.ts: budget policies CRUD (POST/PUT/DELETE /v1/admin/budget-policies)
-- admin.ts: GET /v1/admin/developers/recommendations
-- events.ts: checkBudgetPolicy() — block/throttle enforcement at event ingestion
-- events.ts: maybeSendBudgetAlert() wired after each insert
-- analytics.ts: /teams COALESCE team_budgets + budget_policies for budget_pct
-- app.html: executive dashboard view (ceo+ only in sidebar)
-- app.html: budget alert sticky banner at 80%/100% spend
-- app.html: + New Policy button + create/edit/delete modal in Budgets tab
-- cp-console.js: live feed 4-column grid with agent_name, team, tok/s rate
-- tests/43_enterprise_rbac: 9 sections, 55+ checks including ER-I escalation guard
+### Completed (this branch, 5 commits)
+**Schema & Data Layer**
+- migration/0015: business_unit/team/agent_name to otel_events; budget_policies enhancements
+- migration/0016: developer_email + business_unit to events table; 6 compound indexes
 
-### No outstanding items — ready for PR review + merge
+**Backend Routes**
+- auth.ts: full role hierarchy (owner>superadmin>ceo>admin>member>viewer); invite allowlist fixed; escalation guard; logAudit on PATCH
+- executive.ts: GET /v1/analytics/executive (ceo+ only); UNION events+cross_platform_usage
+- admin.ts: budget policies CRUD; GET /developers/recommendations; GET /budget-alerts?threshold_pct
+- admin.ts: GET /audit-log now supports ?since, ?until, ?actor_role, ?resource_type, ?event_name
+- analytics.ts: GET /business-units (spend per BU×team×provider); /teams COALESCE budget_policies
+- crossplatform.ts: GET /active-developers (live presence); ?business_unit= filter on /developers
+- events.ts: checkBudgetPolicy() enforcement at ingest; maybeSendBudgetAlert wired
+- superadmin.ts: logAuditRaw on all 7 route handlers
+
+**Frontend**
+- app.html: Executive view (ceo+); budget alert sticky banner; + New Policy modal; Active Now card
+- app.html: Members table Spend MTD + Rec columns; invite modal adds ceo/superadmin options
+- cp-console.js: live feed 4-col grid (agent_name, team, tok/s); dev modal Recommendations section
+
+**Tests**
+- tests/suites/43_enterprise_rbac: 14 sections (ER-A through ER-N), 80+ checks
+
+### No remaining outstanding items
