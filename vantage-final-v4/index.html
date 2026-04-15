@@ -287,9 +287,10 @@ section{padding:100px 24px;max-width:1140px;margin:0 auto}
 .cta-mono{font-family:var(--mono);font-size:13px;color:var(--muted);margin-bottom:40px}
 
 /* FOOTER */
-footer{border-top:1px solid var(--border);padding:36px 48px;display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--muted);font-family:var(--mono)}
-footer a{color:var(--muted);text-decoration:none;transition:color .2s}
+footer{border-top:1px solid var(--border);padding:36px 48px;display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--muted);font-family:var(--mono);flex-wrap:wrap;gap:16px}
+footer a{color:var(--muted);text-decoration:none;transition:color .2s;white-space:nowrap}
 footer a:hover{color:var(--text)}
+@media(max-width:640px){footer{flex-direction:column;align-items:flex-start;padding:28px 20px;gap:20px}footer>div{flex-wrap:wrap;gap:16px}}
 
 /* HOW IT WORKS */
 .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:60px;position:relative}
@@ -854,7 +855,7 @@ response = client.chat.completions.<span class="c-func">create</span>(
       <div class="plan-name">TEAM</div>
       <div class="plan-price" style="font-size:36px;padding-top:8px">Contact</div>
       <div class="plan-period">us for pricing</div>
-      <a href="mailto:vantageaiops@gmail.com?subject=Team Plan" class="plan-cta">Contact us →</a>
+      <a href="mailto:sales@vantageaiops.com?subject=Team Plan" class="plan-cta">Contact us →</a>
       <ul class="plan-feats">
         <li>Unlimited events</li>
         <li>Budget policies</li>
@@ -866,7 +867,7 @@ response = client.chat.completions.<span class="c-func">create</span>(
       <div class="plan-name">ENTERPRISE</div>
       <div class="plan-price" style="font-size:36px;padding-top:8px">Custom</div>
       <div class="plan-period">volume pricing</div>
-      <a href="mailto:vantageaiops@gmail.com?subject=Enterprise" class="plan-cta">Talk to sales →</a>
+      <a href="mailto:sales@vantageaiops.com?subject=Enterprise" class="plan-cta">Talk to sales →</a>
       <ul class="plan-feats">
         <li>Everything in Team</li>
         <li>Dedicated support</li>
@@ -924,11 +925,11 @@ response = client.chat.completions.<span class="c-func">create</span>(
   <div class="sec-label">// security</div>
   <div class="sec-title">Security controls <em>actually shipped</em></div>
   <div class="trust-row reveal" style="justify-content:flex-start;margin-top:40px">
-    <div class="trust-badge"><span>🔑</span> API keys hashed with SHA-256 — raw key shown once, never stored</div>
-    <div class="trust-badge"><span>🍪</span> HTTP-only, SameSite sessions — XSS-resistant</div>
+    <div class="trust-badge"><span>🔑</span> API keys stored in hardened, non-reversible form — shown once at creation</div>
+    <div class="trust-badge"><span>🍪</span> Secure session management — industry-standard web security controls</div>
     <div class="trust-badge"><span>📋</span> Full audit log — every admin action recorded with timestamp and IP</div>
-    <div class="trust-badge"><span>🌐</span> TLS everywhere — Cloudflare edge, no plaintext</div>
-    <div class="trust-badge"><span>🚦</span> Rate limiting — per-org, per-minute via Cloudflare KV</div>
+    <div class="trust-badge"><span>🌐</span> Encrypted in transit — globally distributed edge network, no plaintext</div>
+    <div class="trust-badge"><span>🚦</span> Automated rate limiting — brute-force protection on all auth endpoints</div>
     <div class="trust-badge"><span>🔒</span> Privacy-first local proxy — prompts never leave your machine (opt-in)</div>
   </div>
 </section>
@@ -995,7 +996,7 @@ response = client.chat.completions.<span class="c-func">create</span>(
       <div style="font-size:11px;letter-spacing:.1em;color:var(--accent);font-family:var(--mono);margin-bottom:10px">ENTERPRISE</div>
       <div style="font-size:15px;font-weight:600;margin-bottom:6px">Sales & Pricing</div>
       <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Custom pricing, dedicated support, SLA discussion.</p>
-      <a href="mailto:vantageaiops@gmail.com?subject=Enterprise" style="color:var(--accent);font-family:var(--mono);font-size:13px;text-decoration:none">vantageaiops@gmail.com →</a>
+      <a href="mailto:sales@vantageaiops.com?subject=Enterprise" style="color:var(--accent);font-family:var(--mono);font-size:13px;text-decoration:none">sales@vantageaiops.com →</a>
     </div>
   </div>
 </section>

@@ -217,6 +217,7 @@ footer a:hover{color:var(--text)}
         </div>
 
         <a class="dashboard-btn" id="dashboard-link" href="/app.html">Open my dashboard →</a>
+        <div id="post-signup-notice" style="margin-top:12px;font-size:13px;color:#fbbf24;display:none;"></div>
       </div>
     </div>
 
@@ -365,6 +366,12 @@ async function doSignup() {
     });
     if (!sessRes.ok) {
       console.warn('[vantage] Session creation failed — user will need to sign in manually');
+      const notice = document.getElementById('post-signup-notice');
+      if (notice) {
+        notice.textContent = 'Account created. Sign in at the login page to continue.';
+        notice.style.display = 'block';
+      }
+      setTimeout(function() { window.location.href = '/auth.html'; }, 2000);
     }
 
   } catch {
