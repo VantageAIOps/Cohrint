@@ -374,9 +374,16 @@ crossplatform.get('/developer/:id', async (c) => {
     WHERE org_id = ? AND developer_id = ? LIMIT 1
   `).bind(orgId, id).first<{ developer_email: string }>();
 
+  // Fetch team for this developer
+  const teamRow = await c.env.DB.prepare(`
+    SELECT team FROM cross_platform_usage
+    WHERE org_id = ? AND developer_id = ? AND team IS NOT NULL LIMIT 1
+  `).bind(orgId, id).first<{ team: string }>();
+
   return c.json({
     developer_id:    id,
     developer_email: meta?.developer_email ?? null,
+    team:            teamRow?.team ?? null,
     period_days:     days,
     by_provider:     byProvider.results,
     by_model:        byModel.results,

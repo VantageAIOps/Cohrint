@@ -241,7 +241,16 @@ auth.post('/members', authMiddleware, adminOnly, async (c) => {
 
   const email     = (body.email ?? '').trim().toLowerCase();
   const name      = (body.name  ?? '').trim();
-  const role      = ['admin', 'member', 'viewer'].includes(body.role ?? '') ? body.role! : 'member';
+  // Only allow assigning roles up to (but not exceeding) the inviter's own role.
+  // owner/superadmin can assign any role; admin can assign admin and below; etc.
+  const VALID_ROLES = ['viewer', 'member', 'admin', 'ceo', 'superadmin'];
+  const inviterRole = c.get('role') as string;
+  const { hasRole: hr } = await import('../middleware/auth');
+  const requestedRole = body.role ?? 'member';
+  // Allow if: requested role is valid AND inviter's role >= requested role
+  const role = (VALID_ROLES.includes(requestedRole) && hr(inviterRole, requestedRole as import('../types').OrgRole))
+    ? requestedRole
+    : 'member';
   const scopeTeam = body.scope_team?.trim() || null;
 
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -325,8 +334,14 @@ auth.patch('/members/:id', authMiddleware, adminOnly, async (c) => {
 
   const updates: string[] = [];
   const params: unknown[] = [];
-  if (body.role && ['admin', 'member', 'viewer'].includes(body.role)) {
-    updates.push('role = ?'); params.push(body.role);
+  if (body.role) {
+    const VALID_ROLES = ['viewer', 'member', 'admin', 'ceo', 'superadmin'];
+    const updaterRole = c.get('role') as string;
+    const { hasRole: hr } = await import('../middleware/auth');
+    // Can only assign roles up to your own level
+    if (VALID_ROLES.includes(body.role) && hr(updaterRole, body.role as import('../types').OrgRole)) {
+      updates.push('role = ?'); params.push(body.role);
+    }
   }
   if ('scope_team' in body) {
     updates.push('scope_team = ?'); params.push(body.scope_team ?? null);

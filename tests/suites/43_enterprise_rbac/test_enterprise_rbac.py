@@ -514,6 +514,53 @@ def test_budget_policy_validation():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# ER-I: Role invite preservation — ceo/superadmin not silently downgraded
+# ══════════════════════════════════════════════════════════════════════════════
+
+def test_role_invite_preservation():
+    section("ER-I. Invited role is preserved (no silent downgrade)")
+
+    if skip_no_key():
+        return
+
+    key = CI_API_KEY
+
+    for role in ["ceo", "superadmin", "admin", "member", "viewer"]:
+        email = f"test-{uuid.uuid4().hex[:8]}@example.com"
+        r = requests.post(
+            f"{BASE}/v1/auth/members",
+            headers=_headers(key),
+            json={"email": email, "name": "Role Test", "role": role},
+            timeout=TIMEOUT,
+        )
+        chk(f"ER-I.1 Invite role={role} returns 201", r.status_code in (200, 201), f"got {r.status_code}: {r.text[:120]}")
+        if r.status_code in (200, 201):
+            returned_role = r.json().get("role")
+            chk(f"ER-I.2 Returned role={role} not downgraded", returned_role == role,
+                f"expected '{role}', got '{returned_role}'")
+
+    # Admin cannot escalate to superadmin
+    admin_key, _ = fresh_member_key(key, role="admin")
+    if admin_key:
+        escalate_email = f"test-{uuid.uuid4().hex[:8]}@example.com"
+        r_esc = requests.post(
+            f"{BASE}/v1/auth/members",
+            headers=_headers(admin_key),
+            json={"email": escalate_email, "name": "Escalation Test", "role": "superadmin"},
+            timeout=TIMEOUT,
+        )
+        if r_esc.status_code in (200, 201):
+            returned_role = r_esc.json().get("role")
+            chk("ER-I.3 Admin cannot invite superadmin (must downgrade to admin or less)",
+                returned_role != "superadmin",
+                f"role escalation succeeded — got '{returned_role}'")
+        else:
+            chk("ER-I.3 Admin cannot invite superadmin (rejected)", True)
+    else:
+        warn("ER-I.3: Could not get admin key — skipping escalation check")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Runner
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -530,6 +577,7 @@ def run_all():
     test_developer_recommendations()
     test_team_scoped_member()
     test_budget_policy_validation()
+    test_role_invite_preservation()
 
     results = get_results()
     print(f"\n{'═'*60}")
