@@ -46,9 +46,9 @@ def _api(method, path, key=None, **kwargs):
 def skip_no_key():
     if not CI_API_KEY:
         if CI:
-            pytest.fail("COHRINT_CI_API_KEY is required in CI but not set")
+            pytest.fail("VANTAGE_CI_API_KEY is required in CI but not set")
         else:
-            pytest.skip("COHRINT_CI_API_KEY not set — skipping")
+            pytest.skip("VANTAGE_CI_API_KEY not set — skipping")
         return True
     return False
 

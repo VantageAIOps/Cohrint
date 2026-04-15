@@ -14,7 +14,7 @@ LOG_LEVEL = os.environ.get("VANTAGE_LOG_LEVEL", "INFO")
 
 # Pre-seeded CI test account — avoids signup rate limits in CI
 # Set these as GitHub Secrets to skip fresh_account() signups
-CI_API_KEY = os.environ.get("COHRINT_CI_API_KEY", "")
+CI_API_KEY = os.environ.get("VANTAGE_CI_API_KEY", "")
 CI_ORG_ID  = os.environ.get("VANTAGE_CI_ORG_ID", "")
 
 # Integration secrets — tests SKIP if these are not set
