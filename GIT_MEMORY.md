@@ -1,79 +1,74 @@
-# GIT_MEMORY.md — Cohrint
+# GIT_MEMORY — Cohrint / VantageAI
+
 _Last updated: 2026-04-15_
 
 ## Current Branch
-`feat/enterprise-rbac-multiuser`
+`main`
 
 ## Open PRs
-| # | Title | Branch |
-|---|-------|--------|
-| 60 | feat(enterprise): multi-team RBAC, CEO dashboard, budget policies, team attribution | feat/enterprise-rbac-multiuser |
-| 59 | fix(ui): landing page polish + dashboard chart/layout fixes | fix/landing-page-positioning |
+None
 
 ## Latest 15 Commits
-```
-f470821 feat(enterprise): implement all P0/P1 gaps from business case analysis
-8ec0ef7 chore: update GIT_MEMORY.md — all P1/P2 items complete, PR #60 ready for review
-629635e feat(enterprise): P1/P2 gaps — budget enforcement, policy CRUD UI, live feed, alerts
-6974fab chore: update GIT_MEMORY.md — PR #60 P0 fixes, outstanding P1/P2 items
-0664316 fix(enterprise): P0 gaps — role allowlist, otel enriched fields, developer team
-31d2a59 feat(enterprise): multi-team RBAC, CEO dashboard, budget policies, team attribution
-54c3bdf chore: update GIT_MEMORY.md — PR #59 state
-08a1cb3 fix(dashboard+auth): 9 remaining issues from rescan
-249f655 fix(dashboard+auth): 11 crash/flow fixes from full audit
-c69136d fix(dashboard): stale donut legend on empty period + mobile flex breakpoint
-ba0aa10 fix(dashboard): 75/25 split layout for spend trend + donut cards
-2e72278 fix(dashboard): reduce Tool Cost Share donut size + proper alignment
-c4380ba fix(dashboard): chart proportions, connected tools stale dates, vega bot overlap
-f8028ff fix(landing): fix footer wrapping on mobile
-d394858 fix(landing): strip security implementation details + replace gmail with sales email
-```
+
+| Hash | Message |
+|------|---------|
+| `ba1358a` | fix: deferred security issues — __Host- cookie prefix, IP-bound recovery token, scope_team validation, X-Forwarded-For fallback removal, cookie parser = safety, session audit log noise |
+| `c300aec` | fix: security audit — C1 broken FK, C2 PATCH role escalation, C3 logout SameSite, H1 adminOnly on team members, H2 N+1 member query, H3 api_key in dashboard URL, L1 teams updated_at |
+| `6cafb6b` | feat: mount /v1/teams router |
+| `043a7f3` | feat: teams route — list/create/delete teams and list team members |
+| `c95375e` | feat: enforce account-type constraints on signup + member invite |
+| `b462c3d` | feat: populate accountType + teamId in auth middleware context |
+| `0b8a5fe` | feat: add AccountType + teamId to Hono Variables |
+| `977bde6` | feat: migration 0020 — team_id FK on org_members |
+| `95fb503` | feat: migration 0019 — teams table for org sub-teams |
+| `64fbe5a` | feat: migration 0018 — add account_type to orgs |
+| `36d2725` | feat(rbac): scope analytics and cross-platform data to own records for member/viewer roles |
+| `a78b1d8` | feat(rbac): superadmin budget control center |
+| `278d9d7` | feat(rbac): role-based post-login routing + CEO dashboard isolation |
+| `479c651` | fix(migration): add missing last_used_at column to 0017 org_members recreation |
+| `02b707c` | fix(worker): replace dynamic imports of hasRole with static import |
 
 ## Recent Merged PRs
-- #57 feat/claude-intelligence-customer-integration
-- #56 fix/ui-finetune-dashboard
-- #55 feat/free-tier-50k
-- #54 feat/free-tier-50k
-- #53 fix/ci-signup-rate-limit
+
+| Hash | Message |
+|------|---------|
+| `16e0bc3` | Merge PR #61 — chore/rebrand-cohrint |
+| `995b312` | Merge feat/enterprise-rbac-multiuser into chore/rebrand-cohrint |
+| `dc72e70` | Merge PR #60 — feat/enterprise-rbac-multiuser |
+| `294d956` | Merge PR #59 — fix/landing-page-positioning |
+| `f03f6d8` | Merge PR #58 — fix/landing-page-positioning |
 
 ## Package Versions
+
 | Package | Version |
 |---------|---------|
-| vantage-worker | 1.0.0 |
-| vantage-js-sdk | 1.0.1 |
-| vantage-mcp | 1.1.1 |
+| `vantage-worker` | 1.0.0 |
 
-## PR #60 Status — Enterprise RBAC (feat/enterprise-rbac-multiuser)
-All P0 + P1 gaps implemented. Docs updated. Ready for review + merge.
+## What Was Done This Session
 
-### Completed (this branch, 5 commits)
-**Schema & Data Layer**
-- migration/0015: business_unit/team/agent_name to otel_events; budget_policies enhancements; superadmin/ceo roles added to org_members
-- migration/0016: developer_email + business_unit to events table; 6 compound indexes
+### Account Hierarchy (individual / team / organization)
+- **3 D1 migrations** applied to production (`vantage-events`):
+  - `0018` — `account_type TEXT` on `orgs` (default `'organization'`, existing orgs unaffected)
+  - `0019` — `teams` table with composite PK `(org_id, id)`, soft delete, `updated_at`
+  - `0020` — `team_id TEXT` on `org_members` (no FK — composite PK not referenceable in SQLite; app-layer enforced)
+- **New route**: `src/routes/teams.ts` — `GET/POST /v1/teams`, `DELETE /v1/teams/:id`, `GET /v1/teams/:id/members` (all adminOnly)
+- **Auth middleware**: populates `accountType` + `teamId` in Hono context; collapsed double member query into single SELECT
+- **Signup**: accepts `account_type` param, stored + returned in response
+- **Member invite**: individual=blocked; team=member/viewer only; org=requires `team_id` validated against `teams`
+- **PATCH /members/:id**: enforces `accountType` role restrictions
 
-**Backend Routes**
-- auth.ts: full role hierarchy (owner>superadmin>ceo>admin>member>viewer); invite allowlist fixed; escalation guard; logAudit on PATCH
-- executive.ts: GET /v1/analytics/executive (ceo+ only); UNION events+cross_platform_usage
-- admin.ts: budget policies CRUD (GET/POST/PUT/DELETE /v1/admin/budget-policies); GET /developers/recommendations; GET /budget-alerts?threshold_pct
-- admin.ts: GET /audit-log now supports ?since, ?until, ?actor_role, ?resource_type, ?event_name
-- analytics.ts: GET /business-units (spend per BU×team×provider); /teams COALESCE budget_policies
-- crossplatform.ts: GET /active-developers (live presence); ?business_unit= filter on /developers
-- events.ts: checkBudgetPolicy() enforcement at ingest; maybeSendBudgetAlert wired
-- superadmin.ts: logAuditRaw on all 7 route handlers
+### Security Fixes
+- `__Host-` cookie prefix in production (no `Domain=`, origin-bound); logout clears both new and legacy names
+- Recovery token IP-bound (stored at generation, validated + consumed on mismatch at redeem)
+- `scope_team` validated: max 64 chars, `[a-z0-9_-]` only
+- `X-Forwarded-For` fallback removed from all rate-limit IP lookups (`CF-Connecting-IP` only)
+- Cookie parser uses `indexOf('=')` — safe for base64 values
+- Session auth: `auth.login` audit skipped for `/v1/audit-log` reads (matches API key path)
+- Worker deployed: version `fc137c81` live at `api.cohrint.com`
 
-**Frontend**
-- app.html: Executive view (ceo+); budget alert sticky banner; + New Policy modal; Active Now card
-- app.html: Members table Spend MTD + Rec columns; invite modal adds ceo/superadmin options
-- cp-console.js: live feed 4-col grid (agent_name, team, tok/s); dev modal Recommendations section
-
-**Tests**
-- tests/suites/43_enterprise_rbac: 14 sections (ER-A through ER-N), 80+ checks
-
-**Docs**
-- ADMIN_GUIDE.md: 6-level RBAC section, executive endpoint §11.4, budget policies CRUD §11.5, member ID-based delete/rotate notes, audit log filters, Quick Reference updated
-- docs.html: roles table expanded to 6 roles + executive dashboard column; budget policies CRUD + executive endpoint sections added
-
-## PR #59 Status — UI Polish (fix/landing-page-positioning)
-Merged. Changes: mobile sidebar toggle, landing page email/security badge updates, dashboard chart/layout fixes, auth cookie improvements.
-
-### No remaining outstanding items
+## Outstanding Items
+- **Rotate `CLOUDFLARE_API_TOKEN`** — token was shared in chat; go to dash.cloudflare.com/profile/api-tokens
+- Smoke-test live endpoints: individual/team/org signup, team CRUD, member invite with `team_id`
+- Write test suite in `tests/suites/` for account hierarchy routes (none exist yet)
+- `toSlug()` inconsistency between `auth.ts` and `teams.ts` (cosmetic)
+- `api_key_hint` could be restricted to owner/superadmin on member list (low priority)
