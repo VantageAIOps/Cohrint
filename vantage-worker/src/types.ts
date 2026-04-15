@@ -21,12 +21,16 @@ export type Bindings = {
   TOKEN_ENCRYPTION_SECRET?: string;
 };
 
+export type AccountType = 'individual' | 'team' | 'organization';
+
 export type OrgRole = 'owner' | 'superadmin' | 'ceo' | 'admin' | 'member' | 'viewer';
 
 export type Variables = {
   orgId:       string;
   role:        OrgRole;       // role hierarchy: owner > superadmin > ceo > admin > member > viewer
-  scopeTeam:   string | null; // null = see all; 'backend' = scoped to that team
+  accountType: AccountType;   // individual | team | organization
+  scopeTeam:   string | null; // legacy free-text team scope
+  teamId:      string | null; // canonical FK to teams table (org accounts only)
   memberId:    string | null; // null when using the org owner key
   memberEmail: string | null; // actual member email; null for owner key
 };
