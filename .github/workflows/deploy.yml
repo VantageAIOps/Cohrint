@@ -17,7 +17,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    name: Deploy VantageAI Frontend
+    name: Deploy Cohrint Frontend
 
     steps:
       - name: Checkout

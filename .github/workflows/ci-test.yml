@@ -1,4 +1,4 @@
-name: VantageAI Test Suite
+name: Cohrint Test Suite
 
 # Runs the full test suite as post-deploy validation on main.
 #
@@ -68,7 +68,7 @@ jobs:
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             --retry 5 --retry-delay 5 --retry-all-errors \
-            https://api.vantageaiops.com/v1/health)
+            https://api.cohrint.com/v1/health)
           echo "API health: $STATUS"
           [ "$STATUS" = "200" ] || { echo "❌ API not responding (got $STATUS)"; exit 1; }
           echo "✅ API is live"
@@ -77,7 +77,7 @@ jobs:
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             --retry 3 --retry-delay 5 \
-            https://vantageaiops.com/)
+            https://cohrint.com/)
           echo "Frontend: $STATUS"
           [ "$STATUS" = "200" ] || { echo "❌ Frontend not responding (got $STATUS)"; exit 1; }
           echo "✅ Frontend is live"
@@ -127,8 +127,8 @@ jobs:
       - name: Run API + core suites (no browser)
         env:
           HEADLESS: "1"
-          VANTAGE_SITE_URL: "https://vantageaiops.com"
-          VANTAGE_API_URL: "https://api.vantageaiops.com"
+          VANTAGE_SITE_URL: "https://cohrint.com"
+          VANTAGE_API_URL: "https://api.cohrint.com"
           VANTAGE_CI_SECRET: ${{ secrets.VANTAGE_CI_SECRET }}
           EMAIL: ${{ secrets.EMAIL }}
           PASSWORD: ${{ secrets.PASSWORD }}
@@ -207,8 +207,8 @@ jobs:
       - name: Run browser/UI suites
         env:
           HEADLESS: "1"
-          VANTAGE_SITE_URL: "https://vantageaiops.com"
-          VANTAGE_API_URL: "https://api.vantageaiops.com"
+          VANTAGE_SITE_URL: "https://cohrint.com"
+          VANTAGE_API_URL: "https://api.cohrint.com"
           VANTAGE_CI_SECRET: ${{ secrets.VANTAGE_CI_SECRET }}
           EMAIL: ${{ secrets.EMAIL }}
           PASSWORD: ${{ secrets.PASSWORD }}
@@ -277,8 +277,8 @@ jobs:
       - name: Run stress/load/latency suites
         env:
           HEADLESS: "1"
-          VANTAGE_SITE_URL: "https://vantageaiops.com"
-          VANTAGE_API_URL: "https://api.vantageaiops.com"
+          VANTAGE_SITE_URL: "https://cohrint.com"
+          VANTAGE_API_URL: "https://api.cohrint.com"
           VANTAGE_CI_SECRET: ${{ secrets.VANTAGE_CI_SECRET }}
           EMAIL: ${{ secrets.EMAIL }}
           PASSWORD: ${{ secrets.PASSWORD }}
@@ -322,8 +322,8 @@ jobs:
       - name: Run security + rate-limiting suites
         env:
           HEADLESS: "1"
-          VANTAGE_SITE_URL: "https://vantageaiops.com"
-          VANTAGE_API_URL: "https://api.vantageaiops.com"
+          VANTAGE_SITE_URL: "https://cohrint.com"
+          VANTAGE_API_URL: "https://api.cohrint.com"
           VANTAGE_CI_SECRET: ${{ secrets.VANTAGE_CI_SECRET }}
           EMAIL: ${{ secrets.EMAIL }}
           PASSWORD: ${{ secrets.PASSWORD }}
@@ -349,7 +349,7 @@ jobs:
     steps:
       - name: Write summary
         run: |
-          echo "## VantageAI Test Suite — ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "## Cohrint Test Suite — ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY

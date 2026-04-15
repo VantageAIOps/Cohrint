@@ -25,7 +25,7 @@ jobs:
       pull-requests: write  # needed to post the cost comment
     env:
       VANTAGE_API_KEY: ${{ secrets.VANTAGE_API_KEY }}
-      VANTAGE_API_BASE: ${{ secrets.VANTAGE_API_BASE || 'https://api.vantageaiops.com' }}
+      VANTAGE_API_BASE: ${{ secrets.VANTAGE_API_BASE || 'https://api.cohrint.com' }}
       # Budget limits (USD) — adjust per project
       PR_BUDGET_USD: ${{ vars.PR_BUDGET_USD || '5.00' }}
       DAILY_BUDGET_USD: ${{ vars.DAILY_BUDGET_USD || '50.00' }}
@@ -141,7 +141,7 @@ jobs:
               : '';
 
             const body = [
-              `## ${icon} VantageAI Cost Report`,
+              `## ${icon} Cohrint Cost Report`,
               '',
               `| Metric | Value |`,
               `|---|---|`,
@@ -154,7 +154,7 @@ jobs:
                 : `> Cost within budget. Safe to merge.`,
               budgetWarning,
               '',
-              `*Powered by [VantageAI](https://vantageaiops.com) · [View dashboard](https://vantageaiops.com/app.html)*`,
+              `*Powered by [Cohrint](https://cohrint.com) · [View dashboard](https://cohrint.com/app.html)*`,
             ].join('\n');
 
             // Update existing comment or create new one (avoid spam)
@@ -164,7 +164,7 @@ jobs:
               issue_number: context.issue.number,
             });
             const existing = comments.find(c =>
-              c.body?.includes('VantageAI Cost Report') && c.user?.login === 'github-actions[bot]'
+              c.body?.includes('Cohrint Cost Report') && c.user?.login === 'github-actions[bot]'
             );
 
             if (existing) {
