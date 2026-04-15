@@ -682,6 +682,13 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
 </head>
 <body>
 
+<!-- Budget alert banner — shown when budget_pct >= 80 -->
+<div id="budget-alert-banner" style="display:none;background:#7c2d12;border-bottom:2px solid #ea580c;padding:10px 20px;font-size:13px;color:#fed7aa;align-items:center;gap:8px;position:sticky;top:0;z-index:200">
+  <span id="budget-alert-icon">&#9888;&#65039;</span>
+  <span id="budget-alert-msg">Budget threshold reached.</span>
+  <button onclick="document.getElementById('budget-alert-banner').style.display='none'" style="margin-left:auto;background:none;border:none;color:#fed7aa;cursor:pointer;font-size:16px">&#x2715;</button>
+</div>
+
 <div id="offlineBanner">&#9888; You are offline &mdash; showing last cached data. Dashboard will refresh when reconnected.</div>
 
 <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="closeSidebar()"></div>
@@ -1060,6 +1067,48 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
 
       <!-- ─── Budgets & Alerts ─── -->
       <div id="view-budgets" class="view">
+
+        <!-- Budget policy create button -->
+        <button id="btn-new-policy" onclick="openBudgetPolicyModal()" style="margin-bottom:12px;padding:6px 14px;background:#6366f1;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">+ New Policy</button>
+
+        <!-- Budget policy modal -->
+        <div id="modal-budget-policy" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;align-items:center;justify-content:center">
+          <div style="background:#1e1e2e;border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:24px;width:400px;max-width:90vw">
+            <h3 style="margin:0 0 16px;font-size:16px">New Budget Policy</h3>
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <div>
+                <label style="font-size:12px;opacity:.7;display:block;margin-bottom:4px">Scope</label>
+                <select id="bp-scope" style="width:100%;padding:8px;background:#2a2a3e;border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:13px" onchange="updateBpScopeTarget()">
+                  <option value="org">Org-wide</option>
+                  <option value="team">Team</option>
+                  <option value="developer">Developer</option>
+                  <option value="provider">Tool/Provider</option>
+                </select>
+              </div>
+              <div id="bp-target-row" style="display:none">
+                <label style="font-size:12px;opacity:.7;display:block;margin-bottom:4px" id="bp-target-label">Target</label>
+                <input id="bp-scope-target" type="text" placeholder="e.g. claude-team" style="width:100%;padding:8px;background:#2a2a3e;border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:13px;box-sizing:border-box">
+              </div>
+              <div>
+                <label style="font-size:12px;opacity:.7;display:block;margin-bottom:4px">Monthly Limit (USD)</label>
+                <input id="bp-limit" type="number" min="1" placeholder="e.g. 2000" style="width:100%;padding:8px;background:#2a2a3e;border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:13px;box-sizing:border-box">
+              </div>
+              <div>
+                <label style="font-size:12px;opacity:.7;display:block;margin-bottom:4px">Enforcement</label>
+                <select id="bp-enforcement" style="width:100%;padding:8px;background:#2a2a3e;border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:13px">
+                  <option value="alert">Alert only</option>
+                  <option value="throttle">Throttle (warn but allow)</option>
+                  <option value="block">Block (reject events)</option>
+                </select>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:4px">
+                <button onclick="saveBudgetPolicy()" style="flex:1;padding:8px;background:#6366f1;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">Save Policy</button>
+                <button onclick="closeBudgetPolicyModal()" style="flex:1;padding:8px;background:rgba(255,255,255,.08);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="card" data-insight="Set the top-level monthly spend cap for your whole organization.">
           <div class="card-header">
             <div class="card-title">Organization Budget</div>
@@ -1085,6 +1134,20 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
             </thead>
             <tbody id="budgetTeamsBody">
               <tr><td colspan="3" class="empty-state">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card" data-insight="Granular budget policies by scope (org, team, developer, provider) with enforcement modes.">
+          <div class="card-header">
+            <div class="card-title">Budget Policies</div>
+          </div>
+          <table class="tool-table">
+            <thead>
+              <tr><th>Scope</th><th>Limit</th><th>Enforcement</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="budgetPoliciesBody">
+              <tr><td colspan="4" class="empty-state">Loading...</td></tr>
             </tbody>
           </table>
         </div>
@@ -1993,9 +2056,11 @@ function loadOverview() {
         budgetSubEl.textContent = fmt(remaining) + ' remaining';
         budgetSubEl.style.color = '';
       }
+      checkBudgetAlertBanner(parseFloat(budgetPct));
     } else {
       document.getElementById('kpiBudgetPct').textContent = 'N/A';
       document.getElementById('kpiBudgetSub').textContent = 'No budget set';
+      checkBudgetAlertBanner(0);
     }
 
     // Token usage
@@ -3090,9 +3155,69 @@ function loadBudgets() {
   Promise.all([
     apiFetch('/v1/admin/team-budgets').catch(function() { return null; }),
     apiFetch('/v1/alerts/' + orgId).catch(function() { return null; }),
+    apiFetch('/v1/admin/budget-policies').catch(function() { return null; }),
   ]).then(function(results) {
     var budgets = results[0];
     var alerts = results[1];
+    var policiesResult = results[2];
+
+    // Render budget policies list
+    var polTbody = document.getElementById('budgetPoliciesBody');
+    if (polTbody) {
+      polTbody.textContent = '';
+      var policies = (policiesResult && (policiesResult.policies || policiesResult.data || policiesResult)) || [];
+      if (!Array.isArray(policies)) policies = [];
+      if (policies.length === 0) {
+        var emptyTr = document.createElement('tr');
+        var emptyTd = document.createElement('td');
+        emptyTd.colSpan = 4;
+        emptyTd.className = 'empty-state';
+        emptyTd.textContent = policiesResult === null ? 'Failed to load policies.' : 'No budget policies yet. Click \u201c+ New Policy\u201d above to add one.';
+        emptyTr.appendChild(emptyTd);
+        polTbody.appendChild(emptyTr);
+      } else {
+        policies.forEach(function(p) {
+          var ptr = document.createElement('tr');
+
+          var scopeLabel = p.scope === 'org' ? 'Org-wide'
+            : p.scope === 'team' ? 'Team: ' + (p.scope_target || '')
+            : p.scope === 'developer' ? 'Dev: ' + (p.scope_target || '')
+            : p.scope === 'provider' ? 'Provider: ' + (p.scope_target || '')
+            : (p.scope || '') + (p.scope_target ? ': ' + p.scope_target : '');
+
+          var ptd1 = document.createElement('td');
+          ptd1.textContent = scopeLabel;
+          ptd1.style.cssText = 'padding:7px 8px;font-size:12px';
+
+          var ptd2 = document.createElement('td');
+          ptd2.textContent = '$' + fmt(p.monthly_limit_usd || 0) + '/mo';
+          ptd2.style.cssText = 'padding:7px 8px;font-size:12px;color:var(--accent-green,#4ade80)';
+
+          var ptd3 = document.createElement('td');
+          ptd3.textContent = p.enforcement || 'alert';
+          ptd3.style.cssText = 'padding:7px 8px;font-size:11px;opacity:.6';
+
+          var ptd4 = document.createElement('td');
+          ptd4.style.cssText = 'padding:7px 8px;display:flex;gap:6px';
+          var editBtn = document.createElement('button');
+          editBtn.className = 'btn btn-sm';
+          editBtn.textContent = 'Edit';
+          editBtn.onclick = (function(pid) { return function() { openBudgetPolicyModal(pid); }; })(p.id);
+          var delBtn2 = document.createElement('button');
+          delBtn2.className = 'btn btn-danger btn-sm';
+          delBtn2.textContent = 'Delete';
+          delBtn2.onclick = (function(pid) { return function() { deleteBudgetPolicy(pid); }; })(p.id);
+          ptd4.appendChild(editBtn);
+          ptd4.appendChild(delBtn2);
+
+          ptr.appendChild(ptd1);
+          ptr.appendChild(ptd2);
+          ptr.appendChild(ptd3);
+          ptr.appendChild(ptd4);
+          polTbody.appendChild(ptr);
+        });
+      }
+    }
 
     var teams = (budgets && budgets.budgets) || (budgets && budgets.teams) || (budgets && budgets.data) || [];
     var tbody = document.getElementById('budgetTeamsBody');
@@ -4170,6 +4295,94 @@ document.addEventListener('keydown', function(e) {
     closeModal(m.id);
   });
 });
+
+// ── Budget policy CRUD ────────────────────────────────────────────────────
+function openBudgetPolicyModal(editId) {
+  var modal = document.getElementById('modal-budget-policy');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  document.getElementById('bp-scope').value = 'org';
+  document.getElementById('bp-limit').value = '';
+  document.getElementById('bp-enforcement').value = 'alert';
+  document.getElementById('bp-scope-target').value = '';
+  updateBpScopeTarget();
+  modal._editId = editId || null;
+}
+
+function closeBudgetPolicyModal() {
+  var modal = document.getElementById('modal-budget-policy');
+  if (modal) modal.style.display = 'none';
+}
+
+function updateBpScopeTarget() {
+  var scope = document.getElementById('bp-scope').value;
+  var targetRow = document.getElementById('bp-target-row');
+  var targetLabel = document.getElementById('bp-target-label');
+  if (scope === 'org') {
+    targetRow.style.display = 'none';
+  } else {
+    targetRow.style.display = 'block';
+    var labels = { team: 'Team name', developer: 'Developer email', provider: 'Provider (e.g. claude_code)' };
+    targetLabel.textContent = labels[scope] || 'Target';
+  }
+}
+
+function saveBudgetPolicy() {
+  var modal = document.getElementById('modal-budget-policy');
+  var scope = document.getElementById('bp-scope').value;
+  var limit = parseFloat(document.getElementById('bp-limit').value);
+  var enforcement = document.getElementById('bp-enforcement').value;
+  var scopeTarget = document.getElementById('bp-scope-target').value.trim();
+
+  if (!limit || limit <= 0) { alert('Enter a valid monthly limit.'); return; }
+  if (scope !== 'org' && !scopeTarget) { alert('Enter a target for this scope.'); return; }
+
+  var payload = { scope: scope, monthly_limit_usd: limit, enforcement: enforcement };
+  if (scope !== 'org') payload.scope_target = scopeTarget;
+
+  var editId = modal._editId;
+  var method = editId ? 'PUT' : 'POST';
+  var url = editId ? '/v1/admin/budget-policies/' + editId : '/v1/admin/budget-policies';
+
+  apiFetch(url, { method: method, body: JSON.stringify(payload) }).then(function() {
+    closeBudgetPolicyModal();
+    loadBudgets();
+  }).catch(function(err) {
+    alert('Error: ' + (err.message || String(err)));
+  });
+}
+
+function deleteBudgetPolicy(id) {
+  if (!confirm('Delete this budget policy?')) return;
+  apiFetch('/v1/admin/budget-policies/' + id, { method: 'DELETE' }).then(function() {
+    loadBudgets();
+  }).catch(function(err) {
+    alert('Error: ' + (err.message || String(err)));
+  });
+}
+
+// ── Budget alert banner ───────────────────────────────────────────────────
+function checkBudgetAlertBanner(budgetPct) {
+  var banner = document.getElementById('budget-alert-banner');
+  var msg    = document.getElementById('budget-alert-msg');
+  var icon   = document.getElementById('budget-alert-icon');
+  if (!banner) return;
+  if (budgetPct >= 100) {
+    icon.textContent = '\uD83D\uDEA8';
+    msg.textContent = 'Budget exceeded (' + Math.round(budgetPct) + '% used). New events may be blocked. Contact your admin.';
+    banner.style.background = '#450a0a';
+    banner.style.borderBottomColor = '#dc2626';
+    banner.style.display = 'flex';
+  } else if (budgetPct >= 80) {
+    icon.textContent = '\u26A0\uFE0F';
+    msg.textContent = 'Budget warning: ' + Math.round(budgetPct) + '% of monthly budget used.';
+    banner.style.background = '#7c2d12';
+    banner.style.borderBottomColor = '#ea580c';
+    banner.style.display = 'flex';
+  } else {
+    banner.style.display = 'none';
+  }
+}
 </script>
 <script>
 // Card hold-to-reveal insight tooltip

@@ -471,11 +471,18 @@
 
     events.slice(0, 15).forEach(function (e) {
       var row = document.createElement('div');
-      row.style.cssText = 'display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:11px';
+      row.style.cssText = 'display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:11px';
 
       var left = document.createElement('span');
-      left.textContent = (e.provider || '') + ' \u00b7 ' + (e.model || '');
+      var providerLabel = (e.provider || '').replace(/_/g, ' ');
+      var agentLabel    = e.agent_name && e.agent_name !== e.provider ? ' [' + e.agent_name + ']' : '';
+      var teamLabel     = e.team ? ' \u00b7 ' + e.team : '';
+      left.textContent = providerLabel + agentLabel + teamLabel + ' \u00b7 ' + (e.model || '');
       left.style.opacity = '0.8';
+
+      var rate = document.createElement('span');
+      rate.textContent = e.token_rate_per_sec ? (e.token_rate_per_sec.toFixed(0) + ' tok/s') : '';
+      rate.style.cssText = 'opacity:0.5;font-size:10px';
 
       var cost = document.createElement('span');
       cost.textContent = '$' + fmt2(e.cost_usd);
@@ -486,6 +493,7 @@
       ts.style.opacity = '0.4';
 
       row.appendChild(left);
+      row.appendChild(rate);
       row.appendChild(cost);
       row.appendChild(ts);
       el.appendChild(row);
@@ -493,7 +501,7 @@
 
     if (data.is_stale) {
       var staleNote = document.createElement('p');
-      staleNote.textContent = '\u26A0 stale — no activity in last 5 min';
+      staleNote.textContent = '\u26A0 stale \u2014 no activity in last 5 min';
       staleNote.style.cssText = 'font-size:10px;color:#fb923c;margin-top:4px';
       el.appendChild(staleNote);
     }

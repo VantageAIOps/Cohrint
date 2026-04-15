@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { Bindings, Variables, EventIn, BatchIn } from '../types';
 import { authMiddleware } from '../middleware/auth';
+import { maybeSendBudgetAlert } from './alerts';
 
 const events = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -36,6 +37,84 @@ events.use('/batch', async (c, next) => {
   }
   return await next();
 });
+
+// ── Budget policy enforcement ─────────────────────────────────────────────────
+interface BudgetCheck {
+  blocked: boolean;
+  throttled: boolean;
+  pct: number;
+  policy_id: string | null;
+  scope: string | null;
+}
+
+async function checkBudgetPolicy(
+  db: D1Database,
+  kv: KVNamespace,
+  orgId: string,
+  eventCost: number,
+  team: string | null,
+): Promise<BudgetCheck> {
+  // Fetch active policies: org-level and team-level (if team provided)
+  // Order: team policy takes precedence over org policy for block/throttle
+  const policies = await db.prepare(`
+    SELECT id, scope, scope_target, monthly_limit_usd, enforcement
+    FROM budget_policies
+    WHERE org_id = ?
+      AND enforcement IN ('block', 'throttle', 'alert')
+      AND (scope = 'org' OR (scope = 'team' AND scope_target = ?))
+    ORDER BY CASE scope WHEN 'team' THEN 0 ELSE 1 END
+    LIMIT 5
+  `).bind(orgId, team ?? '').all<{ id: string; scope: string; scope_target: string | null; monthly_limit_usd: number; enforcement: string }>();
+
+  for (const policy of policies.results ?? []) {
+    // Get MTD spend for this scope
+    const mtdKey = policy.scope === 'team'
+      ? `mtd:${orgId}:team:${policy.scope_target}`
+      : `mtd:${orgId}:org`;
+
+    let mtdCost: number;
+    try {
+      const cached = await kv.get(mtdKey);
+      mtdCost = cached ? parseFloat(cached) : 0;
+    } catch {
+      mtdCost = 0;
+    }
+
+    // If KV cache is stale/zero, query D1 directly
+    if (mtdCost === 0) {
+      const startOfMonth = new Date();
+      startOfMonth.setUTCDate(1);
+      startOfMonth.setUTCHours(0, 0, 0, 0);
+      const monthStart = Math.floor(startOfMonth.getTime() / 1000);
+
+      let mtdRow: { total: number } | null;
+      if (policy.scope === 'team' && policy.scope_target) {
+        mtdRow = await db.prepare(`
+          SELECT COALESCE(SUM(cost_usd), 0) AS total FROM events
+          WHERE org_id = ? AND team = ? AND created_at >= ?
+        `).bind(orgId, policy.scope_target, monthStart).first<{ total: number }>();
+      } else {
+        mtdRow = await db.prepare(`
+          SELECT COALESCE(SUM(cost_usd), 0) AS total FROM events
+          WHERE org_id = ? AND created_at >= ?
+        `).bind(orgId, monthStart).first<{ total: number }>();
+      }
+      mtdCost = mtdRow?.total ?? 0;
+    }
+
+    const projectedCost = mtdCost + eventCost;
+    const pct = policy.monthly_limit_usd > 0 ? (projectedCost / policy.monthly_limit_usd) * 100 : 0;
+
+    if (policy.enforcement === 'block' && projectedCost > policy.monthly_limit_usd) {
+      return { blocked: true, throttled: false, pct, policy_id: policy.id, scope: policy.scope };
+    }
+    if (policy.enforcement === 'throttle' && projectedCost > policy.monthly_limit_usd) {
+      return { blocked: false, throttled: true, pct, policy_id: policy.id, scope: policy.scope };
+    }
+  }
+
+  return { blocked: false, throttled: false, pct: 0, policy_id: null, scope: null };
+}
 
 // ── Free-tier event limit helper ──────────────────────────────────────────────
 const FREE_TIER_LIMIT = 50_000;
@@ -73,6 +152,21 @@ events.post('/', async (c) => {
       events_limit: FREE_TIER_LIMIT,
     }, 429);
   }
+
+  // Budget policy enforcement (block/throttle)
+  const eventCost = (body as unknown as Record<string, unknown>).total_cost_usd as number ?? 0;
+  const eventTeam = (body as unknown as Record<string, unknown>).team as string ?? null;
+  const budgetCheck = await checkBudgetPolicy(c.env.DB, c.env.KV, orgId, eventCost, eventTeam);
+  if (budgetCheck.blocked) {
+    return c.json({
+      error: 'Budget limit exceeded',
+      message: `This org's ${budgetCheck.scope}-level budget has been exceeded (${Math.round(budgetCheck.pct)}% used). Contact your admin.`,
+      budget_pct: budgetCheck.pct,
+      policy_id: budgetCheck.policy_id,
+    }, 429);
+  }
+  // throttle: allow through but add header warning
+  const isBudgetThrottled = budgetCheck.throttled;
 
   // Accept 'id' as alias for 'event_id'
   const r = body as unknown as Record<string, unknown>;
@@ -132,11 +226,29 @@ events.post('/', async (c) => {
   // Broadcast to SSE subscribers via KV pub channel
   await broadcastEvent(c.env.KV, orgId, body);
 
+  // Fire budget alerts asynchronously (non-blocking)
+  c.executionCtx.waitUntil((async () => {
+    try {
+      const org = await c.env.DB.prepare('SELECT budget_usd FROM orgs WHERE id = ?')
+        .bind(orgId).first<{ budget_usd: number }>();
+      if (org?.budget_usd) {
+        const startOfMonth = new Date();
+        startOfMonth.setUTCDate(1); startOfMonth.setUTCHours(0, 0, 0, 0);
+        const monthStart = Math.floor(startOfMonth.getTime() / 1000);
+        const mtdRow = await c.env.DB.prepare(
+          'SELECT COALESCE(SUM(cost_usd), 0) AS total FROM events WHERE org_id = ? AND created_at >= ?'
+        ).bind(orgId, monthStart).first<{ total: number }>();
+        await maybeSendBudgetAlert(c.env.DB, c.env.KV, orgId, mtdRow?.total ?? 0, org.budget_usd);
+      }
+    } catch { /* non-critical */ }
+  })());
+
   // Invalidate all analytics caches (all scopes including team-scoped variants)
   try { await invalidateOrgAnalyticsCache(c.env.KV, orgId); } catch { /* best-effort */ }
 
   const response: Record<string, unknown> = { ok: true, id: body.event_id };
   if (cacheWarning) response.cache_warning = cacheWarning;
+  if (isBudgetThrottled) response.budget_warning = `Budget threshold exceeded (${Math.round(budgetCheck.pct)}% used). Events are being throttled.`;
   return c.json(response, 201);
 });
 
@@ -170,6 +282,13 @@ events.post('/batch', async (c) => {
       events_used: used,
       events_limit: FREE_TIER_LIMIT,
     }, 429);
+  }
+
+  const batchCost = body.events.reduce((s, ev) => s + (ev.total_cost_usd ?? ev.cost_total_usd ?? 0), 0);
+  const batchTeam = body.events[0]?.team ?? null;
+  const batchBudgetCheck = await checkBudgetPolicy(c.env.DB, c.env.KV, orgId, batchCost, batchTeam ?? null);
+  if (batchBudgetCheck.blocked) {
+    return c.json({ error: 'Budget limit exceeded', budget_pct: batchBudgetCheck.pct, policy_id: batchBudgetCheck.policy_id }, 429);
   }
 
   // Prompt-hash dedup — check KV for each event that includes a prompt_hash

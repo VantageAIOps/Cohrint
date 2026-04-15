@@ -254,13 +254,14 @@ analytics.get('/teams', async (c) => {
       SUM(e.cost_usd)                AS cost_usd,
       SUM(e.total_tokens)            AS tokens,
       COUNT(*)                       AS requests,
-      COALESCE(b.budget_usd, 0)      AS budget_usd,
-      CASE WHEN b.budget_usd > 0
-        THEN ROUND(SUM(e.cost_usd) / b.budget_usd * 100, 1)
+      COALESCE(b.budget_usd, bp.monthly_limit_usd, 0) AS budget_usd,
+      CASE WHEN COALESCE(b.budget_usd, bp.monthly_limit_usd, 0) > 0
+        THEN ROUND(SUM(e.cost_usd) / COALESCE(b.budget_usd, bp.monthly_limit_usd) * 100, 1)
         ELSE NULL
       END AS budget_pct
     FROM events e
     LEFT JOIN team_budgets b ON b.org_id = e.org_id AND b.team = e.team
+    LEFT JOIN budget_policies bp ON bp.org_id = e.org_id AND bp.scope = 'team' AND bp.scope_target = e.team
     WHERE e.org_id = ? AND e.created_at >= ?${clause}
     GROUP BY e.team
     ORDER BY cost_usd DESC
