@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
-import { authMiddleware } from '../middleware/auth';
+import { authMiddleware, hasRole } from '../middleware/auth';
 import { logAudit } from '../lib/audit';
 import { estimateCacheSavings } from '../lib/pricing';
 const analytics = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -18,9 +18,15 @@ function teamScope(scopeTeam: string | null): { clause: string; args: unknown[] 
 
 // ── GET /v1/analytics/summary ─────────────────────────────────────────────────
 analytics.get('/summary', async (c) => {
-  const orgId     = c.get('orgId');
-  const scopeTeam = c.get('scopeTeam');
+  const orgId       = c.get('orgId');
+  const scopeTeam   = c.get('scopeTeam');
+  const role        = c.get('role');
+  const memberEmail = c.get('memberEmail');
+  const isPrivileged = hasRole(role, 'admin');
   const { clause, args } = teamScope(scopeTeam);
+  // Non-admin members only see their own events
+  const devClause = isPrivileged ? '' : ' AND developer_email = ?';
+  const devArgs   = isPrivileged ? [] : [memberEmail];
 
   // Optional agent_name filter — e.g. ?agent=claude-code for integration status checks
   const agentFilter = c.req.query('agent') ?? null;
@@ -28,7 +34,7 @@ analytics.get('/summary', async (c) => {
   const agentArgs   = agentFilter ? [agentFilter] : [];
 
   // KV cache — 5 min TTL. Agent-filtered requests bypass cache (low-volume, targeted).
-  const cacheKey = `analytics:summary:${orgId}:${scopeTeam ?? 'all'}`;
+  const cacheKey = `analytics:summary:${orgId}:${scopeTeam ?? 'all'}:${isPrivileged ? 'all' : (memberEmail ?? 'anon')}`;
   if (!agentFilter) {
     try {
       const cached = await c.env.KV.get(cacheKey);
@@ -49,18 +55,18 @@ analytics.get('/summary', async (c) => {
         COALESCE(SUM(total_tokens), 0) AS today_tokens,
         COALESCE(COUNT(*), 0)          AS today_requests,
         MAX(created_at)                AS last_event_at
-      FROM events WHERE org_id = ? AND created_at >= ?${clause}${agentClause}
-    `).bind(orgId, today, ...args, ...agentArgs),
+      FROM events WHERE org_id = ? AND created_at >= ?${clause}${agentClause}${devClause}
+    `).bind(orgId, today, ...args, ...agentArgs, ...devArgs),
     c.env.DB.prepare(`
       SELECT COALESCE(SUM(cost_usd), 0) AS session_cost_usd
-      FROM events WHERE org_id = ? AND created_at >= ?${clause}${agentClause}
-    `).bind(orgId, thirty, ...args, ...agentArgs),
+      FROM events WHERE org_id = ? AND created_at >= ?${clause}${agentClause}${devClause}
+    `).bind(orgId, thirty, ...args, ...agentArgs, ...devArgs),
   ]);
 
   const mtd = await c.env.DB.prepare(`
     SELECT COALESCE(SUM(cost_usd), 0) AS mtd_cost_usd
-    FROM events WHERE org_id = ? AND created_at >= ?${clause}${agentClause}
-  `).bind(orgId, month, ...args, ...agentArgs).first<{ mtd_cost_usd: number }>();
+    FROM events WHERE org_id = ? AND created_at >= ?${clause}${agentClause}${devClause}
+  `).bind(orgId, month, ...args, ...agentArgs, ...devArgs).first<{ mtd_cost_usd: number }>();
 
   // Budget: per-team when scoped, org-wide otherwise
   let budgetUsd = 0;
@@ -112,14 +118,19 @@ analytics.get('/summary', async (c) => {
 
 // ── GET /v1/analytics/kpis?period=30 ─────────────────────────────────────────
 analytics.get('/kpis', async (c) => {
-  const orgId     = c.get('orgId');
-  const scopeTeam = c.get('scopeTeam');
+  const orgId       = c.get('orgId');
+  const scopeTeam   = c.get('scopeTeam');
+  const role        = c.get('role');
+  const memberEmail = c.get('memberEmail');
+  const isPrivileged = hasRole(role, 'admin');
   const { clause, args } = teamScope(scopeTeam);
+  const devClause = isPrivileged ? '' : ' AND developer_email = ?';
+  const devArgs   = isPrivileged ? [] : [memberEmail];
   const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
   // Align to UTC midnight: show today + previous (period-1) days = exactly `period` calendar days
   const since  = Math.floor(Date.now() / 86_400_000) * 86_400 - (period - 1) * 86_400;
 
-  const kpisCacheKey = `analytics:kpis:${orgId}:${period}:${scopeTeam ?? 'all'}`;
+  const kpisCacheKey = `analytics:kpis:${orgId}:${period}:${scopeTeam ?? 'all'}:${isPrivileged ? 'all' : (memberEmail ?? 'anon')}`;
   try {
     const cached = await c.env.KV.get(kpisCacheKey);
     if (cached) return c.json(JSON.parse(cached));
@@ -137,15 +148,15 @@ analytics.get('/kpis', async (c) => {
       COALESCE(SUM(cache_tokens), 0)               AS cache_tokens_total,
       COALESCE(SUM(CASE WHEN cache_hit=1 THEN 1 ELSE 0 END), 0)        AS duplicate_calls,
       COALESCE(SUM(CASE WHEN cache_hit=1 THEN cost_usd ELSE 0 END), 0) AS wasted_cost_usd
-    FROM events WHERE org_id = ? AND created_at >= ?${clause}
-  `).bind(orgId, since, ...args).first<Record<string, number>>();
+    FROM events WHERE org_id = ? AND created_at >= ?${clause}${devClause}
+  `).bind(orgId, since, ...args, ...devArgs).first<Record<string, number>>();
 
   // Compute cache savings per model (rate varies by model, can't be done in SQL alone)
   const { results: cacheByModel } = await c.env.DB.prepare(`
     SELECT model, COALESCE(SUM(cache_tokens), 0) AS cache_tokens, COALESCE(SUM(total_tokens), 0) AS tokens
-    FROM events WHERE org_id = ? AND created_at >= ?${clause}
+    FROM events WHERE org_id = ? AND created_at >= ?${clause}${devClause}
     GROUP BY model
-  `).bind(orgId, since, ...args).all<{ model: string; cache_tokens: number; tokens: number }>();
+  `).bind(orgId, since, ...args, ...devArgs).all<{ model: string; cache_tokens: number; tokens: number }>();
 
   const totalCacheTokens  = (row?.cache_tokens_total ?? 0) as number;
   const totalPromptTokens = (row?.total_prompt_tokens ?? 0) as number;
@@ -173,8 +184,11 @@ analytics.get('/kpis', async (c) => {
 
 // ── GET /v1/analytics/timeseries?period=30 ───────────────────────────────────
 analytics.get('/timeseries', async (c) => {
-  const orgId     = c.get('orgId');
-  const scopeTeam = c.get('scopeTeam');
+  const orgId       = c.get('orgId');
+  const scopeTeam   = c.get('scopeTeam');
+  const role        = c.get('role');
+  const memberEmail = c.get('memberEmail');
+  const isPrivileged = hasRole(role, 'admin');
   const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
   // Align to UTC midnight: show today + previous (period-1) days = exactly `period` calendar days
   const todayMidnightMs = Math.floor(Date.now() / 86_400_000) * 86_400_000;
@@ -182,8 +196,10 @@ analytics.get('/timeseries', async (c) => {
   const since = new Date(sinceMs).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
   const teamClause = scopeTeam ? ' AND team = ?' : '';
   const teamArgs   = scopeTeam ? [scopeTeam] : [];
+  const devClause = isPrivileged ? '' : ' AND developer_email = ?';
+  const devArgs   = isPrivileged ? [] : [memberEmail];
 
-  const tsCacheKey = `analytics:timeseries:${orgId}:${period}:${scopeTeam ?? 'all'}`;
+  const tsCacheKey = `analytics:timeseries:${orgId}:${period}:${scopeTeam ?? 'all'}:${isPrivileged ? 'all' : (memberEmail ?? 'anon')}`;
   try {
     const cached = await c.env.KV.get(tsCacheKey);
     if (cached) return c.json(JSON.parse(cached));
@@ -198,10 +214,10 @@ analytics.get('/timeseries', async (c) => {
       SUM(input_tokens + output_tokens)         AS tokens,
       COUNT(*)                                  AS requests
     FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ?${teamClause}
+    WHERE org_id = ? AND created_at >= ?${teamClause}${devClause}
     GROUP BY date
     ORDER BY date ASC
-  `).bind(orgId, since, ...teamArgs).all();
+  `).bind(orgId, since, ...teamArgs, ...devArgs).all();
 
   const tsResult = { period, series: results };
   try { await c.env.KV.put(tsCacheKey, JSON.stringify(tsResult), { expirationTtl: 300 }); } catch { /* best-effort */ }
@@ -211,14 +227,19 @@ analytics.get('/timeseries', async (c) => {
 
 // ── GET /v1/analytics/models?period=30 ───────────────────────────────────────
 analytics.get('/models', async (c) => {
-  const orgId     = c.get('orgId');
-  const scopeTeam = c.get('scopeTeam');
+  const orgId       = c.get('orgId');
+  const scopeTeam   = c.get('scopeTeam');
+  const role        = c.get('role');
+  const memberEmail = c.get('memberEmail');
+  const isPrivileged = hasRole(role, 'admin');
   const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
   const todayMidnightMs = Math.floor(Date.now() / 86_400_000) * 86_400_000;
   const sinceMs = todayMidnightMs - (period - 1) * 86_400_000;
   const since = new Date(sinceMs).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
   const teamClause = scopeTeam ? ' AND team = ?' : '';
   const teamArgs   = scopeTeam ? [scopeTeam] : [];
+  const devClause = isPrivileged ? '' : ' AND developer_email = ?';
+  const devArgs   = isPrivileged ? [] : [memberEmail];
 
   const { results } = await c.env.DB.prepare(`
     SELECT
@@ -228,11 +249,11 @@ analytics.get('/models', async (c) => {
       COUNT(*)                          AS requests,
       AVG(latency_ms)                   AS avg_latency_ms
     FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ?${teamClause}
+    WHERE org_id = ? AND created_at >= ?${teamClause}${devClause}
     GROUP BY model, provider
     ORDER BY cost_usd DESC
     LIMIT 25
-  `).bind(orgId, since, ...teamArgs).all();
+  `).bind(orgId, since, ...teamArgs, ...devArgs).all();
 
   logAudit(c, { event_type: 'data_access', event_name: 'data_access.analytics', resource_type: 'analytics', metadata: { endpoint: '/v1/analytics/models' } });
   return c.json({ models: results });

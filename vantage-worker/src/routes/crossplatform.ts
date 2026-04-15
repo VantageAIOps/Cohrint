@@ -61,7 +61,12 @@ function validateDays(raw: string | undefined): number {
 // ── GET /trend — daily cost per provider for stacked area chart ───────────
 
 crossplatform.get('/trend', async (c) => {
-  const orgId = c.get('orgId');
+  const orgId       = c.get('orgId');
+  const role        = c.get('role');
+  const memberEmail = c.get('memberEmail');
+  const isPrivileged = hasRole(role, 'admin');
+  const devClause = isPrivileged ? '' : ' AND developer_email = ?';
+  const devArgs   = isPrivileged ? [] : [memberEmail];
   let days: number;
   try {
     days = validateDays(c.req.query('days'));
@@ -75,10 +80,10 @@ crossplatform.get('/trend', async (c) => {
            provider,
            COALESCE(SUM(cost_usd), 0) AS cost
     FROM cross_platform_usage
-    WHERE org_id = ? AND period_start >= ?
+    WHERE org_id = ? AND period_start >= ?${devClause}
     GROUP BY DATE(period_start), provider
     ORDER BY day ASC
-  `).bind(orgId, since).all<{ day: string; provider: string; cost: number }>();
+  `).bind(orgId, since, ...devArgs).all<{ day: string; provider: string; cost: number }>();
 
   // Build the full N-day calendar spine regardless of whether every day has
   // data. This ensures Chart.js always receives a continuous x-axis.
@@ -107,7 +112,12 @@ crossplatform.get('/trend', async (c) => {
 // ── GET /summary — total spend across all platforms ─────────────────────────
 
 crossplatform.get('/summary', async (c) => {
-  const orgId = c.get('orgId');
+  const orgId       = c.get('orgId');
+  const role        = c.get('role');
+  const memberEmail = c.get('memberEmail');
+  const isPrivileged = hasRole(role, 'admin');
+  const devClause = isPrivileged ? '' : ' AND developer_email = ?';
+  const devArgs   = isPrivileged ? [] : [memberEmail];
   let days: number;
   try {
     days = validateDays(c.req.query('days'));
@@ -125,8 +135,8 @@ crossplatform.get('/summary', async (c) => {
       COALESCE(SUM(cached_tokens), 0) as total_cached_tokens,
       COUNT(*) as total_records
     FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ?
-  `).bind(orgId, since).first();
+    WHERE org_id = ? AND created_at >= ?${devClause}
+  `).bind(orgId, since, ...devArgs).first();
 
   // By provider
   const byProvider = await c.env.DB.prepare(`
@@ -136,9 +146,9 @@ crossplatform.get('/summary', async (c) => {
       COALESCE(SUM(input_tokens + output_tokens), 0) as tokens,
       COUNT(*) as records
     FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ?
+    WHERE org_id = ? AND created_at >= ?${devClause}
     GROUP BY provider ORDER BY cost DESC
-  `).bind(orgId, since).all();
+  `).bind(orgId, since, ...devArgs).all();
 
   // By source (otel vs billing_api)
   const bySource = await c.env.DB.prepare(`
@@ -147,9 +157,9 @@ crossplatform.get('/summary', async (c) => {
       COALESCE(SUM(cost_usd), 0) as cost,
       COUNT(*) as records
     FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ?
+    WHERE org_id = ? AND created_at >= ?${devClause}
     GROUP BY source
-  `).bind(orgId, since).all();
+  `).bind(orgId, since, ...devArgs).all();
 
   // Today's spend
   const todayStart = sqliteTodayStart();
@@ -157,10 +167,10 @@ crossplatform.get('/summary', async (c) => {
     SELECT COALESCE(SUM(cost_usd), 0) as today_cost,
            COALESCE(SUM(input_tokens + output_tokens), 0) as today_tokens
     FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ?
-  `).bind(orgId, todayStart).first();
+    WHERE org_id = ? AND created_at >= ?${devClause}
+  `).bind(orgId, todayStart, ...devArgs).first();
 
-  // Budget check
+  // Budget check (always org-scoped — not filtered by developer)
   const budget = await c.env.DB.prepare(`
     SELECT monthly_limit_usd FROM budget_policies
     WHERE org_id = ? AND scope = 'org' LIMIT 1
@@ -170,8 +180,8 @@ crossplatform.get('/summary', async (c) => {
   const monthSpend = await c.env.DB.prepare(`
     SELECT COALESCE(SUM(cost_usd), 0) as month_cost
     FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ?
-  `).bind(orgId, monthStart).first() as { month_cost: number } | null;
+    WHERE org_id = ? AND created_at >= ?${devClause}
+  `).bind(orgId, monthStart, ...devArgs).first() as { month_cost: number } | null;
 
   // Previous period for trend comparison
   const prevSince = sqliteDateSince(days * 2);
@@ -179,8 +189,8 @@ crossplatform.get('/summary', async (c) => {
   const prevTotal = await c.env.DB.prepare(`
     SELECT COALESCE(SUM(cost_usd), 0) as prev_cost
     FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ? AND created_at < ?
-  `).bind(orgId, prevSince, prevUntil).first() as { prev_cost: number } | null;
+    WHERE org_id = ? AND created_at >= ? AND created_at < ?${devClause}
+  `).bind(orgId, prevSince, prevUntil, ...devArgs).first() as { prev_cost: number } | null;
 
   const budgetLimit = budget?.monthly_limit_usd ?? 0;
   const budgetUsed = monthSpend?.month_cost ?? 0;
@@ -458,9 +468,12 @@ crossplatform.get('/active-developers', async (c) => {
 // ── GET /live — latest OTel events for real-time feed ───────────────────────
 
 crossplatform.get('/live', async (c) => {
-  const orgId  = c.get('orgId');
-  const role   = c.get('role');
+  const orgId       = c.get('orgId');
+  const role        = c.get('role');
+  const memberEmail = c.get('memberEmail');
   const isPrivileged = hasRole(role, 'admin'); // superadmin/ceo/admin/owner see full emails
+  const devClause = isPrivileged ? '' : ' AND developer_email = ?';
+  const devArgs   = isPrivileged ? [] : [memberEmail];
   const rawLimit = parseInt(c.req.query('limit') ?? '50', 10);
   const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 200) : 50;
 
@@ -490,10 +503,10 @@ crossplatform.get('/live', async (c) => {
       provider, developer_email, team, model, agent_name, event_name,
       cost_usd, tokens_in, tokens_out, duration_ms, timestamp
     FROM otel_events
-    WHERE org_id = ? AND timestamp > datetime('now', '-5 minutes')
+    WHERE org_id = ? AND timestamp > datetime('now', '-5 minutes')${devClause}
     ORDER BY timestamp DESC
     LIMIT ?
-  `).bind(orgId, limit).all();
+  `).bind(orgId, ...devArgs, limit).all();
 
   if (recent.results && recent.results.length > 0) {
     return c.json({ events: (recent.results as any[]).map(enrichEvent), is_stale: false });
@@ -505,10 +518,10 @@ crossplatform.get('/live', async (c) => {
       provider, developer_email, team, model, agent_name, event_name,
       cost_usd, tokens_in, tokens_out, duration_ms, timestamp
     FROM otel_events
-    WHERE org_id = ?
+    WHERE org_id = ?${devClause}
     ORDER BY timestamp DESC
     LIMIT ?
-  `).bind(orgId, Math.min(limit, 20)).all();
+  `).bind(orgId, ...devArgs, Math.min(limit, 20)).all();
 
   return c.json({
     events: (fallback.results ?? []).map(enrichEvent),
