@@ -41,7 +41,7 @@ auth.post('/signup', async (c) => {
     const ciBypass = c.req.header('X-Vantage-CI');
     const ciSecret = c.env.VANTAGE_CI_SECRET;
     if (!(ciBypass && ciSecret && ciBypass === ciSecret)) {
-      const ip = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For') ?? 'unknown';
+      const ip = c.req.header('CF-Connecting-IP') ?? 'unknown';
       const rlKey = `rl:signup:${ip}`;
       const count = parseInt(await c.env.KV.get(rlKey) ?? '0', 10);
       if (count >= 30) {
@@ -97,7 +97,7 @@ auth.post('/signup', async (c) => {
 auth.post('/recover', async (c) => {
   // Rate limit recovery: 5 per IP per hour (degrade gracefully if KV unavailable)
   try {
-    const ip = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For') ?? 'unknown';
+    const ip = c.req.header('CF-Connecting-IP') ?? 'unknown';
     const rlKey = `rl:recover:${ip}`;
     const count = parseInt(await c.env.KV.get(rlKey) ?? '0', 10);
     if (count >= 5) {
@@ -124,12 +124,14 @@ auth.post('/recover', async (c) => {
 
     if (org) {
       resolvedOrgId = org.id;
-      // Generate a one-time recovery token (1-hour TTL) so user can get a new key directly
-      const token   = randomHex(24);
-      const kvKey   = `recover:${token}`;
+      // Generate a one-time recovery token (1-hour TTL) so user can get a new key directly.
+      // Token is bound to the requesting IP — redeemable only from the same IP within 1 hour.
+      const token     = randomHex(24);
+      const kvKey     = `recover:${token}`;
+      const requestIp = c.req.header('CF-Connecting-IP') ?? 'unknown';
       let redeemUrl = '';
       try {
-        await c.env.KV.put(kvKey, JSON.stringify({ orgId: org.id, type: 'owner' }), { expirationTtl: 3600 });
+        await c.env.KV.put(kvKey, JSON.stringify({ orgId: org.id, type: 'owner', ip: requestIp }), { expirationTtl: 3600 });
         redeemUrl = `https://api.cohrint.com/v1/auth/recover/redeem?token=${token}`;
       } catch {
         // KV unavailable — email still sent without one-click redeem link
@@ -214,12 +216,21 @@ auth.post('/recover/redeem', async (c) => {
   const raw = await c.env.KV.get(`recover:${token}`);
   if (!raw) return c.json({ error: 'expired' }, 410);
 
-  let payload: { orgId: string; type: string };
+  let payload: { orgId: string; type: string; ip?: string };
   try { payload = JSON.parse(raw); }
   catch { return c.json({ error: 'invalid' }, 400); }
 
   if (!payload.orgId || typeof payload.orgId !== 'string' || !payload.type || payload.type !== 'owner') {
     return c.json({ error: 'invalid' }, 400);
+  }
+
+  // Validate IP binding — token is only redeemable from the IP that requested it.
+  // 'unknown' payloads (generated before this fix) are allowed through.
+  const redeemIp = c.req.header('CF-Connecting-IP') ?? 'unknown';
+  if (payload.ip && payload.ip !== 'unknown' && payload.ip !== redeemIp) {
+    // Consume token on IP mismatch to prevent brute-force probing
+    await c.env.KV.delete(`recover:${token}`);
+    return c.json({ error: 'expired' }, 410);
   }
 
   // Consume the token immediately (single-use)
@@ -379,7 +390,12 @@ auth.patch('/members/:id', authMiddleware, adminOnly, async (c) => {
     }
   }
   if ('scope_team' in body) {
-    updates.push('scope_team = ?'); params.push(body.scope_team ?? null);
+    const st = body.scope_team ?? null;
+    // Validate: max 64 chars, alphanumeric/hyphen/underscore only (matches team slug format)
+    if (st !== null && (st.length > 64 || !/^[a-z0-9_-]+$/i.test(st))) {
+      return c.json({ error: 'scope_team must be ≤64 chars and contain only letters, numbers, hyphens, underscores.' }, 400);
+    }
+    updates.push('scope_team = ?'); params.push(st);
   }
   if (updates.length === 0) return c.json({ error: 'Provide role or scope_team to update.' }, 400);
 
@@ -504,7 +520,7 @@ auth.post('/session', async (c) => {
   // Brute-force protection: 10 failed attempts per IP per 5-minute window
   let rlKey: string | null = null;
   try {
-    const ip = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For') ?? 'unknown';
+    const ip = c.req.header('CF-Connecting-IP') ?? 'unknown';
     rlKey = `rl:session:${ip}`;
     const count = parseInt(await c.env.KV.get(rlKey) ?? '0', 10);
     if (count >= 10) {
@@ -568,20 +584,19 @@ auth.post('/session', async (c) => {
   `).bind(token, orgId, role, memberId, expiresAt).run();
 
   // Set HTTP-only cookie.
-  // SameSite=None is required because the API (api.cohrint.com) and the
-  // frontend (cohrint.com) are different origins; Safari ITP drops
-  // SameSite=Lax cookies set cross-origin, breaking session persistence on reload.
-  // Non-prod: use Lax so cookie works on localhost without Secure.
+  // Production: __Host- prefix enforces Secure + Path=/ + no Domain= (origin-bound,
+  // not leaked to subdomains). SameSite=None is required because the API
+  // (api.cohrint.com) and frontend (cohrint.com) are different origins.
+  // Non-prod: plain name + SameSite=Lax so cookie works on localhost without Secure.
   const isProd = (c.env.ENVIRONMENT ?? 'production') === 'production';
   const cookieParts = isProd
     ? [
-        `cohrint_session=${token}`,
+        `__Host-cohrint_session=${token}`,
         `Path=/`,
         `HttpOnly`,
         `SameSite=None`,
         `Max-Age=${30 * 86_400}`,
         `Secure`,
-        `Domain=cohrint.com`,
       ]
     : [
         `cohrint_session=${token}`,
@@ -652,43 +667,59 @@ auth.get('/session', authMiddleware, async (c) => {
   });
 });
 
+// ── Shared logout helper ──────────────────────────────────────────────────────
+function cookieValue(header: string, name: string): string | null {
+  for (const part of header.split(';')) {
+    const trimmed = part.trim();
+    const eq = trimmed.indexOf('=');
+    if (eq === -1) continue;
+    if (trimmed.slice(0, eq) === name) return trimmed.slice(eq + 1) || null;
+  }
+  return null;
+}
+
+async function destroySession(
+  db: D1Database,
+  cookieHeader: string,
+): Promise<void> {
+  const token = cookieValue(cookieHeader, '__Host-cohrint_session')
+    ?? cookieValue(cookieHeader, 'cohrint_session');
+  if (token) {
+    await db.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
+  }
+}
+
+function clearCookieHeader(isProd: boolean): string[] {
+  // Clear both __Host- (new) and plain (legacy) names so clients transitioning
+  // between versions are fully logged out.
+  if (isProd) {
+    return [
+      '__Host-cohrint_session=; Path=/; HttpOnly; Max-Age=0; SameSite=None; Secure',
+      'cohrint_session=; Path=/; HttpOnly; Max-Age=0; SameSite=None; Secure; Domain=cohrint.com',
+    ];
+  }
+  return ['cohrint_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax'];
+}
+
 // ── DELETE /v1/auth/session — logout, destroy session cookie ─────────────────
 auth.delete('/session', async (c) => {
-  const cookieHeader = c.req.header('Cookie') ?? '';
-  const token = cookieHeader.split(';').map(s => s.trim())
-    .find(s => s.startsWith('cohrint_session='))?.split('=')[1];
-
-  if (token) {
-    await c.env.DB.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
+  await destroySession(c.env.DB, c.req.header('Cookie') ?? '');
+  const isProd = (c.env.ENVIRONMENT ?? 'production') === 'production';
+  const res = await c.json({ ok: true });
+  for (const val of clearCookieHeader(isProd)) {
+    res.headers.append('Set-Cookie', val);
   }
-
-  const res = c.json({ ok: true });
-  const isProdLogout = (c.env.ENVIRONMENT ?? 'production') === 'production';
-  // Must match the SameSite=None used when setting the cookie — browsers treat
-  // SameSite=Lax and SameSite=None as different cookies and won't clear the original.
-  const clearCookie = isProdLogout
-    ? 'cohrint_session=; Path=/; HttpOnly; Max-Age=0; SameSite=None; Secure; Domain=cohrint.com'
-    : 'cohrint_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax';
-  (await res).headers.set('Set-Cookie', clearCookie);
   return res;
 });
 
 // ── POST /v1/auth/logout — alias for DELETE /session (tests + convenience) ───
 auth.post('/logout', async (c) => {
-  const cookieHeader = c.req.header('Cookie') ?? '';
-  const token = cookieHeader.split(';').map(s => s.trim())
-    .find(s => s.startsWith('cohrint_session='))?.split('=')[1];
-
-  if (token) {
-    await c.env.DB.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
-  }
-
-  const res = c.json({ ok: true });
+  await destroySession(c.env.DB, c.req.header('Cookie') ?? '');
   const isProd = (c.env.ENVIRONMENT ?? 'production') === 'production';
-  const clearCookie = isProd
-    ? 'cohrint_session=; Path=/; HttpOnly; Max-Age=0; SameSite=None; Secure; Domain=cohrint.com'
-    : 'cohrint_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax';
-  (await res).headers.set('Set-Cookie', clearCookie);
+  const res = await c.json({ ok: true });
+  for (const val of clearCookieHeader(isProd)) {
+    res.headers.append('Set-Cookie', val);
+  }
   return res;
 });
 

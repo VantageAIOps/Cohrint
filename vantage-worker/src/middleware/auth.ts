@@ -39,10 +39,13 @@ async function checkRateLimit(kv: KVNamespace, orgId: string, limitRpm: number):
 }
 
 // ── Cookie parser helper ──────────────────────────────────────────────────────
+// Uses indexOf to correctly handle '=' characters inside cookie values (e.g. base64).
 function parseCookie(header: string, name: string): string | null {
   for (const part of header.split(';')) {
-    const [k, v] = part.trim().split('=');
-    if (k === name) return v ?? null;
+    const trimmed = part.trim();
+    const eq = trimmed.indexOf('=');
+    if (eq === -1) continue;
+    if (trimmed.slice(0, eq) === name) return trimmed.slice(eq + 1) || null;
   }
   return null;
 }
@@ -57,7 +60,10 @@ export async function authMiddleware(
 ) {
   // ── 1. Session cookie auth ────────────────────────────────────────────────
   const cookieHeader = c.req.header('Cookie') ?? '';
-  const sessionToken = parseCookie(cookieHeader, 'cohrint_session')
+  // __Host- prefix enforces Secure + Path=/ + no Domain= (origin-bound).
+  // Legacy names kept for backward compat during transition.
+  const sessionToken = parseCookie(cookieHeader, '__Host-cohrint_session')
+    ?? parseCookie(cookieHeader, 'cohrint_session')
     ?? parseCookie(cookieHeader, 'vantage_session');
 
   if (sessionToken) {
@@ -98,8 +104,11 @@ export async function authMiddleware(
         c.header('Retry-After', String(retryAt - Math.floor(Date.now() / 1000)));
         return c.json({ error: 'Rate limit exceeded', retry_after: retryAt }, 429);
       }
-      logAudit(c, { event_type: 'auth', event_name: 'auth.login', resource_type: 'session',
-        metadata: { method: 'session', ua: (c.req.header('User-Agent') ?? '').slice(0, 80) } });
+      // Don't log auth.login for audit-log reads — it would shift offset pagination
+      if (!c.req.path.startsWith('/v1/audit-log')) {
+        logAudit(c, { event_type: 'auth', event_name: 'auth.login', resource_type: 'session',
+          metadata: { method: 'session', ua: (c.req.header('User-Agent') ?? '').slice(0, 80) } });
+      }
       return await next();
     }
     // Expired / invalid session — fall through to API key check
@@ -110,7 +119,7 @@ export async function authMiddleware(
   const apiKey = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
 
   if (!apiKey || (!apiKey.startsWith('vnt_') && !apiKey.startsWith('crt_'))) {
-    const ip = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For') ?? '';
+    const ip = c.req.header('CF-Connecting-IP') ?? '';
     logAuditRaw(c.env.DB, c.executionCtx, ip, 'unknown', 'unknown', 'unknown', {
       event_type: 'auth',
       event_name: 'auth.failed',
@@ -148,7 +157,7 @@ export async function authMiddleware(
     ).bind(hash).first<{ id: string; org_id: string; role: string; scope_team: string | null; email: string | null; team_id: string | null }>();
 
     if (!member) {
-      const ip = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For') ?? '';
+      const ip = c.req.header('CF-Connecting-IP') ?? '';
       logAuditRaw(c.env.DB, c.executionCtx, ip, orgId || 'unknown',
         `key:${hash.substring(0, 8)}`, 'unknown', {
           event_type: 'auth',
