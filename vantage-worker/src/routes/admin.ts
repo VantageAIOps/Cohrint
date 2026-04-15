@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
-import { authMiddleware, adminOnly, hasRole } from '../middleware/auth';
+import { authMiddleware, adminOnly, superadminOnly, hasRole } from '../middleware/auth';
 import { logAudit } from '../lib/audit';
 
 const admin = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -623,6 +623,56 @@ admin.get('/budget-alerts', async (c) => {
   alerts.sort((a, b) => (b as { budget_pct: number }).budget_pct - (a as { budget_pct: number }).budget_pct);
 
   return c.json({ alerts, threshold_pct: threshold, generated_at: new Date().toISOString() });
+});
+
+// ── GET /v1/admin/budget-control — superadmin Budget Control Center ───────────
+// Returns all budget policies with current MTD spend per team and per provider.
+admin.get('/budget-control', superadminOnly, async (c) => {
+  const orgId = c.get('orgId');
+
+  const startOfMonth = new Date();
+  startOfMonth.setUTCDate(1); startOfMonth.setUTCHours(0, 0, 0, 0);
+  const monthStartIso = startOfMonth.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+
+  // All budget policies for the org
+  const { results: policies } = await c.env.DB.prepare(
+    `SELECT id, scope, scope_target, provider_target,
+            monthly_limit_usd, enforcement,
+            alert_threshold_50, alert_threshold_80, alert_threshold_100,
+            created_at, updated_at
+     FROM budget_policies WHERE org_id = ?
+     ORDER BY scope, scope_target`
+  ).bind(orgId).all();
+
+  // MTD spend per team
+  const { results: teamSpend } = await c.env.DB.prepare(`
+    SELECT team,
+           COALESCE(SUM(cost_usd), 0)              AS spend_this_month,
+           COUNT(DISTINCT developer_email)          AS developer_count,
+           COUNT(*)                                 AS request_count
+    FROM cross_platform_usage
+    WHERE org_id = ? AND created_at >= ?
+    GROUP BY team
+    ORDER BY spend_this_month DESC
+  `).bind(orgId, monthStartIso).all();
+
+  // MTD spend per provider/tool
+  const { results: providerSpend } = await c.env.DB.prepare(`
+    SELECT provider,
+           COALESCE(SUM(cost_usd), 0) AS spend_this_month,
+           COUNT(*)                   AS request_count
+    FROM cross_platform_usage
+    WHERE org_id = ? AND created_at >= ?
+    GROUP BY provider
+    ORDER BY spend_this_month DESC
+  `).bind(orgId, monthStartIso).all();
+
+  return c.json({
+    policies:       policies       ?? [],
+    team_spend:     teamSpend      ?? [],
+    provider_spend: providerSpend  ?? [],
+    generated_at:   new Date().toISOString(),
+  });
 });
 
 export { admin };

@@ -1152,6 +1152,92 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
           </table>
         </div>
 
+        <!-- ── Budget Control Center (superadmin only) ── -->
+        <div id="budget-control-panel" style="display:none">
+          <div class="section-title" style="margin:24px 0 12px;font-size:14px;font-weight:600;color:var(--text-primary)">
+            Budget Control Center
+            <span style="font-size:11px;opacity:.5;font-weight:400"> — superadmin only</span>
+          </div>
+
+          <div class="card" data-insight="Live MTD spend per team vs budget policy limits. Quick-set a new team budget inline.">
+            <div class="card-header">
+              <div class="card-title">Team Spend vs Budget</div>
+              <button class="btn btn-sm" onclick="openBudgetControlTeamModal()">+ Set Team Budget</button>
+            </div>
+            <div id="budget-team-table">
+              <div class="empty-state">Loading…</div>
+            </div>
+          </div>
+
+          <div class="card" data-insight="Live MTD spend per provider/tool vs any provider-scope budget policies.">
+            <div class="card-header">
+              <div class="card-title">Provider/Tool Spend vs Budget</div>
+              <button class="btn btn-sm" onclick="openBudgetControlProviderModal()">+ Set Provider Budget</button>
+            </div>
+            <div id="budget-provider-table">
+              <div class="empty-state">Loading…</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Budget Control: quick-set team budget modal ── -->
+        <div id="modal-bc-team" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1100;align-items:center;justify-content:center">
+          <div style="background:#1e1e2e;border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:24px;width:360px;max-width:90vw">
+            <h3 style="margin:0 0 16px;font-size:15px">Set Team Budget</h3>
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <div>
+                <label style="font-size:12px;opacity:.7;display:block;margin-bottom:4px">Team Name</label>
+                <input id="bc-team-name" type="text" placeholder="e.g. backend" style="width:100%;padding:8px;background:#2a2a3e;border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:13px;box-sizing:border-box">
+              </div>
+              <div>
+                <label style="font-size:12px;opacity:.7;display:block;margin-bottom:4px">Monthly Limit (USD)</label>
+                <input id="bc-team-limit" type="number" min="1" placeholder="e.g. 2000" style="width:100%;padding:8px;background:#2a2a3e;border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:13px;box-sizing:border-box">
+              </div>
+              <div>
+                <label style="font-size:12px;opacity:.7;display:block;margin-bottom:4px">Enforcement</label>
+                <select id="bc-team-enforcement" style="width:100%;padding:8px;background:#2a2a3e;border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:13px">
+                  <option value="alert">Alert only</option>
+                  <option value="throttle">Throttle</option>
+                  <option value="block">Block</option>
+                </select>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:4px">
+                <button onclick="saveBudgetControlTeam()" style="flex:1;padding:8px;background:#6366f1;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">Save</button>
+                <button onclick="document.getElementById('modal-bc-team').style.display='none'" style="flex:1;padding:8px;background:rgba(255,255,255,.08);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Budget Control: quick-set provider budget modal ── -->
+        <div id="modal-bc-provider" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1100;align-items:center;justify-content:center">
+          <div style="background:#1e1e2e;border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:24px;width:360px;max-width:90vw">
+            <h3 style="margin:0 0 16px;font-size:15px">Set Provider Budget</h3>
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <div>
+                <label style="font-size:12px;opacity:.7;display:block;margin-bottom:4px">Provider / Tool Name</label>
+                <input id="bc-provider-name" type="text" placeholder="e.g. openai" style="width:100%;padding:8px;background:#2a2a3e;border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:13px;box-sizing:border-box">
+              </div>
+              <div>
+                <label style="font-size:12px;opacity:.7;display:block;margin-bottom:4px">Monthly Limit (USD)</label>
+                <input id="bc-provider-limit" type="number" min="1" placeholder="e.g. 1000" style="width:100%;padding:8px;background:#2a2a3e;border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:13px;box-sizing:border-box">
+              </div>
+              <div>
+                <label style="font-size:12px;opacity:.7;display:block;margin-bottom:4px">Enforcement</label>
+                <select id="bc-provider-enforcement" style="width:100%;padding:8px;background:#2a2a3e;border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font-size:13px">
+                  <option value="alert">Alert only</option>
+                  <option value="throttle">Throttle</option>
+                  <option value="block">Block</option>
+                </select>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:4px">
+                <button onclick="saveBudgetControlProvider()" style="flex:1;padding:8px;background:#6366f1;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">Save</button>
+                <button onclick="document.getElementById('modal-bc-provider').style.display='none'" style="flex:1;padding:8px;background:rgba(255,255,255,.08);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="card">
           <div class="card-header">
             <div class="card-title">Slack Notifications</div>
@@ -1930,6 +2016,10 @@ function applyRoleUI(role) {
   // Role badge on executive view
   var roleBadge = document.getElementById('exec-role-badge');
   if (roleBadge) roleBadge.textContent = role.toUpperCase();
+
+  // Budget Control Center: superadmin/owner only
+  var bcPanel = document.getElementById('budget-control-panel');
+  if (bcPanel) bcPanel.style.display = hasRole(role, 'superadmin') ? '' : 'none';
 
   // Handle ?view= URL param now that role is known
   var _urlView = new URLSearchParams(window.location.search).get('view');
