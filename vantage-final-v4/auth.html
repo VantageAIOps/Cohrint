@@ -180,7 +180,7 @@ async function doSignIn() {
   err.style.display = 'none';
   document.getElementById('inp-key').classList.remove('err');
 
-  if (!key.startsWith('crt_')) {
+  if (!key.startsWith('crt_') && !key.startsWith('vnt_')) {
     document.getElementById('inp-key').classList.add('err');
     err.textContent = 'API keys start with crt_ — check for typos.';
     err.style.display = 'block';
