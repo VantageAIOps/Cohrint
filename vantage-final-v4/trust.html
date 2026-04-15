@@ -306,7 +306,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:2px 7p
 
           <div class="arch-node highlight">
             <div class="arch-node-label">Stop Hook</div>
-            <div class="arch-node-name">vantage-track.js</div>
+            <div class="arch-node-name">cohrint-track.js</div>
             <div class="arch-node-sub">runs after session ends</div>
           </div>
 
@@ -324,7 +324,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:2px 7p
         </div>
 
         <div class="arch-note" style="margin-top:20px;">
-          <strong>Strongest isolation mode:</strong> The Stop hook reads files that Claude Code already wrote to disk — it never touches your network traffic, your Anthropic API key, or your prompt content. The JSONL files contain full conversation history, but the hook only reads <code style="font-family:var(--mono);font-size:12px;color:var(--accent)">entry.message.usage</code> (token counts) and <code style="font-family:var(--mono);font-size:12px;color:var(--accent)">entry.message.model</code> from assistant entries. All other fields (<code style="font-family:var(--mono);font-size:12px;color:var(--dim)">messages</code>, <code style="font-family:var(--mono);font-size:12px;color:var(--dim)">content</code>, <code style="font-family:var(--mono);font-size:12px;color:var(--dim)">tool_use</code>) are never accessed. Client-side deduplication uses a local state file (<code style="font-family:var(--mono);font-size:12px;color:var(--dim)">~/.claude/vantage-state.json</code>) — this file is never uploaded.
+          <strong>Strongest isolation mode:</strong> The Stop hook reads files that Claude Code already wrote to disk — it never touches your network traffic, your Anthropic API key, or your prompt content. The JSONL files contain full conversation history, but the hook only reads <code style="font-family:var(--mono);font-size:12px;color:var(--accent)">entry.message.usage</code> (token counts) and <code style="font-family:var(--mono);font-size:12px;color:var(--accent)">entry.message.model</code> from assistant entries. All other fields (<code style="font-family:var(--mono);font-size:12px;color:var(--dim)">messages</code>, <code style="font-family:var(--mono);font-size:12px;color:var(--dim)">content</code>, <code style="font-family:var(--mono);font-size:12px;color:var(--dim)">tool_use</code>) are never accessed. Client-side deduplication uses a local state file (<code style="font-family:var(--mono);font-size:12px;color:var(--dim)">~/.claude/cohrint-state.json</code>) — this file is never uploaded.
         </div>
       </div>
     </div>
@@ -369,7 +369,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:2px 7p
   <span class="json-key">"tool_use"</span>: <span class="json-null">// tool call arguments</span>,
   <span class="json-key">"api_key"</span>: <span class="json-null">// your Anthropic API key</span>,
   <span class="json-key">"file_contents"</span>: <span class="json-null">// files in context window</span>,
-  <span class="json-key">"vantage-state.json"</span>: <span class="json-null">// local dedup state</span>,
+  <span class="json-key">"cohrint-state.json"</span>: <span class="json-null">// local dedup state</span>,
   <span class="json-key">"user_data"</span>: <span class="json-null">// any PII you process</span>
 }</pre>
         </div>
@@ -387,7 +387,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:2px 7p
       <div class="mode-card">
         <div class="mode-name strict">Strict</div>
         <div class="mode-headline">Aggregate counts only</div>
-        <div class="mode-install">VANTAGE_PRIVACY_MODE=strict</div>
+        <div class="mode-install">COHRINT_PRIVACY_MODE=strict</div>
         <ul class="mode-list">
           <li class="yes">Total token counts (no per-call breakdown)</li>
           <li class="yes">Estimated cost range</li>
@@ -401,7 +401,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:2px 7p
       <div class="mode-card">
         <div class="mode-name standard">Standard</div>
         <div class="mode-headline">Metadata per call</div>
-        <div class="mode-install">VANTAGE_PRIVACY_MODE=standard</div>
+        <div class="mode-install">COHRINT_PRIVACY_MODE=standard</div>
         <ul class="mode-list">
           <li class="yes">Per-call token counts</li>
           <li class="yes">Model name and provider</li>
@@ -415,7 +415,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:2px 7p
       <div class="mode-card">
         <div class="mode-name relaxed">Relaxed</div>
         <div class="mode-headline">Metadata + quality signals</div>
-        <div class="mode-install">VANTAGE_PRIVACY_MODE=relaxed</div>
+        <div class="mode-install">COHRINT_PRIVACY_MODE=relaxed</div>
         <ul class="mode-list">
           <li class="yes">All Standard fields</li>
           <li class="yes">Response quality score (0–100)</li>
@@ -564,7 +564,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:2px 7p
       <div class="control-card">
         <div class="control-icon">📁</div>
         <div class="control-title">Claude Code Hook — Prompt Isolation</div>
-        <div class="control-desc">The vantage-track.js Stop hook reads only <code style="font-family:var(--mono);font-size:11px;">entry.message.usage</code> and <code style="font-family:var(--mono);font-size:11px;">entry.message.model</code> from Claude Code session files. Prompt text, tool arguments, file contents, and response content are never accessed. Deduplication state is kept in a local file (<code style="font-family:var(--mono);font-size:11px;">~/.claude/vantage-state.json</code>) that is never transmitted. The hook fires after the session ends — it cannot delay or affect Claude Code's operation.</div>
+        <div class="control-desc">The cohrint-track.js Stop hook reads only <code style="font-family:var(--mono);font-size:11px;">entry.message.usage</code> and <code style="font-family:var(--mono);font-size:11px;">entry.message.model</code> from Claude Code session files. Prompt text, tool arguments, file contents, and response content are never accessed. Deduplication state is kept in a local file (<code style="font-family:var(--mono);font-size:11px;">~/.claude/cohrint-state.json</code>) that is never transmitted. The hook fires after the session ends — it cannot delay or affect Claude Code's operation.</div>
         <span class="control-tag">local file read · usage fields only · non-blocking · no prompt access</span>
       </div>
 
