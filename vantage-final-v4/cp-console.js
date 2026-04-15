@@ -145,6 +145,8 @@
     if (!items.length) {
       var errEl = document.getElementById('cp-donut-error');
       if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'No spend data for this period.'; }
+      var staleL = document.getElementById('cp-donut-legend');
+      if (staleL) staleL.textContent = '';
       return;
     }
 

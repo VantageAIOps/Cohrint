@@ -627,6 +627,8 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
   .topbar { flex-direction: column; gap: 8px; }
   .tool-tabs { padding: 8px 12px; }
   .dashboard { padding: 12px; }
+  .cp-charts-row { flex-direction: column !important; }
+  .cp-charts-row .card:last-child { align-items: center; }
 }
 
 /* Card insight tooltip */
@@ -1378,7 +1380,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
 
         <div id="cp-kpis" class="kpi-grid" style="margin-bottom:16px"></div>
 
-        <div style="display:flex;gap:16px;margin-bottom:16px;align-items:stretch">
+        <div class="cp-charts-row" style="display:flex;gap:16px;margin-bottom:16px;align-items:stretch">
           <div class="card" style="flex:3;min-width:0">
             <div class="card-title">Daily Spend by Tool</div>
             <div style="position:relative;height:220px;margin-top:8px"><canvas id="cp-trend-canvas"></canvas></div>
