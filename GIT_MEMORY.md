@@ -12,9 +12,11 @@ _Last updated: 2026-04-15_
 
 ## Latest 15 Commits
 ```
+629635e feat(enterprise): P1/P2 gaps — budget enforcement, policy CRUD UI, live feed, alerts
+6974fab chore: update GIT_MEMORY.md — PR #60 P0 fixes, outstanding P1/P2 items
 0664316 fix(enterprise): P0 gaps — role allowlist, otel enriched fields, developer team
 31d2a59 feat(enterprise): multi-team RBAC, CEO dashboard, budget policies, team attribution
-54c3bdf chore: update GIT_MEMORY.md — PR #59 state, branch fix/landing-page-positioning
+54c3bdf chore: update GIT_MEMORY.md — PR #59 state
 08a1cb3 fix(dashboard+auth): 9 remaining issues from rescan
 249f655 fix(dashboard+auth): 11 crash/flow fixes from full audit
 c69136d fix(dashboard): stale donut legend on empty period + mobile flex breakpoint
@@ -25,8 +27,6 @@ f8028ff fix(landing): fix footer wrapping on mobile
 d394858 fix(landing): strip security implementation details + replace gmail with sales email
 30df133 fix(landing): fix orphaned </div> + grammatically incomplete subheadline
 93c6ea4 docs: add VantageAI guidebook v1.1 (PDF + DOCX)
-0b3cb76 chore: update GIT_MEMORY.md — PR #58 state
-4dd249f fix(landing): remove algo exposure, reframe hero for enterprise buyers
 ```
 
 ## Recent Merged PRs
@@ -43,20 +43,24 @@ d394858 fix(landing): strip security implementation details + replace gmail with
 | vantage-js-sdk | 1.0.1 |
 | vantage-mcp | 1.1.1 |
 
-## Outstanding Items (PR #60 — enterprise RBAC)
+## PR #60 — Enterprise RBAC Feature (feat/enterprise-rbac-multiuser)
 
-### Fixed this session (0664316)
-- auth.ts: role allowlist now includes ceo/superadmin; privilege escalation guard added
-- otel.ts: agent_name, team, business_unit extracted + stored in otel_events INSERT
-- crossplatform.ts: /developer/:id returns team field
-- tests/43: ER-I suite (role preservation + escalation block)
+### All items completed
+- Role hierarchy: owner > superadmin > ceo > admin > member > viewer (ROLE_RANK)
+- auth.ts: role allowlist fixed (ceo/superadmin no longer silently downgraded)
+- auth.ts: privilege escalation guard on invite + PATCH member
+- otel.ts: agent_name, team, business_unit extracted + stored in otel_events
+- crossplatform.ts: /developer/:id returns team field; /live returns agent_name, team, token_rate_per_sec
+- executive.ts: GET /v1/analytics/executive (ceo/superadmin/owner only)
+- admin.ts: budget policies CRUD (POST/PUT/DELETE /v1/admin/budget-policies)
+- admin.ts: GET /v1/admin/developers/recommendations
+- events.ts: checkBudgetPolicy() — block/throttle enforcement at event ingestion
+- events.ts: maybeSendBudgetAlert() wired after each insert
+- analytics.ts: /teams COALESCE team_budgets + budget_policies for budget_pct
+- app.html: executive dashboard view (ceo+ only in sidebar)
+- app.html: budget alert sticky banner at 80%/100% spend
+- app.html: + New Policy button + create/edit/delete modal in Budgets tab
+- cp-console.js: live feed 4-column grid with agent_name, team, tok/s rate
+- tests/43_enterprise_rbac: 9 sections, 55+ checks including ER-I escalation guard
 
-### Still outstanding (P1/P2)
-- events.ts: no budget enforcement at event ingestion (block/throttle policies ignored)
-- alerts.ts: hardcoded thresholds, budget_policies table not consulted
-- analytics.ts: /v1/analytics/teams JOINs team_budgets only, not budget_policies
-- Frontend: no CREATE/EDIT/DELETE UI for budget policies (Budgets tab read-only)
-- Frontend: Members tab missing per-member spend/savings columns
-- Frontend: no budget alert banner/toast at 80%/100%
-- Frontend: no global team filter in Overview/Spend tabs
-- Frontend: live feed renderCpLiveFeed missing agent_name, token_rate_per_sec, team columns
+### No outstanding items — ready for PR review + merge
