@@ -712,12 +712,19 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
       </button>
     </div>
 
-    <div class="sidebar-section">
+    <div class="sidebar-section" id="sb-section-executive" style="display:none">
+      <div class="sidebar-label">Executive</div>
+      <button class="sb-item" id="sb-executive" onclick="nav('executive', this)">
+        <span class="icon">&#9881;</span> CEO Dashboard
+      </button>
+    </div>
+
+    <div class="sidebar-section" id="sb-section-team" style="display:none">
       <div class="sidebar-label">Team</div>
-      <button class="sb-item" onclick="nav('members', this)">
+      <button class="sb-item" id="sb-members" onclick="nav('members', this)">
         <span class="icon">&#9673;</span> Members
       </button>
-      <button class="sb-item" onclick="nav('budgets', this)">
+      <button class="sb-item" id="sb-budgets" onclick="nav('budgets', this)">
         <span class="icon">&#9680;</span> Budgets &amp; Alerts
       </button>
     </div>
@@ -727,7 +734,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
       <button class="sb-item" id="sb-settings" onclick="nav('settings', this)">
         <span class="icon">&#9881;</span> Settings
       </button>
-      <button class="sb-item" onclick="nav('security', this)">
+      <button class="sb-item" id="sb-security" onclick="nav('security', this)" style="display:none">
         <span class="icon">&#128274;</span> Security
       </button>
       <button class="sb-item" onclick="nav('integrations', this)">
@@ -1433,6 +1440,60 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
   </div>
 </div>
 
+<!-- ── Executive / CEO Dashboard view ──────────────────────────────────── -->
+<div id="view-executive" class="view">
+  <div class="view-content">
+    <div class="view-header">
+      <div class="view-title">CEO Dashboard</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span id="exec-role-badge" style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--accent);color:#000;font-weight:600"></span>
+        <select id="exec-period-select" onchange="loadExecutive()" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px">
+          <option value="7">7 days</option>
+          <option value="30" selected>30 days</option>
+          <option value="90">90 days</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Org KPIs -->
+    <div class="kpi-grid" id="exec-kpis" style="margin-bottom:16px">
+      <div class="kpi-card"><div class="kpi-label">MTD Spend</div><div class="kpi-value" id="exec-mtd">—</div><div class="kpi-sub" id="exec-mtd-sub"></div></div>
+      <div class="kpi-card"><div class="kpi-label">Org Budget Used</div><div class="kpi-value" id="exec-budget-pct">—</div><div class="kpi-sub" id="exec-budget-sub"></div></div>
+      <div class="kpi-card"><div class="kpi-label">Savings Opportunity</div><div class="kpi-value" id="exec-savings">—</div><div class="kpi-sub">est. with prompt tuning</div></div>
+      <div class="kpi-card"><div class="kpi-label">Period Spend</div><div class="kpi-value" id="exec-total">—</div><div class="kpi-sub" id="exec-total-sub"></div></div>
+    </div>
+
+    <!-- Team × Tool budget matrix -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">Budget by Team &times; Tool</div>
+      <div id="exec-team-matrix" style="overflow-x:auto"></div>
+    </div>
+
+    <!-- Provider breakdown + Top developers side by side -->
+    <div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap">
+      <div class="card" style="flex:1;min-width:260px">
+        <div class="card-title">Spend by Provider</div>
+        <div id="exec-provider-list"></div>
+      </div>
+      <div class="card" style="flex:2;min-width:300px">
+        <div class="card-title">Top Individual Spenders</div>
+        <div id="exec-top-devs"></div>
+      </div>
+    </div>
+
+    <!-- Budget policy compliance -->
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="card-title" style="margin-bottom:0">Budget Policy Compliance</div>
+        <button class="btn-outline" onclick="nav('budgets', document.getElementById('sb-budgets'))" style="font-size:11px;padding:4px 10px">Manage Policies</button>
+      </div>
+      <div id="exec-policies"></div>
+    </div>
+
+    <div id="exec-error" class="card-error" style="margin-top:8px"></div>
+  </div>
+</div>
+
 <!-- ── Developer detail modal ──────────────────────────────────────────── -->
 <div id="devDetailModal" class="modal-overlay" role="dialog" aria-modal="true">
   <div class="modal" style="max-width:600px;width:100%">
@@ -1756,6 +1817,36 @@ function populateUserFromSession(s) {
       banner.style.display = 'block';
     }
   }
+
+  // Role-based UI gating
+  applyRoleUI(s.role || user.role || 'member');
+}
+
+// Role hierarchy (mirrors backend ROLE_RANK)
+var _ROLE_RANK = { viewer: 0, member: 1, admin: 2, ceo: 3, superadmin: 4, owner: 5 };
+function hasRole(role, minimum) {
+  return (_ROLE_RANK[role] || 0) >= (_ROLE_RANK[minimum] || 0);
+}
+
+function applyRoleUI(role) {
+  var isAdmin = hasRole(role, 'admin');
+  var isExec  = hasRole(role, 'ceo');
+
+  // Team section (Members + Budgets): admin+ only
+  var teamSection = document.getElementById('sb-section-team');
+  if (teamSection) teamSection.style.display = isAdmin ? '' : 'none';
+
+  // Security tab: admin+ only
+  var secBtn = document.getElementById('sb-security');
+  if (secBtn) secBtn.style.display = isAdmin ? '' : 'none';
+
+  // Executive section: ceo/superadmin/owner only
+  var execSection = document.getElementById('sb-section-executive');
+  if (execSection) execSection.style.display = isExec ? '' : 'none';
+
+  // Role badge on executive view
+  var roleBadge = document.getElementById('exec-role-badge');
+  if (roleBadge) roleBadge.textContent = role.toUpperCase();
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1808,6 +1899,7 @@ function loadViewData(view) {
     case 'security':      loadAuditLog(); break;
     case 'integrations':  loadIntegrations(); break;
     case 'account': loadAccount(); break;
+    case 'executive': loadExecutive(); break;
   }
 }
 
@@ -3647,6 +3739,211 @@ function loadAccount() {
       document.getElementById('accountUsageFill').style.width = Math.min(100, (used / limit * 100)).toFixed(0) + '%';
     }
   });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Developer Detail Modal
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function showDeveloperDetail(devId, devEmail) {
+  if (!devId) return;
+  var title = document.getElementById('devDetailTitle');
+  var body  = document.getElementById('devDetailBody');
+  if (title) title.textContent = devEmail || devId;
+  if (body)  body.innerHTML = '<div style="opacity:.6;padding:24px 0;text-align:center">Loading...</div>';
+  document.getElementById('devDetailModal').classList.add('active');
+
+  var days = period || 30;
+  apiFetch('/v1/cross-platform/developer/' + devId + '?days=' + days)
+    .catch(function() { return null; })
+    .then(function(d) {
+      if (!d) {
+        if (body) body.innerHTML = '<div style="opacity:.5;padding:16px">Failed to load developer data.</div>';
+        return;
+      }
+      var html = '';
+
+      // Provider breakdown
+      if (d.by_provider && d.by_provider.length) {
+        html += '<div style="margin-bottom:16px"><div style="font-size:11px;opacity:.5;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Cost by Provider</div>';
+        d.by_provider.forEach(function(p) {
+          html += '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">'
+                + '<span>' + esc(p.provider) + '</span>'
+                + '<span style="font-weight:600">$' + fmtCost(p.cost) + '</span>'
+                + '</div>';
+        });
+        html += '</div>';
+      }
+
+      // Productivity
+      var pr = d.productivity;
+      if (pr) {
+        html += '<div style="margin-bottom:16px"><div style="font-size:11px;opacity:.5;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Productivity</div>';
+        html += '<div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);gap:8px">';
+        html += '<div class="kpi-card" style="padding:8px 10px"><div class="kpi-label">Commits</div><div class="kpi-value" style="font-size:18px">' + (pr.commits || 0) + '</div></div>';
+        html += '<div class="kpi-card" style="padding:8px 10px"><div class="kpi-label">PRs Merged</div><div class="kpi-value" style="font-size:18px">' + (pr.pull_requests || 0) + '</div></div>';
+        html += '<div class="kpi-card" style="padding:8px 10px"><div class="kpi-label">Lines Changed</div><div class="kpi-value" style="font-size:18px">' + fmtNum((pr.lines_added || 0) + (pr.lines_removed || 0)) + '</div></div>';
+        html += '</div></div>';
+      }
+
+      // Top models
+      if (d.by_model && d.by_model.length) {
+        html += '<div style="margin-bottom:16px"><div style="font-size:11px;opacity:.5;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Top Models</div>';
+        d.by_model.slice(0, 5).forEach(function(m) {
+          html += '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">'
+                + '<span style="font-size:12px">' + esc(m.model) + '</span>'
+                + '<span style="font-weight:600;font-size:12px">$' + fmtCost(m.cost) + '</span>'
+                + '</div>';
+        });
+        html += '</div>';
+      }
+
+      if (!html) html = '<div style="opacity:.5;padding:16px;text-align:center">No data for this period.</div>';
+      if (body) body.innerHTML = html;
+    });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Executive (CEO) Dashboard
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function loadExecutive() {
+  var days = parseInt(document.getElementById('exec-period-select')?.value || '30', 10);
+  var errEl = document.getElementById('exec-error');
+  if (errEl) errEl.textContent = '';
+
+  apiFetch('/v1/analytics/executive?days=' + days)
+    .catch(function() { return null; })
+    .then(function(d) {
+      if (!d) {
+        if (errEl) errEl.textContent = 'Failed to load executive data. Ensure your account has CEO or superadmin role.';
+        return;
+      }
+
+      // Org KPIs
+      var setText = function(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
+      setText('exec-mtd',        '$' + fmtCost(d.org.mtd_cost_usd));
+      setText('exec-mtd-sub',    d.org.name || '');
+      setText('exec-budget-pct', d.org.budget_pct !== null ? d.org.budget_pct + '%' : 'No budget set');
+      setText('exec-budget-sub', d.org.budget_usd > 0 ? 'of $' + fmtCost(d.org.budget_usd) + ' limit' : '');
+      setText('exec-savings',    '$' + fmtCost(d.totals.savings_opportunity_usd));
+      setText('exec-total',      '$' + fmtCost(d.totals.total_cost_usd));
+      setText('exec-total-sub',  fmtNum(d.totals.total_records) + ' records');
+
+      // Team × Provider matrix
+      var matrixEl = document.getElementById('exec-team-matrix');
+      if (matrixEl && d.by_team && d.by_team.length) {
+        // Collect all providers across all teams
+        var providers = [];
+        d.by_team.forEach(function(t) {
+          (t.by_provider || []).forEach(function(p) {
+            if (!providers.includes(p.provider)) providers.push(p.provider);
+          });
+        });
+        providers.sort();
+
+        var tbl = '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+        tbl += '<thead><tr><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)">Team</th>';
+        providers.forEach(function(p) {
+          tbl += '<th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--border)">' + esc(p) + '</th>';
+        });
+        tbl += '<th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--border)">Total</th>';
+        tbl += '<th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--border)">Budget</th>';
+        tbl += '<th style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--border)">Used%</th>';
+        tbl += '</tr></thead><tbody>';
+
+        d.by_team.forEach(function(t) {
+          var provMap = {};
+          (t.by_provider || []).forEach(function(p) { provMap[p.provider] = p.cost; });
+          var pct = t.budget_pct;
+          var pctColor = pct >= 90 ? '#f87171' : pct >= 70 ? '#fbbf24' : '#4ade80';
+
+          tbl += '<tr>';
+          tbl += '<td style="padding:6px 8px;border-bottom:1px solid var(--border);font-weight:500">' + esc(t.team) + '</td>';
+          providers.forEach(function(p) {
+            var c = provMap[p];
+            tbl += '<td style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--border)">' + (c ? '$' + fmtCost(c) : '—') + '</td>';
+          });
+          tbl += '<td style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--border);font-weight:600">$' + fmtCost(t.cost) + '</td>';
+          tbl += '<td style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--border)">' + (t.budget_usd > 0 ? '$' + fmtCost(t.budget_usd) : '—') + '</td>';
+          tbl += '<td style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--border);color:' + (pct !== null ? pctColor : 'inherit') + '">' + (pct !== null ? pct + '%' : '—') + '</td>';
+          tbl += '</tr>';
+        });
+        tbl += '</tbody></table>';
+        matrixEl.innerHTML = tbl;
+      } else if (matrixEl) {
+        matrixEl.innerHTML = '<div style="opacity:.5;padding:16px;text-align:center">No team data available. Tag events with team names to see breakdown.</div>';
+      }
+
+      // Provider list
+      var provEl = document.getElementById('exec-provider-list');
+      if (provEl && d.by_provider && d.by_provider.length) {
+        var total = d.totals.total_cost_usd || 1;
+        provEl.innerHTML = d.by_provider.map(function(p) {
+          var pct = Math.round((p.cost / total) * 100);
+          return '<div style="margin-bottom:10px">'
+            + '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">'
+            + '<span>' + esc(p.provider) + '</span><span>$' + fmtCost(p.cost) + ' (' + pct + '%)</span></div>'
+            + '<div style="background:var(--border);border-radius:4px;height:6px">'
+            + '<div style="background:var(--accent);border-radius:4px;height:6px;width:' + pct + '%"></div>'
+            + '</div></div>';
+        }).join('');
+      }
+
+      // Top developers
+      var devEl = document.getElementById('exec-top-devs');
+      if (devEl && d.top_developers && d.top_developers.length) {
+        var tbl2 = '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+        tbl2 += '<thead><tr>'
+          + '<th style="text-align:left;padding:4px 6px;border-bottom:1px solid var(--border)">Developer</th>'
+          + '<th style="text-align:left;padding:4px 6px;border-bottom:1px solid var(--border)">Team</th>'
+          + '<th style="text-align:right;padding:4px 6px;border-bottom:1px solid var(--border)">Cost</th>'
+          + '<th style="text-align:right;padding:4px 6px;border-bottom:1px solid var(--border)">PRs</th>'
+          + '<th style="text-align:right;padding:4px 6px;border-bottom:1px solid var(--border)">$/PR</th>'
+          + '</tr></thead><tbody>';
+        d.top_developers.forEach(function(dev) {
+          tbl2 += '<tr>'
+            + '<td style="padding:4px 6px;border-bottom:1px solid var(--border)">' + esc(dev.developer_email) + '</td>'
+            + '<td style="padding:4px 6px;border-bottom:1px solid var(--border);opacity:.6">' + esc(dev.team || '—') + '</td>'
+            + '<td style="text-align:right;padding:4px 6px;border-bottom:1px solid var(--border);font-weight:600">$' + fmtCost(dev.cost) + '</td>'
+            + '<td style="text-align:right;padding:4px 6px;border-bottom:1px solid var(--border)">' + (dev.pull_requests || 0) + '</td>'
+            + '<td style="text-align:right;padding:4px 6px;border-bottom:1px solid var(--border)">' + (dev.cost_per_pr ? '$' + fmtCost(dev.cost_per_pr) : '—') + '</td>'
+            + '</tr>';
+        });
+        tbl2 += '</tbody></table>';
+        devEl.innerHTML = tbl2;
+      }
+
+      // Budget policy compliance
+      var polEl = document.getElementById('exec-policies');
+      if (polEl && d.budget_policies && d.budget_policies.length) {
+        var rows = d.budget_policies.map(function(p) {
+          var color = (p.budget_pct >= 90) ? '#f87171' : (p.budget_pct >= 70) ? '#fbbf24' : '#4ade80';
+          var label = p.scope === 'org' ? 'Org-wide'
+                    : p.scope === 'team' ? 'Team: ' + p.scope_target
+                    : p.scope === 'developer' ? 'Dev: ' + p.scope_target
+                    : p.scope === 'provider' ? 'Provider: ' + p.scope_target
+                    : p.scope + ': ' + p.scope_target;
+          return '<tr>'
+            + '<td style="padding:5px 8px;border-bottom:1px solid var(--border)">' + esc(label) + '</td>'
+            + '<td style="text-align:right;padding:5px 8px;border-bottom:1px solid var(--border)">$' + fmtCost(p.monthly_limit_usd) + '/mo</td>'
+            + '<td style="text-align:right;padding:5px 8px;border-bottom:1px solid var(--border)">$' + fmtCost(p.mtd_spend_usd) + '</td>'
+            + '<td style="text-align:right;padding:5px 8px;border-bottom:1px solid var(--border);color:' + (p.budget_pct !== null ? color : 'inherit') + '">' + (p.budget_pct !== null ? p.budget_pct + '%' : '—') + '</td>'
+            + '<td style="padding:5px 8px;border-bottom:1px solid var(--border);font-size:11px;opacity:.6">' + (p.enforcement || 'alert') + '</td>'
+            + '</tr>';
+        }).join('');
+        polEl.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:12px">'
+          + '<thead><tr>'
+          + '<th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border)">Scope</th>'
+          + '<th style="text-align:right;padding:5px 8px;border-bottom:1px solid var(--border)">Limit</th>'
+          + '<th style="text-align:right;padding:5px 8px;border-bottom:1px solid var(--border)">MTD Spend</th>'
+          + '<th style="text-align:right;padding:5px 8px;border-bottom:1px solid var(--border)">Used</th>'
+          + '<th style="padding:5px 8px;border-bottom:1px solid var(--border)">Mode</th>'
+          + '</tr></thead><tbody>' + rows + '</tbody></table>';
+      } else if (polEl) {
+        polEl.innerHTML = '<div style="opacity:.5;padding:12px;text-align:center">No budget policies configured. <a href="#" onclick="nav(\'budgets\', document.getElementById(\'sb-budgets\'))">Add policies</a></div>';
+      }
+    });
 }
 
 var _apiKeyVisible = false;

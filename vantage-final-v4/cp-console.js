@@ -277,7 +277,7 @@
 
     var thead = table.createTHead();
     var hrow  = thead.insertRow();
-    ['Developer', 'Tools', 'Spend', 'Commits', '$/commit'].forEach(function (h) {
+    ['Developer', 'Team', 'Tools', 'Spend', 'Commits', '$/commit'].forEach(function (h) {
       var th = document.createElement('th');
       th.textContent = h;
       th.style.cssText = 'padding:4px 6px;text-align:left;font-size:10px;opacity:.5;font-weight:500;border-bottom:1px solid rgba(255,255,255,.08)';
@@ -291,6 +291,7 @@
       if (hasId) {
         row.dataset.devId    = d.developer_id;
         row.dataset.devEmail = d.developer_email || '';
+        row.dataset.devTeam  = d.team || '';
         row.className = 'cp-dev-row';
         row.style.cursor = 'pointer';
       } else {
@@ -301,6 +302,10 @@
       var emailTd = row.insertCell();
       emailTd.textContent = d.developer_email || d.developer_id || '—';
       emailTd.style.cssText = 'padding:7px 6px;font-size:12px';
+
+      var teamTd = row.insertCell();
+      teamTd.textContent = d.team || '—';
+      teamTd.style.cssText = 'padding:7px 6px;font-size:11px;opacity:.5';
 
       var toolsTd = row.insertCell();
       toolsTd.style.cssText = 'padding:7px 6px';
@@ -329,23 +334,24 @@
 
     el.querySelectorAll('.cp-dev-row').forEach(function (row) {
       row.addEventListener('click', function () {
-        openDevModal(row.dataset.devId, row.dataset.devEmail);
+        openDevModal(row.dataset.devId, row.dataset.devEmail, row.dataset.devTeam);
       });
     });
   }
 
   // ── Developer detail modal ────────────────────────────────────────────────
-  function openDevModal(devId, devEmail) {
+  function openDevModal(devId, devEmail, devTeam) {
     var modal = document.getElementById('devDetailModal');
     var title = document.getElementById('devDetailTitle');
     var body  = document.getElementById('devDetailBody');
     if (!modal || !title || !body) return;
 
-    title.textContent = devEmail || devId;
+    title.textContent = (devEmail || devId) + (devTeam ? ' (' + devTeam + ')' : '');
     body.textContent  = 'Loading\u2026';
     modal.classList.add('active');
 
-    apiFetch('/v1/cross-platform/developer/' + encodeURIComponent(devId))
+    var days = (typeof period !== 'undefined' ? period : 30);
+    apiFetch('/v1/cross-platform/developer/' + encodeURIComponent(devId) + '?days=' + days)
       .then(function (data) { renderDevModalBody(body, data); })
       .catch(function (e) {
         body.textContent = '\u26A0 ' + (e.message || 'Failed to load');
