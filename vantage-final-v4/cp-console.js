@@ -163,12 +163,35 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        cutout: '62%',
+        cutout: '65%',
         plugins: {
-          legend: { position: 'bottom', labels: { color: '#9ca3af', boxWidth: 10, padding: 14, font: { size: 10 } } },
-          tooltip: { callbacks: { label: function (ctx) { return ' $' + ctx.parsed.toFixed(2); } } },
+          legend: { display: false },
+          tooltip: { callbacks: { label: function (ctx) { return ctx.label + ': $' + ctx.parsed.toFixed(2); } } },
         },
       },
+    });
+
+    // Render compact legend below the canvas
+    var legendEl = document.getElementById('cp-donut-legend');
+    if (!legendEl) {
+      legendEl = document.createElement('div');
+      legendEl.id = 'cp-donut-legend';
+      canvas.parentElement.insertAdjacentElement('afterend', legendEl);
+    }
+    legendEl.textContent = '';
+    legendEl.style.cssText = 'display:flex;flex-wrap:wrap;justify-content:center;gap:8px 14px;margin-top:10px;width:100%';
+    var total = items.reduce(function (s, p) { return s + (p.cost || 0); }, 0);
+    items.forEach(function (p) {
+      var pct = total > 0 ? Math.round(p.cost / total * 100) : 0;
+      var item = document.createElement('div');
+      item.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:10px;color:#9ca3af';
+      var dot = document.createElement('span');
+      dot.style.cssText = 'width:8px;height:8px;border-radius:50%;background:' + pc(p.provider) + ';flex-shrink:0';
+      var lbl = document.createElement('span');
+      lbl.textContent = p.provider + ' ' + pct + '%';
+      item.appendChild(dot);
+      item.appendChild(lbl);
+      legendEl.appendChild(item);
     });
   }
 
