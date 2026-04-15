@@ -13,6 +13,7 @@ CREATE TABLE org_members_new (
   api_key_hint  TEXT,
   scope_team    TEXT,
   created_at    INTEGER NOT NULL DEFAULT (unixepoch()),
+  last_used_at  INTEGER DEFAULT NULL,
   UNIQUE(org_id, email)
 );
 
