@@ -174,7 +174,7 @@ pre{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;pad
 <body>
 
 <nav>
-  <a href="/" class="nav-logo"><span class="logo-dot"></span>VANTAGE</a>
+  <a href="/" class="nav-logo"><span class="logo-dot"></span>COHRINT</a>
   <div class="nav-links">
     <a href="/calculator.html">Calculator</a>
     <a href="/app.html">Dashboard</a>
@@ -235,7 +235,7 @@ pre{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;pad
 
     <div class="docs-nav-group">
       <div class="docs-nav-sec" onclick="toggleNavGroup(this)">CLI</div>
-      <a class="docs-nav-item" onclick="show('vantage-cli',this)">Cohrint Agent</a>
+      <a class="docs-nav-item" onclick="show('cohrint-cli',this)">Cohrint Agent</a>
     </div>
 
     <div class="docs-nav-group">
@@ -278,10 +278,10 @@ quickstart: `
 <div class="tab-row"><div class="tab active" onclick="switchTab('qs',this,'qs-py')">Python</div><div class="tab" onclick="switchTab('qs',this,'qs-ts')">TypeScript</div></div>
 <div id="qs-py" class="tab-content active"><pre>pip install cohrint
 
-<span class="c-kw">import</span> cohrint <span class="c-kw">as</span> vantage
+<span class="c-kw">import</span> cohrint <span class="c-kw">as</span> cohrint
 <span class="c-kw">from</span> cohrint.proxy.openai_proxy <span class="c-kw">import</span> OpenAI
 
-vantage.<span class="c-fn">init</span>(api_key=<span class="c-str">"crt_your_key"</span>)
+cohrint.<span class="c-fn">init</span>(api_key=<span class="c-str">"crt_your_key"</span>)
 client = OpenAI(api_key=<span class="c-str">"sk-..."</span>)
 
 <span class="c-cm"># Every call is now tracked automatically</span>
@@ -313,19 +313,19 @@ response = client.chat.completions.<span class="c-fn">create</span>(
 <h2>Path 3 — Python Agent CLI (terminal users)</h2>
 <p>Best for: developers who use AI CLIs directly and want prompt optimization + cost tracking.</p>
 <pre><span class="c-cm"># Install and run</span>
-<span class="c-kw">$</span> pip install vantageai-agent
-<span class="c-kw">$</span> vantageai-agent
+<span class="c-kw">$</span> pip install cohrint-agent
+<span class="c-kw">$</span> cohrint-agent
 
 <span class="c-cm"># Or one-shot usage</span>
-<span class="c-kw">$</span> echo <span class="c-str">"explain kubernetes"</span> | vantageai-agent --backend claude
+<span class="c-kw">$</span> echo <span class="c-str">"explain kubernetes"</span> | cohrint-agent --backend claude
 
 <span class="c-cm">  ⚡ Optimized: 8 → 6 tokens (saved 2, -25%)</span>
 <span class="c-cm">  [Claude responds...]</span>
 <span class="c-cm">  💰 Cost: $0.0065 | 💾 Saved: 2 tokens</span>
 
 <span class="c-cm"># Switch backends with flags</span>
-vantageai-agent --backend gemini
-vantageai-agent --backend openai --model gpt-4o
+cohrint-agent --backend gemini
+cohrint-agent --backend openai --model gpt-4o
 <span class="c-cm"># In the REPL: /model, /summary, /sessions, /optimize</span></pre>
 
 <div class="info-box">💡 All three paths send data to the same dashboard. Mix and match — use SDK for your API, OTel for your team's coding tools, CLI for your terminal.</div>
@@ -341,8 +341,8 @@ install: `
 <tr><td><code>cohrint</code></td><td><code>pip install cohrint</code></td><td>Python SDK — wrap OpenAI/Anthropic clients</td></tr>
 <tr><td><code>cohrint</code></td><td><code>npm install cohrint</code></td><td>TypeScript/JS SDK — wrap any LLM client</td></tr>
 <tr><td><code>cohrint-mcp</code></td><td><code>npx -y cohrint-mcp</code></td><td>MCP server for Claude Code, Codex CLI, Gemini CLI</td></tr>
-<tr><td><code>vantageai-agent</code></td><td><code>pip install vantageai-agent</code></td><td>Python CLI agent — interactive REPL with cost tracking + optimization</td></tr>
-<tr><td><code>vantageai-local-proxy</code></td><td><code>npx vantageai-local-proxy</code></td><td>Local privacy proxy — zero-trust tracking</td></tr>
+<tr><td><code>cohrint-agent</code></td><td><code>pip install cohrint-agent</code></td><td>Python CLI agent — interactive REPL with cost tracking + optimization</td></tr>
+<tr><td><code>cohrint-local-proxy</code></td><td><code>npx cohrint-local-proxy</code></td><td>Local privacy proxy — zero-trust tracking</td></tr>
 </tbody>
 </table>
 
@@ -394,7 +394,7 @@ concepts: `
 │ Codex CLI    │──OTel──────────────▸│  /v1/otel    │
 │ Gemini CLI   │──OTel──────────────▸│              │
 │ Your API app │──SDK───────────────▸│  /v1/events  │──▸ Dashboard
-│ vantage CLI  │──tracking──────────▸│              │
+│ cohrint CLI  │──tracking──────────▸│              │
 │ Local Proxy  │──stats─────────────▸│              │
 └──────────────┘                    └──────────────┘
                                      Billing APIs ──▸ /v1/cross-platform/connections</pre>
@@ -444,10 +444,10 @@ concepts: `
 python: `
 <h1>Python SDK</h1>
 <h2>OpenAI proxy</h2>
-<pre><span class="c-keyword">import</span> cohrint <span class="c-keyword">as</span> vantage
+<pre><span class="c-keyword">import</span> cohrint <span class="c-keyword">as</span> cohrint
 <span class="c-keyword">from</span> cohrint.proxy.openai_proxy <span class="c-keyword">import</span> <span class="c-var">OpenAI</span>
 
-vantage.<span class="c-func">init</span>(<span class="c-var">api_key</span>=<span class="c-string">"crt_your_key"</span>, <span class="c-var">environment</span>=<span class="c-string">"production"</span>)
+cohrint.<span class="c-func">init</span>(<span class="c-var">api_key</span>=<span class="c-string">"crt_your_key"</span>, <span class="c-var">environment</span>=<span class="c-string">"production"</span>)
 client = <span class="c-var">OpenAI</span>(<span class="c-var">api_key</span>=<span class="c-string">"sk-..."</span>)
 
 <span class="c-comment"># Non-streaming</span>
@@ -472,7 +472,7 @@ message = claude.messages.<span class="c-func">create</span>(
 
 <h2>init() options</h2>
 <table class="api-table"><thead><tr><th>Parameter</th><th>Default</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>api_key</code></td><td>required</td><td>Your Vantage API key (crt_…)</td></tr>
+<tr><td><code>api_key</code></td><td>required</td><td>Your Cohrint API key (crt_…)</td></tr>
 <tr><td><code>environment</code></td><td>"production"</td><td>Tag events: production | staging | development</td></tr>
 <tr><td><code>flush_interval</code></td><td>2.0</td><td>Seconds between background flushes</td></tr>
 <tr><td><code>batch_size</code></td><td>50</td><td>Max events per HTTP request</td></tr>
@@ -490,14 +490,14 @@ npm install openai               <span class="c-comment"># if using OpenAI proxy
 npm install @anthropic-ai/sdk    <span class="c-comment"># if using Anthropic proxy</span></pre>
 
 <h2>Quickstart — OpenAI</h2>
-<pre><span class="c-keyword">import</span> * <span class="c-keyword">as</span> <span class="c-var">vantage</span> <span class="c-keyword">from</span> <span class="c-string">"cohrint"</span>;
+<pre><span class="c-keyword">import</span> * <span class="c-keyword">as</span> <span class="c-var">cohrint</span> <span class="c-keyword">from</span> <span class="c-string">"cohrint"</span>;
 <span class="c-keyword">import</span> <span class="c-var">OpenAI</span> <span class="c-keyword">from</span> <span class="c-string">"openai"</span>;
 
 <span class="c-comment">// 1. Initialise once at app startup</span>
-<span class="c-var">vantage</span>.<span class="c-func">init</span>({ <span class="c-var">apiKey</span>: process.env.<span class="c-var">VANTAGE_API_KEY</span>! });
+<span class="c-var">cohrint</span>.<span class="c-func">init</span>({ <span class="c-var">apiKey</span>: process.env.<span class="c-var">COHRINT_API_KEY</span>! });
 
 <span class="c-comment">// 2. Wrap your existing client — no other changes</span>
-<span class="c-keyword">const</span> openai = <span class="c-var">vantage</span>.<span class="c-func">createOpenAIProxy</span>(<span class="c-keyword">new</span> <span class="c-var">OpenAI</span>(), <span class="c-var">vantage</span>.<span class="c-func">getClient</span>());
+<span class="c-keyword">const</span> openai = <span class="c-var">cohrint</span>.<span class="c-func">createOpenAIProxy</span>(<span class="c-keyword">new</span> <span class="c-var">OpenAI</span>(), <span class="c-var">cohrint</span>.<span class="c-func">getClient</span>());
 
 <span class="c-comment">// 3. Use exactly as before</span>
 <span class="c-keyword">const</span> res = <span class="c-keyword">await</span> openai.chat.completions.<span class="c-func">create</span>({
@@ -508,11 +508,11 @@ npm install @anthropic-ai/sdk    <span class="c-comment"># if using Anthropic pr
 // ✓ Cheapest alternative: gemini-2.0-flash — save 94%</span></pre>
 
 <h2>Quickstart — Anthropic</h2>
-<pre><span class="c-keyword">import</span> * <span class="c-keyword">as</span> <span class="c-var">vantage</span> <span class="c-keyword">from</span> <span class="c-string">"cohrint"</span>;
+<pre><span class="c-keyword">import</span> * <span class="c-keyword">as</span> <span class="c-var">cohrint</span> <span class="c-keyword">from</span> <span class="c-string">"cohrint"</span>;
 <span class="c-keyword">import</span> <span class="c-var">Anthropic</span> <span class="c-keyword">from</span> <span class="c-string">"@anthropic-ai/sdk"</span>;
 
-<span class="c-var">vantage</span>.<span class="c-func">init</span>({ <span class="c-var">apiKey</span>: process.env.<span class="c-var">VANTAGE_API_KEY</span>! });
-<span class="c-keyword">const</span> claude = <span class="c-var">vantage</span>.<span class="c-func">createAnthropicProxy</span>(<span class="c-keyword">new</span> <span class="c-var">Anthropic</span>(), <span class="c-var">vantage</span>.<span class="c-func">getClient</span>());
+<span class="c-var">cohrint</span>.<span class="c-func">init</span>({ <span class="c-var">apiKey</span>: process.env.<span class="c-var">COHRINT_API_KEY</span>! });
+<span class="c-keyword">const</span> claude = <span class="c-var">cohrint</span>.<span class="c-func">createAnthropicProxy</span>(<span class="c-keyword">new</span> <span class="c-var">Anthropic</span>(), <span class="c-var">cohrint</span>.<span class="c-func">getClient</span>());
 
 <span class="c-keyword">const</span> msg = <span class="c-keyword">await</span> claude.messages.<span class="c-func">create</span>({
   <span class="c-var">model</span>: <span class="c-string">"claude-sonnet-4-6"</span>,
@@ -588,7 +588,7 @@ process.<span class="c-func">on</span>(<span class="c-string">"SIGTERM"</span>, 
 
 mcp: `
 <h1>MCP Server</h1>
-<p>The Vantage MCP server connects any MCP-compatible AI coding assistant to your live usage data. Once connected, you can ask your AI questions about costs directly in chat — no copy-pasting needed.</p>
+<p>The Cohrint MCP server connects any MCP-compatible AI coding assistant to your live usage data. Once connected, you can ask your AI questions about costs directly in chat — no copy-pasting needed.</p>
 
 <h2>No install required</h2>
 <p>All editors use <code>npx</code>. The server runs on-demand from the npm registry:</p>
@@ -617,11 +617,11 @@ mcp: `
 <div class="step-row"><div class="step-num">3</div><div class="step-body">Add the Cohrint server (create the file if it doesn't exist):</div></div>
 <pre>{
   <span class="c-string">"mcpServers"</span>: {
-    <span class="c-string">"vantage"</span>: {
+    <span class="c-string">"cohrint"</span>: {
       <span class="c-string">"command"</span>: <span class="c-string">"npx"</span>,
       <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"cohrint-mcp"</span>],
       <span class="c-string">"env"</span>: {
-        <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"crt_your_key_here"</span>
+        <span class="c-string">"COHRINT_API_KEY"</span>: <span class="c-string">"crt_your_key_here"</span>
       }
     }
   }
@@ -630,9 +630,9 @@ mcp: `
 
 <h2>Environment variables</h2>
 <table class="api-table"><thead><tr><th>Variable</th><th>Required</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>VANTAGE_API_KEY</code></td><td>Yes</td><td>Your <code>crt_...</code> API key from signup</td></tr>
-<tr><td><code>VANTAGE_ORG</code></td><td>No</td><td>Org ID override (auto-parsed from key)</td></tr>
-<tr><td><code>VANTAGE_API_BASE</code></td><td>No</td><td>Custom API base (default: <code>https://api.cohrint.com</code>)</td></tr>
+<tr><td><code>COHRINT_API_KEY</code></td><td>Yes</td><td>Your <code>crt_...</code> API key from signup</td></tr>
+<tr><td><code>COHRINT_ORG</code></td><td>No</td><td>Org ID override (auto-parsed from key)</td></tr>
+<tr><td><code>COHRINT_API_BASE</code></td><td>No</td><td>Custom API base (default: <code>https://api.cohrint.com</code>)</td></tr>
 </tbody></table>
 
 <h2>Example prompts</h2>
@@ -660,7 +660,7 @@ mcp: `
 </div>
 <div class="warn-box" style="margin-top:8px">
 <strong>Tools fail with auth error?</strong><br>
-Make sure your <code>VANTAGE_API_KEY</code> is correct and starts with <code>crt_</code>. Get a new key at <a href="/signup.html">signup</a> if needed.
+Make sure your <code>COHRINT_API_KEY</code> is correct and starts with <code>crt_</code>. Get a new key at <a href="/signup.html">signup</a> if needed.
 </div>
 <div class="doc-section" style="margin-top:24px;padding:16px;background:var(--bg2);border:1px solid var(--border);border-radius:8px">
   <strong>Other MCP-compatible editors</strong>
@@ -680,7 +680,7 @@ claudecode: `
 <h2>Automatic tracking via Stop hook</h2>
 <p>Reads Claude Code's local session files and uploads token usage after every response. <strong>Zero code changes required.</strong></p>
 
-<div class="step-row"><div class="step-num">1</div><div class="step-body">Create <code>~/.claude/hooks/vantage-track.js</code> — <a href="https://github.com/Amanjain98/Cohrint/blob/main/.claude/hooks/vantage-track.js" style="color:var(--accent)">get the script from GitHub</a> or copy from ADMIN_GUIDE §23.4</div></div>
+<div class="step-row"><div class="step-num">1</div><div class="step-body">Create <code>~/.claude/hooks/cohrint-track.js</code> — <a href="https://github.com/Amanjain98/Cohrint/blob/main/.claude/hooks/cohrint-track.js" style="color:var(--accent)">get the script from GitHub</a> or copy from ADMIN_GUIDE §23.4</div></div>
 
 <div class="step-row"><div class="step-num">2</div><div class="step-body">Register it as a Stop hook in <code>~/.claude/settings.json</code></div></div>
 <pre>{
@@ -689,7 +689,7 @@ claudecode: `
       <span class="c-string">"matcher"</span>: <span class="c-string">""</span>,
       <span class="c-string">"hooks"</span>: [{
         <span class="c-string">"type"</span>: <span class="c-string">"command"</span>,
-        <span class="c-string">"command"</span>: <span class="c-string">"VANTAGE_API_KEY=crt_your_key node ~/.claude/hooks/vantage-track.js"</span>
+        <span class="c-string">"command"</span>: <span class="c-string">"COHRINT_API_KEY=crt_your_key node ~/.claude/hooks/cohrint-track.js"</span>
       }]
     }]
   }
@@ -697,7 +697,7 @@ claudecode: `
 
 <div class="step-row"><div class="step-num">3</div><div class="step-body">Backfill all historical sessions (one-time)</div></div>
 <pre><span class="c-comment"># Upload all past Claude Code sessions — safe to run multiple times</span>
-VANTAGE_API_KEY=<span class="c-string">crt_your_key</span> npx vantageai-local-proxy scan --tool claude-code --push</pre>
+COHRINT_API_KEY=<span class="c-string">crt_your_key</span> npx cohrint-local-proxy scan --tool claude-code --push</pre>
 
 <div class="info-box">✅ <strong style="color:var(--text)">Privacy.</strong> Claude Code writes sessions to <code>~/.claude/projects/*/uuid.jsonl</code>. The hook reads these files locally and uploads only token counts + model name + calculated cost. Prompt text and responses never leave your machine.</div>
 
@@ -719,11 +719,11 @@ VANTAGE_API_KEY=<span class="c-string">crt_your_key</span> npx vantageai-local-p
 <p>Create <code>.mcp.json</code> in your project root:</p>
 <pre>{
   <span class="c-string">"mcpServers"</span>: {
-    <span class="c-string">"vantage"</span>: {
+    <span class="c-string">"cohrint"</span>: {
       <span class="c-string">"type"</span>: <span class="c-string">"stdio"</span>,
       <span class="c-string">"command"</span>: <span class="c-string">"npx"</span>,
       <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"cohrint-mcp"</span>],
-      <span class="c-string">"env"</span>: { <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"crt_your_key"</span> }
+      <span class="c-string">"env"</span>: { <span class="c-string">"COHRINT_API_KEY"</span>: <span class="c-string">"crt_your_key"</span> }
     }
   }
 }</pre>
@@ -732,17 +732,17 @@ VANTAGE_API_KEY=<span class="c-string">crt_your_key</span> npx vantageai-local-p
 <p>Add to <code>~/.claude/mcp.json</code>:</p>
 <pre>{
   <span class="c-string">"mcpServers"</span>: {
-    <span class="c-string">"vantage"</span>: {
+    <span class="c-string">"cohrint"</span>: {
       <span class="c-string">"type"</span>: <span class="c-string">"stdio"</span>,
       <span class="c-string">"command"</span>: <span class="c-string">"npx"</span>,
       <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"cohrint-mcp"</span>],
-      <span class="c-string">"env"</span>: { <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"crt_your_key"</span> }
+      <span class="c-string">"env"</span>: { <span class="c-string">"COHRINT_API_KEY"</span>: <span class="c-string">"crt_your_key"</span> }
     }
   }
 }</pre>
 
 <h3>Verify it works</h3>
-<p>Open Claude Code and type: <code>/mcp</code> — you should see "vantage" listed. Then try:</p>
+<p>Open Claude Code and type: <code>/mcp</code> — you should see "cohrint" listed. Then try:</p>
 <pre><span class="c-comment"># Ask Claude Code about your AI costs</span>
 "How much have we spent on LLMs this month?"
 "Which model is the most expensive?"</pre>
@@ -760,11 +760,11 @@ vscode: `
 <div class="step-row"><div class="step-num">1</div><div class="step-body">Create <code>.vscode/mcp.json</code> in your project root:</div></div>
 <pre>{
   <span class="c-string">"servers"</span>: {
-    <span class="c-string">"vantage"</span>: {
+    <span class="c-string">"cohrint"</span>: {
       <span class="c-string">"type"</span>: <span class="c-string">"stdio"</span>,
       <span class="c-string">"command"</span>: <span class="c-string">"npx"</span>,
       <span class="c-string">"args"</span>: [<span class="c-string">"-y"</span>, <span class="c-string">"cohrint-mcp"</span>],
-      <span class="c-string">"env"</span>: { <span class="c-string">"VANTAGE_API_KEY"</span>: <span class="c-string">"crt_your_key"</span> }
+      <span class="c-string">"env"</span>: { <span class="c-string">"COHRINT_API_KEY"</span>: <span class="c-string">"crt_your_key"</span> }
     }
   }
 }</pre>
@@ -788,23 +788,23 @@ tagging: `
 <p>Tags let you break down AI costs by any dimension — feature, team, user, experiment, or anything meaningful to your org.</p>
 <div class="tab-row"><div class="tab active" onclick="switchTab('tag',this,'tag-py')">Python</div><div class="tab" onclick="switchTab('tag',this,'tag-ts')">TypeScript</div></div>
 <div id="tag-py" class="tab-content active"><pre><span class="c-comment"># Thread-scoped — applies to all subsequent calls on this thread</span>
-vantage.<span class="c-func">tag</span>(<span class="c-string">"feature"</span>, <span class="c-string">"customer_support"</span>)
-vantage.<span class="c-func">tag</span>(<span class="c-string">"team"</span>, <span class="c-string">"product"</span>)
-vantage.<span class="c-func">tag</span>(<span class="c-string">"user_id"</span>, user.id)
+cohrint.<span class="c-func">tag</span>(<span class="c-string">"feature"</span>, <span class="c-string">"customer_support"</span>)
+cohrint.<span class="c-func">tag</span>(<span class="c-string">"team"</span>, <span class="c-string">"product"</span>)
+cohrint.<span class="c-func">tag</span>(<span class="c-string">"user_id"</span>, user.id)
 
 <span class="c-comment"># Context manager for scoped tagging</span>
 <span class="c-keyword">from</span> contextlib <span class="c-keyword">import</span> contextmanager
 
 <span class="c-keyword">@contextmanager</span>
-<span class="c-keyword">def</span> <span class="c-func">vantage_feature</span>(name, **tags):
-    vantage.<span class="c-func">tag</span>(<span class="c-string">"feature"</span>, name)
-    <span class="c-keyword">for</span> k, v <span class="c-keyword">in</span> tags.items(): vantage.<span class="c-func">tag</span>(k, v)
+<span class="c-keyword">def</span> <span class="c-func">cohrint_feature</span>(name, **tags):
+    cohrint.<span class="c-func">tag</span>(<span class="c-string">"feature"</span>, name)
+    <span class="c-keyword">for</span> k, v <span class="c-keyword">in</span> tags.items(): cohrint.<span class="c-func">tag</span>(k, v)
     <span class="c-keyword">try</span>:
         <span class="c-keyword">yield</span>
     <span class="c-keyword">finally</span>:
-        vantage.get_client().<span class="c-func">clear_tags</span>()
+        cohrint.get_client().<span class="c-func">clear_tags</span>()
 
-<span class="c-keyword">with</span> <span class="c-func">vantage_feature</span>(<span class="c-string">"doc_summary"</span>, team=<span class="c-string">"content"</span>):
+<span class="c-keyword">with</span> <span class="c-func">cohrint_feature</span>(<span class="c-string">"doc_summary"</span>, team=<span class="c-string">"content"</span>):
     response = client.chat.completions.<span class="c-func">create</span>(...)</pre></div>
 <div id="tag-ts" class="tab-content"><pre><span class="c-keyword">import</span> { <span class="c-func">tag</span>, <span class="c-func">getClient</span> } <span class="c-keyword">from</span> <span class="c-string">"cohrint"</span>;
 
@@ -1118,10 +1118,10 @@ back to your app        (tokens, cost, latency)</pre>
 <h2>Quick start (2 minutes)</h2>
 <div class="step-row"><div class="step-num">1</div><div class="step-body">Start the local proxy</div></div>
 <pre><span class="c-comment"># No install needed — runs via npx</span>
-VANTAGE_API_KEY=<span class="c-string">crt_your_key</span> npx vantageai-local-proxy
+COHRINT_API_KEY=<span class="c-string">crt_your_key</span> npx cohrint-local-proxy
 
 <span class="c-comment"># Or with options</span>
-npx vantageai-local-proxy --api-key <span class="c-string">crt_your_key</span> --privacy <span class="c-string">strict</span> --team <span class="c-string">backend</span></pre>
+npx cohrint-local-proxy --api-key <span class="c-string">crt_your_key</span> --privacy <span class="c-string">strict</span> --team <span class="c-string">backend</span></pre>
 
 <div class="step-row"><div class="step-num">2</div><div class="step-body">Point your LLM client to localhost — <strong>one line change</strong></div></div>
 <div class="tab-row"><div class="tab active" onclick="switchTab('lp',this,'lp-py')">Python (OpenAI)</div><div class="tab" onclick="switchTab('lp',this,'lp-ts')">TypeScript (OpenAI)</div><div class="tab" onclick="switchTab('lp',this,'lp-ant')">Python (Anthropic)</div><div class="tab" onclick="switchTab('lp',this,'lp-curl')">cURL</div></div>
@@ -1129,7 +1129,7 @@ npx vantageai-local-proxy --api-key <span class="c-string">crt_your_key</span> -
 <div id="lp-py" class="tab-content active"><pre><span class="c-keyword">from</span> openai <span class="c-keyword">import</span> <span class="c-var">OpenAI</span>
 
 client = <span class="c-var">OpenAI</span>(
-    <span class="c-var">api_key</span>=<span class="c-string">"sk-your-real-key"</span>,            <span class="c-comment"># stays local — never sent to Vantage</span>
+    <span class="c-var">api_key</span>=<span class="c-string">"sk-your-real-key"</span>,            <span class="c-comment"># stays local — never sent to Cohrint</span>
     <span class="c-var">base_url</span>=<span class="c-string">"http://localhost:4891/v1"</span>,   <span class="c-comment"># ← only change needed</span>
 )
 
@@ -1195,12 +1195,12 @@ curl http://localhost:<span class="c-num">4891</span>/health</pre></div>
 
 <h2>CLI options</h2>
 <table class="api-table"><thead><tr><th>Flag</th><th>Env var</th><th>Default</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>--api-key</code></td><td><code>VANTAGE_API_KEY</code></td><td>—</td><td>Your Vantage key (required)</td></tr>
-<tr><td><code>--port</code></td><td><code>VANTAGE_PROXY_PORT</code></td><td>4891</td><td>Local proxy port</td></tr>
-<tr><td><code>--privacy</code></td><td><code>VANTAGE_PRIVACY</code></td><td>strict</td><td>Privacy level: strict | standard | relaxed</td></tr>
-<tr><td><code>--team</code></td><td><code>VANTAGE_TEAM</code></td><td>—</td><td>Team tag for all events</td></tr>
-<tr><td><code>--env</code></td><td><code>VANTAGE_ENV</code></td><td>production</td><td>Environment tag</td></tr>
-<tr><td><code>--debug</code></td><td><code>VANTAGE_DEBUG</code></td><td>false</td><td>Log each tracked call to terminal</td></tr>
+<tr><td><code>--api-key</code></td><td><code>COHRINT_API_KEY</code></td><td>—</td><td>Your Cohrint key (required)</td></tr>
+<tr><td><code>--port</code></td><td><code>COHRINT_PROXY_PORT</code></td><td>4891</td><td>Local proxy port</td></tr>
+<tr><td><code>--privacy</code></td><td><code>COHRINT_PRIVACY</code></td><td>strict</td><td>Privacy level: strict | standard | relaxed</td></tr>
+<tr><td><code>--team</code></td><td><code>COHRINT_TEAM</code></td><td>—</td><td>Team tag for all events</td></tr>
+<tr><td><code>--env</code></td><td><code>COHRINT_ENV</code></td><td>production</td><td>Environment tag</td></tr>
+<tr><td><code>--debug</code></td><td><code>COHRINT_DEBUG</code></td><td>false</td><td>Log each tracked call to terminal</td></tr>
 <tr><td><code>--redact-models</code></td><td>—</td><td>false</td><td>Replace model names with generic tiers</td></tr>
 </tbody></table>
 
@@ -1230,16 +1230,16 @@ curl http://localhost:<span class="c-num">4891</span>/health</pre></div>
 <h2>Usage — one line change</h2>
 <div class="tab-row"><div class="tab active" onclick="switchTab('pm',this,'pm-ts')">TypeScript</div><div class="tab" onclick="switchTab('pm',this,'pm-py')">Python</div></div>
 
-<div id="pm-ts" class="tab-content active"><pre><span class="c-keyword">import</span> * <span class="c-keyword">as</span> <span class="c-var">vantage</span> <span class="c-keyword">from</span> <span class="c-string">"cohrint"</span>;
+<div id="pm-ts" class="tab-content active"><pre><span class="c-keyword">import</span> * <span class="c-keyword">as</span> <span class="c-var">cohrint</span> <span class="c-keyword">from</span> <span class="c-string">"cohrint"</span>;
 <span class="c-keyword">import</span> <span class="c-var">OpenAI</span> <span class="c-keyword">from</span> <span class="c-string">"openai"</span>;
 
 <span class="c-comment">// Add privacy: "stats-only" — that's it</span>
-<span class="c-var">vantage</span>.<span class="c-func">init</span>({
+<span class="c-var">cohrint</span>.<span class="c-func">init</span>({
   <span class="c-var">apiKey</span>: <span class="c-string">"crt_your_key"</span>,
   <span class="c-var">privacy</span>: <span class="c-string">"stats-only"</span>,   <span class="c-comment">// ← no prompt/response text sent</span>
 });
 
-<span class="c-keyword">const</span> openai = <span class="c-var">vantage</span>.<span class="c-func">createOpenAIProxy</span>(<span class="c-keyword">new</span> <span class="c-var">OpenAI</span>(), <span class="c-var">vantage</span>.<span class="c-func">getClient</span>());
+<span class="c-keyword">const</span> openai = <span class="c-var">cohrint</span>.<span class="c-func">createOpenAIProxy</span>(<span class="c-keyword">new</span> <span class="c-var">OpenAI</span>(), <span class="c-var">cohrint</span>.<span class="c-func">getClient</span>());
 
 <span class="c-comment">// All calls tracked with stats only — no text leaves your app</span>
 <span class="c-keyword">const</span> res = <span class="c-keyword">await</span> openai.chat.completions.<span class="c-func">create</span>({
@@ -1250,11 +1250,11 @@ curl http://localhost:<span class="c-num">4891</span>/health</pre></div>
 <span class="c-comment">// Dashboard sees: gpt-4o | 45→120 tokens | $0.0034 | 780ms</span>
 <span class="c-comment">// Dashboard does NOT see: "Sensitive business data here..."</span></pre></div>
 
-<div id="pm-py" class="tab-content"><pre><span class="c-keyword">import</span> cohrint <span class="c-keyword">as</span> vantage
+<div id="pm-py" class="tab-content"><pre><span class="c-keyword">import</span> cohrint <span class="c-keyword">as</span> cohrint
 <span class="c-keyword">from</span> cohrint.proxy.openai_proxy <span class="c-keyword">import</span> <span class="c-var">OpenAI</span>
 
 <span class="c-comment"># Add privacy="stats-only"</span>
-vantage.<span class="c-func">init</span>(
+cohrint.<span class="c-func">init</span>(
     <span class="c-var">api_key</span>=<span class="c-string">"crt_your_key"</span>,
     <span class="c-var">privacy</span>=<span class="c-string">"stats-only"</span>,   <span class="c-comment"># ← no text sent</span>
 )
@@ -1296,7 +1296,7 @@ response = client.chat.completions.<span class="c-func">create</span>(
 <table class="api-table"><thead><tr><th>Feature</th><th>Local Proxy (strict)</th><th>SDK (stats-only)</th></tr></thead><tbody>
 <tr><td>Code changes needed</td><td>Change <code>base_url</code> only</td><td>Add <code>privacy: "stats-only"</code></td></tr>
 <tr><td>Prompt text sent</td><td>❌ Never</td><td>❌ Never</td></tr>
-<tr><td>API key sent to Vantage</td><td>❌ Never</td><td>❌ Never (only crt_ key)</td></tr>
+<tr><td>API key sent to Cohrint</td><td>❌ Never</td><td>❌ Never (only crt_ key)</td></tr>
 <tr><td>Streaming support</td><td>Pass-through (basic stats)</td><td>Full (accurate token counts)</td></tr>
 <tr><td>Works with all providers</td><td>✅ Any HTTP LLM API</td><td>OpenAI + Anthropic proxies</td></tr>
 <tr><td>Runs as separate process</td><td>Yes (localhost server)</td><td>No (in-process)</td></tr>
@@ -1889,31 +1889,31 @@ otlp_endpoint = "https://api.cohrint.com/v1/otel"</pre>
 <div class="info-box">Audit log events are write-once and cannot be deleted. Retention is 12 months on all plans.</div>
 `,
 
-'vantage-cli': `
+'cohrint-cli': `
 <h1>Cohrint Agent — Python CLI</h1>
 <p>A Python-based interactive REPL and one-shot CLI with <strong>per-tool permissions</strong>, <strong>exact cost tracking</strong>, and support for both Anthropic API keys and <strong>Claude Max subscriptions</strong> (no API key required).</p>
 
 <h2>Install & Run</h2>
-<pre>pip install vantageai-agent
+<pre>pip install cohrint-agent
 
 # With Anthropic API key
-vantageai-agent
+cohrint-agent
 
 # With Claude Max subscription (no API key needed)
-vantageai-agent --backend claude</pre>
+cohrint-agent --backend claude</pre>
 
 <h2>Upgrade & Rollback</h2>
 <pre># Upgrade to latest
-pip install --upgrade vantageai-agent
+pip install --upgrade cohrint-agent
 
 # Install a specific version
-pip install vantageai-agent==0.2.3
+pip install cohrint-agent==0.2.3
 
 # Rollback to a previous version
-pip install vantageai-agent==0.1.0
+pip install cohrint-agent==0.1.0
 
 # Check current version
-vantageai-agent --version</pre>
+cohrint-agent --version</pre>
 
 <h2>CLI Flags</h2>
 <table class="api-table">
@@ -1943,7 +1943,7 @@ vantageai-agent --version</pre>
 <h2>Claude Max Backend</h2>
 <p>Use your Claude Max subscription instead of API credits. The <code>--backend claude</code> flag routes prompts through the Claude Code CLI with full multi-turn session support via <code>--resume</code>.</p>
 <pre># First run shows tier selection wizard
-vantageai-agent --backend claude
+cohrint-agent --backend claude
 
 # Costs shown as API-equivalent (actual charge: $0.00)
 # ↳ 1,234 tokens · API-equivalent: $0.0199  [Max subscription: $0.00 actual]</pre>
@@ -1965,7 +1965,7 @@ vantageai-agent --backend claude
 
 <h2>Dashboard Integration</h2>
 <p>When configured with a Cohrint API key, the agent pushes cost data to your dashboard automatically.</p>
-<div class="info-box">Set <code>VANTAGE_API_KEY</code> or save to <code>~/.vantage-agent/api_key</code>.</div>
+<div class="info-box">Set <code>COHRINT_API_KEY</code> or save to <code>~/.cohrint-agent/api_key</code>.</div>
 
 <h2>Anomaly Detection</h2>
 <p>The agent warns when a prompt's cost exceeds 3x the session average, helping catch runaway token usage before it impacts your budget.</p>
@@ -2056,8 +2056,8 @@ vantageai-agent --backend claude
 <h1>Datadog Export</h1>
 <p>Push Cohrint cost and token metrics into your own Datadog account as custom metrics. Once connected, a daily cron exports the previous 24 hours of <code>cross_platform_usage</code> data as two Datadog gauge series:</p>
 <ul style="font-size:14px;color:var(--muted);line-height:2;margin:0 0 16px 20px">
-  <li><code>vantage.ai.cost_usd</code> — tagged by <code>provider</code>, <code>model</code>, <code>developer_id</code>, <code>org_id</code></li>
-  <li><code>vantage.ai.tokens</code> — same tags; only emitted when <code>input_tokens + output_tokens &gt; 0</code></li>
+  <li><code>cohrint.ai.cost_usd</code> — tagged by <code>provider</code>, <code>model</code>, <code>developer_id</code>, <code>org_id</code></li>
+  <li><code>cohrint.ai.tokens</code> — same tags; only emitted when <code>input_tokens + output_tokens &gt; 0</code></li>
 </ul>
 <div class="info-box">Datadog API keys are AES-256-GCM encrypted before storage and never logged in plain text.</div>
 
