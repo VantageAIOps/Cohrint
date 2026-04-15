@@ -7,25 +7,25 @@ _Last updated: 2026-04-15_
 ## Open PRs
 | # | Title | Branch |
 |---|-------|--------|
-| 58 | fix(landing): remove algorithm exposure + reframe hero for enterprise buyers | fix/landing-page-positioning |
+| 59 | fix(ui): landing page polish + dashboard chart/layout fixes | fix/landing-page-positioning |
 
 ## Latest 15 Commits
 ```
+08a1cb3 fix(dashboard+auth): 9 remaining issues from rescan
+249f655 fix(dashboard+auth): 11 crash/flow fixes from full audit
+c69136d fix(dashboard): stale donut legend on empty period + mobile flex breakpoint
+ba0aa10 fix(dashboard): 75/25 split layout for spend trend + donut cards
+2e72278 fix(dashboard): reduce Tool Cost Share donut size + proper alignment
+c4380ba fix(dashboard): chart proportions, connected tools stale dates, vega bot overlap
+f8028ff fix(landing): fix footer wrapping on mobile
+d394858 fix(landing): strip security implementation details + replace gmail with sales email
+30df133 fix(landing): fix orphaned </div> + grammatically incomplete subheadline
+93c6ea4 docs: add VantageAI guidebook v1.1 (PDF + DOCX)
+0b3cb76 chore: update GIT_MEMORY.md — PR #58 state, branch fix/landing-page-positioning
 4dd249f fix(landing): remove algo exposure, reframe hero for enterprise buyers
 e0f7165 Merge pull request #57 from VantageAIOps/feat/claude-intelligence-customer-integration
 34790d8 feat(trust): update security page with Claude Code hook architecture
 077038a docs: update ADMIN_GUIDE + PRODUCT_STRATEGY with claude-intelligence architecture
-a61a684 fix(claude-intelligence): address code review issues from PR #57
-5a3a553 chore: update GIT_MEMORY.md for PR #57 state
-bf893aa feat(claude-intelligence): full customer integration — track, setup, dashboard, npm package
-3b2b249 docs: add GIT_HISTORY.md — complete 440-commit log with PR index and phase summary
-99f4db4 Merge pull request #56 from VantageAIOps/fix/ui-finetune-dashboard
-dea95d0 docs: comprehensive update — PRODUCT_STRATEGY v7.0, ADMIN_GUIDE +503 lines, docs.html new endpoints
-2587b40 fix(ui): stack install-box commands vertically on mobile to prevent line breaks
-e975937 chore: update GIT_MEMORY.md — PR #56 state, branch fix/ui-finetune-dashboard
-b681a78 fix(ui): close modal via closeModal() on Escape/overlay to reset form fields
-999fec8 fix(ui): dashboard polish — layout, UX, accessibility, mobile fixes
-73c089f Merge pull request #55 from VantageAIOps/feat/free-tier-50k
 ```
 
 ## Recent Merged PRs
@@ -45,7 +45,8 @@ b681a78 fix(ui): close modal via closeModal() on Escape/overlay to reset form fi
 | claude-intelligence | @vantageaiops/claude-code | 1.0.0 |
 
 ## Outstanding Items
-- **PR #58** — landing page positioning fix + competitive analysis docs; awaiting review + merge
-- After PR #58 merges: deploy frontend via `npx wrangler pages deploy ./vantage-final-v4 --project-name=vantageai`
-- **PRODUCT_STRATEGY.md § 15** added: full palma.ai competitive teardown — read before any enterprise sales call
-- **60-day roadmap items** tracked in TODO.md (competitive intelligence section, 2026-04-15): cost forecasting widget, chargeback reports, model switch advisor, GitHub Actions landing page, app-layer attribution, quality/cost tradeoff tooling
+- **PR #59** open — all CI checks passing (API Tests still running); ready to merge
+- After PR #59 merges: deploy frontend `npx wrangler pages deploy ./vantage-final-v4 --project-name=vantageai` + backend `npx wrangler deploy`
+- Set up Cloudflare Email Routing: `sales@vantageaiops.com` → real inbox
+- **60-day roadmap** (TODO.md): cost forecasting widget, chargeback report export, model switch advisor, GitHub Actions cost gate landing page, app-layer attribution, quality/cost tradeoff tooling
+- **PRODUCT_STRATEGY.md §15**: full palma.ai competitive teardown — read before enterprise sales calls
