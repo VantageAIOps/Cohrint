@@ -991,3 +991,115 @@ Use these directly in Claude sessions. Each is tuned for your specific build tas
 *VantageAI · War Room Strategy · Confidential · April 2026*
 *P2 is complete. The platform is real. The only question left is distribution.*
 *Every week you don't own your layer, a better-funded player gets closer to it.*
+
+---
+
+## 15. Competitive Analysis — palma.ai vs VantageAI (2026-04-15)
+
+> **Why this section exists:** On 2026-04-15 we did a deep competitive teardown of palma.ai — the closest enterprise competitor in the AI governance/observability space. The findings informed a landing page revision, a hero copy change, and a 60-day product roadmap. Read this before any positioning conversation, pricing negotiation, or enterprise sales call.
+
+---
+
+### What palma.ai is (and isn't)
+
+palma.ai is an **MCP protocol gateway** — a control plane that intercepts tool calls between AI agents and MCP servers before they execute. Their product answers the question: *"What are our agents allowed to do, and did they do it?"*
+
+They are:
+- Selling to **CISOs and compliance teams** — the buyer is security, not engineering
+- 100% **sales-led** — no public pricing, every prospect books a demo
+- Targeting **regulated industries** — fintech, automotive, defense — where "the agent did X" is a liability
+- Positioned around **EU AI Act / DORA / NIST** compliance frameworks
+- Members of the **Agentic AI Foundation** alongside Anthropic, OpenAI, Google — strong enterprise trust signal
+
+They are **not** a FinOps tool. They track cost as a byproduct of governance, not as the primary product. They cannot tell you which model is most cost-efficient for a given quality threshold. They cannot forecast spend. They have no CI/CD integration. They have no self-serve tier.
+
+---
+
+### Where palma.ai is genuinely stronger than us
+
+**1. Human-in-the-loop agent approvals**
+palma can pause an agent mid-execution and require a human to approve a sensitive tool call (e.g., write to production database). We observe spend after the fact. For a CISO evaluating liability, "we stopped it" is categorically different from "we saw it cost $200." This is not our fight — we should not try to build a competing policy enforcement layer.
+
+**2. Per-tool-call RBAC**
+palma's access control operates at the tool level: "Agent X can read from Postgres but cannot write." Our RBAC is cost-data isolation only (team scoping, viewer roles). This is a meaningful gap for enterprise procurement where data governance reviewers ask "what can each agent actually do?"
+
+**3. Compliance framework alignment**
+EU AI Act (Articles 13/17/26), DORA, NIST AI RMF — palma has done the work of mapping their product to these frameworks. We have SOC 2 Type I in progress (Q3 2026) and a DPA/BAA offering. This is table stakes, not a differentiator. We need to either accelerate the compliance story or be explicit that we are the FinOps layer that complements a governance tool like palma.
+
+**4. Sales credibility signals**
+CEO previously built and sold infrastructure monitoring to Cisco. Agentic AI Foundation membership. Enterprise procurement teams recognize these patterns and weight them. We are earlier in building these signals.
+
+---
+
+### Where we are genuinely stronger
+
+**1. Cost granularity mapped to business outcomes**
+"Cost per PR merged," "cost per resolved ticket," "cost per feature shipped" — this is CFO/VP Eng language. palma tracks spend as a cost allocation byproduct. We make it the core product. No other competitor does outcome-level cost attribution.
+
+**2. Self-serve PLG motion**
+50K events free, 2-line SDK integration, MCP server for natural language queries in the IDE, running in 10 minutes without talking to sales. palma has zero self-serve. Every customer requires a sales cycle. Our PLG motion lets us land accounts they can never reach at their sales velocity.
+
+**3. Token optimization = hard ROI**
+We can show a measurable payback: "you spent $10K last month; our optimization recovered $4K of that." palma has no equivalent ROI mechanism. This is our strongest enterprise close argument — CFOs approve tools that pay for themselves.
+
+**4. CI/CD cost gates**
+Preventing runaway AI spend during CI test runs via GitHub Actions is a specific pain point we solve that nobody else has clearly articulated. A team that burns $1,200 on a CI run once will remember that pain. We are the only product with a documented solution.
+
+**5. Privacy-first local proxy**
+Prompts never leave the user's machine. This is a strong story for IP-sensitive organizations (law firms, defense contractors, financial institutions doing proprietary research). palma's on-prem story is about control plane deployment — it doesn't address prompt-level privacy.
+
+**6. Live multi-model pricing intelligence**
+24 LLM prices in real time. Model switch recommendations based on actual usage patterns. palma is deliberately model-agnostic — they cannot help you choose the cheapest appropriate model because their product treats all models as equivalent.
+
+---
+
+### Critical positioning insight — we are NOT direct competitors
+
+palma owns: *"Control what your agents are allowed to do."*
+We own: *"Know what your AI costs and whether it was worth it."*
+
+These answer different questions for different buyers in the same organization. The CISO buys palma. The CFO or VP Eng buys Vantage. In a 200-person company, these are often different people with different budgets.
+
+**The go-to-market implication:** We should land first via self-serve PLG (no procurement friction, $49/month Team tier), embed in the engineering team, generate ROI data, then position a palma conversation as a separate deal for the security team. This avoids head-on competition and lets us expand deal size. "palma and Vantage are complementary" is a true statement that helps both companies.
+
+---
+
+### Gaps neither of us covers — first-mover opportunities (60-day window)
+
+**1. Cost forecasting**
+"At current burn rate, Team A will exhaust their $5,000 budget in 11 days." Single aggregation on existing data. Neither palma nor Helicone/Langfuse/LangSmith have this. Makes the product sticky for engineering managers who check it daily. Should be on the main dashboard, not buried. Build time: ~1 week.
+
+**2. Internal chargeback reporting**
+A monthly PDF/CSV per team: cost center number, total AI spend, event count, model breakdown, cost-per-developer. The internal invoice for AI spend. Standard FinOps practice for cloud (every CloudHealth/Apptio customer uses this). Zero AI-specific tools offer it today. Opens VP Finance as an internal champion alongside VP Eng — doubles sponsor count per deal. Build time: ~2 weeks.
+
+**3. Application-layer cost attribution**
+Both us and palma track spend at the tool/infra layer. Neither gives a SaaS company the ability to say "our /summarize endpoint costs $0.08/call" or "customer ABC costs us $0.43/month in AI inference." This is the LLM equivalent of per-feature cloud cost attribution (Datadog APM does this for infra; nobody does it for LLM). Requires a thin SDK-level decorator pattern. Build time: ~4 weeks.
+
+**4. Quality vs. cost tradeoff tooling**
+We already track hallucination rate, faithfulness, and quality scores. We already have live model pricing. Nobody has connected these to answer: "Use GPT-4o for high-stakes requests, Haiku for low-stakes — here is the cost-per-quality-unit at each threshold." This becomes our unique positioning against Helicone and Langfuse who are pure observability. Build time: ~3 weeks.
+
+**5. Vendor negotiation intelligence**
+"At your current growth rate you qualify for Anthropic volume discounts in 6 weeks." Zero competitors touch this. Requires usage trend extrapolation + published volume tier thresholds. Very high enterprise value: a single conversation with an Anthropic account rep triggered by our insight could save a customer $20K/year — they remember who surfaced that. Build time: ~2 weeks.
+
+**6. Compliance report generation**
+Enterprise compliance teams need formatted audit reports for SOC 2 Type II / DORA evidence packages — not raw CSV exports. A "generate audit report" button that produces a formatted PDF with event counts, access log summary, anomaly incidents, and model usage by team would accelerate our SOC 2 story and is a concrete competitive moat in regulated industries.
+
+---
+
+### Landing page & positioning changes made (2026-04-15)
+
+1. **Hero headline changed:** "Real-time cost visibility across every AI coding tool" → "Know what your AI bill will be before it arrives — and cut it." Rationale: the old headline is descriptive (what we do). The new headline is outcome-led (what the buyer feels). Enterprise buyers need to recognize their pain before they evaluate a solution.
+
+2. **Capabilities cards revised:** Removed 5 cards that exposed core algorithm details (prompt optimizer internals, Z-score anomaly detection, exact rate-limit thresholds, SSE architecture, efficiency scorer methodology). Rewrote 11 cards to be outcome-focused. Engineering specifics are a competitive liability on a public page; outcomes are a sales asset.
+
+3. **FAQ answers revised:** Removed "3 environment variables" OTel setup detail and CLI slash-command internals. Replaced with outcome-focused copy.
+
+**Rule going forward:** Capabilities section should answer "what business problem does this solve?" not "how does it technically work?" The how is the moat. Keep it off the landing page.
+
+---
+
+### Recommended reading before enterprise sales calls
+
+- Sequoia "AI's $600B Question" (2024) — macro tailwind context; every CTO who read this is asking "are we spending too much?"
+- CloudHealth → VMware acquisition (2018) — closest analog to our trajectory; how a cloud cost tool built a defensible moat despite hyperscaler dashboards
+- EU AI Act Articles 13, 17, 26 — palma's compliance narrative; understand it before a prospect asks "how do you compare to palma on EU AI Act?"
