@@ -54,11 +54,23 @@ Last updated: 2026-04-15
   # Update any IDE workspace files, shell aliases, or scripts that reference the old path
   ```
 
-- [ ] **Update all GitHub Actions workflows to cohrint naming**
-  - Audit `.github/workflows/*.yml` for any references to `vantageai`, `vantageaiops`, project names, or hardcoded paths
-  - Update Wrangler deploy steps: `--project-name=vantageai` → `--project-name=cohrint`
-  - Update any `working-directory:` references if they use the old folder name
-  - Update npm package names or pypi package names if any workflow publishes them
+- [x] **Update all GitHub Actions workflows to cohrint naming** (done 2026-04-15, commit 5cca3f3)
+  - Updated: `ci-test.yml`, `deploy.yml`, `deploy-worker.yml`, `cost-check.yml`, `ci-cross-browser.yml`
+  - All URLs updated: `vantageaiops.com` → `cohrint.com`, `api.vantageaiops.com` → `api.cohrint.com`
+
+- [ ] **Rename published npm/pypi packages to cohrint branding** ⚠️ breaking change — coordinate with users
+  - `vantageaiops-mcp` → `cohrint-mcp`
+  - `vantageaiops` (JS SDK) → `cohrint` or `@cohrint/sdk`
+  - `vantageai-local-proxy` → `cohrint-local-proxy`
+  - `@vantageaiops/claude-code` → `@cohrint/claude-code`
+  - `vantageai-agent` (PyPI) → `cohrint-agent`
+  - Steps:
+    1. Publish new packages under cohrint names (bump minor version)
+    2. `npm deprecate` old package names pointing users to new names
+    3. Update `publish-packages.yml` package name references
+    4. Update `repo-backup.yml` archive filename (`vantageai-backup` → `cohrint-backup`)
+    5. Update `ci-pr-gate.yml`: `vantageai-agent` CLI install + help command
+    6. Update any README / docs referencing old package names
 
 - [ ] **Run full test suite — verify migration from vantageaiops.com → cohrint**
   ```bash
