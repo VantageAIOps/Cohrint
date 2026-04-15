@@ -1,12 +1,12 @@
 # Cloudflare Pages _redirects
 # NOTE: Pages auto-serves /foo from foo.html — only alias DIFFERENT paths here
-/login        /auth.html       301
-/signin       /auth.html       301
+/login        /auth            301
+/signin       /auth            301
 /dashboard    /app.html        301
 /pricing      /signup.html     301
-/security     /trust.html      301
-/trust        /trust.html      301
-/benchmark    /report.html     301
+/security     /trust           301
+/trust        /trust           301
+/benchmark    /report          301
 
 # Clean URLs — redirect .html → no extension (canonical = clean URL)
 /docs.html          /docs           301
@@ -17,3 +17,4 @@
 /report.html        /report         301
 /trust.html         /trust          301
 /blog.html          /blog           301
+/auth.html          /auth           301
