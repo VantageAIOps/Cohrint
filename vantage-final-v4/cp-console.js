@@ -104,7 +104,7 @@
             label: s.provider,
             data: s.data,
             borderColor: pc(s.provider),
-            backgroundColor: pc(s.provider) + '33',
+            backgroundColor: pc(s.provider) + '22',
             fill: true,
             tension: 0.3,
             pointRadius: 0,
@@ -113,15 +113,22 @@
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
         scales: {
           y: {
             stacked: true,
             beginAtZero: true,
-            ticks: { callback: function (v) { return '$' + Number(v).toFixed(2); } },
+            grid: { color: 'rgba(255,255,255,0.04)' },
+            ticks: { color: '#6b7280', font: { size: 10 }, callback: function (v) { return '$' + Number(v).toFixed(2); } },
           },
-          x: { ticks: { maxTicksLimit: 8 } },
+          x: {
+            grid: { display: false },
+            ticks: { color: '#6b7280', font: { size: 9 }, maxTicksLimit: 8 },
+          },
         },
-        plugins: { legend: { position: 'bottom' } },
+        plugins: {
+          legend: { position: 'bottom', labels: { color: '#9ca3af', boxWidth: 10, padding: 14, font: { size: 10 } } },
+        },
         interaction: { mode: 'index' },
       },
     });
@@ -134,7 +141,13 @@
     if (!canvas) return;
     if (cpDoughnutChart) { cpDoughnutChart.destroy(); cpDoughnutChart = null; }
 
-    var items = summary.by_provider || [];
+    var items = (summary.by_provider || []).filter(function (p) { return (p.cost || 0) > 0; });
+    if (!items.length) {
+      var errEl = document.getElementById('cp-donut-error');
+      if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'No spend data for this period.'; }
+      return;
+    }
+
     cpDoughnutChart = new Chart(canvas.getContext('2d'), {
       type: 'doughnut',
       data: {
@@ -142,13 +155,17 @@
         datasets: [{
           data: items.map(function (p) { return p.cost; }),
           backgroundColor: items.map(function (p) { return pc(p.provider); }),
-          borderWidth: 1,
+          borderWidth: 2,
+          borderColor: '#0d1117',
+          hoverOffset: 6,
         }],
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
+        cutout: '62%',
         plugins: {
-          legend: { position: 'bottom' },
+          legend: { position: 'bottom', labels: { color: '#9ca3af', boxWidth: 10, padding: 14, font: { size: 10 } } },
           tooltip: { callbacks: { label: function (ctx) { return ' $' + ctx.parsed.toFixed(2); } } },
         },
       },
@@ -475,6 +492,28 @@
   }
 
   // ── Connections ───────────────────────────────────────────────────────────
+  function relativeTime(dateStr) {
+    if (!dateStr) return '—';
+    var ts = new Date(String(dateStr).replace(' ', 'T') + (String(dateStr).includes('Z') ? '' : 'Z')).getTime();
+    if (isNaN(ts)) return '—';
+    var diff = Date.now() - ts;
+    if (diff < 0) return 'just now';
+    var mins = Math.floor(diff / 60000);
+    if (mins < 2)   return 'just now';
+    if (mins < 60)  return mins + 'm ago';
+    var hrs = Math.floor(mins / 60);
+    if (hrs < 24)   return hrs + 'h ago';
+    var days = Math.floor(hrs / 24);
+    if (days < 30)  return days + 'd ago';
+    return Math.floor(days / 30) + 'mo ago';
+  }
+
+  function isStaleDate(dateStr) {
+    if (!dateStr) return true;
+    var ts = new Date(String(dateStr).replace(' ', 'T') + (String(dateStr).includes('Z') ? '' : 'Z')).getTime();
+    return isNaN(ts) || (Date.now() - ts) > 48 * 60 * 60 * 1000; // >48h = stale
+  }
+
   function renderCpConnections(data) {
     var el = document.getElementById('cp-connections');
     if (!el) return;
@@ -497,18 +536,24 @@
       return;
     }
 
-    function addRow(providerName, statusColor, syncTime) {
+    function addRow(providerName, statusColor, dateStr) {
+      var stale = isStaleDate(dateStr);
       var row = document.createElement('div');
-      row.style.cssText = 'display:flex;justify-content:space-between;padding:5px 0;font-size:12px';
+      row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:12px';
+
       var left = document.createElement('span');
+      left.style.cssText = 'display:flex;align-items:center;gap:6px';
       var dot = document.createElement('span');
-      dot.textContent = '\u25cf ';
-      dot.style.color = statusColor;
+      dot.style.cssText = 'width:7px;height:7px;border-radius:50%;flex-shrink:0;background:' + (stale ? '#fb923c' : statusColor);
+      if (!stale && statusColor === '#4ade80') dot.style.boxShadow = '0 0 5px #4ade80';
       left.appendChild(dot);
       left.appendChild(document.createTextNode(providerName));
+
       var right = document.createElement('span');
-      right.textContent = syncTime || '—';
-      right.style.opacity = '0.5';
+      right.textContent = relativeTime(dateStr);
+      right.style.cssText = 'font-size:10px;opacity:.45;white-space:nowrap';
+      if (stale && dateStr) right.style.color = '#fb923c';
+
       row.appendChild(left);
       row.appendChild(right);
       el.appendChild(row);
@@ -516,12 +561,10 @@
 
     billing.forEach(function (c) {
       var color = c.status === 'active' ? '#4ade80' : c.status === 'error' ? '#f87171' : '#fb923c';
-      var sync  = c.last_sync_at ? String(c.last_sync_at).slice(0, 16).replace('T', ' ') : '';
-      addRow(c.provider, color, sync);
+      addRow(c.provider, color, c.last_sync_at);
     });
     otel.forEach(function (o) {
-      var t = o.last_data_at ? String(o.last_data_at).slice(0, 16).replace('T', ' ') : '';
-      addRow(o.provider + ' (OTel)', '#4ade80', t);
+      addRow(o.provider + ' (OTel)', '#4ade80', o.last_data_at);
     });
   }
 
