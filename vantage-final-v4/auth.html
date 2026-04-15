@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
-<title>Sign in — VantageAI</title>
-<meta name="description" content="Sign in to your VantageAI account with your API key.">
+<title>Sign in — Cohrint</title>
+<meta name="description" content="Sign in to your Cohrint account with your API key.">
 <meta name="robots" content="noindex">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#00d4a1">
@@ -79,7 +79,7 @@ footer a:hover{color:var(--mu)}
 </head>
 <body>
 <nav>
-  <a href="/" class="logo"><span class="dot"></span>VantageAI</a>
+  <a href="/" class="logo"><span class="dot"></span>Cohrint</a>
   <div style="display:flex;align-items:center;gap:12px">
     <a href="/" class="back-link">← Home</a>
     <button data-theme-toggle onclick="vantageTheme.toggle()" style="background:none;border:1px solid var(--border2,rgba(255,255,255,.13));color:var(--muted,#6b7b8a);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .2s" title="Toggle theme">☀</button>
@@ -93,17 +93,17 @@ footer a:hover{color:var(--mu)}
   <!-- SIGN IN FORM -->
   <div class="box" id="signin-box">
     <div class="box-header">
-      <h1>Sign in to<br><em>VantageAI</em></h1>
+      <h1>Sign in to<br><em>Cohrint</em></h1>
       <p>Enter your API key to access your dashboard and docs.</p>
     </div>
 
     <div class="info-box">
-      Your key starts with <strong style="color:var(--tx);font-family:var(--mono)">vnt_</strong> and was shown when you signed up. Lost it? Click <em>Recover key</em> below.
+      Your key starts with <strong style="color:var(--tx);font-family:var(--mono)">crt_</strong> and was shown when you signed up. Lost it? Click <em>Recover key</em> below.
     </div>
 
     <div class="field">
       <label>API KEY</label>
-      <input type="text" id="inp-key" placeholder="vnt_yourorg_..." autocomplete="off" spellcheck="false" aria-label="API Key">
+      <input type="text" id="inp-key" placeholder="crt_yourorg_..." autocomplete="off" spellcheck="false" aria-label="API Key">
     </div>
     <button class="submit-btn" id="signin-btn" onclick="doSignIn()">Sign in →</button>
     <div class="err-msg error" id="signin-err"></div>
@@ -135,13 +135,13 @@ footer a:hover{color:var(--mu)}
 </div>
 
 <footer>
-  <a href="/">VantageAI</a>
+  <a href="/">Cohrint</a>
   <div style="display:flex;gap:20px"><a href="/docs.html">Docs</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div>
-  <span>© 2026 VantageAI</span>
+  <span>© 2026 Cohrint</span>
 </footer>
 
 <script>
-const API = 'https://api.vantageaiops.com';
+const API = 'https://api.cohrint.com';
 
 // Already signed in? Check server session.
 // Deferred until after DOMContentLoaded + idle to avoid Safari/WebKit race
@@ -180,9 +180,9 @@ async function doSignIn() {
   err.style.display = 'none';
   document.getElementById('inp-key').classList.remove('err');
 
-  if (!key.startsWith('vnt_')) {
+  if (!key.startsWith('crt_')) {
     document.getElementById('inp-key').classList.add('err');
-    err.textContent = 'API keys start with vnt_ — check for typos.';
+    err.textContent = 'API keys start with crt_ — check for typos.';
     err.style.display = 'block';
     return;
   }

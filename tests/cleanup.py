@@ -1,5 +1,5 @@
 """
-cleanup.py — Standalone test artifact cleanup for VantageAI test suite
+cleanup.py — Standalone test artifact cleanup for Cohrint test suite
 =======================================================================
 Usage:
   python tests/cleanup.py [--dry-run] [--all]
@@ -16,7 +16,7 @@ from infra.cleanup import run
 
 if __name__ == "__main__":
     import argparse
-    p = argparse.ArgumentParser(description="VantageAI test artifact cleanup")
+    p = argparse.ArgumentParser(description="Cohrint test artifact cleanup")
     p.add_argument("--dry-run", action="store_true",
                    help="Show what would be removed without deleting")
     p.add_argument("--all", action="store_true",

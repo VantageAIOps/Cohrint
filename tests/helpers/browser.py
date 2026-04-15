@@ -1,5 +1,5 @@
 """
-browser.py — Playwright browser helpers for VantageAI test suite
+browser.py — Playwright browser helpers for Cohrint test suite
 """
 
 import sys

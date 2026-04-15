@@ -9,7 +9,7 @@ async function sha256hex(data: string): Promise<string> {
 const stream = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 /**
- * GET /v1/stream/:org_id?token=vnt_...
+ * GET /v1/stream/:org_id?token=crt_...
  *
  * Server-Sent Events endpoint.
  * Workers can't hold persistent connections like Node.js, so we use a
@@ -28,7 +28,7 @@ stream.get('/:orgId', async (c) => {
   // Auth via query param (EventSource API can't set headers)
   // Accept either:
   //   ?sse_token=<short-lived 32-hex token>  — browser/dashboard (session-based auth)
-  //   ?token=vnt_...                          — SDK / direct API callers
+  //   ?token=crt_...                          — SDK / direct API callers
   const sseToken = c.req.query('sse_token') ?? '';
   const token    = c.req.query('token') ?? '';
 
@@ -39,7 +39,7 @@ stream.get('/:orgId', async (c) => {
       return c.json({ error: 'Invalid or expired sse_token' }, 401);
     }
     // Token stays in KV until its TTL expires — allows reconnects without re-auth
-  } else if (token.startsWith('vnt_')) {
+  } else if (token.startsWith('vnt_') || token.startsWith('crt_')) {
     // Validate API key against DB (same pattern as authMiddleware)
     const hash = await sha256hex(token);
     const org = await c.env.DB.prepare(
@@ -156,10 +156,10 @@ stream.get('/:orgId', async (c) => {
       'Connection':                  'keep-alive',
       'Access-Control-Allow-Origin': (() => {
         const origin = c.req.header('Origin') ?? '';
-        const allowed = (c.env.ALLOWED_ORIGINS ?? 'https://vantageaiops.com').split(',').map((s: string) => s.trim());
+        const allowed = (c.env.ALLOWED_ORIGINS ?? 'https://cohrint.com').split(',').map((s: string) => s.trim());
         return allowed.some((a: string) => a === '*' || a === origin || (a.includes('*') && new RegExp('^' + a.replace('*', '.*') + '$').test(origin)))
           ? origin
-          : (allowed.find((a: string) => !a.includes('*')) ?? 'https://vantageaiops.com');
+          : (allowed.find((a: string) => !a.includes('*')) ?? 'https://cohrint.com');
       })(),
       'X-Accel-Buffering':           'no',
     },

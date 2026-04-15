@@ -1,5 +1,5 @@
 /**
- * VantageAI — Shared Theme System
+ * Cohrint — Shared Theme System
  *
  * Include this script in <head> of every page (before styles render)
  * to prevent flash-of-wrong-theme.

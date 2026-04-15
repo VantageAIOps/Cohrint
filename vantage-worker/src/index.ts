@@ -1,11 +1,11 @@
 /**
- * VantageAI — Cloudflare Worker
+ * Cohrint — Cloudflare Worker
  *
  * Architecture:
  *   Workers  — globally distributed API (this file)
  *   D1       — SQLite events + org config (binding: DB)
  *   KV       — rate limiting + SSE pub/sub + alert throttling (binding: KV)
- *   Pages    — frontend at vantageaiops.com
+ *   Pages    — frontend at cohrint.com
  *
  * Endpoints:
  *   GET  /health
@@ -120,7 +120,7 @@ app.route('/v1/analytics/executive', executive); // CEO/superadmin unified dashb
 // ── 404 fallback ──────────────────────────────────────────────────────────────
 app.notFound((c) => c.json({
   error: 'Not found',
-  docs:  'https://vantageaiops.com/docs.html',
+  docs:  'https://cohrint.com/docs.html',
 }, 404));
 
 // ── Global error handler ──────────────────────────────────────────────────────

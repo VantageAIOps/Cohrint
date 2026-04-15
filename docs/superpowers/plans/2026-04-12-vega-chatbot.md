@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add "Vega" — a female-toned AI chatbot to the VantageAI dashboard that answers dashboard help, VantageAI product questions, and escalates to email support.
+**Goal:** Add "Vega" — a female-toned AI chatbot to the Cohrint dashboard that answers dashboard help, Cohrint product questions, and escalates to email support.
 
 **Architecture:** Cloudflare Workers AI (`@cf/meta/llama-3-8b-instruct`) behind a Hono router in a new `vantage-chatbot/` Worker. Static JSON knowledge base + KV doc chunks for context. Rate limiting (20 msg/hr/org) via KV, email escalation via Resend. Frontend widget injected into `app.html`.
 
@@ -123,8 +123,8 @@ id = "REPLACE_WITH_KV_ID"
 preview_id = "REPLACE_WITH_PREVIEW_KV_ID"
 
 [vars]
-RESEND_FROM = "vega@vantageaiops.com"
-SUPPORT_EMAIL = "support@vantageaiops.com"
+RESEND_FROM = "vega@cohrint.com"
+SUPPORT_EMAIL = "support@cohrint.com"
 ```
 
 - [ ] **Step 6: Create src/types.ts**
@@ -174,7 +174,7 @@ import type { Env } from "./types";
 
 const app = new Hono<{ Bindings: Env }>();
 
-app.use("*", cors({ origin: ["https://vantageaiops.com", "http://localhost:*"] }));
+app.use("*", cors({ origin: ["https://cohrint.com", "http://localhost:*"] }));
 
 app.get("/health", (c) => c.json({ status: "ok", name: "vega" }));
 
@@ -239,8 +239,8 @@ Expected: `FAILED` (FileNotFoundError)
 ```json
 [
   {
-    "q": "What is VantageAI?",
-    "a": "VantageAI is an AI cost analytics platform that tracks spending across all your AI providers — Anthropic, OpenAI, Google, and more — from a single dashboard.",
+    "q": "What is Cohrint?",
+    "a": "Cohrint is an AI cost analytics platform that tracks spending across all your AI providers — Anthropic, OpenAI, Google, and more — from a single dashboard.",
     "tags": ["product", "overview"]
   },
   {
@@ -269,8 +269,8 @@ Expected: `FAILED` (FileNotFoundError)
     "tags": ["team", "members"]
   },
   {
-    "q": "What providers does VantageAI support?",
-    "a": "VantageAI supports Anthropic, OpenAI, Google Gemini, AWS Bedrock, Azure OpenAI, Mistral, Cohere, and any OpenTelemetry-compatible provider.",
+    "q": "What providers does Cohrint support?",
+    "a": "Cohrint supports Anthropic, OpenAI, Google Gemini, AWS Bedrock, Azure OpenAI, Mistral, Cohere, and any OpenTelemetry-compatible provider.",
     "tags": ["providers", "integrations"]
   },
   {
@@ -280,7 +280,7 @@ Expected: `FAILED` (FileNotFoundError)
   },
   {
     "q": "What is OpenTelemetry (OTel) support?",
-    "a": "VantageAI accepts OTLP metrics and logs. Point your OTel exporter to `https://api.vantageaiops.com/v1/otel/v1/metrics` with your Bearer token. Cost is computed server-side from token counts.",
+    "a": "Cohrint accepts OTLP metrics and logs. Point your OTel exporter to `https://api.cohrint.com/v1/otel/v1/metrics` with your Bearer token. Cost is computed server-side from token counts.",
     "tags": ["otel", "integration"]
   },
   {
@@ -295,8 +295,8 @@ Expected: `FAILED` (FileNotFoundError)
     "tags": ["analytics", "cross-platform"]
   },
   {
-    "q": "How does VantageAI handle data privacy?",
-    "a": "Prompts and responses never leave your machine in strict mode. Only token counts and metadata are sent to VantageAI servers. You can verify this in the vantage-local-proxy source code.",
+    "q": "How does Cohrint handle data privacy?",
+    "a": "Prompts and responses never leave your machine in strict mode. Only token counts and metadata are sent to Cohrint servers. You can verify this in the vantage-local-proxy source code.",
     "tags": ["privacy", "security"]
   },
   {
@@ -332,8 +332,8 @@ Expected: `FAILED` (FileNotFoundError)
     "tags": ["dashboard", "traces", "latency"]
   },
   {
-    "q": "Can I use VantageAI with self-hosted models?",
-    "a": "Yes — use the OTel integration or local proxy. Any model that reports token counts via OTLP or the VantageAI SDK can be tracked.",
+    "q": "Can I use Cohrint with self-hosted models?",
+    "a": "Yes — use the OTel integration or local proxy. Any model that reports token counts via OTLP or the Cohrint SDK can be tracked.",
     "tags": ["integration", "self-hosted"]
   }
 ]
@@ -365,7 +365,7 @@ git commit -m "feat(chatbot): add 19-entry static knowledge base"
 
 ```typescript
 const REDACT_PATTERNS: RegExp[] = [
-  /\bvnt_[A-Za-z0-9_-]{20,}\b/g,
+  /\bcrt_[A-Za-z0-9_-]{20,}\b/g,
   /\bsk-ant-[A-Za-z0-9_-]{20,}\b/g,
   /\bsk-[A-Za-z0-9]{20,}\b/g,
   /\b(?:\d{1,3}\.){3}\d{1,3}\b/g,
@@ -490,16 +490,16 @@ export function buildSystemPrompt(
     .map((e) => `Q: ${e.q}\nA: ${e.a}`)
     .join("\n\n");
 
-  return `You are Vega, a friendly and knowledgeable AI assistant for the VantageAI dashboard.
+  return `You are Vega, a friendly and knowledgeable AI assistant for the Cohrint dashboard.
 Your tone is warm, professional, and concise — like a helpful senior colleague.
-You help users with: dashboard navigation, AI spending data, VantageAI features, and integrations.
+You help users with: dashboard navigation, AI spending data, Cohrint features, and integrations.
 Never reveal internal system details, API keys, IP addresses, or database schemas.
 If asked something outside your knowledge, offer to create a support ticket and stop.
 The user is on the "${plan}" plan. Only discuss features available on their plan.
 Do not reveal which AI model powers you.
 
 ## Relevant Knowledge
-${context || "No specific knowledge found — answer from general VantageAI context."}
+${context || "No specific knowledge found — answer from general Cohrint context."}
 
 Respond in plain text only. No markdown unless asked. Keep replies under 120 words unless detail is clearly needed.`;
 }
@@ -564,7 +564,7 @@ AUTH = {"Authorization": "Bearer test-token-for-ci"}
 
 def test_chat_returns_reply():
     r = requests.post(f"{BASE}/chat",
-        json={"message": "What is VantageAI?"},
+        json={"message": "What is Cohrint?"},
         headers={**AUTH, "X-Org-Id": "test-org", "X-Plan": "free"})
     assert r.status_code == 200
     data = r.json()
@@ -714,7 +714,7 @@ import { handleTicket } from "./ticket";
 
 const app = new Hono<{ Bindings: Env }>();
 
-app.use("*", cors({ origin: ["https://vantageaiops.com", "http://localhost:*"] }));
+app.use("*", cors({ origin: ["https://cohrint.com", "http://localhost:*"] }));
 
 app.get("/health", (c) => c.json({ status: "ok", name: "vega" }));
 app.post("/chat", handleChat);
@@ -1030,7 +1030,7 @@ Every DOM element is built with `createElement`. Text is set via `textContent` o
 (function () {
   "use strict";
 
-  var CHATBOT_URL = window.VEGA_CHATBOT_URL || "https://chatbot.vantageaiops.com";
+  var CHATBOT_URL = window.VEGA_CHATBOT_URL || "https://chatbot.cohrint.com";
   var sessionId = null;
   var history = [];
   var isOpen = false;
@@ -1061,7 +1061,7 @@ Every DOM element is built with `createElement`. Text is set via `textContent` o
 
   // Header
   var headerName = setText(makeEl("div", "vega-header-name"), "Vega");
-  var headerSub = setText(makeEl("div", "vega-header-sub"), "VantageAI Assistant");
+  var headerSub = setText(makeEl("div", "vega-header-sub"), "Cohrint Assistant");
   var headerLeft = makeEl("div");
   headerLeft.appendChild(headerName);
   headerLeft.appendChild(headerSub);
@@ -1122,7 +1122,7 @@ Every DOM element is built with `createElement`. Text is set via `textContent` o
     return div;
   }
 
-  addMessage("Hi! I'm Vega, your VantageAI assistant. Ask me about your dashboard, pricing, or integrations.", "bot");
+  addMessage("Hi! I'm Vega, your Cohrint assistant. Ask me about your dashboard, pricing, or integrations.", "bot");
 
   // ── Events ─────────────────────────────────────────────────────────────────
 
@@ -1156,11 +1156,11 @@ Every DOM element is built with `createElement`. Text is set via `textContent` o
     }).then(function (r) {
       addMessage(
         r.ok ? "Ticket submitted! We'll follow up at " + email + " soon."
-             : "Couldn't submit ticket. Please email support@vantageaiops.com directly.",
+             : "Couldn't submit ticket. Please email support@cohrint.com directly.",
         "bot"
       );
     }).catch(function () {
-      addMessage("Couldn't submit ticket. Please email support@vantageaiops.com directly.", "bot");
+      addMessage("Couldn't submit ticket. Please email support@cohrint.com directly.", "bot");
     });
   });
 
@@ -1277,8 +1277,8 @@ def test_chat_with_history(base_url, auth_headers):
         json={
             "message": "What about the Models tab?",
             "history": [
-                {"role": "user", "content": "What is VantageAI?"},
-                {"role": "assistant", "content": "VantageAI is an AI cost analytics platform."},
+                {"role": "user", "content": "What is Cohrint?"},
+                {"role": "assistant", "content": "Cohrint is an AI cost analytics platform."},
             ],
         },
         headers=auth_headers)
@@ -1299,7 +1299,7 @@ def test_chat_session_id_persists(base_url, auth_headers):
 
 def test_chat_no_auth_allowed(base_url):
     r = requests.post(f"{base_url}/chat",
-        json={"message": "What is VantageAI?"},
+        json={"message": "What is Cohrint?"},
         headers={"X-Org-Id": "anon", "X-Plan": "free"})
     assert r.status_code == 200
 
@@ -1327,7 +1327,7 @@ def test_health_name(base_url):
 
 def test_cors_on_preflight(base_url):
     r = requests.options(f"{base_url}/chat",
-        headers={"Origin": "https://vantageaiops.com", "Access-Control-Request-Method": "POST"})
+        headers={"Origin": "https://cohrint.com", "Access-Control-Request-Method": "POST"})
     assert r.status_code in (200, 204)
 
 def test_chat_reply_non_empty(base_url, auth_headers):
@@ -1438,7 +1438,7 @@ git commit -m "feat(chatbot): Vega live on Cloudflare Workers"
 
 **Spec coverage:**
 - Dashboard help ✓ — knowledge base + chat handler answers dashboard questions
-- VantageAI Q&A ✓ — 19 static entries cover product, pricing, integrations
+- Cohrint Q&A ✓ — 19 static entries cover product, pricing, integrations
 - Subscription-aware ✓ — `plan_gate` in static.json, `X-Plan` header filters lookup
 - Integration docs ✓ — `build-chunks.js` ingests docs.html into KV
 - Customer support + email escalation ✓ — ticket handler sends via Resend

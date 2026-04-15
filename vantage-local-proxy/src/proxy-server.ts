@@ -9,7 +9,7 @@
  *                     ↓
  *           Strip ALL sensitive data
  *                     ↓
- *           Send ONLY stats → api.vantageaiops.com
+ *           Send ONLY stats → api.cohrint.com
  *
  * The client's API key and prompts NEVER leave their machine.
  * Only anonymized numbers (tokens, cost, latency) are forwarded.
@@ -30,10 +30,10 @@ export interface LocalProxyConfig {
   /** Port to listen on (default: 4891) */
   port?: number;
 
-  /** VantageAI API key for sending stats (vnt_...) */
+  /** Cohrint API key for sending stats (crt_... or vnt_...) */
   vantageApiKey: string;
 
-  /** VantageAI ingest endpoint (default: https://api.vantageaiops.com) */
+  /** Cohrint ingest endpoint (default: https://api.cohrint.com) */
   vantageApiBase?: string;
 
   /** Privacy configuration */
@@ -303,7 +303,7 @@ export function startProxyServer(config: LocalProxyConfig): void {
   const {
     port = 4891,
     vantageApiKey,
-    vantageApiBase = "https://api.vantageaiops.com",
+    vantageApiBase = "https://api.cohrint.com",
     privacy = DEFAULT_PRIVACY,
     team = "",
     environment = "production",
@@ -587,7 +587,7 @@ export function startProxyServer(config: LocalProxyConfig): void {
   server.listen(port, () => {
     console.log(`
 ╔══════════════════════════════════════════════════════════════╗
-║              VantageAI Local Proxy — RUNNING                ║
+║               Cohrint Local Proxy — RUNNING                 ║
 ╠══════════════════════════════════════════════════════════════╣
 ║                                                              ║
 ║  Address:  http://localhost:${String(port).padEnd(37)}║
@@ -595,9 +595,9 @@ export function startProxyServer(config: LocalProxyConfig): void {
 ║  Privacy:  ${String(privacy.level).padEnd(45)}║
 ║                                                              ║
 ║  YOUR DATA STAYS LOCAL:                                      ║
-║    API keys    → never sent to VantageAI                     ║
-║    Prompts     → never sent to VantageAI                     ║
-║    Responses   → never sent to VantageAI                     ║
+║    API keys    → never sent to Cohrint                       ║
+║    Prompts     → never sent to Cohrint                       ║
+║    Responses   → never sent to Cohrint                       ║
 ║    Stats only  → token counts, cost, latency                 ║
 ║                                                              ║
 ║  ENDPOINTS:                                                  ║

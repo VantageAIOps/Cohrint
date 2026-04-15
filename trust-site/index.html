@@ -3,16 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Security & Trust — VantageAI</title>
-<meta name="description" content="VantageAI security architecture. Zero traffic interception. Your prompts and API keys never leave your infrastructure. Built for enterprise security reviews.">
+<title>Security & Trust — Cohrint</title>
+<meta name="description" content="Cohrint security architecture. Zero traffic interception. Your prompts and API keys never leave your infrastructure. Built for enterprise security reviews.">
 <meta name="robots" content="index, follow">
-<link rel="canonical" href="https://trust.vantageaiops.com">
-<meta property="og:title" content="Security & Trust — VantageAI">
+<link rel="canonical" href="https://trust.cohrint.com">
+<meta property="og:title" content="Security & Trust — Cohrint">
 <meta property="og:description" content="Zero traffic interception. Your prompts never leave your infrastructure. Full security architecture for enterprise procurement reviews.">
-<meta property="og:url" content="https://trust.vantageaiops.com">
+<meta property="og:url" content="https://trust.cohrint.com">
 <meta property="og:type" content="website">
-<link rel="icon" type="image/svg+xml" href="https://vantageaiops.com/favicon.svg">
-<link rel="icon" type="image/png" sizes="32x32" href="https://vantageaiops.com/favicon-32.png">
+<link rel="icon" type="image/svg+xml" href="https://cohrint.com/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="https://cohrint.com/favicon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -208,15 +208,15 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:2px 7p
 
 <!-- NAV -->
 <nav>
-  <a href="https://vantageaiops.com" class="nav-logo">
+  <a href="https://cohrint.com" class="nav-logo">
     <span class="logo-dot"></span>
-    VantageAI
+    Cohrint
   </a>
   <div class="nav-right">
     <span class="nav-badge">Trust &amp; Security</span>
-    <a href="https://vantageaiops.com/docs.html">Docs</a>
-    <a href="https://vantageaiops.com/privacy.html">Privacy</a>
-    <a href="https://vantageaiops.com/signup.html">Get started</a>
+    <a href="https://cohrint.com/docs.html">Docs</a>
+    <a href="https://cohrint.com/privacy.html">Privacy</a>
+    <a href="https://cohrint.com/signup.html">Get started</a>
   </div>
 </nav>
 
@@ -226,7 +226,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:2px 7p
   <div class="hero-glow"></div>
   <div class="hero-eyebrow">Trust &amp; Security</div>
   <h1>Your prompts never leave<br><em>your infrastructure.</em></h1>
-  <p class="hero-sub">VantageAI is an observer, not a middleman. We collect cost metadata — never prompt content. This page documents exactly what we see, what we store, and how we protect it.</p>
+  <p class="hero-sub">Cohrint is an observer, not a middleman. We collect cost metadata — never prompt content. This page documents exactly what we see, what we store, and how we protect it.</p>
   <div class="hero-meta">
     <div class="hero-meta-item"><span class="dot dot-green"></span> Zero traffic interception</div>
     <div class="hero-meta-item"><span class="dot dot-green"></span> No prompt or response storage</div>
@@ -241,7 +241,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:2px 7p
   <div class="section">
     <div class="sec-label">Architecture</div>
     <div class="sec-title">How data flows</div>
-    <p class="sec-desc">VantageAI sits beside your AI calls, not in front of them. Your code communicates directly with OpenAI, Anthropic, or any provider — VantageAI reads response metadata after the call completes.</p>
+    <p class="sec-desc">Cohrint sits beside your AI calls, not in front of them. Your code communicates directly with OpenAI, Anthropic, or any provider — Cohrint reads response metadata after the call completes.</p>
 
     <div class="arch-wrap">
       <div class="arch-flow">
@@ -261,7 +261,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:2px 7p
 
         <div style="display:flex;flex-direction:column;align-items:center;gap:20px">
           <div class="arch-node highlight">
-            <div class="arch-node-label">VantageAI</div>
+            <div class="arch-node-label">Cohrint</div>
             <div class="arch-node-name">Cost Observer</div>
             <div class="arch-node-sub">tokens · cost · latency</div>
           </div>
@@ -281,7 +281,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:2px 7p
       </div>
 
       <div class="arch-note">
-        <strong>Critical distinction:</strong> Your application calls the AI provider directly — VantageAI is never in the network path between your code and the provider. In SDK and OTel modes, the SDK reads token counts and cost from the response object in-process, then queues a metadata event asynchronously. Your production traffic is unaffected by VantageAI's availability.
+        <strong>Critical distinction:</strong> Your application calls the AI provider directly — Cohrint is never in the network path between your code and the provider. In SDK and OTel modes, the SDK reads token counts and cost from the response object in-process, then queues a metadata event asynchronously. Your production traffic is unaffected by Cohrint's availability.
       </div>
     </div>
   </div>
@@ -290,12 +290,12 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:2px 7p
   <div class="section">
     <div class="sec-label">Data Minimization</div>
     <div class="sec-title">Exactly what we collect</div>
-    <p class="sec-desc">The following JSON examples show the actual payload sent to VantageAI servers versus what stays on your machine. No policy interpretation — this is the real data structure.</p>
+    <p class="sec-desc">The following JSON examples show the actual payload sent to Cohrint servers versus what stays on your machine. No policy interpretation — this is the real data structure.</p>
 
     <div class="payload-grid">
       <div class="payload-box">
         <div class="payload-header">
-          <span class="payload-header-title">Sent to VantageAI servers</span>
+          <span class="payload-header-title">Sent to Cohrint servers</span>
           <span class="payload-badge badge-sent">✓ transmitted</span>
         </div>
         <div class="payload-body">
@@ -337,7 +337,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:2px 7p
   <div class="section">
     <div class="sec-label">Privacy Modes</div>
     <div class="sec-title">Choose your disclosure level</div>
-    <p class="sec-desc">VantageAI ships with three privacy modes. The default is Standard. Strict mode is designed for regulated industries — only aggregate counts leave your environment.</p>
+    <p class="sec-desc">Cohrint ships with three privacy modes. The default is Standard. Strict mode is designed for regulated industries — only aggregate counts leave your environment.</p>
 
     <div class="modes-grid">
       <div class="mode-card">
@@ -388,14 +388,14 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:2px 7p
   <div class="section">
     <div class="sec-label">Vendor Comparison</div>
     <div class="sec-title">How we compare to proxy-based tools</div>
-    <p class="sec-desc">The core architectural difference between VantageAI and Helicone or LangSmith is whether your API traffic passes through a third-party server. This table is intended for security reviewers and procurement teams.</p>
+    <p class="sec-desc">The core architectural difference between Cohrint and Helicone or LangSmith is whether your API traffic passes through a third-party server. This table is intended for security reviewers and procurement teams.</p>
 
     <div class="cmp-wrap">
       <table class="cmp-table">
         <thead>
           <tr>
             <th>Question</th>
-            <th class="col-vantage">VantageAI</th>
+            <th class="col-vantage">Cohrint</th>
             <th>Helicone</th>
             <th>LangSmith</th>
           </tr>
@@ -499,7 +499,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:2px 7p
       <div class="control-card">
         <div class="control-icon">🔒</div>
         <div class="control-title">Transport Encryption</div>
-        <div class="control-desc">All traffic between clients and VantageAI is encrypted with TLS 1.2 minimum. TLS 1.3 is preferred and negotiated by default. Cloudflare terminates TLS at the edge. No unencrypted endpoints exist.</div>
+        <div class="control-desc">All traffic between clients and Cohrint is encrypted with TLS 1.2 minimum. TLS 1.3 is preferred and negotiated by default. Cloudflare terminates TLS at the edge. No unencrypted endpoints exist.</div>
         <span class="control-tag">TLS 1.3 · Cloudflare edge · HSTS enforced</span>
       </div>
 
@@ -581,14 +581,14 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:2px 7p
       </tbody>
     </table>
 
-    <p style="margin-top:20px;font-size:13px;color:var(--muted)">You may request deletion of your account and all associated data at any time by emailing <a href="mailto:security@vantageaiops.com">security@vantageaiops.com</a>. Deletion is processed within 72 hours.</p>
+    <p style="margin-top:20px;font-size:13px;color:var(--muted)">You may request deletion of your account and all associated data at any time by emailing <a href="mailto:security@cohrint.com">security@cohrint.com</a>. Deletion is processed within 72 hours.</p>
   </div>
 
   <!-- INFRASTRUCTURE -->
   <div class="section">
     <div class="sec-label">Infrastructure</div>
     <div class="sec-title">Where it runs</div>
-    <p class="sec-desc">VantageAI is built entirely on Cloudflare's platform. We inherit Cloudflare's security certifications for the infrastructure layer.</p>
+    <p class="sec-desc">Cohrint is built entirely on Cloudflare's platform. We inherit Cloudflare's security certifications for the infrastructure layer.</p>
 
     <div class="infra-grid">
       <div class="infra-card">
@@ -596,7 +596,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:2px 7p
         <div class="infra-name">Cloudflare Workers</div>
         <div class="infra-desc">All API endpoints run as Cloudflare Workers on the global edge network. No origin server. Code executes in isolated V8 contexts — no shared memory between requests.</div>
         <div class="infra-cert"><a href="https://www.cloudflare.com/trust-hub/compliance-resources/" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;">Cloudflare SOC 2 Type II ↗</a></div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Infrastructure-layer certification (Cloudflare). VantageAI's own SOC 2 Type I audit is in progress — see Compliance timeline below.</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Infrastructure-layer certification (Cloudflare). Cohrint's own SOC 2 Type I audit is in progress — see Compliance timeline below.</div>
       </div>
 
       <div class="infra-card">
@@ -701,7 +701,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:2px 7p
         <div class="contact-type">Vendor security review</div>
         <div class="contact-title">Security questionnaires &amp; assessments</div>
         <div class="contact-desc">Send your vendor security questionnaire (SIG Lite, CAIQ, custom form) to this address. We respond within 48 business hours. We can also schedule a security call for enterprise procurement reviews.</div>
-        <a href="mailto:security@vantageaiops.com" class="contact-email">security@vantageaiops.com</a>
+        <a href="mailto:security@cohrint.com" class="contact-email">security@cohrint.com</a>
         <div class="contact-sla">Response SLA: 48 business hours</div>
       </div>
 
@@ -709,7 +709,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:2px 7p
         <div class="contact-type">Vulnerability disclosure</div>
         <div class="contact-title">Responsible disclosure</div>
         <div class="contact-desc">If you have found a security vulnerability, please disclose it responsibly. We do not currently have a public bug bounty program but we acknowledge and credit all valid reports. Please do not disclose publicly before we have had a chance to remediate.</div>
-        <a href="mailto:security@vantageaiops.com" class="contact-email">security@vantageaiops.com</a>
+        <a href="mailto:security@cohrint.com" class="contact-email">security@cohrint.com</a>
         <div class="contact-sla">Initial response: 24 hours · Remediation: 90 days</div>
       </div>
     </div>
@@ -719,13 +719,13 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:2px 7p
 
 <!-- FOOTER -->
 <footer>
-  <div class="footer-left">VantageAI · trust.vantageaiops.com · Last updated April 2026</div>
+  <div class="footer-left">Cohrint · trust.cohrint.com · Last updated April 2026</div>
   <div class="footer-links">
-    <a href="https://vantageaiops.com">Home</a>
-    <a href="https://vantageaiops.com/privacy.html">Privacy Policy</a>
-    <a href="https://vantageaiops.com/terms.html">Terms of Service</a>
-    <a href="https://vantageaiops.com/docs.html">Docs</a>
-    <a href="mailto:security@vantageaiops.com">security@vantageaiops.com</a>
+    <a href="https://cohrint.com">Home</a>
+    <a href="https://cohrint.com/privacy.html">Privacy Policy</a>
+    <a href="https://cohrint.com/terms.html">Terms of Service</a>
+    <a href="https://cohrint.com/docs.html">Docs</a>
+    <a href="mailto:security@cohrint.com">security@cohrint.com</a>
   </div>
 </footer>
 

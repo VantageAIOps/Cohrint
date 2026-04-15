@@ -10,7 +10,7 @@
 
 `track_llm_call` records every LLM call as a unique event. Currently:
 1. The dashboard "Cache Savings" KPI card shows **zero always** — the `cache_tokens` column exists in D1 and OTel already populates it, but `GET /v1/analytics/kpis` never queries it.
-2. There is **no detection of repeated/duplicate LLM calls** — if an agent sends the same prompt 10 times in a day, VantageAI has no way to flag that waste.
+2. There is **no detection of repeated/duplicate LLM calls** — if an agent sends the same prompt 10 times in a day, Cohrint has no way to flag that waste.
 3. `track_llm_call` MCP schema exposes no `cache_tokens` parameter — agents cannot report provider-native cache reads.
 
 ---

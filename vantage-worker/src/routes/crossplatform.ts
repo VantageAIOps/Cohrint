@@ -1,5 +1,5 @@
 /**
- * VantageAI — Cross-Platform Cost API
+ * Cohrint — Cross-Platform Cost API
  *
  * Serves aggregated data from OTel telemetry + billing APIs.
  * Powers the "All AI Spend" dashboard with live/near-real-time data.

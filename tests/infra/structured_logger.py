@@ -1,5 +1,5 @@
 """
-structured_logger.py — Structured JSON logging infrastructure for VantageAI
+structured_logger.py — Structured JSON logging infrastructure for Cohrint
 ============================================================================
 Purpose:
   Central logging layer used by both the test suite and (eventually) the
@@ -180,7 +180,7 @@ class VantageLogger:
         """
         Context manager that logs duration on exit.
 
-        with log.timer("POST /v1/auth/session", key_prefix="vnt_abc"):
+        with log.timer("POST /v1/auth/session", key_prefix="crt_abc"):
             r = requests.post(...)
         """
         return _Timer(self, label, level=level, **ctx)

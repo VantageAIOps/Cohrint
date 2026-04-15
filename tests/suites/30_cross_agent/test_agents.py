@@ -271,7 +271,7 @@ class TestCostTrackingMultiAgent:
     def test_xa31_track_claude_event(self, headers):
         section("F --- Cost Tracking via API (multi-agent)")
         ev = make_event(i=0, model="claude-sonnet-4-6", cost=0.01)
-        ev["source"] = "vantageai-agent"
+        ev["source"] = "cohrint-agent"
         ev["tags"] = {"agent": "claude"}
         r = requests.post(f"{API_URL}/v1/events", json=ev, headers=headers, timeout=10)
         chk("XA.31 claude agent event tracked", r.status_code in (200, 201))
@@ -279,7 +279,7 @@ class TestCostTrackingMultiAgent:
 
     def test_xa32_track_gemini_event(self, headers):
         ev = make_event(i=0, model="gemini-2.0-flash", cost=0.0004)
-        ev["source"] = "vantageai-agent"
+        ev["source"] = "cohrint-agent"
         ev["tags"] = {"agent": "gemini"}
         ev["provider"] = "google"
         r = requests.post(f"{API_URL}/v1/events", json=ev, headers=headers, timeout=10)
@@ -288,7 +288,7 @@ class TestCostTrackingMultiAgent:
 
     def test_xa33_track_codex_event(self, headers):
         ev = make_event(i=0, model="gpt-4o", cost=0.005)
-        ev["source"] = "vantageai-agent"
+        ev["source"] = "cohrint-agent"
         ev["tags"] = {"agent": "codex"}
         r = requests.post(f"{API_URL}/v1/events", json=ev, headers=headers, timeout=10)
         chk("XA.33 codex agent event tracked", r.status_code in (200, 201))
@@ -296,7 +296,7 @@ class TestCostTrackingMultiAgent:
 
     def test_xa34_track_api_backend_event(self, headers):
         ev = make_event(i=0, model="claude-sonnet-4-6", cost=0.01)
-        ev["source"] = "vantageai-agent"
+        ev["source"] = "cohrint-agent"
         ev["tags"] = {"agent": "api"}
         r = requests.post(f"{API_URL}/v1/events", json=ev, headers=headers, timeout=10)
         chk("XA.34 api backend event tracked", r.status_code in (200, 201))
@@ -304,7 +304,7 @@ class TestCostTrackingMultiAgent:
 
     def test_xa35_track_multiple_backends(self, headers):
         ev = make_event(i=0, model="gpt-4o", cost=0.005)
-        ev["source"] = "vantageai-agent"
+        ev["source"] = "cohrint-agent"
         ev["tags"] = {"agent": "codex", "backend": "codex"}
         r = requests.post(f"{API_URL}/v1/events", json=ev, headers=headers, timeout=10)
         chk("XA.35 second codex event tracked", r.status_code in (200, 201))
@@ -320,7 +320,7 @@ class TestCostTrackingMultiAgent:
         for i, (model, provider, agent) in enumerate(agents):
             ev = make_event(i=i, model=model, cost=0.005)
             ev["provider"] = provider
-            ev["source"] = "vantageai-agent"
+            ev["source"] = "cohrint-agent"
             ev["tags"] = {"agent": agent}
             events.append(ev)
         r = requests.post(

@@ -531,7 +531,7 @@ def test_sse_stream_after_otel_ingest(headers, api_key, org_id):
     time.sleep(3)
 
     # Poll the SSE stream endpoint — this is what the dashboard live feed reads.
-    # Uses ?token=vnt_... auth (legacy bearer in query param, accepted by stream.ts).
+    # Uses ?token=crt_... auth (legacy bearer in query param, accepted by stream.ts).
     # The worker polls KV every 2s and closes after 25s; we read with streaming=True
     # and parse the first 'data:' line.
     stream_url = f"{API_URL}/v1/stream/{org_id}?token={api_key}"
@@ -638,7 +638,7 @@ def test_budget_api(headers):
 
 def run():
     info("=" * 66)
-    info("  VantageAI — E2E OTel + Cross-Platform Tests (78 checks)")
+    info("  Cohrint — E2E OTel + Cross-Platform Tests (78 checks)")
     info("  Simulates: Claude Code, Copilot, Gemini, Codex, Cline, SDK")
     info("=" * 66)
 

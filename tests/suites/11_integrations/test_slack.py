@@ -47,7 +47,7 @@ def main():
                           "threshold": 10.0,
                           "current_value": 15.0,
                           "org_id": org_id,
-                          "message": "Test alert from VantageAI CI",
+                          "message": "Test alert from Cohrint CI",
                       },
                       headers=headers, timeout=30)
     chk("SLK.1  POST /alerts/slack valid webhook → 200",

@@ -6,8 +6,8 @@ Wraps litellm.completion() — covers 100+ models including:
   AWS Bedrock, Azure OpenAI, Perplexity, and any OpenAI-compatible API.
 
 USAGE:
-    import vantage; vantage.init("vnt_...")
-    from vantageaiops.proxy import litellm
+    import vantage; vantage.init("crt_...")
+    from cohrint.proxy import litellm
 
     # Any model litellm supports
     response = litellm.completion(
@@ -31,7 +31,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from vantageaiops.proxy.universal import _build_event
+from cohrint.proxy.universal import _build_event
 
 try:
     import litellm as _ll

@@ -1,15 +1,15 @@
-# VantageAI Consumption Analysis Prompt
+# Cohrint Consumption Analysis Prompt
 
-> A comprehensive, multi-dimensional prompt for analyzing AI cost consumption across all platforms, models, teams, and developers in the VantageAI dashboard. Designed to be used with Claude, GPT-4o, or any frontier model connected to the VantageAI MCP server.
+> A comprehensive, multi-dimensional prompt for analyzing AI cost consumption across all platforms, models, teams, and developers in the Cohrint dashboard. Designed to be used with Claude, GPT-4o, or any frontier model connected to the Cohrint MCP server.
 
 ---
 
 ## The Prompt
 
 ```
-You are an expert AI FinOps analyst connected to the VantageAI cost intelligence platform.
+You are an expert AI FinOps analyst connected to the Cohrint cost intelligence platform.
 Your job is to perform a comprehensive, multi-dimensional consumption analysis of our
-organization's AI spending. You have access to the following VantageAI MCP tools:
+organization's AI spending. You have access to the following Cohrint MCP tools:
 
   - get_summary        → MTD spend, today's spend, requests, avg latency, budget status
   - get_kpis           → Detailed KPIs: cost, tokens, requests, latency, efficiency score
@@ -226,16 +226,16 @@ One paragraph: current state, biggest risk, biggest opportunity.
 ## Usage
 
 ### Via MCP (Claude Code / Cursor / Windsurf)
-Paste the prompt above into any AI assistant connected to the VantageAI MCP server.
+Paste the prompt above into any AI assistant connected to the Cohrint MCP server.
 The assistant will automatically call the MCP tools and produce the full report.
 
 ### Via API
-Send the prompt as a system message to any frontier model, with the VantageAI MCP
+Send the prompt as a system message to any frontier model, with the Cohrint MCP
 tools registered as available tools. The model will orchestrate the tool calls.
 
 ### Via Dashboard
-Navigate to the VantageAI dashboard → "All AI Spend" tab for the visual version
-of this analysis. The dashboard at `https://vantageaiops.com/app.html` provides:
+Navigate to the Cohrint dashboard → "All AI Spend" tab for the visual version
+of this analysis. The dashboard at `https://cohrint.com/app.html` provides:
 - Real-time KPI cards (total spend, today, MTD, session, budget %)
 - Cost trend charts (daily line chart)
 - Provider breakdown (pie/bar chart)

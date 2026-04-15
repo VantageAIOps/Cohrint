@@ -34,7 +34,7 @@ def test_signup():
         d = r.json()
         chk("1.2  Response has api_key", "api_key" in d)
         chk("1.3  Response has org_id",  "org_id"  in d)
-        chk("1.4  api_key starts with vnt_", d.get("api_key", "").startswith("vnt_"),
+        chk("1.4  api_key starts with crt_", d.get("api_key", "").startswith("crt_"),
             f"got: {d.get('api_key', '')[:10]}")
         chk("1.5  Response has hint",    "hint" in d)
         api_key = d["api_key"]
@@ -80,7 +80,7 @@ def test_session(api_key):
 
     # 1.11 POST /session with invalid key → 401
     r2 = requests.post(f"{API_URL}/v1/auth/session",
-                       json={"api_key": "vnt_invalidkey123"}, timeout=15)
+                       json={"api_key": "crt_invalidkey123"}, timeout=15)
     chk("1.11 POST /session invalid key → 401", r2.status_code == 401,
         f"got {r2.status_code}")
 
@@ -139,7 +139,7 @@ def test_rotate(api_key):
         chk("1.19 POST /rotate returns new key", bool(new_key),
             f"response: {d}")
         if new_key:
-            chk("1.20 New key starts with vnt_", new_key.startswith("vnt_"),
+            chk("1.20 New key starts with crt_", new_key.startswith("crt_"),
                 f"got: {new_key[:10]}")
             # New key should work for session
             r2 = requests.post(f"{API_URL}/v1/auth/session",

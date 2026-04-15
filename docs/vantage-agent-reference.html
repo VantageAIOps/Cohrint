@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VantageAI Agent — Command Reference</title>
+<title>Cohrint Agent — Command Reference</title>
 <style>
   :root {
     --brand: #FF6B35;
@@ -449,7 +449,7 @@
     <div class="sidebar-logo">
       <div class="logo-dot">V</div>
       <div>
-        <div class="logo-text">VantageAI</div>
+        <div class="logo-text">Cohrint</div>
         <div class="logo-sub">Agent Reference</div>
       </div>
     </div>
@@ -495,7 +495,7 @@
 
     <!-- Header -->
     <div class="page-header">
-      <h1>VantageAI Agent — Command Reference</h1>
+      <h1>Cohrint Agent — Command Reference</h1>
       <p>Personal reference for running the vantage-agent. All commands, timing rules, and safety gates in one place.</p>
       <div class="badges">
         <span class="badge badge-orange">⚡ Cloudflare Workers</span>
@@ -775,16 +775,16 @@ Read: &lt;project_root&gt;/CLAUDE.md
       </div>
 
       <div class="card">
-        <div class="card-title">Worker — api.vantageaiops.com</div>
+        <div class="card-title">Worker — api.cohrint.com</div>
         <div class="code-block">
 <span class="cmd">cd vantage-worker</span>
 <span class="cmd">npm run typecheck</span>          <span class="comment"># must be zero errors first</span>
-<span class="cmd">npx wrangler deploy</span>         <span class="comment"># → api.vantageaiops.com</span>
+<span class="cmd">npx wrangler deploy</span>         <span class="comment"># → api.cohrint.com</span>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-title">Pages — vantageaiops.com</div>
+        <div class="card-title">Pages — cohrint.com</div>
         <div class="code-block">
 <span class="cmd">npx wrangler pages deploy ./vantage-final-v4 --project-name=vantageai</span>
         </div>
@@ -1067,7 +1067,7 @@ Read: &lt;project_root&gt;/CLAUDE.md
           <span class="gotcha-icon">🍪</span>
           <div class="gotcha-text">
             <strong>Cookie domain must be root</strong>
-            <span>Set on <code>vantageaiops.com</code> (no subdomain) to share across <code>api.</code> and <code>app.</code></span>
+            <span>Set on <code>cohrint.com</code> (no subdomain) to share across <code>api.</code> and <code>app.</code></span>
           </div>
         </div>
         <div class="gotcha">
@@ -1132,7 +1132,7 @@ if (auth.role === 'viewer') return c.json({ error: 'Forbidden' }, 403)
         <div class="never-item"><span class="never-icon">✗</span><span><code>git push --force origin main</code></span></div>
         <div class="never-item"><span class="never-icon">✗</span><span><code>git reset --hard</code> without explicit approval</span></div>
         <div class="never-item"><span class="never-icon">✗</span><span><code>git add -A</code> or <code>git add .</code> — always add specific files</span></div>
-        <div class="never-item"><span class="never-icon">✗</span><span><code>console.log</code> any <code>vnt_*</code> token</span></div>
+        <div class="never-item"><span class="never-icon">✗</span><span><code>console.log</code> any <code>crt_*</code> token</span></div>
         <div class="never-item"><span class="never-icon">✗</span><span>Commit API keys, wrangler.toml IDs, or .env files</span></div>
         <div class="never-item"><span class="never-icon">✗</span><span>Skip auth on any route — even health/ping endpoints</span></div>
         <div class="never-item"><span class="never-icon">✗</span><span>Hard-delete user data — soft delete (<code>deleted_at</code>) only</span></div>

@@ -171,7 +171,7 @@ try:
                     if base_el.count() > 0:
                         api_base = base_el.first.get_attribute("value") or ""
                         chk("3.3  Settings view shows API base URL",
-                            "vantageaiops.com" in api_base or len(api_base) > 5,
+                            "cohrint.com" in api_base or len(api_base) > 5,
                             f"api_base='{api_base}'")
                     else:
                         warn("3.3  API base URL input not found in settings view")

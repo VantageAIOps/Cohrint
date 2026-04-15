@@ -1,7 +1,7 @@
 """
 setup_wizard.py — First-run tiered permission wizard.
 
-Shown when a user runs vantageai-agent without an API key and
+Shown when a user runs cohrint-agent without an API key and
 auto_detect_backend() returns 'claude' (or --backend claude is passed).
 
 TIER_TOOLS maps tier number → tools to auto-approve.
@@ -33,7 +33,7 @@ TIER_TOOLS: dict[int, list[str]] = {
 
 
 def _config_dir(config_dir: Path | None) -> Path:
-    return config_dir or Path(os.environ.get("VANTAGE_CONFIG_DIR", Path.home() / ".vantage-agent"))
+    return config_dir or Path(os.environ.get("COHRINT_CONFIG_DIR", Path.home() / ".cohrint-agent"))
 
 
 def needs_setup(config_dir: Path | None = None) -> bool:
@@ -92,7 +92,7 @@ def run_setup_wizard(permissions: "PermissionManager", config_dir: Path | None =
     Returns the chosen tier (1-4).
     """
     console.print()
-    console.print("  [bold]Vantage Agent — Tool Permissions[/bold]")
+    console.print("  [bold]Cohrint Agent — Tool Permissions[/bold]")
     console.print()
     console.print("  Claude Code CLI detected. Select what Claude is allowed to do:")
     console.print()

@@ -1,7 +1,7 @@
 """
 vantage/models/event.py
 -----------------------
-Core data models. Every AI call becomes a VantageEvent.
+Core data models. Every AI call becomes a CohrintEvent.
 """
 
 from __future__ import annotations
@@ -85,7 +85,7 @@ class OptimizerMeta:
 
 
 @dataclass
-class VantageEvent:
+class CohrintEvent:
     # Identity
     event_id:    str
     timestamp:   float

@@ -15,7 +15,7 @@ import vantage
 # ══════════════════════════════════════════════════════════
 
 vantage.init(
-    api_key     = "vnt_your_key_here",  # from app.vantage.ai > Settings > API Keys
+    api_key     = "crt_your_key_here",  # from app.vantage.ai > Settings > API Keys
     org         = "acme-corp",           # your org slug
     team        = "product-team",        # default team tag
     environment = "production",          # or "staging", "development"
@@ -130,7 +130,7 @@ if __name__ == "__main__":
 
     # Load real keys from env for testing
     vantage.init(
-        api_key     = os.getenv("VANTAGE_API_KEY", "vnt_dev_test"),
+        api_key     = os.getenv("VANTAGE_API_KEY", "crt_dev_test"),
         environment = "development",
         debug       = True,
     )

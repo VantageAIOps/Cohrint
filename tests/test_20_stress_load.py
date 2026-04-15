@@ -2,7 +2,7 @@
 test_20_stress_load.py — Production Stress & Load Tests
 ========================================================
 Developer notes:
-  Comprehensive stress testing against production (api.vantageaiops.com).
+  Comprehensive stress testing against production (api.cohrint.com).
   These tests run REAL traffic — not mocked. They are safe to run because:
     • All test accounts use @vantage-test.dev emails (easily filtered)
     • Events are clearly tagged environment="stress-test"

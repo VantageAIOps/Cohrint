@@ -303,7 +303,7 @@ chk("16.23b Concurrent same-email: others get 409",
 # 16.24 Concurrent invalid key sign-ins → all 401
 def do_bad_session():
     r = requests.post(f"{API_URL}/v1/auth/session",
-                      json={"api_key": f"vnt_invalid_{rand_tag()}"}, timeout=10)
+                      json={"api_key": f"crt_invalid_{rand_tag()}"}, timeout=10)
     return r.status_code
 
 with ThreadPoolExecutor(max_workers=5) as ex:
@@ -467,7 +467,7 @@ try:
                     for c in sr_main.cookies:
                         ctx.add_cookies([{
                             "name": c.name, "value": c.value,
-                            "domain": "vantageaiops.com", "path": "/",
+                            "domain": "cohrint.com", "path": "/",
                         }])
                 pages_list.append(p)
 
@@ -523,7 +523,7 @@ try:
                         for c in sr.cookies:
                             ctx_n.add_cookies([{
                                 "name": c.name, "value": c.value,
-                                "domain": "vantageaiops.com", "path": "/",
+                                "domain": "cohrint.com", "path": "/",
                             }])
                 try:
                     p2.goto(f"{SITE_URL}/app", wait_until="networkidle", timeout=25_000)

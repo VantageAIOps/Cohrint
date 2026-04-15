@@ -87,7 +87,7 @@ class PermissionServer(threading.Thread):
 
 
 def install_hook_script(config_dir: Path) -> Path:
-    """Write ~/.vantage-agent/perm-hook.sh and make it executable."""
+    """Write ~/.cohrint-agent/perm-hook.sh and make it executable."""
     config_dir.mkdir(parents=True, exist_ok=True)
     hook_path = config_dir / "perm-hook.sh"
     hook_path.write_text(_HOOK_SCRIPT)
@@ -106,7 +106,7 @@ def build_session_settings_file(
     Writes merged settings to output_path. --settings REPLACES user settings,
     so we must carry all existing settings forward.
     """
-    _cfg = str(config_dir or Path.home() / ".vantage-agent")
+    _cfg = str(config_dir or Path.home() / ".cohrint-agent")
 
     # Load user settings (fail gracefully)
     user_settings: dict = {}
@@ -123,8 +123,8 @@ def build_session_settings_file(
             "type": "command",
             "command": str(Path(_cfg) / "perm-hook.sh"),
             "env": {
-                "VANTAGE_SOCKET": socket_path,
-                "VANTAGE_CONFIG_DIR": _cfg,
+                "COHRINT_SOCKET": socket_path,
+                "COHRINT_CONFIG_DIR": _cfg,
             },
         }],
     }
@@ -142,12 +142,12 @@ def build_session_settings_file(
 
 
 _HOOK_SCRIPT = r"""#!/bin/bash
-# vantage-agent PreToolUse permission hook
+# cohrint-agent PreToolUse permission hook
 # Receives tool info on stdin as JSON from Claude Code.
 # Exits 0 = allow, 2 = block (stdout message goes to model as tool_result).
 
-SOCKET_PATH="${VANTAGE_SOCKET:-}"
-CONFIG_DIR="${VANTAGE_CONFIG_DIR:-$HOME/.vantage-agent}"
+SOCKET_PATH="${COHRINT_SOCKET:-}"
+CONFIG_DIR="${COHRINT_CONFIG_DIR:-$HOME/.cohrint-agent}"
 PERMISSIONS_FILE="$CONFIG_DIR/permissions.json"
 
 # Read stdin (tool info JSON)
@@ -179,17 +179,17 @@ case "$FAST" in
     "allow") exit 0 ;;
     "deny")
         TOOL=$(python3 -c "import sys,json; print(json.loads(sys.argv[1]).get('tool_name','tool'))" "$INPUT" 2>/dev/null)
-        echo "[Vantage] $TOOL is in your always-denied list."
+        echo "[Cohrint] $TOOL is in your always-denied list."
         exit 2
         ;;
 esac
 
-# Need interactive prompt: connect to vantage-agent socket
+# Need interactive prompt: connect to cohrint-agent socket
 if [ -z "$SOCKET_PATH" ] || [ ! -S "$SOCKET_PATH" ]; then
     # No socket available — apply fail policy
     POLICY=$(python3 -c "
 import json, os
-cfg = os.path.join(os.environ.get('VANTAGE_CONFIG_DIR', os.path.expanduser('~/.vantage-agent')), 'config.json')
+cfg = os.path.join(os.environ.get('COHRINT_CONFIG_DIR', os.path.expanduser('~/.cohrint-agent')), 'config.json')
 d = json.load(open(cfg)) if os.path.exists(cfg) else {}
 print(d.get('hook_fail_policy', 'allow'))
 " 2>/dev/null || echo "allow")
@@ -222,7 +222,7 @@ case "$RESPONSE" in
     allow*) exit 0 ;;
     deny*)
         TOOL=$(python3 -c "import sys,json; print(json.loads(sys.argv[1]).get('tool_name','tool'))" "$INPUT" 2>/dev/null)
-        echo "[Vantage] $TOOL denied. Use /allow $TOOL to approve, or try a read-only approach."
+        echo "[Cohrint] $TOOL denied. Use /allow $TOOL to approve, or try a read-only approach."
         exit 2
         ;;
     *) exit 0 ;;

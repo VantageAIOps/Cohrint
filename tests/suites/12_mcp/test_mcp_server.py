@@ -65,14 +65,14 @@ def run_mcp_handshake():
 
     try:
         proc = subprocess.run(
-            ["npx", "-y", "vantageaiops-mcp"],
+            ["npx", "-y", "cohrint-mcp"],
             input=stdin_data,
             capture_output=True,
             text=True,
             timeout=30,
             env={
                 **__import__("os").environ,
-                "VANTAGE_API_KEY": "vnt_test_mcp_server_check",
+                "VANTAGE_API_KEY": "crt_test_mcp_server_check",
             },
         )
     except FileNotFoundError:

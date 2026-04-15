@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  var CHATBOT_URL = window.VEGA_CHATBOT_URL || "https://chatbot.vantageaiops.com";
+  var CHATBOT_URL = window.VEGA_CHATBOT_URL || "https://chatbot.cohrint.com";
   var sessionId = null;
   var history = [];
   var isOpen = false;
@@ -36,7 +36,7 @@
   var headerName = makeEl("div", "vega-header-name");
   headerName.textContent = "Vega";
   var headerSub = makeEl("div", "vega-header-sub");
-  headerSub.textContent = "VantageAI Assistant";
+  headerSub.textContent = "Cohrint Assistant";
   var headerLeft = makeEl("div");
   headerLeft.appendChild(headerName);
   headerLeft.appendChild(headerSub);
@@ -99,7 +99,7 @@
 
   // Greeting
   addMessage(
-    "Hi! I\u2019m Vega, your VantageAI assistant. Ask me about your dashboard, pricing, or integrations.",
+    "Hi! I\u2019m Vega, your Cohrint assistant. Ask me about your dashboard, pricing, or integrations.",
     "bot"
   );
 
@@ -195,13 +195,13 @@
           addMessage(
             r.ok
               ? "Ticket submitted! We\u2019ll follow up at " + email + " soon."
-              : "Couldn\u2019t submit ticket. Please email support@vantageaiops.com directly.",
+              : "Couldn\u2019t submit ticket. Please email support@cohrint.com directly.",
             "bot"
           );
         })
         .catch(function () {
           removeTicketForm();
-          addMessage("Couldn\u2019t submit ticket. Please email support@vantageaiops.com directly.", "bot");
+          addMessage("Couldn\u2019t submit ticket. Please email support@cohrint.com directly.", "bot");
         });
     });
 

@@ -56,7 +56,7 @@ def test_key_rotation(api_key):
             f"response keys: {list(d.keys())}")
 
         if new_key:
-            chk("ST.6  New key starts with vnt_", new_key.startswith("vnt_"))
+            chk("ST.6  New key starts with crt_", new_key.startswith("crt_"))
 
             # ST.7 New key works for session
             r2 = requests.post(f"{API_URL}/v1/auth/session",
@@ -124,7 +124,7 @@ def test_settings_ui(api_key, org_id):
             # ST.12 API base URL shown
             try:
                 body = page.inner_text("body")
-                has_api_url = "api.vantageaiops.com" in body or API_URL in body
+                has_api_url = "api.cohrint.com" in body or API_URL in body
                 chk("ST.12 API base URL visible in settings", has_api_url,
                     "API URL not found in page text")
             except Exception as e:

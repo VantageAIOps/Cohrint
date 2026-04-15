@@ -47,7 +47,7 @@ def main():
                           "threshold": 10.0,
                           "current_value": 15.5,
                           "org_id": org_id,
-                          "subject": "VantageAI CI Test Alert",
+                          "subject": "Cohrint CI Test Alert",
                       },
                       headers=headers, timeout=30)
     chk("MAIL.1  POST /alerts/email valid email → 200",

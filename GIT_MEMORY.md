@@ -1,4 +1,4 @@
-# GIT_MEMORY.md — VantageAI
+# GIT_MEMORY.md — Cohrint
 _Last updated: 2026-04-15_
 
 ## Current Branch

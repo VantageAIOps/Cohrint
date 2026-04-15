@@ -1,5 +1,5 @@
 """
-api.py — API helpers for VantageAI test suite
+api.py — API helpers for Cohrint test suite
 """
 
 import sys

@@ -5,4 +5,4 @@ Allow: /
 Disallow: /app.html
 
 # Sitemap
-Sitemap: https://vantageaiops.com/sitemap.xml
+Sitemap: https://cohrint.com/sitemap.xml

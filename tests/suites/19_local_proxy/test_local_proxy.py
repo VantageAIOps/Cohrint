@@ -888,7 +888,7 @@ def test_scanner_unknown(headers):
 
 def run():
     info("=" * 60)
-    info("  VantageAI — Local Proxy: Privacy, Pricing & Integration")
+    info("  Cohrint — Local Proxy: Privacy, Pricing & Integration")
     info("  42 checks across 4 sections")
     info("=" * 60)
 

@@ -30,7 +30,7 @@ Tests (14.1 – 14.45):
   14.10 Settings modal: opens on /app page
   14.11 Settings modal: shows email
   14.12 Settings modal: shows org name
-  14.13 Settings modal: shows API key hint (vnt_...XXXX)
+  14.13 Settings modal: shows API key hint (crt_...XXXX)
   14.14 Settings modal: shows plan tier
   14.15 Settings modal: closes without crash
   14.16 Settings modal: has regenerate/rotate key option (or recovery link)
@@ -233,7 +233,7 @@ if KEY:
         MEMBER_ID  = md.get("id") or md.get("member_id")
         MEMBER_KEY = md.get("api_key")
         chk("14.22 Member invite: key returned in response",
-            bool(MEMBER_KEY) and MEMBER_KEY.startswith("vnt_"),
+            bool(MEMBER_KEY) and MEMBER_KEY.startswith("crt_"),
             f"key: {MEMBER_KEY[:20] if MEMBER_KEY else None}")
 
     # 14.21 List members
@@ -352,7 +352,7 @@ try:
                 for c in sr.cookies:
                     ctx.add_cookies([{
                         "name": c.name, "value": c.value,
-                        "domain": "vantageaiops.com", "path": "/",
+                        "domain": "cohrint.com", "path": "/",
                     }])
 
             try:
@@ -410,9 +410,9 @@ try:
                     chk("14.12 Settings shows org name",
                         "org" in content_lower or ORG.lower() in content_lower[:5000])
 
-                    # 14.13 API key hint (format: vnt_...XXXX)
+                    # 14.13 API key hint (format: crt_...XXXX)
                     chk("14.13 Settings shows API key hint",
-                        "vnt_" in content[:5000] or "api key" in content_lower
+                        "crt_" in content[:5000] or "api key" in content_lower
                         or (HINT and HINT in content[:5000]))
 
                     # 14.14 Plan/tier visible

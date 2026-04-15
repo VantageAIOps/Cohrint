@@ -4,32 +4,32 @@
 <meta charset="UTF-8">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>VantageAI — LLM Cost Analytics Dashboard</title>
-<meta name="description" content="VantageAI dashboard — real-time LLM cost analytics, budget alerts, model comparison and agent trace viewer.">
+<title>Cohrint — LLM Cost Analytics Dashboard</title>
+<meta name="description" content="Cohrint dashboard — real-time LLM cost analytics, budget alerts, model comparison and agent trace viewer.">
 <meta name="robots" content="noindex, follow">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#00d4a1">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="VantageAI">
-<link rel="canonical" href="https://vantageaiops.com/app.html">
+<meta name="apple-mobile-web-app-title" content="Cohrint">
+<link rel="canonical" href="https://cohrint.com/app.html">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="VantageAI">
-<meta property="og:title" content="VantageAI — LLM Cost Analytics Dashboard">
+<meta property="og:site_name" content="Cohrint">
+<meta property="og:title" content="Cohrint — LLM Cost Analytics Dashboard">
 <meta property="og:description" content="Real-time LLM cost analytics, budget alerts, model comparison and agent trace viewer.">
-<meta property="og:url" content="https://vantageaiops.com/app.html">
-<meta property="og:image" content="https://vantageaiops.com/og-image.png">
+<meta property="og:url" content="https://cohrint.com/app.html">
+<meta property="og:image" content="https://cohrint.com/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="VantageAI — LLM Cost Analytics Dashboard">
-<meta name="twitter:image" content="https://vantageaiops.com/og-image.png">
+<meta name="twitter:title" content="Cohrint — LLM Cost Analytics Dashboard">
+<meta name="twitter:image" content="https://cohrint.com/og-image.png">
 <script src="/theme.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
 <script src="/vantage-models.js"></script>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════════
-   VantageAI — Dark Industrial Command Center
+   Cohrint — Dark Industrial Command Center
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
@@ -698,7 +698,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
     <div class="sidebar-logo">
       <div class="logo-icon">V</div>
       <div>
-        <div class="logo-text">VantageAI</div>
+        <div class="logo-text">Cohrint</div>
       </div>
       <div class="logo-badge">BETA</div>
     </div>
@@ -1026,7 +1026,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
       <!-- ─── Members ─── -->
       <div id="view-members" class="view">
         <div class="kpi-grid" style="grid-template-columns: repeat(3, 1fr);">
-          <div class="kpi-card" data-insight="Total number of team members with access to the VantageAI dashboard.">
+          <div class="kpi-card" data-insight="Total number of team members with access to the Cohrint dashboard.">
             <div class="kpi-label">Members</div>
             <div class="kpi-value" id="memberCount">&mdash;</div>
           </div>
@@ -1255,7 +1255,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
               <span id="copilotStatusBadge" style="display:none;font-size:10px;font-family:var(--font-mono);font-weight:600;padding:3px 8px;border-radius:10px;"></span>
             </div>
             <p style="font-size:12px;color:var(--text-secondary);margin-bottom:14px;">
-              Connect your GitHub organization to pull Copilot seat usage and cost data directly into VantageAI.
+              Connect your GitHub organization to pull Copilot seat usage and cost data directly into Cohrint.
             </p>
 
             <!-- Connected state -->
@@ -1327,7 +1327,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
               <div style="margin-bottom:12px;">
                 <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;font-family:var(--font-mono);">Run once in your terminal:</div>
                 <div style="background:var(--bg-input);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-family:var(--font-mono);font-size:12px;color:var(--accent-green);display:flex;align-items:center;justify-content:space-between;gap:8px;">
-                  <span>npx vantageaiops-mcp setup</span>
+                  <span>npx cohrint-mcp setup</span>
                   <button onclick="copyClaudeSetupCmd(this)" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:11px;padding:0;white-space:nowrap;">Copy</button>
                 </div>
               </div>
@@ -1407,7 +1407,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
               <div class="card-title">API Key</div>
             </div>
             <div class="api-key-display">
-              <code id="accountApiKey">vnt_****...****</code>
+              <code id="accountApiKey">crt_****...****</code>
               <button class="btn btn-sm" onclick="toggleApiKeyVisibility()">Show</button>
               <button class="btn btn-sm" onclick="copyApiKey()">Copy</button>
             </div>
@@ -1629,7 +1629,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
 
 <script>
 /* ═══════════════════════════════════════════════════════════════════════════
-   VantageAI Dashboard — All JavaScript
+   Cohrint Dashboard — All JavaScript
    All DOM manipulation uses esc() for XSS prevention on user-supplied data.
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -1637,7 +1637,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
 (function() {
   var _stored = localStorage.getItem('api_base');
   // Only accept the known API host or relative paths — rejects arbitrary https:// origins
-  var _ALLOWED_API_HOSTS = ['api.vantageaiops.com', 'localhost', '127.0.0.1'];
+  var _ALLOWED_API_HOSTS = ['api.cohrint.com', 'localhost', '127.0.0.1'];
   var _valid = false;
   if (_stored) {
     if (/^\/[^/]/.test(_stored)) {
@@ -1649,7 +1649,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
       } catch (_) { _valid = false; }
     }
   }
-  window._API_BASE_VALIDATED = _valid ? _stored : 'https://api.vantageaiops.com';
+  window._API_BASE_VALIDATED = _valid ? _stored : 'https://api.cohrint.com';
 })();
 var API_BASE = window._API_BASE_VALIDATED;
 var _session = null;
@@ -3467,7 +3467,7 @@ function testSlack() {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function loadSettings() {
-  document.getElementById('settingsApiBase').value = localStorage.getItem('api_base') || 'https://api.vantageaiops.com';
+  document.getElementById('settingsApiBase').value = localStorage.getItem('api_base') || 'https://api.cohrint.com';
   document.getElementById('privacyMode').value = localStorage.getItem('vantage_privacy') || 'strict';
   loadBenchmarkOptIn();
   loadCopilotStatus();
@@ -3686,7 +3686,7 @@ function checkClaudeCodeSetup() {
 }
 
 function copyClaudeSetupCmd(btn) {
-  navigator.clipboard.writeText('npx vantageaiops-mcp setup').then(function() {
+  navigator.clipboard.writeText('npx cohrint-mcp setup').then(function() {
     var orig = btn.textContent;
     btn.textContent = 'Copied!';
     setTimeout(function() { btn.textContent = orig; }, 2000);

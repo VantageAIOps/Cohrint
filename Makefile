@@ -1,4 +1,4 @@
-# VantageAI — Developer Makefile
+# Cohrint — Developer Makefile
 # Provides consistent commands for local dev and CI/CD
 #
 # Usage:
@@ -42,13 +42,13 @@ test-ci:
 ## Quick smoke test — verify API and frontend are live
 test-smoke:
 	@echo "Checking API health..."
-	@curl -sf https://api.vantageaiops.com/v1/health | python3 -c "import sys,json; d=json.load(sys.stdin); print('✅ API:', d.get('status','ok'))" || echo "❌ API unreachable"
+	@curl -sf https://api.cohrint.com/v1/health | python3 -c "import sys,json; d=json.load(sys.stdin); print('✅ API:', d.get('status','ok'))" || echo "❌ API unreachable"
 	@echo "Checking frontend..."
-	@curl -sf -o /dev/null -w "✅ Frontend: HTTP %{http_code}\n" https://vantageaiops.com/ || echo "❌ Frontend unreachable"
+	@curl -sf -o /dev/null -w "✅ Frontend: HTTP %{http_code}\n" https://cohrint.com/ || echo "❌ Frontend unreachable"
 
 ## Deploy frontend to Cloudflare Pages
 deploy:
-	npx wrangler pages deploy ./vantage-final-v4 --project-name=vantageai --branch=main
+	npx wrangler pages deploy ./vantage-final-v4 --project-name=cohrint --branch=main
 
 ## Deploy API Worker to Cloudflare Workers
 deploy-worker:

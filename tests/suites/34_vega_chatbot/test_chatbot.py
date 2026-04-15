@@ -55,7 +55,7 @@ AUTH = {"Authorization": "Bearer test-token-for-ci"}
 
 def test_chat_returns_reply():
     r = requests.post(f"{BASE}/chat",
-        json={"message": "What is VantageAI?"},
+        json={"message": "What is Cohrint?"},
         headers={**AUTH, "X-Org-Id": "test-org", "X-Plan": "free"})
     assert r.status_code == 200
     data = r.json()
@@ -121,8 +121,8 @@ def test_chat_with_history():
         json={
             "message": "What about the Models tab?",
             "history": [
-                {"role": "user", "content": "What is VantageAI?"},
-                {"role": "assistant", "content": "VantageAI is an AI cost analytics platform."},
+                {"role": "user", "content": "What is Cohrint?"},
+                {"role": "assistant", "content": "Cohrint is an AI cost analytics platform."},
             ],
         },
         headers={**AUTH, "X-Org-Id": "test-org", "X-Plan": "free"},
@@ -153,7 +153,7 @@ def test_chat_session_id_persists():
 def test_chat_no_auth_allowed():
     r = requests.post(
         f"{BASE}/chat",
-        json={"message": "What is VantageAI?"},
+        json={"message": "What is Cohrint?"},
         headers={"X-Org-Id": "anon", "X-Plan": "free"},
     )
     assert r.status_code == 200
@@ -195,7 +195,7 @@ def test_cors_on_preflight():
     r = requests.options(
         f"{BASE}/chat",
         headers={
-            "Origin": "https://vantageaiops.com",
+            "Origin": "https://cohrint.com",
             "Access-Control-Request-Method": "POST",
         },
     )

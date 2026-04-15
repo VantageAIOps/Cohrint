@@ -155,15 +155,15 @@ function formatAnomalyAlert(result: AnomalyResult): Record<string, unknown> {
         text: {
           type: 'mrkdwn',
           text: result.topTeam !== 'unknown'
-            ? `*Team:* ${result.topTeam} — <https://vantageaiops.com/app.html|View dashboard →>`
-            : `<https://vantageaiops.com/app.html|View dashboard →>`,
+            ? `*Team:* ${result.topTeam} — <https://cohrint.com/app.html|View dashboard →>`
+            : `<https://cohrint.com/app.html|View dashboard →>`,
         },
       },
       {
         type: 'context',
         elements: [{
           type: 'mrkdwn',
-          text: `Detected at ${new Date().toISOString()} · VantageAI Anomaly Detection`,
+          text: `Detected at ${new Date().toISOString()} · Cohrint Anomaly Detection`,
         }],
       },
     ],

@@ -1,7 +1,7 @@
 [
   {
-    "q": "What is VantageAI?",
-    "a": "VantageAI is an AI cost analytics platform that tracks spending across all your AI providers — Anthropic, OpenAI, Google, and more — from a single dashboard.",
+    "q": "What is Cohrint?",
+    "a": "Cohrint is an AI cost analytics platform that tracks spending across all your AI providers — Anthropic, OpenAI, Google, and more — from a single dashboard.",
     "tags": ["product", "overview"]
   },
   {
@@ -30,8 +30,8 @@
     "tags": ["team", "members"]
   },
   {
-    "q": "What providers does VantageAI support?",
-    "a": "VantageAI supports Anthropic, OpenAI, Google Gemini, AWS Bedrock, Azure OpenAI, Mistral, Cohere, and any OpenTelemetry-compatible provider.",
+    "q": "What providers does Cohrint support?",
+    "a": "Cohrint supports Anthropic, OpenAI, Google Gemini, AWS Bedrock, Azure OpenAI, Mistral, Cohere, and any OpenTelemetry-compatible provider.",
     "tags": ["providers", "integrations"]
   },
   {
@@ -41,7 +41,7 @@
   },
   {
     "q": "What is OpenTelemetry (OTel) support?",
-    "a": "VantageAI accepts OTLP metrics and logs. Point your OTel exporter to `https://api.vantageaiops.com/v1/otel/v1/metrics` with your Bearer token. Cost is computed server-side from token counts.",
+    "a": "Cohrint accepts OTLP metrics and logs. Point your OTel exporter to `https://api.cohrint.com/v1/otel/v1/metrics` with your Bearer token. Cost is computed server-side from token counts.",
     "tags": ["otel", "integration"]
   },
   {
@@ -56,8 +56,8 @@
     "tags": ["analytics", "cross-platform"]
   },
   {
-    "q": "How does VantageAI handle data privacy?",
-    "a": "Prompts and responses never leave your machine in strict mode. Only token counts and metadata are sent to VantageAI servers. You can verify this in the vantage-local-proxy source code.",
+    "q": "How does Cohrint handle data privacy?",
+    "a": "Prompts and responses never leave your machine in strict mode. Only token counts and metadata are sent to Cohrint servers. You can verify this in the vantage-local-proxy source code.",
     "tags": ["privacy", "security"]
   },
   {
@@ -93,8 +93,8 @@
     "tags": ["dashboard", "traces", "latency"]
   },
   {
-    "q": "Can I use VantageAI with self-hosted models?",
-    "a": "Yes — use the OTel integration or local proxy. Any model that reports token counts via OTLP or the VantageAI SDK can be tracked.",
+    "q": "Can I use Cohrint with self-hosted models?",
+    "a": "Yes — use the OTel integration or local proxy. Any model that reports token counts via OTLP or the Cohrint SDK can be tracked.",
     "tags": ["integration", "self-hosted"]
   }
 ]

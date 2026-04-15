@@ -5,7 +5,7 @@ AI coding agent with per-tool permissions, cost tracking, prompt optimization, a
 ## Install
 
 ```bash
-pip install vantageai-agent
+pip install cohrint-agent
 ```
 
 Requires Python 3.9+.
@@ -17,19 +17,19 @@ Requires Python 3.9+.
 ```bash
 # Set your API key, then launch
 export ANTHROPIC_API_KEY=sk-...
-vantageai-agent
+cohrint-agent
 ```
 
 ### One-shot prompt
 
 ```bash
-vantageai-agent "explain the main function in cli.py"
+cohrint-agent "explain the main function in cli.py"
 ```
 
 ### Pipe mode
 
 ```bash
-echo "summarize this file" | vantageai-agent
+echo "summarize this file" | cohrint-agent
 ```
 
 ## Backends
@@ -44,11 +44,11 @@ Vantage auto-detects the best backend. You can override with `--backend`:
 | `gemini` | Gemini CLI subprocess | `gemini` binary |
 
 ```bash
-vantageai-agent --backend claude "refactor this function"
-vantageai-agent --backend codex "write unit tests for auth.py"
+cohrint-agent --backend claude "refactor this function"
+cohrint-agent --backend codex "write unit tests for auth.py"
 ```
 
-Auto-detect priority: `VANTAGE_BACKEND` env → `ANTHROPIC_API_KEY` → `claude` binary → `codex` binary → `gemini` binary.
+Auto-detect priority: `COHRINT_BACKEND` env → `ANTHROPIC_API_KEY` → `claude` binary → `codex` binary → `gemini` binary.
 
 ## Session Management
 
@@ -56,10 +56,10 @@ Sessions are persisted to `~/.vantage/sessions/`. Resume any previous session:
 
 ```bash
 # List sessions and costs
-vantageai-agent summary
+cohrint-agent summary
 
 # Resume by session ID
-vantageai-agent --resume abc12345
+cohrint-agent --resume abc12345
 ```
 
 ## REPL Commands
@@ -93,21 +93,21 @@ Every turn shows token usage and cost. Exit shows a full session summary:
 
 For Claude Code / Codex / Gemini (subscription or free tier), costs are labeled `~$0.00 (free tier)` or `~$0.0123 (estimated)`.
 
-## VantageAI Dashboard
+## Cohrint Dashboard
 
-Send telemetry to your VantageAI dashboard for cross-session cost analysis:
+Send telemetry to your Cohrint dashboard for cross-session cost analysis:
 
 ```bash
-export VANTAGE_API_KEY=vnt_...
-vantageai-agent
+export COHRINT_API_KEY=crt_...
+cohrint-agent
 ```
 
-Or pass inline: `vantageai-agent --vantage-key vnt_...`
+Or pass inline: `cohrint-agent --vantage-key crt_...`
 
 ## All Flags
 
 ```
-vantageai-agent [OPTIONS] [PROMPT]
+cohrint-agent [OPTIONS] [PROMPT]
 
   PROMPT              One-shot prompt (omit for interactive REPL)
 
@@ -116,7 +116,7 @@ vantageai-agent [OPTIONS] [PROMPT]
   --max-tokens        Max output tokens (default: 16384)
   --resume SESSION_ID Resume a previous session
   --api-key           Anthropic API key (or ANTHROPIC_API_KEY env)
-  --vantage-key       VantageAI dashboard API key (or VANTAGE_API_KEY env)
+  --vantage-key       Cohrint dashboard API key (or COHRINT_API_KEY env)
   --system            Custom system prompt
   --no-optimize       Disable prompt optimization
   --cwd               Set working directory
@@ -128,9 +128,9 @@ vantageai-agent [OPTIONS] [PROMPT]
 | Variable | Description |
 |----------|-------------|
 | `ANTHROPIC_API_KEY` | Anthropic API key |
-| `VANTAGE_API_KEY` | VantageAI dashboard key |
-| `VANTAGE_BACKEND` | Force backend (api/claude/codex/gemini) |
-| `VANTAGE_MODEL` | Default model override |
+| `COHRINT_API_KEY` | Cohrint dashboard key |
+| `COHRINT_BACKEND` | Force backend (api/claude/codex/gemini) |
+| `COHRINT_MODEL` | Default model override |
 
 ## License
 

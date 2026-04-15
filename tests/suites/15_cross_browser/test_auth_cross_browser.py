@@ -68,7 +68,7 @@ def _run_auth_flow(page, errors, api_key: str, prefix: str, label: str, is_webki
     # Step 2: invalid key stays on /auth
     try:
         page.fill("#inp-key, input[type='password'], input[type='text']",
-                  "vnt_invalid_crossbrowser_test")
+                  "crt_invalid_crossbrowser_test")
         try:
             with page.expect_response(
                 lambda r: "/v1/auth/session" in r.url and r.request.method == "POST",

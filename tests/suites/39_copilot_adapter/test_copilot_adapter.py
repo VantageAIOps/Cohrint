@@ -6,7 +6,7 @@ Validates the three Copilot connection endpoints:
   DELETE /v1/copilot/connect
   GET    /v1/copilot/status
 
-All tests hit the live API at https://api.vantageaiops.com.
+All tests hit the live API at https://api.cohrint.com.
 No mocks. A fresh account is created per module via fresh_account().
 
 Labels: CP.1 – CP.26
@@ -79,7 +79,7 @@ class TestCopilotAuth:
 
     def test_cp04_bad_key_returns_401(self):
         r = requests.get(STATUS_URL,
-                         headers={"Authorization": "Bearer vnt_bad_key"},
+                         headers={"Authorization": "Bearer crt_bad_key"},
                          timeout=10)
         chk("CP.4  GET /copilot/status bad key -> 401",
             r.status_code == 401, f"got {r.status_code}")

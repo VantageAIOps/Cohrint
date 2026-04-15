@@ -147,7 +147,7 @@ events.post('/', async (c) => {
     return c.json({
       error: 'Free tier limit reached',
       message: `Your org has used ${used.toLocaleString()} / ${FREE_TIER_LIMIT.toLocaleString()} free events this month. Upgrade to Team plan to continue tracking.`,
-      upgrade_url: 'https://vantageaiops.com/signup.html',
+      upgrade_url: 'https://cohrint.com/signup.html',
       events_used: used,
       events_limit: FREE_TIER_LIMIT,
     }, 429);
@@ -278,7 +278,7 @@ events.post('/batch', async (c) => {
     return c.json({
       error: 'Free tier limit reached',
       message: `Your org has used ${used.toLocaleString()} / ${FREE_TIER_LIMIT.toLocaleString()} free events this month. Upgrade to Team plan to continue tracking.`,
-      upgrade_url: 'https://vantageaiops.com/signup.html',
+      upgrade_url: 'https://cohrint.com/signup.html',
       events_used: used,
       events_limit: FREE_TIER_LIMIT,
     }, 429);

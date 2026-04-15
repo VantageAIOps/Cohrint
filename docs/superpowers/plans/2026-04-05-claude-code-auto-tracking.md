@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Automatically upload Claude Code token/cost data to the VantageAI dashboard — both backfilling all historical sessions and tracking each new turn in real-time via a Claude Code `Stop` hook.
+**Goal:** Automatically upload Claude Code token/cost data to the Cohrint dashboard — both backfilling all historical sessions and tracking each new turn in real-time via a Claude Code `Stop` hook.
 
 **Architecture:** The `vantage-local-proxy` already has a `claudeCodeScanner` that reads `~/.claude/projects/*/uuid.jsonl`. We fix two bugs in `pushScanResults` (wrong endpoint, missing `event_id`), add per-turn deduplication via a state file, and wire a `Stop` hook in `~/.claude/settings.json` that uploads the latest assistant turn after every Claude response.
 
@@ -59,7 +59,7 @@ async function pushScanResults(
   apiKey: string,
   apiBase: string,
 ): Promise<void> {
-  console.log("  Pushing scan results to VantageAI...");
+  console.log("  Pushing scan results to Cohrint...");
 
   // Load dedup state — skip sessions already uploaded
   const stateFile = join(homedir(), ".claude", "vantage-state.json");
@@ -178,13 +178,13 @@ git commit -m "fix(proxy): fix pushScanResults — correct endpoint, event_id, d
 - [ ] **Step 1: Run the scan + push**
 
 ```bash
-VANTAGE_API_KEY=vnt_aaravbagraab_465dd2e76ca2abe8914305acf3964eba \
+COHRINT_API_KEY=crt_aaravbagraab_465dd2e76ca2abe8914305acf3964eba \
   node vantage-local-proxy/dist/cli.js scan --tool claude-code --push
 ```
 
 Expected output:
 ```
-  VantageAI Local File Scanner
+  Cohrint Local File Scanner
   Checking Claude Code      FOUND
   ...
   Uploading NNN new turns (MM sessions)...
@@ -204,8 +204,8 @@ const fetch = (...args) => import('node-fetch').then(({default: f}) => f(...args
 
 Actually just curl:
 ```bash
-curl -s "https://api.vantageaiops.com/v1/analytics/kpis" \
-  -H "Authorization: Bearer vnt_aaravbagraab_465dd2e76ca2abe8914305acf3964eba" | python3 -m json.tool
+curl -s "https://api.cohrint.com/v1/analytics/kpis" \
+  -H "Authorization: Bearer crt_aaravbagraab_465dd2e76ca2abe8914305acf3964eba" | python3 -m json.tool
 ```
 
 Expected: `total_requests` > 3 (was 3 before backfill), `total_cost_usd` > 0.
@@ -213,7 +213,7 @@ Expected: `total_requests` > 3 (was 3 before backfill), `total_cost_usd` > 0.
 - [ ] **Step 3: Verify dedup works (running twice is safe)**
 
 ```bash
-VANTAGE_API_KEY=vnt_aaravbagraab_465dd2e76ca2abe8914305acf3964eba \
+COHRINT_API_KEY=crt_aaravbagraab_465dd2e76ca2abe8914305acf3964eba \
   node vantage-local-proxy/dist/cli.js scan --tool claude-code --push
 ```
 
@@ -233,20 +233,20 @@ This script runs after every Claude response. It reads the most recent assistant
 ```javascript
 #!/usr/bin/env node
 /**
- * VantageAI Claude Code Stop Hook
+ * Cohrint Claude Code Stop Hook
  *
  * Called after every Claude response. Reads the latest assistant turn
- * from the current project's JSONL file and uploads it to VantageAI.
+ * from the current project's JSONL file and uploads it to Cohrint.
  *
- * Requires: VANTAGE_API_KEY env var (set in ~/.claude/settings.json hook env)
+ * Requires: COHRINT_API_KEY env var (set in ~/.claude/settings.json hook env)
  */
 
 import { readdir, readFile, writeFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
 
-const API_KEY  = process.env.VANTAGE_API_KEY ?? "";
-const API_BASE = process.env.VANTAGE_API_BASE ?? "https://api.vantageaiops.com";
+const API_KEY  = process.env.COHRINT_API_KEY ?? "";
+const API_BASE = process.env.VANTAGE_API_BASE ?? "https://api.cohrint.com";
 const STATE_FILE = join(homedir(), ".claude", "vantage-state.json");
 
 // Pricing table (must stay in sync with vantage-local-proxy/src/pricing.ts)
@@ -415,7 +415,7 @@ chmod +x ~/.claude/hooks/vantage-track.js
 - [ ] **Step 3: Smoke test the script manually**
 
 ```bash
-VANTAGE_API_KEY=vnt_aaravbagraab_465dd2e76ca2abe8914305acf3964eba \
+COHRINT_API_KEY=crt_aaravbagraab_465dd2e76ca2abe8914305acf3964eba \
   node ~/.claude/hooks/vantage-track.js
 ```
 
@@ -423,8 +423,8 @@ Expected: exits silently (no errors). If it's the first run after backfill, it w
 
 Check API to verify:
 ```bash
-curl -s "https://api.vantageaiops.com/v1/analytics/kpis" \
-  -H "Authorization: Bearer vnt_aaravbagraab_465dd2e76ca2abe8914305acf3964eba" | python3 -m json.tool
+curl -s "https://api.cohrint.com/v1/analytics/kpis" \
+  -H "Authorization: Bearer crt_aaravbagraab_465dd2e76ca2abe8914305acf3964eba" | python3 -m json.tool
 ```
 
 ---
@@ -451,7 +451,7 @@ Add to the `hooks` object in `~/.claude/settings.json` (alongside existing `PreT
     "hooks": [
       {
         "type": "command",
-        "command": "VANTAGE_API_KEY=vnt_aaravbagraab_465dd2e76ca2abe8914305acf3964eba node ~/.claude/hooks/vantage-track.js"
+        "command": "COHRINT_API_KEY=crt_aaravbagraab_465dd2e76ca2abe8914305acf3964eba node ~/.claude/hooks/vantage-track.js"
       }
     ]
   }
@@ -490,7 +490,7 @@ The full `hooks` section should look like:
       "hooks": [
         {
           "type": "command",
-          "command": "VANTAGE_API_KEY=vnt_aaravbagraab_465dd2e76ca2abe8914305acf3964eba node ~/.claude/hooks/vantage-track.js"
+          "command": "COHRINT_API_KEY=crt_aaravbagraab_465dd2e76ca2abe8914305acf3964eba node ~/.claude/hooks/vantage-track.js"
         }
       ]
     }
@@ -524,8 +524,8 @@ git commit -m "feat(tracking): add Claude Code Stop hook + fix backfill push"
 - [ ] **Step 1: Check dashboard data increased from backfill**
 
 ```bash
-curl -s "https://api.vantageaiops.com/v1/analytics/kpis" \
-  -H "Authorization: Bearer vnt_aaravbagraab_465dd2e76ca2abe8914305acf3964eba" | python3 -m json.tool
+curl -s "https://api.cohrint.com/v1/analytics/kpis" \
+  -H "Authorization: Bearer crt_aaravbagraab_465dd2e76ca2abe8914305acf3964eba" | python3 -m json.tool
 ```
 
 Expected:
@@ -536,8 +536,8 @@ Expected:
 - [ ] **Step 2: Check cross-platform summary also reflects data**
 
 ```bash
-curl -s "https://api.vantageaiops.com/v1/cross-platform/summary?days=30" \
-  -H "Authorization: Bearer vnt_aaravbagraab_465dd2e76ca2abe8914305acf3964eba" | python3 -m json.tool
+curl -s "https://api.cohrint.com/v1/cross-platform/summary?days=30" \
+  -H "Authorization: Bearer crt_aaravbagraab_465dd2e76ca2abe8914305acf3964eba" | python3 -m json.tool
 ```
 
 Note: cross-platform reads from `cross_platform_usage` table (OTel/billing) — if it's still zero, that's expected since we're writing to `events` table. The main dashboard analytics will show data.
@@ -547,8 +547,8 @@ Note: cross-platform reads from `cross_platform_usage` table (OTel/billing) — 
 Open a new Claude Code conversation and send a message. After the response, wait 2-3 seconds, then check:
 
 ```bash
-curl -s "https://api.vantageaiops.com/v1/analytics/summary" \
-  -H "Authorization: Bearer vnt_aaravbagraab_465dd2e76ca2abe8914305acf3964eba" | python3 -m json.tool
+curl -s "https://api.cohrint.com/v1/analytics/summary" \
+  -H "Authorization: Bearer crt_aaravbagraab_465dd2e76ca2abe8914305acf3964eba" | python3 -m json.tool
 ```
 
 The `session_cost_usd` (30-min window) should increase.

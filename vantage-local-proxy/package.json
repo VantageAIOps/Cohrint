@@ -1,7 +1,7 @@
 {
-  "name": "vantageai-local-proxy",
+  "name": "cohrint-local-proxy",
   "version": "1.0.2",
-  "description": "Secure local proxy for LLM cost tracking — keeps API keys and prompts local, sends only anonymized stats to VantageAI dashboard",
+  "description": "Secure local proxy for LLM cost tracking — keeps API keys and prompts local, sends only anonymized stats to Cohrint dashboard",
   "keywords": [
     "ai",
     "llm",
@@ -11,7 +11,7 @@
     "openai",
     "anthropic"
   ],
-  "homepage": "https://vantageaiops.com",
+  "homepage": "https://cohrint.com",
   "repository": {
     "type": "git",
     "url": "https://github.com/Amanjain98/VantageAI"

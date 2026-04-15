@@ -292,7 +292,7 @@ try:
 
     if r_rot.status_code == 200:
         new_key = r_rot.json().get("api_key")
-        chk("3.2  New key returned after rotation", bool(new_key) and new_key.startswith("vnt_"),
+        chk("3.2  New key returned after rotation", bool(new_key) and new_key.startswith("crt_"),
             str(r_rot.json()))
         chk("3.3  New key is different from old key", new_key != old_key,
             "key unchanged after rotation!")

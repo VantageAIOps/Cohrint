@@ -1,5 +1,5 @@
 """
-Test Suite 21 — VantageAI Agent (Python)
+Test Suite 21 — Cohrint Agent (Python)
 Tests the prompt optimizer, pricing engine, and CLI structure.
 Replaces the old TypeScript vantage-cli tests.
 """
@@ -216,8 +216,8 @@ class TestConfigAndStructure:
         content = (AGENT_DIR / "pyproject.toml").read_text()
         m = re.search(r'^\s*name\s*=\s*"([^"]+)"', content, re.MULTILINE)
         name = m.group(1) if m else ""
-        chk("CL.25 package name is vantageai-agent", name == "vantageai-agent")
-        assert name == "vantageai-agent", f"got: {name!r}"
+        chk("CL.25 package name is cohrint-agent", name == "cohrint-agent")
+        assert name == "cohrint-agent", f"got: {name!r}"
 
     def test_cl26_cli_entry_point(self):
         try:
@@ -227,8 +227,8 @@ class TestConfigAndStructure:
         with open(AGENT_DIR / "pyproject.toml", "rb") as f:
             data = tomllib.load(f)
         scripts = data.get("project", {}).get("scripts", {})
-        chk("CL.26 vantageai-agent script entry point", "vantageai-agent" in scripts)
-        assert "vantageai-agent" in scripts
+        chk("CL.26 cohrint-agent script entry point", "cohrint-agent" in scripts)
+        assert "cohrint-agent" in scripts
 
     def test_cl27_source_files_present(self):
         expected = [

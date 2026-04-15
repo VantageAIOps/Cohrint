@@ -135,7 +135,7 @@ def test_otel_auth(headers):
     # Bad key → 401
     r = requests.post(f"{API_URL}/v1/otel/v1/metrics",
                       json={"resourceMetrics": []},
-                      headers={"Authorization": "Bearer vnt_bad_key"}, timeout=10)
+                      headers={"Authorization": "Bearer crt_bad_key"}, timeout=10)
     chk("OT.3  POST /otel/v1/metrics bad key → 401",
         r.status_code == 401, f"got {r.status_code}")
 
@@ -368,7 +368,7 @@ def test_cross_platform_connections(headers):
 
 def run():
     info("=" * 60)
-    info("  VantageAI — OTel Collector + Cross-Platform API Tests")
+    info("  Cohrint — OTel Collector + Cross-Platform API Tests")
     info("  Endpoints: /v1/otel/* and /v1/cross-platform/*")
     info("=" * 60)
 

@@ -100,7 +100,7 @@ except Exception as e:
 
 def _set_session_cookie(ctx):
     """Inject the session cookie into a Playwright browser context.
-    Adds the cookie for both vantageaiops.com and api.vantageaiops.com so
+    Adds the cookie for both cohrint.com and api.cohrint.com so
     that XHR requests from the app to the API sub-domain also send the cookie.
     """
     if not TEST_KEY:
@@ -110,7 +110,7 @@ def _set_session_cookie(ctx):
     if not r.ok:
         return False
     for c in r.cookies:
-        for domain in ("vantageaiops.com", "api.vantageaiops.com"):
+        for domain in ("cohrint.com", "api.cohrint.com"):
             ctx.add_cookies([{
                 "name":   c.name,
                 "value":  c.value,
@@ -269,7 +269,7 @@ try:
                 "document.getElementById('acct-key-hint')?.textContent?.trim() || ''"
             )
             chk("21.25  Account view has API key hint element",
-                len(hint_text) > 0 and "vnt_" in hint_text,
+                len(hint_text) > 0 and "crt_" in hint_text,
                 f"acct-key-hint = '{hint_text}'")
 
             # Save profile button visible
@@ -290,8 +290,8 @@ try:
             chk("21.27  Settings view has API Base URL input",
                 bool(base_val),
                 "set-base-input was empty")
-            chk("21.28  API Base URL contains api.vantageaiops.com",
-                "vantageaiops.com" in base_val,
+            chk("21.28  API Base URL contains api.cohrint.com",
+                "cohrint.com" in base_val,
                 f"set-base-input = '{base_val}'")
         except Exception as e:
             fail("21.27-28  Settings view evaluation failed", str(e)[:200])

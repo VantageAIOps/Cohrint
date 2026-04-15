@@ -68,7 +68,7 @@ auth.post('/signup', async (c) => {
   const taken = await c.env.DB.prepare('SELECT id FROM orgs WHERE id = ?').bind(orgId).first();
   if (taken) orgId = `${orgId}-${randomHex(3)}`;
 
-  const rawKey  = `vnt_${orgId}_${randomHex(16)}`;
+  const rawKey  = `crt_${orgId}_${randomHex(16)}`;
   const keyHash = await sha256hex(rawKey);
   const keyHint = `${rawKey.slice(0, 12)}...`;
 
@@ -82,7 +82,7 @@ auth.post('/signup', async (c) => {
     api_key:   rawKey,
     org_id:    orgId,
     hint:      keyHint,
-    dashboard: `https://vantageaiops.com/app.html?api_key=${rawKey}&org=${orgId}`,
+    dashboard: `https://cohrint.com/app.html?api_key=${rawKey}&org=${orgId}`,
   }, 201);
 });
 
@@ -123,7 +123,7 @@ auth.post('/recover', async (c) => {
       let redeemUrl = '';
       try {
         await c.env.KV.put(kvKey, JSON.stringify({ orgId: org.id, type: 'owner' }), { expirationTtl: 3600 });
-        redeemUrl = `https://api.vantageaiops.com/v1/auth/recover/redeem?token=${token}`;
+        redeemUrl = `https://api.cohrint.com/v1/auth/recover/redeem?token=${token}`;
       } catch {
         // KV unavailable — email still sent without one-click redeem link
       }
@@ -131,7 +131,7 @@ auth.post('/recover', async (c) => {
       const { subject, html } = keyRecoveryEmail({
         orgId:      org.id,
         orgName:    org.name || org.id,
-        keyHint:    org.api_key_hint || 'vnt_...',
+        keyHint:    org.api_key_hint || 'crt_...',
         isOwner:    true,
         redeemUrl,
       });
@@ -147,7 +147,7 @@ auth.post('/recover', async (c) => {
         const { subject, html } = keyRecoveryEmail({
           orgId:   member.org_id,
           orgName: member.org_name || member.org_id,
-          keyHint: member.api_key_hint || 'vnt_...',
+          keyHint: member.api_key_hint || 'crt_...',
           isOwner: false,
         });
         await sendEmail(c.env.RESEND_API_KEY, { to: email, subject, html });
@@ -174,7 +174,7 @@ auth.post('/recover', async (c) => {
 // redirects to a confirmation page. Only the subsequent POST actually rotates.
 auth.get('/recover/redeem', async (c) => {
   const token = c.req.query('token') ?? '';
-  const SITE  = 'https://vantageaiops.com';
+  const SITE  = 'https://cohrint.com';
   const wantsJson = (c.req.header('Accept') ?? '').includes('application/json');
 
   if (!token) {
@@ -219,7 +219,7 @@ auth.post('/recover/redeem', async (c) => {
   await c.env.KV.delete(`recover:${token}`);
 
   // Rotate the org owner key
-  const newKey  = `vnt_${payload.orgId}_${randomHex(16)}`;
+  const newKey  = `crt_${payload.orgId}_${randomHex(16)}`;
   const keyHash = await sha256hex(newKey);
   const keyHint = `${newKey.slice(0, 12)}...`;
 
@@ -263,7 +263,7 @@ auth.post('/members', authMiddleware, adminOnly, async (c) => {
   if (existing) return c.json({ error: `${email} is already a member of this org` }, 409);
 
   const memberId = randomHex(8);
-  const rawKey   = `vnt_${orgId}_${randomHex(16)}`;
+  const rawKey   = `crt_${orgId}_${randomHex(16)}`;
   const keyHash  = await sha256hex(rawKey);
   const keyHint  = `${rawKey.slice(0, 12)}...`;
 
@@ -421,7 +421,7 @@ auth.post('/members/:id/rotate', authMiddleware, adminOnly, async (c) => {
     return c.json({ error: 'Cannot rotate key for a peer or higher-privileged member' }, 403);
   }
 
-  const rawKey  = `vnt_${orgId}_${randomHex(16)}`;
+  const rawKey  = `crt_${orgId}_${randomHex(16)}`;
   const keyHash = await sha256hex(rawKey);
   const keyHint = `${rawKey.slice(0, 12)}...`;
 
@@ -442,7 +442,7 @@ auth.post('/members/:id/rotate', authMiddleware, adminOnly, async (c) => {
     keyHint,
   });
   c.executionCtx.waitUntil(
-    sendEmail(c.env.RESEND_API_KEY, { to: member.email, subject: `[VantageAI] Your API key has been rotated`, html: rotateHtml })
+    sendEmail(c.env.RESEND_API_KEY, { to: member.email, subject: `[Cohrint] Your API key has been rotated`, html: rotateHtml })
   );
 
   logAudit(c, {
@@ -482,8 +482,8 @@ auth.post('/session', async (c) => {
   catch { return c.json({ error: 'Invalid JSON body' }, 400); }
 
   const apiKey = (body.api_key ?? '').trim();
-  if (!apiKey.startsWith('vnt_')) {
-    return c.json({ error: 'Invalid API key format — must start with vnt_' }, 400);
+  if (!apiKey.startsWith('vnt_') && !apiKey.startsWith('crt_')) {
+    return c.json({ error: 'Invalid API key format — must start with vnt_ or crt_' }, 400);
   }
 
   const hash = await sha256hex(apiKey);
@@ -533,23 +533,23 @@ auth.post('/session', async (c) => {
   `).bind(token, orgId, role, memberId, expiresAt).run();
 
   // Set HTTP-only cookie.
-  // SameSite=None is required because the API (api.vantageaiops.com) and the
-  // frontend (vantageaiops.com) are different origins; Safari ITP drops
+  // SameSite=None is required because the API (api.cohrint.com) and the
+  // frontend (cohrint.com) are different origins; Safari ITP drops
   // SameSite=Lax cookies set cross-origin, breaking session persistence on reload.
   // Non-prod: use Lax so cookie works on localhost without Secure.
   const isProd = (c.env.ENVIRONMENT ?? 'production') === 'production';
   const cookieParts = isProd
     ? [
-        `vantage_session=${token}`,
+        `cohrint_session=${token}`,
         `Path=/`,
         `HttpOnly`,
         `SameSite=None`,
         `Max-Age=${30 * 86_400}`,
         `Secure`,
-        `Domain=vantageaiops.com`,
+        `Domain=cohrint.com`,
       ]
     : [
-        `vantage_session=${token}`,
+        `cohrint_session=${token}`,
         `Path=/`,
         `HttpOnly`,
         `Max-Age=${30 * 86_400}`,
@@ -612,7 +612,7 @@ auth.get('/session', authMiddleware, async (c) => {
     member: memberInfo,
     sse_token: sseTokenFinal,
     sse_url:   sseTokenFinal
-      ? `https://api.vantageaiops.com/v1/stream/${orgId}?sse_token=${sseTokenFinal}`
+      ? `https://api.cohrint.com/v1/stream/${orgId}?sse_token=${sseTokenFinal}`
       : null,
   });
 });
@@ -621,7 +621,7 @@ auth.get('/session', authMiddleware, async (c) => {
 auth.delete('/session', async (c) => {
   const cookieHeader = c.req.header('Cookie') ?? '';
   const token = cookieHeader.split(';').map(s => s.trim())
-    .find(s => s.startsWith('vantage_session='))?.split('=')[1];
+    .find(s => s.startsWith('cohrint_session='))?.split('=')[1];
 
   if (token) {
     await c.env.DB.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
@@ -630,8 +630,8 @@ auth.delete('/session', async (c) => {
   const res = c.json({ ok: true });
   const isProdLogout = (c.env.ENVIRONMENT ?? 'production') === 'production';
   const clearCookie = isProdLogout
-    ? 'vantage_session=; Path=/; HttpOnly; Max-Age=0; SameSite=None; Secure; Domain=vantageaiops.com'
-    : 'vantage_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax';
+    ? 'cohrint_session=; Path=/; HttpOnly; Max-Age=0; SameSite=None; Secure; Domain=cohrint.com'
+    : 'cohrint_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax';
   (await res).headers.set('Set-Cookie', clearCookie);
   return res;
 });
@@ -640,7 +640,7 @@ auth.delete('/session', async (c) => {
 auth.post('/logout', async (c) => {
   const cookieHeader = c.req.header('Cookie') ?? '';
   const token = cookieHeader.split(';').map(s => s.trim())
-    .find(s => s.startsWith('vantage_session='))?.split('=')[1];
+    .find(s => s.startsWith('cohrint_session='))?.split('=')[1];
 
   if (token) {
     await c.env.DB.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
@@ -649,8 +649,8 @@ auth.post('/logout', async (c) => {
   const res = c.json({ ok: true });
   const isProd = (c.env.ENVIRONMENT ?? 'production') === 'production';
   const clearCookie = isProd
-    ? 'vantage_session=; Path=/; HttpOnly; Max-Age=0; SameSite=None; Secure; Domain=vantageaiops.com'
-    : 'vantage_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax';
+    ? 'cohrint_session=; Path=/; HttpOnly; Max-Age=0; SameSite=None; Secure; Domain=cohrint.com'
+    : 'cohrint_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax';
   (await res).headers.set('Set-Cookie', clearCookie);
   return res;
 });
@@ -661,7 +661,7 @@ auth.post('/rotate', authMiddleware, async (c) => {
   const role  = c.get('role');
   if (role !== 'owner') return c.json({ error: 'Only the org owner can rotate the root key' }, 403);
 
-  const rawKey  = `vnt_${orgId}_${randomHex(16)}`;
+  const rawKey  = `crt_${orgId}_${randomHex(16)}`;
   const keyHash = await sha256hex(rawKey);
   const keyHint = `${rawKey.slice(0, 12)}...`;
 

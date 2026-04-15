@@ -20,7 +20,7 @@ from .tools import SAFE_TOOLS
 
 console = Console()
 
-_DEFAULT_CONFIG_DIR = Path(os.environ.get("VANTAGE_CONFIG_DIR", Path.home() / ".vantage-agent"))
+_DEFAULT_CONFIG_DIR = Path(os.environ.get("COHRINT_CONFIG_DIR", Path.home() / ".cohrint-agent"))
 _PERM_FILE_NAME = "permissions.json"
 
 # Module-level aliases kept for backwards-compat with older test code

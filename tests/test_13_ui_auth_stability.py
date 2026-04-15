@@ -106,7 +106,7 @@ else:
             bool(d.get("org_id") or d.get("role") or d.get("email")), str(d))
 
     # 13.6 Cookie present
-    chk("13.6  Session cookie set (vantage_session or similar)",
+    chk("13.6  Session cookie set (cohrint_session or similar)",
         any("session" in c.lower() or "vantage" in c.lower()
             for c in r.cookies.keys()),
         f"cookies: {dict(r.cookies)}")
@@ -127,7 +127,7 @@ else:
 
     # 13.18 CORS headers
     ro = requests.options(f"{API_URL}/v1/auth/session",
-                          headers={"Origin": "https://vantageaiops.com",
+                          headers={"Origin": "https://cohrint.com",
                                    "Access-Control-Request-Method": "POST"},
                           timeout=10)
     acao = ro.headers.get("Access-Control-Allow-Origin", "")
@@ -203,7 +203,7 @@ try:
 
             # 13.4 Invalid key shows error (not crash)
             if key_input.count() > 0 and signin_btn.count() > 0:
-                key_input.fill("vnt_invalid_key_xyz")
+                key_input.fill("crt_invalid_key_xyz")
                 signin_btn.click()
                 page.wait_for_timeout(3_000)
                 content = page.content().lower()
@@ -386,7 +386,7 @@ try:
                 for c in sr.cookies:
                     ctx.add_cookies([{
                         "name": c.name, "value": c.value,
-                        "domain": "vantageaiops.com", "path": "/",
+                        "domain": "cohrint.com", "path": "/",
                     }])
             try:
                 page.goto(f"{SITE_URL}/app", wait_until="networkidle", timeout=25_000)
@@ -414,7 +414,7 @@ try:
                 if session_cookies:
                     sc = session_cookies[0]
                     chk("13.21 Session cookie has correct domain",
-                        "vantageaiops.com" in (sc.get("domain") or ""),
+                        "cohrint.com" in (sc.get("domain") or ""),
                         f"domain: {sc.get('domain')}")
 
             except Exception as e:

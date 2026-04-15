@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
-VantageAI — Full End-to-End Test Suite
+Cohrint — Full End-to-End Test Suite
 =======================================
 What this tests (all against the LIVE deployed site):
 
- 1. Python SDK — pip install vantageaiops (fresh venv, NOT local code)
- 2. npm SDK    — npm install vantageaiops (fresh install, NOT local dist)
- 3. UI — Sign-up page   (https://vantageaiops.com/signup)
- 4. UI — Sign-in page   (https://vantageaiops.com/auth)
- 5. UI — Key recovery   (https://vantageaiops.com/auth → "Forgot key")
+ 1. Python SDK — pip install cohrint (fresh venv, NOT local code)
+ 2. npm SDK    — npm install cohrint (fresh install, NOT local dist)
+ 3. UI — Sign-up page   (https://cohrint.com/signup)
+ 4. UI — Sign-in page   (https://cohrint.com/auth)
+ 5. UI — Key recovery   (https://cohrint.com/auth → "Forgot key")
  6. UI — Dashboard      (/app.html — KPIs, charts, tables)
- 7. API — Every endpoint with a real vnt_key written to live D1
+ 7. API — Every endpoint with a real crt_key written to live D1
  8. Live data — events sent via SDK appear in the dashboard
 
 Requirements (installed automatically if missing):
@@ -37,8 +37,8 @@ import requests
 # ─────────────────────────────────────────────────────────────────────────────
 # Config
 # ─────────────────────────────────────────────────────────────────────────────
-SITE_URL = "https://vantageaiops.com"
-API_URL  = "https://api.vantageaiops.com"
+SITE_URL = "https://cohrint.com"
+API_URL  = "https://api.cohrint.com"
 HEADLESS = True   # set False to watch the browser
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -88,9 +88,9 @@ else:
     PY_BIN = os.path.join(PY_VENV, "bin", "python")
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 1. pip install vantageaiops (from PyPI, not local)
+# 1. pip install cohrint (from PyPI, not local)
 # ─────────────────────────────────────────────────────────────────────────────
-section("1. Python SDK — pip install vantageaiops from PyPI")
+section("1. Python SDK — pip install cohrint from PyPI")
 
 try:
     # Create fresh venv
@@ -100,26 +100,26 @@ try:
     )
     chk("Created fresh Python venv", result.returncode == 0, result.stderr[:200])
 
-    # pip install vantageaiops from PyPI
+    # pip install cohrint from PyPI
     result = subprocess.run(
-        [PY_BIN, "-m", "pip", "install", "vantageaiops", "--quiet", "--no-cache-dir"],
+        [PY_BIN, "-m", "pip", "install", "cohrint", "--quiet", "--no-cache-dir"],
         capture_output=True, text=True, timeout=120
     )
-    chk("pip install vantageaiops (PyPI) succeeded", result.returncode == 0,
+    chk("pip install cohrint (PyPI) succeeded", result.returncode == 0,
         result.stderr[:300] if result.returncode != 0 else "")
 
     # Verify version
     result = subprocess.run(
-        [PY_BIN, "-c", "import vantageaiops; print(vantageaiops.__version__)"],
+        [PY_BIN, "-c", "import cohrint; print(cohrint.__version__)"],
         capture_output=True, text=True, timeout=15
     )
     pypi_version = result.stdout.strip()
-    chk(f"import vantageaiops works in venv (v{pypi_version})",
+    chk(f"import cohrint works in venv (v{pypi_version})",
         result.returncode == 0 and bool(pypi_version))
 
     # Verify it's NOT using local code
     result2 = subprocess.run(
-        [PY_BIN, "-c", "import vantageaiops, os; print(os.path.dirname(vantageaiops.__file__))"],
+        [PY_BIN, "-c", "import cohrint, os; print(os.path.dirname(cohrint.__file__))"],
         capture_output=True, text=True, timeout=10
     )
     pkg_path = result2.stdout.strip()
@@ -130,8 +130,8 @@ try:
     # Verify key SDK functions exist
     result3 = subprocess.run(
         [PY_BIN, "-c",
-         "import vantageaiops as v; assert callable(v.init); assert callable(v.flush); "
-         "from vantageaiops.models.pricing import calculate_cost; "
+         "import cohrint as v; assert callable(v.init); assert callable(v.flush); "
+         "from cohrint.models.pricing import calculate_cost; "
          "c=calculate_cost('gpt-4o',1000,300); assert c['total']>0; print('ok')"],
         capture_output=True, text=True, timeout=15
     )
@@ -142,9 +142,9 @@ except Exception as e:
     fail("Python SDK install check failed", str(e))
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 2. npm install vantageaiops (from npm registry, not local dist)
+# 2. npm install cohrint (from npm registry, not local dist)
 # ─────────────────────────────────────────────────────────────────────────────
-section("2. npm SDK — npm install vantageaiops from registry")
+section("2. npm SDK — npm install cohrint from registry")
 
 try:
     # npm init + install
@@ -152,27 +152,27 @@ try:
                    capture_output=True, timeout=30)
 
     result = subprocess.run(
-        ["npm", "install", "vantageaiops", "--no-fund", "--no-audit"],
+        ["npm", "install", "cohrint", "--no-fund", "--no-audit"],
         cwd=NPM_DIR, capture_output=True, text=True, timeout=120
     )
-    chk("npm install vantageaiops succeeded", result.returncode == 0,
+    chk("npm install cohrint succeeded", result.returncode == 0,
         result.stderr[:300] if result.returncode != 0 else "")
 
     # Verify version
-    pkg_json_path = os.path.join(NPM_DIR, "node_modules", "vantageaiops", "package.json")
+    pkg_json_path = os.path.join(NPM_DIR, "node_modules", "cohrint", "package.json")
     with open(pkg_json_path) as f:
         npm_pkg = json.load(f)
     npm_version = npm_pkg.get("version", "?")
     chk(f"npm package installed (v{npm_version})", bool(npm_version))
 
     # Verify it's NOT the local dist
-    pkg_main = os.path.join(NPM_DIR, "node_modules", "vantageaiops",
+    pkg_main = os.path.join(NPM_DIR, "node_modules", "cohrint",
                              npm_pkg.get("module", "dist/index.js"))
     chk("npm package is in node_modules (not local dist)", NPM_DIR in pkg_main)
 
     # Verify JS SDK exports work
     test_js = textwrap.dedent("""
-        import { calculateCost, findCheapest, PRICES } from 'vantageaiops';
+        import { calculateCost, findCheapest, PRICES } from 'cohrint';
         const cost = calculateCost('gpt-4o', 1000, 300);
         if (!cost || cost.totalCostUsd <= 0) {
             console.error('calculateCost failed:', cost);
@@ -201,9 +201,9 @@ except Exception as e:
     fail("npm SDK install check failed", str(e))
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 3. Live API — sign up fresh test account (get real vnt_key)
+# 3. Live API — sign up fresh test account (get real crt_key)
 # ─────────────────────────────────────────────────────────────────────────────
-section("3. Live API sign-up — generate real vnt_key")
+section("3. Live API sign-up — generate real crt_key")
 
 TEST_EMAIL = f"e2e_{rand_tag()}@vantage-test.dev"
 TEST_NAME  = "E2E UI Test"
@@ -220,8 +220,8 @@ try:
     d = r.json()
     API_KEY = d.get("api_key")
     ORG_ID  = d.get("org_id")
-    chk("Real vnt_key returned (starts with vnt_)",
-        isinstance(API_KEY, str) and API_KEY.startswith("vnt_"))
+    chk("Real crt_key returned (starts with crt_)",
+        isinstance(API_KEY, str) and API_KEY.startswith("crt_"))
     chk("org_id in database", bool(ORG_ID))
     info(f"org_id = {ORG_ID}")
     info(f"key    = {API_KEY[:24]}...")
@@ -295,7 +295,7 @@ if PLAYWRIGHT_OK:
                 key_el = page.locator("#key-display")
                 CAPTURED_KEY = key_el.inner_text().strip()
                 chk("API key displayed in success state",
-                    bool(CAPTURED_KEY) and CAPTURED_KEY.startswith("vnt_"),
+                    bool(CAPTURED_KEY) and CAPTURED_KEY.startswith("crt_"),
                     f"got: {CAPTURED_KEY[:30] if CAPTURED_KEY else 'empty'}")
 
                 # Check warning message is shown
@@ -332,7 +332,7 @@ if PLAYWRIGHT_OK:
                 page.locator("text=Recover").count() > 0)
 
             # Try signing in with a WRONG key — should show error
-            page.fill("#inp-key", "vnt_wrongkey_definitely_invalid_00000")
+            page.fill("#inp-key", "crt_wrongkey_definitely_invalid_00000")
             with page.expect_response(
                 lambda r: "/v1/auth/session" in r.url, timeout=10_000
             ) as resp_info:
@@ -512,7 +512,7 @@ import sys, time, json
 sys.path.insert(0, '')   # ensure no local path pollution
 
 # Use the PyPI-installed package
-import vantageaiops as vantage
+import cohrint as vantage
 
 vantage.init(
     api_key="{API_KEY}",
@@ -522,8 +522,8 @@ vantage.init(
     debug=True,
 )
 
-from vantageaiops.utils.queue import EventQueue
-from vantageaiops.models.event import VantageEvent, TokenUsage, CostInfo
+from cohrint.utils.queue import EventQueue
+from cohrint.models.event import CohrintEvent, TokenUsage, CostInfo
 
 q = EventQueue(api_key="{API_KEY}", ingest_url="{API_URL}",
                flush_interval=1.0, batch_size=5, debug=True)
@@ -544,7 +544,7 @@ req = urllib.request.Request(
     "{API_URL}/v1/events/batch", data=payload, method="POST",
     headers={{"Content-Type": "application/json",
               "Authorization": "Bearer {API_KEY}",
-              "User-Agent": "vantageaiops-python/0.3.1"}},
+              "User-Agent": "cohrint-python/0.3.1"}},
 )
 with urllib.request.urlopen(req, timeout=15) as r:
     body = json.loads(r.read())
@@ -571,10 +571,10 @@ except Exception as e:
 section("6. JS SDK (npm) — send real events to live API")
 
 JS_SDK_SCRIPT = textwrap.dedent(f"""
-import {{ VantageClient }} from 'vantageaiops';
+import {{ CohrintClient }} from 'cohrint';
 import {{ randomUUID }} from 'crypto';
 
-const client = new VantageClient({{
+const client = new CohrintClient({{
   apiKey: '{API_KEY}',
   ingestUrl: '{API_URL}',
   environment: 'e2e-test',

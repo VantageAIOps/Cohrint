@@ -11,7 +11,7 @@ Developer notes:
 Known bugs to detect:
   - "Website goes down immediately after using existing api_key"
     → check that POST session → redirect to /app works without crashing
-  - Session cookie domain must match vantageaiops.com
+  - Session cookie domain must match cohrint.com
   - Redirect loop guard: /auth?next=/auth should go to /app not loop
   - After sign-in, GET /session should return org info needed to load data
 
@@ -68,16 +68,16 @@ if API_KEY:
     # 1.4 Wrong key → 401
     try:
         r = requests.post(f"{API_URL}/v1/auth/session",
-                          json={"api_key": "vnt_wrongorg_000000000000000000000000"}, timeout=10)
+                          json={"api_key": "crt_wrongorg_000000000000000000000000"}, timeout=10)
         chk("1.4  Wrong key → 401", r.status_code == 401, f"got {r.status_code}")
     except Exception as e:
         fail("1.4  Wrong-key test failed", str(e))
 
-    # 1.5 Malformed key (no vnt_ prefix) → 400 or 401
+    # 1.5 Malformed key (no crt_ prefix) → 400 or 401
     try:
         r = requests.post(f"{API_URL}/v1/auth/session",
                           json={"api_key": "sk-notavantagekey"}, timeout=10)
-        chk("1.5  Malformed key (no vnt_) → 400/401", r.status_code in (400, 401),
+        chk("1.5  Malformed key (no crt_) → 400/401", r.status_code in (400, 401),
             f"got {r.status_code}")
     except Exception as e:
         fail("1.5  Malformed-key test failed", str(e))
@@ -169,7 +169,7 @@ try:
 
         # 2.5 Wrong key shows error message
         try:
-            page.fill("#inp-key", "vnt_badorg_0000000000000000000000000000")
+            page.fill("#inp-key", "crt_badorg_0000000000000000000000000000")
             with page.expect_response(
                 lambda r: "/v1/auth/session" in r.url and r.request.method == "POST",
                 timeout=10_000
@@ -232,7 +232,7 @@ try:
         page2 = ctx2.new_page()
         try:
             page2.goto(f"{SITE_URL}/auth", wait_until="networkidle", timeout=20_000)
-            page2.fill("#inp-key", "vnt_badkey_00000000000000000000000000")
+            page2.fill("#inp-key", "crt_badkey_00000000000000000000000000")
             with page2.expect_response(
                 lambda r: "/v1/auth/session" in r.url and r.request.method == "POST",
                 timeout=10_000

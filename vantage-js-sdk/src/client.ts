@@ -14,7 +14,7 @@ export interface VantageClientOptions {
   batchSize?: number;
   debug?: boolean;
   /**
-   * Privacy mode controls what data is sent to VantageAI servers:
+   * Privacy mode controls what data is sent to Cohrint servers:
    *  - "full"       — sends everything including prompt/response previews (default, existing behavior)
    *  - "stats-only" — sends ONLY token counts, cost, latency, model. NO text whatsoever.
    *  - "hashed"     — like stats-only but includes SHA-256 prompt hash for dedup detection
@@ -34,7 +34,7 @@ export class VantageClient {
   constructor(opts: VantageClientOptions) {
     const _keyParts = opts.apiKey.split("_");
     if (!opts.org && _keyParts.length < 2) {
-      throw new Error("Invalid API key format: expected 'vnt_<orgId>_...' or provide opts.org explicitly.");
+      throw new Error("Invalid API key format: expected 'crt_<orgId>_...' (or legacy 'vnt_<orgId>_...') or provide opts.org explicitly.");
     }
     this.orgId = opts.org ?? _keyParts[1] ?? "";
     this.environment = opts.environment ?? "production";
@@ -45,7 +45,7 @@ export class VantageClient {
 
     this.queue = new EventQueue(
       opts.apiKey,
-      opts.ingestUrl ?? "https://api.vantageaiops.com",
+      opts.ingestUrl ?? "https://api.cohrint.com",
       (opts.flushInterval ?? 2) * 1000,
       opts.batchSize ?? 50,
       this.debug

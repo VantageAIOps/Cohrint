@@ -1,5 +1,5 @@
 """
-metrics_collector.py — Real-time metrics collection for VantageAI test suite
+metrics_collector.py — Real-time metrics collection for Cohrint test suite
 =============================================================================
 Purpose:
   Collects and aggregates performance metrics across test runs:

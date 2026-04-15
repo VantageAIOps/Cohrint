@@ -3,7 +3,7 @@ test_19_new_user_onboarding.py — Complete New User Onboarding E2E Tests
 =======================================================================
 Developer notes:
   Tests the complete new-user journey from landing page to first event ingested:
-    1. User lands on vantageaiops.com
+    1. User lands on cohrint.com
     2. Clicks "Get Started"
     3. Fills signup form
     4. Gets API key (copy to clipboard)
@@ -27,7 +27,7 @@ Tests (19.1 – 19.40):
   19.2  /signup page loads after clicking CTA
   19.3  Signup form: fill name, email, org
   19.4  Signup form: submit → 201 (API call succeeds)
-  19.5  Success state shows API key starting with vnt_
+  19.5  Success state shows API key starting with crt_
   19.6  Success state: "shown only once" / copy warning visible
   19.7  Dashboard link visible in success state
   19.8  After signup, session cookie is set
@@ -130,7 +130,7 @@ try:
             if r_redeem.ok:
                 new_key = r_redeem.json().get("api_key")
                 chk("19.28 Recovery: valid token → new key returned",
-                    bool(new_key) and new_key.startswith("vnt_"),
+                    bool(new_key) and new_key.startswith("crt_"),
                     f"key: {new_key}")
                 if new_key:
                     # 19.29 Old key no longer works
@@ -167,7 +167,7 @@ if r_docs.ok:
     chk("19.32 Docs: quickstart section present",
         any(w in docs_html for w in ["quickstart", "quick start", "getting started"]))
     chk("19.33 Docs: API key usage example (curl or python)",
-        any(w in docs_html for w in ["curl", "python", "bearer", "vnt_", "api_key"]))
+        any(w in docs_html for w in ["curl", "python", "bearer", "crt_", "api_key"]))
 
 # 19.34 /calculator
 r_calc = requests.get(f"{SITE_URL}/calculator", timeout=20)
@@ -267,14 +267,14 @@ try:
                 if key_el.count() > 0:
                     captured_key = key_el.inner_text().strip()
                 else:
-                    # Search page content for vnt_ key
+                    # Search page content for crt_ key
                     content = page.content()
                     import re
-                    m = re.search(r"vnt_[a-zA-Z0-9_]+", content)
+                    m = re.search(r"crt_[a-zA-Z0-9_]+", content)
                     captured_key = m.group(0) if m else None
 
-                chk("19.5  Success: API key shown (starts vnt_)",
-                    bool(captured_key) and captured_key.startswith("vnt_"),
+                chk("19.5  Success: API key shown (starts crt_)",
+                    bool(captured_key) and captured_key.startswith("crt_"),
                     f"key: {captured_key[:25] if captured_key else 'NOT FOUND'}")
 
                 content = page.content().lower()
@@ -338,7 +338,7 @@ try:
                         for c in sr.cookies:
                             ctx.add_cookies([{
                                 "name": c.name, "value": c.value,
-                                "domain": "vantageaiops.com", "path": "/",
+                                "domain": "cohrint.com", "path": "/",
                             }])
                     page.goto(f"{SITE_URL}/app", wait_until="networkidle", timeout=25_000)
                 except Exception:

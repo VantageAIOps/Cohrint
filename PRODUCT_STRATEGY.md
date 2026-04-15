@@ -1,4 +1,4 @@
-# VantageAI — Product Strategy v7.0
+# Cohrint — Product Strategy v7.0
 **The 10-Year War Room Plan: From LLM Cost Tracker → AI Spend Intelligence Layer → Bloomberg of AI**
 
 **Author:** Aman Jain / Kamal Soft Pvt Ltd
@@ -7,7 +7,7 @@
 **Stage:** Pre-Seed / 1-Man Army
 **Critical Window:** 18 months
 
-> **v7.0 Changes:** P2 milestone complete. All Copilot adapter, Datadog exporter, Benchmark system, Cross-Platform Console, Audit Log, Trust page, Report page fully shipped and live. Updated "What's Built" to reflect 18-table schema, 41 test suites, MCP v1.1.1, CLI rename to npx vantageai-cli, Python SDK v1.0.1. Competitive landscape rewritten for April 2026 — VantageAI now holds a unique cross-stack position no competitor covers. Task plan updated: P2 closed, P3 tasks reprioritized.
+> **v7.0 Changes:** P2 milestone complete. All Copilot adapter, Datadog exporter, Benchmark system, Cross-Platform Console, Audit Log, Trust page, Report page fully shipped and live. Updated "What's Built" to reflect 18-table schema, 41 test suites, MCP v1.1.1, CLI rename to npx vantageai-cli, Python SDK v1.0.1. Competitive landscape rewritten for April 2026 — Cohrint now holds a unique cross-stack position no competitor covers. Task plan updated: P2 closed, P3 tasks reprioritized.
 
 ---
 
@@ -60,7 +60,7 @@ The diagnosis from v6 still applies to the basic cost-visibility story. But the 
 | Distribution | Platform is built. Nobody knows. Every week of no distribution is a week a funded competitor can catch up. |
 | No social proof | Testimonials removed (good). Still no logos, no case studies, no named customers on the site. Enterprise sales stalls. |
 | No paying customers yet | All metrics are product metrics. Revenue is the only signal that matters externally. |
-| Brand name "VantageAI" | Trademark conflict risk. `vantageaiops.com` is clunky in enterprise sales conversations. |
+| Brand name "Cohrint" | Trademark conflict risk. `cohrint.com` is clunky in enterprise sales conversations. |
 | Palma.ai direct threat | Direct ICP competitor. Still pre-PMF but watch closely. |
 | Benchmark data thin | k-anonymity floor of 5 orgs means most cohorts return 404 until more orgs opt in. Chicken-and-egg. |
 | No semantic cache shipped | Helicone is exact-match only. Window to ship semantic cache before they move is still open but closing. |
@@ -151,7 +151,7 @@ EU AI Act, SOX-equivalent AI audit requirements, HIPAA AI governance — all com
 
 ## 5. What's Built
 
-All items below are shipped and live at `vantageaiops.com` as of 2026-04-14.
+All items below are shipped and live at `cohrint.com` as of 2026-04-14.
 
 ### Infrastructure
 
@@ -190,9 +190,9 @@ All items below are shipped and live at `vantageaiops.com` as of 2026-04-14.
 
 | Client | Package | Status |
 |--------|---------|--------|
-| Python SDK | `vantageaiops` v1.0.1 on PyPI | ✅ Live |
-| TypeScript SDK | `vantageaiops` on npm | ✅ Live |
-| MCP Server | `vantageaiops-mcp` v1.1.1 on npm — 12 tools | ✅ Live |
+| Python SDK | `cohrint` v1.0.1 on PyPI | ✅ Live |
+| TypeScript SDK | `cohrint` on npm | ✅ Live |
+| MCP Server | `cohrint-mcp` v1.1.1 on npm — 12 tools | ✅ Live |
 | CLI Agent | `npx vantageai-cli` — transparent AI agent wrapper | ✅ Live |
 | Local Proxy | `vantage-local-proxy` — 3 privacy modes (strict/standard/relaxed) | ✅ Live |
 | OTel OTLP | 1 env var → 10+ tools (Claude Code, Copilot, Cursor, Gemini CLI, Cline, Codex, Kiro, Windsurf, Continue, OpenCode) | ✅ Live |
@@ -235,7 +235,7 @@ All items below are shipped and live at `vantageaiops.com` as of 2026-04-14.
 
 **Claude Code Integration (Stop Hook Tracking)**
 - [x] Zero-config Stop hook — auto-tracks every Claude Code session
-- [x] Three install channels: vantage-mcp setup, @vantageaiops/claude-code npm, manual install.sh
+- [x] Three install channels: vantage-mcp setup, @cohrint/claude-code npm, manual install.sh
 - [x] Client-side deduplication — ~/.claude/vantage-state.json (50K ID cap), server-side INSERT OR IGNORE
 - [x] Dual-write architecture — events → /v1/events/batch (analytics) + /v1/otel/v1/metrics (cross-platform)
 - [x] Cost calculation — mirrors worker pricing table, supports 12 models (Claude, GPT-4o, o1, o3-mini, Gemini)
@@ -347,7 +347,7 @@ Helicone, LangSmith both have this. Engineering teams want to version prompts, A
 ---
 
 ### 🟡 GAP 6: Brand / Domain Fragmentation (Minor)
-"VantageAI" trademark conflicts. `vantageaiops.com` is clunky for enterprise sales.
+"Cohrint" trademark conflicts. `cohrint.com` is clunky for enterprise sales.
 
 **FIX:** Decide domain by Month 1. Options: spendlens.ai, ailedger.com, modelbench.io, or commit to vantageai.com. Register and redirect.
 
@@ -540,7 +540,7 @@ Every week counts. Only build what advances the data moat or the enterprise wedg
 
 ### Competitive Landscape (April 2026)
 
-| Dimension | VantageAI | Helicone | LangSmith | Langfuse | Datadog LLM Obs. | GitHub Copilot Analytics | Palma.ai |
+| Dimension | Cohrint | Helicone | LangSmith | Langfuse | Datadog LLM Obs. | GitHub Copilot Analytics | Palma.ai |
 |---|---|---|---|---|---|---|---|
 | **Free tier** | 50K events/mo | 10K/mo | 5K traces/mo | 50K units/mo | None | Included w/ seat | Unknown |
 | **Paid entry** | TBD | $20/seat/mo | $39/seat/mo | $29/mo flat | ~$120/day activation | $10–19/user/mo | Unknown |
@@ -565,7 +565,7 @@ Every week counts. Only build what advances the data moat or the enterprise wedg
 |-----------|--------------------|-----------  |
 | Helicone | Exact-match cache only. No AI coding tool OTel. No Copilot billing. No per-developer cross-tool attribution. Proxy = traffic interception risk for enterprise. | AI Spend Console + Copilot adapter + no-proxy architecture + privacy modes beats on all enterprise dimensions. |
 | LangSmith | Deep LangChain coupling. Tracing-heavy, not cost-primary. No multi-tool procurement story. No Copilot. | Cost-first narrative. Non-LangChain teams are underserved. CTOs buying Copilot don't care about LangChain. |
-| Langfuse | MIT OSS is a moat. Strong eval + prompt mgmt. No AI coding tool OTel. No CLI wrapper. No Copilot. | "Langfuse shows your LLM calls. VantageAI shows your AI coding bill." Different buyer: CTO vs ML engineer. |
+| Langfuse | MIT OSS is a moat. Strong eval + prompt mgmt. No AI coding tool OTel. No CLI wrapper. No Copilot. | "Langfuse shows your LLM calls. Cohrint shows your AI coding bill." Different buyer: CTO vs ML engineer. |
 | Datadog LLM | $15+/host explodes at scale. Observability focus, not cost intelligence. No AI coding tools. No Copilot attribution. | Purpose-built for AI spend. 10x cheaper. "Datadog is for infra, Vantage is for AI budgets." We push data to Datadog — we don't compete with it. |
 | OpenAI Dashboard | Only shows OpenAI. Provider-biased. No cross-model comparison. No independence. | Multi-provider neutrality. "Would you let your bank audit itself?" |
 | Anthropic Console | Same — single provider. No Copilot, no Cursor, no competitive intelligence. | You show the full picture. They show only their slice. CFOs need the full picture. |
@@ -573,9 +573,9 @@ Every week counts. Only build what advances the data moat or the enterprise wedg
 | Palma.ai | **Direct threat.** Identical ICP. Appears to be pre-PMF, limited marketing. | We've shipped: Copilot adapter, Datadog exporter, benchmark system, cross-platform console, MCP server — all production. Ship first, own the "AI Coding FinOps" category. |
 | CloudZero / Apptio | Cloud cost focus. Not built for LLM/AI token economics. Expensive, slow to adapt. | AI-native from day one. These are your 5-year acquisition targets. |
 
-### Why VantageAI Is the Only Full-Stack AI Coding Spend Platform
+### Why Cohrint Is the Only Full-Stack AI Coding Spend Platform
 
-As of April 2026, VantageAI is the **only platform** that covers the complete AI coding spend stack in one dashboard:
+As of April 2026, Cohrint is the **only platform** that covers the complete AI coding spend stack in one dashboard:
 
 1. **IDE tools** (GitHub Copilot) — via Copilot Metrics API adapter, per-developer, per-seat cost
 2. **LLM APIs** (OpenAI, Anthropic, Google, Mistral, etc.) — via SDK + OTel collector, per-call tracking
@@ -777,7 +777,7 @@ _Reordered 2026-04-14 based on P2 completion, competitive analysis, and threat a
 
 - [ ] **Email 20 CTOs at AI-heavy startups** — Design partner outreach. Use Prompt #02. Frame around Copilot billing visibility — that's the new hook. 5 warm leads = the next 6 months of roadmap feedback. **3h.**
 - [ ] **Write + post Show HN** — 8am ET Tuesday or Wednesday. Lead with cross-stack story: "only tool that covers Copilot + Claude Code + any LLM API in one dashboard." Use Prompt #05. **2.5h.**
-- [ ] **Decide brand/domain** — Commit to vantageai.com or register spendlens.ai / ailedger.com. `vantageaiops.com` is a liability in enterprise sales. **2h.**
+- [ ] **Decide brand/domain** — Commit to vantageai.com or register spendlens.ai / ailedger.com. `cohrint.com` is a liability in enterprise sales. **2h.**
 - [ ] **Seed benchmark data** — Manually opt in 3–5 early orgs (with permission). First cohort with k≥5 unlocks the entire benchmark story. **1h + outreach.**
 
 ---
@@ -879,7 +879,7 @@ Architectural decisions and trade-offs made during V2 implementation. These are 
 
 **Decision:** Claude Code hook events are written to **both** `/v1/events/batch` (analytics pipeline) **and** `/v1/otel/v1/metrics` (cross-platform console).
 
-**Why:** VantageAI has two independent event pipelines:
+**Why:** Cohrint has two independent event pipelines:
 - **Analytics** (`events` table) powers the main dashboard, budgets, KPIs, team breakdowns
 - **Cross-Platform** (`cross_platform_usage` + OTel) powers the unified developer spend view across all tools (Copilot, Cursor, Claude Code, Codeium)
 
@@ -903,9 +903,9 @@ If Claude Code only went to analytics, it would be invisible in the cross-platfo
 
 ### 5. Setup Subcommand Before MCP Transport Initialization
 
-**Decision:** The `npx vantageaiops-mcp setup` subcommand must intercept `process.argv[2] === 'setup'` **before** `StdioServerTransport` is instantiated.
+**Decision:** The `npx cohrint-mcp setup` subcommand must intercept `process.argv[2] === 'setup'` **before** `StdioServerTransport` is instantiated.
 
-**Why:** The MCP server runs an infinite loop on stdin (MCP protocol). If the setup subcommand runs after the transport starts, stdin is consumed by the transport and the process won't exit cleanly. The user runs `npx vantageaiops-mcp setup` and it hangs indefinitely.
+**Why:** The MCP server runs an infinite loop on stdin (MCP protocol). If the setup subcommand runs after the transport starts, stdin is consumed by the transport and the process won't exit cleanly. The user runs `npx cohrint-mcp setup` and it hangs indefinitely.
 
 **Implementation:** In vantage-mcp/src/index.ts, the `main()` function checks `process.argv[2]` at the very top. If it's `'setup'`, it calls `runSetup()` synchronously and exits with `process.exit(0)` **before** creating the transport.
 
@@ -921,7 +921,7 @@ main()
 
 ### 6. Zero Runtime Dependencies Constraint
 
-**Decision:** All SDK/CLI packages (`vantage-mcp`, `@vantageaiops/claude-code`, `vantage-js-sdk`) must have **zero npm runtime dependencies**.
+**Decision:** All SDK/CLI packages (`vantage-mcp`, `@cohrint/claude-code`, `vantage-js-sdk`) must have **zero npm runtime dependencies**.
 
 **Why:** (a) Security: fewer dependencies = fewer CVEs to patch. (b) Installation speed: no `npm install` recursion. (c) Compliance: easier auditing for regulated customers. (d) Bundling: tools like Claude Code might bundle the SDK; zero deps makes bundling trivial.
 
@@ -988,13 +988,13 @@ Use these directly in Claude sessions. Each is tuned for your specific build tas
 
 ---
 
-*VantageAI · War Room Strategy · Confidential · April 2026*
+*Cohrint · War Room Strategy · Confidential · April 2026*
 *P2 is complete. The platform is real. The only question left is distribution.*
 *Every week you don't own your layer, a better-funded player gets closer to it.*
 
 ---
 
-## 15. Competitive Analysis — palma.ai vs VantageAI (2026-04-15)
+## 15. Competitive Analysis — palma.ai vs Cohrint (2026-04-15)
 
 > **Why this section exists:** On 2026-04-15 we did a deep competitive teardown of palma.ai — the closest enterprise competitor in the AI governance/observability space. The findings informed a landing page revision, a hero copy change, and a 60-day product roadmap. Read this before any positioning conversation, pricing negotiation, or enterprise sales call.
 

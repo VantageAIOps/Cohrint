@@ -6,7 +6,7 @@ Mistral, LiteLLM, LangChain, and raw HTTP calls with one decorator.
 
 USAGE (any model):
     import vantage
-    vantage.init(api_key="vnt_...", org="acme", team="product")
+    vantage.init(api_key="crt_...", org="acme", team="product")
 
     # OpenAI
     from vantage.proxy import openai
@@ -33,7 +33,7 @@ from dataclasses import dataclass, field, asdict
 from typing import Any, Callable, Optional
 from functools import wraps
 
-from vantage.models.event import VantageEvent, TokenUsage, CostInfo, QualityMetrics, OptimizerMeta
+from vantage.models.event import CohrintEvent, TokenUsage, CostInfo, QualityMetrics, OptimizerMeta
 from vantage.models.pricing import calculate_cost, find_cheapest
 from vantage.utils.queue import EventQueue
 
@@ -42,7 +42,7 @@ from vantage.utils.queue import EventQueue
 import contextvars
 
 _CTX_TAGS:    contextvars.ContextVar[dict] = contextvars.ContextVar("vantage_tags",    default={})
-_CTX_SESSION: contextvars.ContextVar[str]  = contextvars.ContextVar("vantage_session", default="")
+_CTX_SESSION: contextvars.ContextVar[str]  = contextvars.ContextVar("cohrint_session", default="")
 _CTX_USER:    contextvars.ContextVar[str]  = contextvars.ContextVar("vantage_user",    default="")
 _CTX_FEATURE: contextvars.ContextVar[str]  = contextvars.ContextVar("vantage_feature", default="")
 _CTX_PROJECT: contextvars.ContextVar[str]  = contextvars.ContextVar("vantage_project", default="")
@@ -169,14 +169,14 @@ def _build_event(
     org_id: str,
     environment: str,
     optimizer_meta: Optional[dict] = None,
-) -> VantageEvent:
+) -> CohrintEvent:
     costs = calculate_cost(model, prompt_tokens, completion_tokens, cached_tokens)
     cheaper = find_cheapest(model, prompt_tokens, completion_tokens)
 
     # Fingerprint prompt for dedup/caching analysis
     prompt_hash = hashlib.md5(system_prompt.encode()).hexdigest()[:12] if system_prompt else ""
 
-    return VantageEvent(
+    return CohrintEvent(
         event_id    = str(uuid.uuid4()),
         timestamp   = time.time(),
         org_id      = org_id,

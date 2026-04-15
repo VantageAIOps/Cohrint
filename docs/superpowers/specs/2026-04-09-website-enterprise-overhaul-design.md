@@ -1,13 +1,13 @@
-# VantageAI Website & Security Overhaul — Design Spec
+# Cohrint Website & Security Overhaul — Design Spec
 _2026-04-09 · Approved by Aman Jain_
 
 ---
 
 ## Overview
 
-Four-phase overhaul of the VantageAI public website (`vantage-final-v4/`) and Worker security surface. Ordered by risk and effort: quick content fixes first, then enterprise redesign, then live demo, then security audit.
+Four-phase overhaul of the Cohrint public website (`vantage-final-v4/`) and Worker security surface. Ordered by risk and effort: quick content fixes first, then enterprise redesign, then live demo, then security audit.
 
-**Sales email:** vantageaiops@gmail.com (used for all pricing CTAs)
+**Sales email:** cohrint@gmail.com (used for all pricing CTAs)
 
 ---
 
@@ -56,12 +56,12 @@ Remove or rename:
 - Nav item: "Zed / JetBrains" → remove entirely
 - Section heading: "Windsurf" → remove section
 - Section heading: "Zed & JetBrains" → remove section
-- Replace removed sections with a generic note: "VantageAI MCP works with any MCP-compatible editor. See your editor's documentation for MCP server configuration."
+- Replace removed sections with a generic note: "Cohrint MCP works with any MCP-compatible editor. See your editor's documentation for MCP server configuration."
 
 ### 1.6 `docs.html` — Competitive Intelligence Redaction
 
 Remove these internal implementation details:
-- **Line ~1736:** Fuzzy pricing match description ("tries substring matching, e.g. `claude-sonnet-4-6-20260301` matches `claude-sonnet-4-6`") → replace with: "VantageAI automatically resolves model variants to their base pricing."
+- **Line ~1736:** Fuzzy pricing match description ("tries substring matching, e.g. `claude-sonnet-4-6-20260301` matches `claude-sonnet-4-6`") → replace with: "Cohrint automatically resolves model variants to their base pricing."
 - **Line ~1268:** Replace "MD5" with "hashed" in privacy mode table. The full-mode description should say "hashed identifier" not name the algorithm.
 
 Keep (not sensitive):
@@ -90,7 +90,7 @@ Add "Docs" link in the app navigation bar pointing to `/docs.html`. Opens in new
 
 ### 2.2 Navigation
 
-- Left: VantageAI logo
+- Left: Cohrint logo
 - Center links: Features · Pricing · Resources (dropdown: Docs, Calculator)
 - Right: Sign In · **Request Access** (indigo button)
 - Add "Security" link pointing to `#security` anchor on the page
@@ -130,7 +130,7 @@ Only describe features that are shipped. Remove:
 
 ### 2.6 Comparison Table
 
-Two columns only: "Category Leaders" vs "VantageAI".
+Two columns only: "Category Leaders" vs "Cohrint".
 Footnote as specified in §1.3.
 
 ### 2.7 Pricing Section
@@ -140,8 +140,8 @@ Three tiers. No payment gateway — all paid tiers use mailto CTA.
 | Tier | What's included | CTA |
 |------|----------------|-----|
 | **Free** | Up to 10k events/month · All core analytics · 1 org | Sign Up free → `/signup.html` |
-| **Team** | Unlimited events · Budget policies · MCP tools · Cross-platform OTel | Contact us → `mailto:vantageaiops@gmail.com?subject=Team Plan` |
-| **Enterprise** | Volume pricing · Dedicated support · SLA discussion | Talk to sales → `mailto:vantageaiops@gmail.com?subject=Enterprise` |
+| **Team** | Unlimited events · Budget policies · MCP tools · Cross-platform OTel | Contact us → `mailto:cohrint@gmail.com?subject=Team Plan` |
+| **Enterprise** | Volume pricing · Dedicated support · SLA discussion | Talk to sales → `mailto:cohrint@gmail.com?subject=Enterprise` |
 
 Remove: seat counts, specific feature lists that aren't shipped, SOC2/HIPAA badges.
 
@@ -170,7 +170,7 @@ Three columns:
 
 ### 3.1 Setup (One-Time Manual)
 
-1. Create demo org manually in D1: `org_id = "demo"`, email = `demo@vantageaiops.com`
+1. Create demo org manually in D1: `org_id = "demo"`, email = `demo@cohrint.com`
 2. Seed fixed constant data via `vantage-final-v4/seed-data.js` (extend existing script):
    - 3 teams: `backend`, `ml-platform`, `product`
    - 4 models: `claude-sonnet-4-6`, `gpt-4o`, `gemini-2.0-flash`, `claude-haiku-4-5`
@@ -245,7 +245,7 @@ Re-seed manually if data needs refreshing. No automation needed — data is cons
 
 ## Constraints
 
-- No payment gateway — all paid tier CTAs use `mailto:vantageaiops@gmail.com`
+- No payment gateway — all paid tier CTAs use `mailto:cohrint@gmail.com`
 - No false claims — only describe shipped features
 - No fake reviews — no person names or company names until real testimonials
 - No competitor names on landing page — use category labels only

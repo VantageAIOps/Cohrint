@@ -11,7 +11,7 @@ Developer notes:
     • Rate limiting headers present
     • Content-Type headers correct
 
-  All tests run against https://api.vantageaiops.com (production).
+  All tests run against https://api.cohrint.com (production).
   No mocking — every call goes to the real Cloudflare Worker.
 
   Endpoint coverage: 28 endpoints
@@ -64,7 +64,7 @@ Tests (15.1 – 15.50):
   15.34 Unauthenticated /v1/events → 401
   15.35 Unauthenticated /v1/admin/overview → 401
   15.36 CORS: OPTIONS /v1/events → 200 with ACAO header
-  15.37 CORS: ACAO includes vantageaiops.com
+  15.37 CORS: ACAO includes cohrint.com
   15.38 CORS: OPTIONS /v1/analytics/summary → 200
   15.39 Rate limit headers present on event ingest
   15.40 Content-Type: application/json on all JSON endpoints
@@ -100,7 +100,7 @@ from logging_infra.structured_logger import get_logger
 
 log = get_logger("test.production_endpoints")
 
-ORIGIN = "https://vantageaiops.com"
+ORIGIN = "https://cohrint.com"
 CORS_HDR = {"Origin": ORIGIN}
 latencies = []
 
@@ -425,8 +425,8 @@ for test_id, path in [
     chk(f"{test_id}  OPTIONS {path} → 200 (CORS preflight)",
         r_opts.status_code in (200, 204), f"got {r_opts.status_code}")
     acao = r_opts.headers.get("Access-Control-Allow-Origin", "")
-    chk(f"{test_id}b  CORS ACAO includes vantageaiops.com or *",
-        "vantageaiops.com" in acao or acao == "*",
+    chk(f"{test_id}b  CORS ACAO includes cohrint.com or *",
+        "cohrint.com" in acao or acao == "*",
         f"ACAO: '{acao}'")
 
 # 15.37 (covered by 15.36b)

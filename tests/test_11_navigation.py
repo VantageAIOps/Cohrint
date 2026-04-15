@@ -88,7 +88,7 @@ def signin_session_via_api(ctx):
         ctx.add_cookies([{
             "name":   c.name,
             "value":  c.value,
-            "domain": "vantageaiops.com",
+            "domain": "cohrint.com",
             "path":   "/",
         }])
     return True
@@ -405,7 +405,7 @@ try:
                     # 11.27 API key hint shown
                     content = page.content().lower()
                     chk("11.27  Settings shows API key hint",
-                        any(w in content for w in ["vnt_", "api key", "key", "****"]))
+                        any(w in content for w in ["crt_", "api key", "key", "****"]))
 
                     # Close modal
                     try:

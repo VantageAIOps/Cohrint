@@ -14,7 +14,7 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 # Test configuration
-BASE_URL = os.getenv("VANTAGE_API_URL", "https://api.vantageaiops.com")
+BASE_URL = os.getenv("VANTAGE_API_URL", "https://api.cohrint.com")
 API_KEY = os.getenv("VANTAGE_API_KEY", "")
 
 

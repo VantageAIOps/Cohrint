@@ -56,7 +56,7 @@ jobs:
           for attempt in $(seq 1 $MAX_ATTEMPTS); do
             echo "▶ Deploy attempt $attempt / $MAX_ATTEMPTS"
             if npx wrangler pages deploy ./vantage-final-v4 \
-                --project-name=vantageai \
+                --project-name=cohrint \
                 --branch=${{ steps.branch.outputs.branch }}; then
               echo "✅ Deploy succeeded on attempt $attempt"
               exit 0
@@ -72,4 +72,4 @@ jobs:
 
       - name: Confirm deployment
         if: github.ref == 'refs/heads/main'
-        run: echo "✅ Frontend deployed — https://vantageaiops.com"
+        run: echo "✅ Frontend deployed — https://cohrint.com"

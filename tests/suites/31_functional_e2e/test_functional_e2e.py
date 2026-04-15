@@ -1,7 +1,7 @@
 """
 Test Suite 31 — Full-Product Functional E2E Tests
 ===================================================
-Suite FN: End-to-end functional tests covering the ENTIRE VantageAI product
+Suite FN: End-to-end functional tests covering the ENTIRE Cohrint product
 lifecycle — from signup through event ingestion, analytics, cross-platform,
 OTel, budget checks, session management, org isolation, CLI integration,
 MCP tooling, and local proxy pipeline.
@@ -147,9 +147,9 @@ class TestOnboardingFlow:
     def test_fn02_api_key_format_valid(self):
         d = signup_api(email=rand_email("fn31"))
         key = d["api_key"]
-        chk("FN.2 api_key has vnt_ prefix and org embedded",
-            key.startswith("vnt_") and "_" in key[4:])
-        assert key.startswith("vnt_")
+        chk("FN.2 api_key has crt_ prefix and org embedded",
+            key.startswith("crt_") and "_" in key[4:])
+        assert key.startswith("crt_")
 
     def test_fn03_session_login_works(self):
         d = signup_api(email=rand_email("fn31"))

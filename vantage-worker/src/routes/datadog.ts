@@ -1,5 +1,5 @@
 /**
- * VantageAI — Datadog Metrics Exporter
+ * Cohrint — Datadog Metrics Exporter
  *
  * Pushes per-developer AI cost metrics from cross_platform_usage into an
  * org's own Datadog account. Additive — does not replace existing Datadog

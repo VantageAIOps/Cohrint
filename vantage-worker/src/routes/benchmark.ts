@@ -1,5 +1,5 @@
 /**
- * VantageAI — Anonymized Benchmark API
+ * Cohrint — Anonymized Benchmark API
  *
  * Powers cross-company intelligence benchmarks.
  * Opt-in only. No org identifiers in public endpoints.
