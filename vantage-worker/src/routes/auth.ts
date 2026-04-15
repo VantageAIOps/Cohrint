@@ -630,7 +630,7 @@ auth.delete('/session', async (c) => {
   const res = c.json({ ok: true });
   const isProdLogout = (c.env.ENVIRONMENT ?? 'production') === 'production';
   const clearCookie = isProdLogout
-    ? 'cohrint_session=; Path=/; HttpOnly; Max-Age=0; SameSite=None; Secure; Domain=cohrint.com'
+    ? 'cohrint_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax; Secure; Domain=cohrint.com'
     : 'cohrint_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax';
   (await res).headers.set('Set-Cookie', clearCookie);
   return res;
@@ -649,7 +649,7 @@ auth.post('/logout', async (c) => {
   const res = c.json({ ok: true });
   const isProd = (c.env.ENVIRONMENT ?? 'production') === 'production';
   const clearCookie = isProd
-    ? 'cohrint_session=; Path=/; HttpOnly; Max-Age=0; SameSite=None; Secure; Domain=cohrint.com'
+    ? 'cohrint_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax; Secure; Domain=cohrint.com'
     : 'cohrint_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax';
   (await res).headers.set('Set-Cookie', clearCookie);
   return res;

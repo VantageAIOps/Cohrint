@@ -57,7 +57,8 @@ export async function authMiddleware(
 ) {
   // ── 1. Session cookie auth ────────────────────────────────────────────────
   const cookieHeader = c.req.header('Cookie') ?? '';
-  const sessionToken = parseCookie(cookieHeader, 'cohrint_session');
+  const sessionToken = parseCookie(cookieHeader, 'cohrint_session')
+    ?? parseCookie(cookieHeader, 'vantage_session');
 
   if (sessionToken) {
     const session = await c.env.DB.prepare(
