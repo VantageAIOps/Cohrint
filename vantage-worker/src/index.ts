@@ -50,6 +50,10 @@
  *   POST /v1/otel/v1/metrics             (OTLP metrics — Claude Code, Copilot, Gemini CLI)
  *   POST /v1/otel/v1/logs                (OTLP events — api_request, tool_result, etc.)
  *   POST /v1/otel/v1/traces              (OTLP traces — future)
+ *   GET  /v1/teams                        (admin — list org teams)
+ *   POST /v1/teams                        (admin — create team)
+ *   DELETE /v1/teams/:id                  (admin — soft-delete team)
+ *   GET  /v1/teams/:id/members            (admin — list team members)
  *   POST /v1/copilot/connect             (admin — store GitHub org + PAT encrypted in KV)
  *   DELETE /v1/copilot/connect           (admin — remove Copilot connection)
  *   GET  /v1/copilot/status              (list Copilot connections + last sync time)
@@ -80,6 +84,7 @@ import { copilot, syncCopilotMetrics } from './routes/copilot';
 import { datadog, syncDatadogMetrics } from './routes/datadog';
 import { benchmark, syncBenchmarkContributions } from './routes/benchmark';
 import { executive } from './routes/executive';
+import { teams }     from './routes/teams';
 import { runAnomalyDetection } from './lib/anomaly';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -116,6 +121,7 @@ app.route('/v1/copilot',        copilot);   // GitHub Copilot Metrics API adapte
 app.route('/v1/datadog',        datadog);   // Datadog metrics exporter
 app.route('/v1/benchmark',      benchmark); // Anonymized cross-company benchmarks
 app.route('/v1/analytics/executive', executive); // CEO/superadmin unified dashboard
+app.route('/v1/teams',              teams);      // Team CRUD (org accounts only)
 
 // ── 404 fallback ──────────────────────────────────────────────────────────────
 app.notFound((c) => c.json({
