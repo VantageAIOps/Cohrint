@@ -7,3 +7,13 @@
 /security     /trust.html      301
 /trust        /trust.html      301
 /benchmark    /report.html     301
+
+# Clean URLs — redirect .html → no extension (canonical = clean URL)
+/docs.html          /docs           301
+/calculator.html    /calculator     301
+/roadmap.html       /roadmap        301
+/privacy.html       /privacy        301
+/terms.html         /terms          301
+/report.html        /report         301
+/trust.html         /trust          301
+/blog.html          /blog           301
