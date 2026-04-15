@@ -5,7 +5,7 @@ Tests:
   - vantage-track.js pricing table completeness
   - vantage-track.js cost calculation accuracy
   - vantage-track.js OTel payload structure
-  - @vantageaiops/claude-code package structure
+  - @cohrint/claude-code package structure
   - vantage-mcp setup subcommand (unit-level, no ~/.claude side-effects)
   - Dashboard Claude Code card presence in app.html
 """
@@ -109,7 +109,7 @@ class TestEnvVars:
     def test_no_hardcoded_api_key(self):
         """API key must not be hardcoded in the hook file."""
         hook_text = read_hook()
-        assert "vnt_" not in hook_text, "Hardcoded API key found in vantage-track.js"
+        assert "crt_" not in hook_text, "Hardcoded API key found in vantage-track.js"
 
 
 # ── OTel emission tests ───────────────────────────────────────────────────────
@@ -148,10 +148,10 @@ class TestSuccessFeedback:
         """Hook must write a success message to stderr after upload."""
         hook_text = read_hook()
         assert "vantage-track] Tracked" in hook_text
-        assert "vantageaiops.com" in hook_text
+        assert "cohrint.com" in hook_text
 
 
-# ── @vantageaiops/claude-code package ────────────────────────────────────────
+# ── @cohrint/claude-code package ────────────────────────────────────────
 
 class TestClaudeCodePackage:
     def test_package_json_exists(self):
@@ -159,7 +159,7 @@ class TestClaudeCodePackage:
 
     def test_package_name(self):
         pkg = json.loads((CLAUDE_INT / "package.json").read_text())
-        assert pkg["name"] == "@vantageaiops/claude-code"
+        assert pkg["name"] == "@cohrint/claude-code"
 
     def test_package_version(self):
         pkg = json.loads((CLAUDE_INT / "package.json").read_text())
@@ -252,7 +252,7 @@ class TestDashboardClaudeCodeCard:
         assert "copyClaudeSetupCmd" in self.app_html()
 
     def test_setup_command_displayed(self):
-        assert "npx vantageaiops-mcp setup" in self.app_html()
+        assert "npx cohrint-mcp setup" in self.app_html()
 
     def test_load_claude_code_status_function(self):
         assert "loadClaudeCodeStatus" in self.app_html()

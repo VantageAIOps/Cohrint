@@ -124,7 +124,7 @@ if r and r.status_code == 201:
     d = r.json()
     chk("4.1  Signup: api_key present",   bool(d.get("api_key")))
     chk("4.2  Signup: org_id present",    bool(d.get("org_id")))
-    chk("4.3  Signup: api_key starts vnt_", d.get("api_key","").startswith("vnt_"))
+    chk("4.3  Signup: api_key starts crt_", d.get("api_key","").startswith("crt_"))
 
 # Session create
 r = api("POST", "/v1/auth/session", expected=200, auth=False,
@@ -153,7 +153,7 @@ r = api("GET", "/v1/auth/session", expected=401, auth=False)
 r = api("POST", "/v1/auth/rotate", expected=200, auth=False, cookies=COOKIES)
 if r and r.status_code == 200:
     new_key = r.json().get("api_key")
-    chk("4.9  /auth/rotate: new key returned", bool(new_key) and new_key.startswith("vnt_"))
+    chk("4.9  /auth/rotate: new key returned", bool(new_key) and new_key.startswith("crt_"))
     # Update creds to new key
     API_KEY = new_key
     HEADERS = get_headers(API_KEY)

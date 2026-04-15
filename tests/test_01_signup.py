@@ -48,7 +48,7 @@ try:
     chk("1.1  Valid signup → 201", r.status_code == 201, f"got {r.status_code}: {r.text[:100]}")
     d = r.json()
     chk("1.2  api_key present in response", "api_key" in d, str(d))
-    chk("1.3  api_key starts with vnt_", d.get("api_key","").startswith("vnt_"), d.get("api_key",""))
+    chk("1.3  api_key starts with crt_", d.get("api_key","").startswith("crt_"), d.get("api_key",""))
     chk("1.4  org_id present in response", bool(d.get("org_id")), str(d))
     chk("1.5  hint present (last 4 chars)", bool(d.get("hint")), str(d))
     log.info("Signup succeeded", email=email, org_id=d.get("org_id"))
@@ -179,8 +179,8 @@ try:
                 # 2.9 API key displayed
                 key_el = page.locator("#key-display")
                 captured_key = key_el.inner_text().strip()
-                chk("2.9  API key in success state (starts vnt_)",
-                    bool(captured_key) and captured_key.startswith("vnt_"),
+                chk("2.9  API key in success state (starts crt_)",
+                    bool(captured_key) and captured_key.startswith("crt_"),
                     f"got: {captured_key[:30] if captured_key else 'empty'}")
 
                 # 2.10 "Shown once" warning present

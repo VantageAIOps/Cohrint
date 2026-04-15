@@ -149,7 +149,7 @@ except Exception as e:
 section("3. Invalid key flooding (50 bad keys)")
 # ─────────────────────────────────────────────────────────────────────────────
 try:
-    bad_keys = [f"vnt_badorg{rand_tag()}_{rand_tag(32)}" for _ in range(50)]
+    bad_keys = [f"crt_badorg{rand_tag()}_{rand_tag(32)}" for _ in range(50)]
 
     def try_bad_key(key):
         r = requests.post(f"{API_URL}/v1/auth/session",

@@ -1,11 +1,11 @@
 {
-  "name": "@vantageaiops/claude-code",
+  "name": "@cohrint/claude-code",
   "version": "1.0.0",
-  "description": "Zero-config Claude Code cost tracking — installs a Stop hook that posts token usage to VantageAI after every session",
+  "description": "Zero-config Claude Code cost tracking — installs a Stop hook that posts token usage to Cohrint after every session",
   "private": false,
   "type": "commonjs",
   "bin": {
-    "vantageaiops-claude-code": "./bin/cli.js"
+    "cohrint-claude-code": "./bin/cli.js"
   },
   "scripts": {
     "postinstall": "node bin/cli.js --postinstall || true"
@@ -25,10 +25,10 @@
     "llm",
     "hooks"
   ],
-  "homepage": "https://vantageaiops.com",
+  "homepage": "https://cohrint.com",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Amanjain98/VantageAI"
+    "url": "https://github.com/Amanjain98/Cohrint"
   },
   "license": "MIT",
   "engines": {

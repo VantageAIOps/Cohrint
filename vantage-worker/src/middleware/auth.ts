@@ -49,15 +49,15 @@ function parseCookie(header: string, name: string): string | null {
 
 // ── Auth middleware ───────────────────────────────────────────────────────────
 // Lookup order:
-//   1. Session cookie (vantage_session)  → dashboard UI
-//   2. Authorization: Bearer vnt_...     → SDK / API
+//   1. Session cookie (cohrint_session)  → dashboard UI
+//   2. Authorization: Bearer crt_...     → SDK / API
 export async function authMiddleware(
   c: Context<{ Bindings: Bindings; Variables: Variables }>,
   next: Next,
 ) {
   // ── 1. Session cookie auth ────────────────────────────────────────────────
   const cookieHeader = c.req.header('Cookie') ?? '';
-  const sessionToken = parseCookie(cookieHeader, 'vantage_session');
+  const sessionToken = parseCookie(cookieHeader, 'cohrint_session');
 
   if (sessionToken) {
     const session = await c.env.DB.prepare(
@@ -98,14 +98,14 @@ export async function authMiddleware(
   const authHeader = c.req.header('Authorization') ?? '';
   const apiKey = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
 
-  if (!apiKey || !apiKey.startsWith('vnt_')) {
+  if (!apiKey || (!apiKey.startsWith('vnt_') && !apiKey.startsWith('crt_'))) {
     const ip = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For') ?? '';
     logAuditRaw(c.env.DB, c.executionCtx, ip, 'unknown', 'unknown', 'unknown', {
       event_type: 'auth',
       event_name: 'auth.failed',
       metadata: { reason: 'missing_or_malformed_key', path: c.req.path },
     });
-    return c.json({ error: 'Missing or invalid API key. Expected: Bearer vnt_...' }, 401);
+    return c.json({ error: 'Missing or invalid API key. Expected: Bearer crt_...' }, 401);
   }
 
   const parts = apiKey.split('_');
@@ -142,7 +142,7 @@ export async function authMiddleware(
           event_name: 'auth.failed',
           metadata: { reason: 'key_not_found', path: c.req.path },
         });
-      return c.json({ error: 'API key not found. Sign up at vantageaiops.com' }, 401);
+      return c.json({ error: 'API key not found. Sign up at cohrint.com' }, 401);
     } else {
       c.set('orgId',       member.org_id);
       c.set('role',        (member.role as OrgRole) || 'member');

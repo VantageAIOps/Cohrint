@@ -1,18 +1,18 @@
 """
-vantageaiops — LLM cost tracking & AI observability SDK
+cohrint — LLM cost tracking & AI observability SDK
 """
 from __future__ import annotations
 import logging
 from typing import Optional
-from vantageaiops.utils.queue import EventQueue
+from cohrint.utils.queue import EventQueue
 
-logger = logging.getLogger("vantageaiops")
+logger = logging.getLogger("cohrint")
 _queue: Optional[EventQueue] = None
 _config: dict = {}
 
 
 def init(api_key: str, *, org: str = "", team: str = "", environment: str = "production",
-         ingest_url: str = "https://api.vantageaiops.com", flush_interval: float = 2.0,
+         ingest_url: str = "https://api.cohrint.com", flush_interval: float = 2.0,
          batch_size: int = 50, debug: bool = False) -> None:
     global _queue, _config
     if debug:
@@ -25,12 +25,12 @@ def init(api_key: str, *, org: str = "", team: str = "", environment: str = "pro
     _queue = EventQueue(api_key=api_key, ingest_url=ingest_url,
                         flush_interval=flush_interval, batch_size=batch_size, debug=debug)
     _queue.start()
-    logger.info("VantageAI initialised — org=%s env=%s", org, environment)
+    logger.info("Cohrint initialised — org=%s env=%s", org, environment)
 
 
 def _get_queue() -> EventQueue:
     if _queue is None:
-        raise RuntimeError("Call vantageaiops.init(api_key=...) first.")
+        raise RuntimeError("Call cohrint.init(api_key=...) first.")
     return _queue
 
 
@@ -39,7 +39,7 @@ def _get_config() -> dict:
 
 
 def tag(key: str, value: str) -> None:
-    from vantageaiops.proxy.universal import _CTX_TAGS
+    from cohrint.proxy.universal import _CTX_TAGS
     _CTX_TAGS.set({**_CTX_TAGS.get({}), key: value})
 
 
@@ -48,6 +48,6 @@ def flush() -> None:
         _queue.flush_sync()
 
 
-from vantageaiops.proxy.universal import trace
+from cohrint.proxy.universal import trace
 __version__ = "0.3.1"
 __all__ = ["init", "trace", "tag", "flush", "__version__"]

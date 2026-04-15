@@ -1,4 +1,4 @@
-# Deploy VantageAI Worker to Cloudflare
+# Deploy Cohrint Worker to Cloudflare
 
 Run these commands in order — takes about 5 minutes total.
 
@@ -39,8 +39,11 @@ npm run db:migrate:remote
 
 ## 5. Set secrets
 ```bash
-wrangler secret put SUPABASE_SERVICE_KEY
-# paste your Supabase service_role key when prompted
+wrangler secret put RESEND_API_KEY
+# paste your Resend API key when prompted
+
+wrangler secret put TOKEN_ENCRYPTION_SECRET
+# generate with: openssl rand -base64 32
 ```
 
 ## 6. Deploy
@@ -53,9 +56,9 @@ Your Worker will be live at:
 
 ## 7. Update frontend API base
 After deploying, paste your Worker URL into the dashboard Settings:
-- Open `https://vantageaiops.com/app.html`
+- Open `https://cohrint.com/app.html`
 - Click ⚙ Settings
 - Set API Base to your Worker URL
 
 Or set it via URL param:
-`https://vantageaiops.com/app.html?api_base=https://vantage-api.YOUR-ACCOUNT.workers.dev`
+`https://cohrint.com/app.html?api_base=https://vantage-api.YOUR-ACCOUNT.workers.dev`

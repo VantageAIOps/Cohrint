@@ -65,14 +65,14 @@ INITIALIZED_NOTIFY = rpc_notify("notifications/initialized")
 TOOLS_LIST = rpc_request("tools/list", {}, req_id=2)
 
 
-def launch_mcp(env_overrides=None, api_key="vnt_test_stress_key"):
+def launch_mcp(env_overrides=None, api_key="crt_test_stress_key"):
     """Launch MCP server, send handshake, return (proc, send_fn, recv_fn)."""
     env = {**os.environ, "VANTAGE_API_KEY": api_key}
     if env_overrides:
         env.update(env_overrides)
 
     proc = subprocess.Popen(
-        ["npx", "-y", "vantageaiops-mcp"],
+        ["npx", "-y", "cohrint-mcp"],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -168,7 +168,7 @@ def get_stderr(proc):
 
 # ── Batch runner: send multiple messages in one session ───────────────────────
 
-def run_session(messages, api_key="vnt_test_stress_key", env_overrides=None, wait_per_msg=0.8):
+def run_session(messages, api_key="crt_test_stress_key", env_overrides=None, wait_per_msg=0.8):
     """
     Launch MCP, handshake, then send each message. Returns list of all responses.
     Each entry: (req_id_sent, responses_list)
@@ -190,7 +190,7 @@ def run_session(messages, api_key="vnt_test_stress_key", env_overrides=None, wai
     return all_responses, stderr_data
 
 
-def run_single_tool(name, args=None, req_id=10, api_key="vnt_test_stress_key",
+def run_single_tool(name, args=None, req_id=10, api_key="crt_test_stress_key",
                      env_overrides=None):
     """Launch MCP, handshake, call one tool, return the tool response."""
     msg = tool_call(name, args, req_id)
@@ -801,7 +801,7 @@ def test_crash_reporting():
         fail("STR.54 No response")
 
     # STR.55 — Stderr never leaks API key
-    api_key = "vnt_testorg_secretvalue123456789"
+    api_key = "crt_testorg_secretvalue123456789"
     proc = launch_mcp(api_key=api_key)
     try:
         handshake(proc)
@@ -1116,16 +1116,16 @@ def test_edge_payloads():
 def test_config_edge_cases():
     section("MCP-STR. Config & Startup Edge Cases")
 
-    # STR.79 — API key with only prefix (vnt_ with nothing after)
-    resp, stderr = run_single_tool("get_summary", {}, api_key="vnt_")
+    # STR.79 — API key with only prefix (crt_ with nothing after)
+    resp, stderr = run_single_tool("get_summary", {}, api_key="crt_")
     chk("STR.79 Minimal API key prefix doesn't crash", resp is not None)
 
     # STR.80 — API key with unicode
-    resp, stderr = run_single_tool("get_summary", {}, api_key="vnt_org_🔑key")
+    resp, stderr = run_single_tool("get_summary", {}, api_key="crt_org_🔑key")
     chk("STR.80 Unicode in API key doesn't crash", resp is not None)
 
     # STR.81 — Very long API key (1000 chars)
-    long_key = "vnt_testorg_" + "a" * 988
+    long_key = "crt_testorg_" + "a" * 988
     resp, stderr = run_single_tool("optimize_prompt",
                                     {"prompt": "test"},
                                     api_key=long_key)
@@ -1134,7 +1134,7 @@ def test_config_edge_cases():
     # STR.82 — API base with trailing slashes
     resp, stderr = run_single_tool("optimize_prompt",
                                     {"prompt": "test"},
-                                    env_overrides={"VANTAGE_API_BASE": "https://api.vantageaiops.com///"})
+                                    env_overrides={"VANTAGE_API_BASE": "https://api.cohrint.com///"})
     chk("STR.82 Trailing slashes in API base handled", resp is not None)
 
 

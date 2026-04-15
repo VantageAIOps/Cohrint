@@ -421,22 +421,22 @@ At the bottom of the API key path, just before `return await next()`:
 Find:
 
 ```typescript
-  if (!apiKey || !apiKey.startsWith('vnt_')) {
-    return c.json({ error: 'Missing or invalid API key. Expected: Bearer vnt_...' }, 401);
+  if (!apiKey || !apiKey.startsWith('crt_')) {
+    return c.json({ error: 'Missing or invalid API key. Expected: Bearer crt_...' }, 401);
   }
 ```
 
 Replace with:
 
 ```typescript
-  if (!apiKey || !apiKey.startsWith('vnt_')) {
+  if (!apiKey || !apiKey.startsWith('crt_')) {
     const ip = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For') ?? '';
     logAuditRaw(c.env.DB, c.executionCtx, ip, 'unknown', 'unknown', 'unknown', {
       event_type: 'auth',
       event_name: 'auth.failed',
       metadata: { reason: 'missing_or_malformed_key', path: c.req.path },
     });
-    return c.json({ error: 'Missing or invalid API key. Expected: Bearer vnt_...' }, 401);
+    return c.json({ error: 'Missing or invalid API key. Expected: Bearer crt_...' }, 401);
   }
 ```
 
@@ -446,7 +446,7 @@ Find:
 
 ```typescript
     if (!member) {
-      return c.json({ error: 'API key not found. Sign up at vantageaiops.com' }, 401);
+      return c.json({ error: 'API key not found. Sign up at cohrint.com' }, 401);
     }
 ```
 
@@ -461,7 +461,7 @@ Replace with:
           event_name: 'auth.failed',
           metadata: { reason: 'key_not_found', path: c.req.path },
         });
-      return c.json({ error: 'API key not found. Sign up at vantageaiops.com' }, 401);
+      return c.json({ error: 'API key not found. Sign up at cohrint.com' }, 401);
     }
 ```
 
@@ -674,7 +674,7 @@ from config.settings import API_URL
 from helpers.api import fresh_account, get_headers
 from helpers.output import section, chk, get_results, reset_results, fail
 
-FRONTEND_URL = "https://vantageaiops.com"
+FRONTEND_URL = "https://cohrint.com"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1195,7 +1195,7 @@ function exportAuditCsv() {
   var type    = document.getElementById('auditTypeFilter').value;
   var from    = document.getElementById('auditDateFrom').value;
   var to      = document.getElementById('auditDateTo').value;
-  var apiBase = localStorage.getItem('vantage_api_base') || 'https://api.vantageaiops.com';
+  var apiBase = localStorage.getItem('vantage_api_base') || 'https://api.cohrint.com';
   var token   = localStorage.getItem('vantage_api_key') || '';
   var qs = '?format=csv&limit=500';
   if (type) qs += '&event_type=' + encodeURIComponent(type);

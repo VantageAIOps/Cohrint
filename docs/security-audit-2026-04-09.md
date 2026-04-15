@@ -1,4 +1,4 @@
-# VantageAI Security Audit — 2026-04-09
+# Cohrint Security Audit — 2026-04-09
 _Internal report. Not for public distribution._
 
 ---

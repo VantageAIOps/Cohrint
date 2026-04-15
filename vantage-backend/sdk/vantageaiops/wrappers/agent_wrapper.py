@@ -16,9 +16,9 @@ HOW IT WORKS:
 
 USAGE:
   import vantage
-  from vantageaiops.wrappers.agent_wrapper import AgentProxy
+  from cohrint.wrappers.agent_wrapper import AgentProxy
 
-  vantage.init(api_key="vnt_...", agent="copilot", team="engineering")
+  vantage.init(api_key="crt_...", agent="copilot", team="engineering")
 
   # Start the local proxy
   proxy = AgentProxy(
@@ -173,7 +173,7 @@ class AgentProxy:
         latency_ms:  float,
         status_code: int,
     ) -> None:
-        """Parse the request/response bodies and capture a VantageEvent."""
+        """Parse the request/response bodies and capture a CohrintEvent."""
         try:
             import vantage as sdk
             client = sdk.get_client()
@@ -201,7 +201,7 @@ class AgentProxy:
         )
 
         # Calculate cost
-        from vantageaiops.models.pricing import calculate_cost, find_cheapest_alternative
+        from cohrint.models.pricing import calculate_cost, find_cheapest_alternative
         _, _, total_cost = calculate_cost(model, prompt_tokens, comp_tokens, cached_tokens)
         alt = find_cheapest_alternative(model, prompt_tokens, comp_tokens)
 
@@ -225,8 +225,8 @@ class AgentProxy:
         # System prompt tokens estimate
         sys_token_estimate = sum(len(m.get("content","")) // 4 for m in sys_msgs)
 
-        from vantageaiops.models.event import VantageEvent
-        event = VantageEvent(
+        from cohrint.models.event import CohrintEvent
+        event = CohrintEvent(
             provider              = provider,
             model                 = model,
             agent                 = self.agent_name,

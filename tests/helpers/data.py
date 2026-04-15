@@ -1,5 +1,5 @@
 """
-data.py — Random test data generators for VantageAI test suite
+data.py — Random test data generators for Cohrint test suite
 """
 
 import string

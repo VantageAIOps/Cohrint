@@ -6,7 +6,7 @@ Wraps litellm.completion() — covers 100+ models including:
   AWS Bedrock, Azure OpenAI, Perplexity, and any OpenAI-compatible API.
 
 USAGE:
-    import vantage; vantage.init("vnt_...")
+    import vantage; vantage.init("crt_...")
     from vantage.proxy import litellm
 
     # Any model litellm supports

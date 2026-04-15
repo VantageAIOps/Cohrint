@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Overhaul the VantageAI public website to enterprise quality — remove unsupported tool references, fake reviews, competitor names; redesign to light/enterprise aesthetic; add live demo sandbox; harden security headers and auth.
+**Goal:** Overhaul the Cohrint public website to enterprise quality — remove unsupported tool references, fake reviews, competitor names; redesign to light/enterprise aesthetic; add live demo sandbox; harden security headers and auth.
 
 **Architecture:** All changes are to static HTML/CSS/JS files in `vantage-final-v4/` and Cloudflare Worker routes in `vantage-worker/src/`. No new build pipeline — files deployed as-is via Cloudflare Pages. Worker changes deploy via `wrangler deploy`.
 
@@ -45,7 +45,7 @@ After removing those sections, add a generic note at the end of the MCP section 
 ```html
 <div class="doc-section" style="margin-top:24px;padding:16px;background:var(--bg2);border:1px solid var(--border);border-radius:8px">
   <strong>Other MCP-compatible editors</strong>
-  <p style="margin-top:8px;color:var(--muted)">VantageAI MCP works with any editor that supports the Model Context Protocol. Refer to your editor's documentation for MCP server configuration instructions.</p>
+  <p style="margin-top:8px;color:var(--muted)">Cohrint MCP works with any editor that supports the Model Context Protocol. Refer to your editor's documentation for MCP server configuration instructions.</p>
 </div>
 ```
 
@@ -138,7 +138,7 @@ Replace the `<thead>` block (lines ~861–868):
 <thead>
   <tr>
     <th>Capability</th>
-    <th class="vantage-col">&#10022; VantageAI</th>
+    <th class="vantage-col">&#10022; Cohrint</th>
     <th>API Gateway<br><small style="font-weight:400;font-size:11px">Tools</small></th>
     <th>LLM Observability<br><small style="font-weight:400;font-size:11px">SDKs</small></th>
     <th>General APM<br><small style="font-weight:400;font-size:11px">Platforms</small></th>
@@ -189,7 +189,7 @@ Replace the entire `<section id="pricing"` block with:
       <div class="plan-name">TEAM</div>
       <div class="plan-price" style="font-size:32px;padding-top:8px">Contact Us</div>
       <div class="plan-period">for team pricing</div>
-      <a href="mailto:vantageaiops@gmail.com?subject=Team%20Plan%20Inquiry" class="plan-cta">Contact Sales &rarr;</a>
+      <a href="mailto:cohrint@gmail.com?subject=Team%20Plan%20Inquiry" class="plan-cta">Contact Sales &rarr;</a>
       <ul class="plan-feats">
         <li>Unlimited events</li>
         <li>Budget policies + Slack alerts</li>
@@ -206,7 +206,7 @@ Replace the entire `<section id="pricing"` block with:
       <div class="plan-name">ENTERPRISE</div>
       <div class="plan-price" style="font-size:32px;padding-top:8px">Custom</div>
       <div class="plan-period">volume pricing &middot; dedicated support</div>
-      <a href="mailto:vantageaiops@gmail.com?subject=Enterprise%20Inquiry" class="plan-cta">Talk to Sales &rarr;</a>
+      <a href="mailto:cohrint@gmail.com?subject=Enterprise%20Inquiry" class="plan-cta">Talk to Sales &rarr;</a>
       <ul class="plan-feats">
         <li>Everything in Team</li>
         <li>Dedicated onboarding</li>
@@ -247,9 +247,9 @@ Replace the `<footer>` block (~lines 982–992):
 <footer style="background:var(--bg2);border-top:1px solid var(--border);padding:40px 24px">
   <div style="max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr auto auto auto;gap:40px;align-items:start">
     <div>
-      <div style="font-weight:700;font-size:16px;color:var(--text);margin-bottom:8px">VantageAI</div>
+      <div style="font-weight:700;font-size:16px;color:var(--text);margin-bottom:8px">Cohrint</div>
       <div style="font-size:13px;color:var(--muted);max-width:220px">AI spend intelligence for engineering teams.</div>
-      <a href="mailto:vantageaiops@gmail.com" style="font-size:13px;color:var(--accent);margin-top:8px;display:block">vantageaiops@gmail.com</a>
+      <a href="mailto:cohrint@gmail.com" style="font-size:13px;color:var(--accent);margin-top:8px;display:block">cohrint@gmail.com</a>
     </div>
     <div>
       <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:12px">Product</div>
@@ -276,7 +276,7 @@ Replace the `<footer>` block (~lines 982–992):
     </div>
   </div>
   <div style="max-width:1100px;margin:24px auto 0;padding-top:24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
-    <span style="font-size:12px;color:var(--muted)">&copy; 2026 VantageAI. All rights reserved.</span>
+    <span style="font-size:12px;color:var(--muted)">&copy; 2026 Cohrint. All rights reserved.</span>
     <span style="font-size:12px;color:var(--muted)">Hosted on Cloudflare's global edge network.</span>
   </div>
 </footer>
@@ -372,11 +372,11 @@ Replace the entire `<div class="hero">` block (~lines 433–462):
     <a href="#" class="btn-ghost js-demo-btn">&#9654; View Live Demo</a>
   </div>
   <div class="install-box" style="animation:fadeUp .7s .4s ease both">
-    <span>$</span> pip install vantageaiops
-    <button class="copy-btn" onclick="copyInstall('pip install vantageaiops', this)">copy</button>
+    <span>$</span> pip install cohrint
+    <button class="copy-btn" onclick="copyInstall('pip install cohrint', this)">copy</button>
     <span style="color:var(--dim)">&middot;</span>
-    <span>$</span> npm install vantageaiops
-    <button class="copy-btn" onclick="copyInstall('npm install vantageaiops', this)">copy</button>
+    <span>$</span> npm install cohrint
+    <button class="copy-btn" onclick="copyInstall('npm install cohrint', this)">copy</button>
   </div>
   <p style="font-size:11px;color:var(--dim);margin-top:12px;font-family:var(--mono);animation:fadeUp .7s .5s ease both">Free tier &middot; No credit card &middot; Deploy in minutes</p>
 </div>
@@ -389,12 +389,12 @@ In the `<nav>` block, add Security link after Pricing:
 <a href="#security" class="nav-link">Security</a>
 ```
 
-Also fix the Enterprise CTA email — search for `owner@vantageaiops.com` and replace with `vantageaiops@gmail.com`.
+Also fix the Enterprise CTA email — search for `owner@cohrint.com` and replace with `cohrint@gmail.com`.
 
 - [ ] **Step 4: Verify**
 
 ```bash
-grep -n "hero-badge\|The first AI\|Know exactly\|owner@vantageaiops" "vantage-final-v4/index.html"
+grep -n "hero-badge\|The first AI\|Know exactly\|owner@cohrint" "vantage-final-v4/index.html"
 # Expected: no output
 
 grep -n "AI Spend Intelligence\|js-demo-btn\|security" "vantage-final-v4/index.html"
@@ -438,7 +438,7 @@ At the bottom of app.html, before `</body>`, add:
 (function() {
   var DEMO_ORG = 'demo';
   try {
-    var sess = JSON.parse(localStorage.getItem('vantage_session') || '{}');
+    var sess = JSON.parse(localStorage.getItem('cohrint_session') || '{}');
     if (sess && sess.org_id === DEMO_ORG) {
       var banner = document.createElement('div');
       banner.id = 'demo-banner';
@@ -484,17 +484,17 @@ git commit -m "feat(app): add Docs nav link and XSS-safe demo session banner"
 
 Hash the demo key:
 ```bash
-echo -n "vnt_demo_a1b2c3d4e5f6a7b8" | sha256sum
+echo -n "crt_demo_a1b2c3d4e5f6a7b8" | sha256sum
 # Note the 64-char hex hash output — call it DEMO_HASH
 ```
 
 In the Cloudflare Dashboard, go to D1 → vantage-events → Console and run:
 ```sql
 INSERT OR IGNORE INTO orgs (id, api_key_hash, api_key_hint, name, email, plan, budget_usd, created_at)
-VALUES ('demo', 'REPLACE_WITH_DEMO_HASH', 'vnt_demo_a1b...', 'VantageAI Demo', 'demo@vantageaiops.com', 'team', 0, strftime('%s','now'));
+VALUES ('demo', 'REPLACE_WITH_DEMO_HASH', 'crt_demo_a1b...', 'Cohrint Demo', 'demo@cohrint.com', 'team', 0, strftime('%s','now'));
 
 INSERT OR IGNORE INTO org_members (id, org_id, email, name, role, api_key_hash, api_key_hint, scope_team, created_at)
-VALUES ('demo-viewer', 'demo', 'viewer@demo.vantageaiops.com', 'Demo Viewer', 'viewer', 'REPLACE_WITH_DEMO_HASH', 'vnt_demo_a1b...', NULL, strftime('%s','now'));
+VALUES ('demo-viewer', 'demo', 'viewer@demo.cohrint.com', 'Demo Viewer', 'viewer', 'REPLACE_WITH_DEMO_HASH', 'crt_demo_a1b...', NULL, strftime('%s','now'));
 ```
 
 - [ ] **Step 2: Add fixed demo seed SQL to seed-data.js**
@@ -555,10 +555,10 @@ In the `<script>` block at the bottom of `index.html` (~line 994), add before th
 document.querySelectorAll('.js-demo-btn').forEach(function(btn) {
   btn.addEventListener('click', function(e) {
     e.preventDefault();
-    var DEMO_KEY = 'vnt_demo_a1b2c3d4e5f6a7b8';
+    var DEMO_KEY = 'crt_demo_a1b2c3d4e5f6a7b8';
     btn.textContent = 'Loading demo\u2026';
     btn.style.opacity = '0.7';
-    fetch('https://api.vantageaiops.com/v1/auth/session', {
+    fetch('https://api.cohrint.com/v1/auth/session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ api_key: DEMO_KEY }),
@@ -568,7 +568,7 @@ document.querySelectorAll('.js-demo-btn').forEach(function(btn) {
       if (r.ok) {
         return r.json().then(function(data) {
           if (data.org_id) {
-            localStorage.setItem('vantage_session', JSON.stringify({ org_id: data.org_id, role: 'viewer' }));
+            localStorage.setItem('cohrint_session', JSON.stringify({ org_id: data.org_id, role: 'viewer' }));
           }
           window.location.href = '/app.html';
         });
@@ -589,7 +589,7 @@ document.querySelectorAll('.js-demo-btn').forEach(function(btn) {
 - [ ] **Step 4: Verify**
 
 ```bash
-grep -n "js-demo-btn\|DEMO_KEY\|vnt_demo" "vantage-final-v4/index.html"
+grep -n "js-demo-btn\|DEMO_KEY\|crt_demo" "vantage-final-v4/index.html"
 grep -n "dv001\|team_budgets" "vantage-final-v4/seed-data.js"
 # Expected: all found
 ```
@@ -623,7 +623,7 @@ cat "vantage-final-v4/_headers"
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
   Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' cdnjs.cloudflare.com cdn.jsdelivr.net static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' fonts.googleapis.com cdnjs.cloudflare.com cdn.jsdelivr.net; font-src 'self' fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://api.vantageaiops.com https://cloudflareinsights.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' cdnjs.cloudflare.com cdn.jsdelivr.net static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' fonts.googleapis.com cdnjs.cloudflare.com cdn.jsdelivr.net; font-src 'self' fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://api.cohrint.com https://cloudflareinsights.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
   X-Permitted-Cross-Domain-Policies: none
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Resource-Policy: same-site
@@ -735,7 +735,7 @@ git commit -m "security: brute-force protection on /auth/session, sanitize error
 
 ```bash
 cat > "docs/security-audit-2026-04-09.md" << 'AUDIT'
-# VantageAI Security Audit — April 2026
+# Cohrint Security Audit — April 2026
 _Internal document. Not for public distribution._
 _Conducted: 2026-04-09_
 
@@ -798,7 +798,7 @@ git commit -m "docs: internal security audit report April 2026"
 
 ```bash
 git push origin feat/semantic-cache-analytics
-gh run view --repo VantageAIOps/VantageAI
+gh run view --repo CohrintOps/Cohrint
 ```
 
 - [ ] **Step 2: After PR merges — deploy Worker**
@@ -816,13 +816,13 @@ npx wrangler pages deploy ./vantage-final-v4 --project-name=vantageai
 - [ ] **Step 4: Smoke test live site**
 
 ```bash
-curl -sI https://vantageaiops.com | grep -E "Strict-Transport|Content-Security|X-Frame"
+curl -sI https://cohrint.com | grep -E "Strict-Transport|Content-Security|X-Frame"
 # Expected: all three headers present
 
-curl -s https://vantageaiops.com | grep -iE "Helicone|LangSmith|Datadog LLM|Windsurf|JetBrains|Jordan Kim|SOC2 Ready|HIPAA Ready"
+curl -s https://cohrint.com | grep -iE "Helicone|LangSmith|Datadog LLM|Windsurf|JetBrains|Jordan Kim|SOC2 Ready|HIPAA Ready"
 # Expected: no output
 
-curl -s https://vantageaiops.com | grep -iE "terms|privacy"
+curl -s https://cohrint.com | grep -iE "terms|privacy"
 # Expected: footer links found
 ```
 

@@ -130,7 +130,7 @@ def run(dry_run=False, clean_all=False):
 
 
 if __name__ == "__main__":
-    p = argparse.ArgumentParser(description="VantageAI test artifact cleanup")
+    p = argparse.ArgumentParser(description="Cohrint test artifact cleanup")
     p.add_argument("--dry-run", action="store_true",
                    help="Show what would be removed without deleting")
     p.add_argument("--all", action="store_true",

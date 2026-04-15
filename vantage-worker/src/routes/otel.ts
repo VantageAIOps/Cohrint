@@ -1,5 +1,5 @@
 /**
- * VantageAI — OpenTelemetry Collector Endpoint (Multi-Platform)
+ * Cohrint — OpenTelemetry Collector Endpoint (Multi-Platform)
  *
  * Receives OTLP HTTP/protobuf and HTTP/JSON from 7+ AI coding tools:
  *
@@ -23,7 +23,7 @@
  *   POST /v1/otel/v1/traces    — OTLP traces (HTTP/JSON, for future use)
  *
  * Auth:
- *   - Header: Authorization: Bearer vnt_...  (VantageAI API key)
+ *   - Header: Authorization: Bearer crt_...  (Cohrint API key)
  *   - Or via OTEL_EXPORTER_OTLP_HEADERS env var on client side
  *
  * No latency added to the user's AI workflow — we're a telemetry SINK,
@@ -226,7 +226,7 @@ otel.post('/v1/metrics', async (c) => {
   const apiKey = extractAuth(c);
   const orgId = await resolveOrg(apiKey, c.env.DB);
   if (!orgId) {
-    return c.json({ error: 'Invalid or missing API key. Set OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer vnt_YOUR_KEY"' }, 401);
+    return c.json({ error: 'Invalid or missing API key. Set OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer crt_YOUR_KEY"' }, 401);
   }
 
   // Rate limit: 3000 OTel ingest requests per minute per org

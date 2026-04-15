@@ -1,5 +1,5 @@
 """
-helpers — Shared test infrastructure for VantageAI test suite.
+helpers — Shared test infrastructure for Cohrint test suite.
 Re-exports everything from sub-modules for backward compatibility.
 """
 from .api import *

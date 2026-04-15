@@ -23,7 +23,7 @@ from helpers.output import ok, fail, warn, info, section, chk, get_results
 BASE = f"{API_URL}/v1/superadmin"
 SECRET = os.environ.get("SUPERADMIN_SECRET", "")
 AUTH_HEADERS = {"Authorization": f"Bearer {SECRET}"} if SECRET else {}
-WRONG_HEADERS = {"Authorization": "Bearer vnt_wrong_secret_test_12345"}
+WRONG_HEADERS = {"Authorization": "Bearer crt_wrong_secret_test_12345"}
 TIMEOUT = 20
 
 

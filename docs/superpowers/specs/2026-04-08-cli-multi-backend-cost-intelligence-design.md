@@ -559,7 +559,7 @@ vantage-agent summary
 ## 16. Out of Scope (v1)
 
 - Llama / local model backends
-- Fetch pricing from VantageAI API (static dict is fine for v1)
+- Fetch pricing from Cohrint API (static dict is fine for v1)
 - `screen`/`tmux` process detach/reattach across terminals
 - MCP tool call observation for CLI backends
 - Agent-internal command passthrough (`/compact` forwarding)

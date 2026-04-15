@@ -1,4 +1,4 @@
-# VantageAI infra package
+# Cohrint infra package
 from .structured_logger import VantageLogger, get_logger
 from .reporter import TestReporter
 from .metrics_collector import MetricsCollector, track_request

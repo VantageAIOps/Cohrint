@@ -23,7 +23,7 @@ import urllib.error
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 SERVER   = os.getenv("VANTAGE_INGEST_URL", "http://localhost:8000").rstrip("/v1/events").rstrip("/")
-API_KEY  = os.getenv("VANTAGE_API_KEY", "vnt_test_key")
+API_KEY  = os.getenv("VANTAGE_API_KEY", "crt_test_key")
 ANTH_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 
 PASS = "\033[92m✓\033[0m"

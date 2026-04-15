@@ -48,7 +48,7 @@ def make_event(prompt_hash=None):
 def test_session_invalid_key_returns_401():
     section("SH — /v1/auth/session brute-force protection")
 
-    r = requests.post(SESSION_URL, json={"api_key": "vnt_thiskeyisinvalid"}, timeout=15)
+    r = requests.post(SESSION_URL, json={"api_key": "crt_thiskeyisinvalid"}, timeout=15)
     chk("SH.1  Invalid key → 401 (not locked out on first attempt)",
         r.status_code == 401, f"got {r.status_code}")
 

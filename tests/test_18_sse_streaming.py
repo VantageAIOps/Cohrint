@@ -18,7 +18,7 @@ Developer notes:
   Known issues to test:
     • "data: " lines must be valid JSON (otherwise EventSource.onmessage fails)
     • The SSE_TOKEN (query param) flow must work from browser
-    • The Bearer auth fallback (?token=vnt_...) must work
+    • The Bearer auth fallback (?token=crt_...) must work
     • Disconnect + reconnect must not cause dashboard crash
 
 Tests (18.1 – 18.25):
@@ -32,7 +32,7 @@ Tests (18.1 – 18.25):
   18.8  SSE: reconnect works (second connection after first disconnects)
   18.9  SSE: multiple events received when batch ingested
   18.10 SSE token flow: POST /v1/auth/session returns sse_token (or inline)
-  18.11 GET /v1/stream/:orgId?token=vnt_... (legacy auth) → 200
+  18.11 GET /v1/stream/:orgId?token=crt_... (legacy auth) → 200
   18.12 GET /v1/stream/:orgId no auth → 401
   18.13 SSE: wrong orgId for valid key → 401/403
   18.14 Dashboard: live stream indicator shown (Playwright)
@@ -208,7 +208,7 @@ else:
         f"{API_URL}/v1/stream/{ORG}?token={KEY}",
         headers={"Accept": "text/event-stream"},
         stream=True, timeout=6)
-    chk("18.11 GET /v1/stream/:orgId?token=vnt_... → 200",
+    chk("18.11 GET /v1/stream/:orgId?token=crt_... → 200",
         r_token.status_code == 200, f"got {r_token.status_code}")
     try:
         r_token.close()
@@ -415,7 +415,7 @@ try:
                 for c in sr.cookies:
                     ctx.add_cookies([{
                         "name": c.name, "value": c.value,
-                        "domain": "vantageaiops.com", "path": "/",
+                        "domain": "cohrint.com", "path": "/",
                     }])
 
             try:

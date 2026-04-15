@@ -12,7 +12,7 @@ export type Bindings = {
   RATE_LIMIT_RPM:      string;
   // Optional — set via: wrangler secret put RESEND_API_KEY
   RESEND_API_KEY?:     string;
-  FROM_EMAIL?:         string;   // defaults to noreply@vantageaiops.com
+  FROM_EMAIL?:         string;   // defaults to noreply@cohrint.com
   // Superadmin — set via: wrangler secret put SUPERADMIN_SECRET
   SUPERADMIN_SECRET?:  string;
   // CI bypass for signup rate limiting — set via: wrangler secret put VANTAGE_CI_SECRET

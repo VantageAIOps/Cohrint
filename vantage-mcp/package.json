@@ -1,12 +1,12 @@
 {
-  "name": "vantageaiops-mcp",
+  "name": "cohrint-mcp",
   "version": "1.1.1",
-  "description": "MCP server for VantageAI — track LLM costs and query analytics from Claude Desktop, Cursor, Windsurf, VS Code and more",
+  "description": "MCP server for Cohrint — track LLM costs and query analytics from Claude Desktop, Cursor, Windsurf, VS Code and more",
   "private": false,
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "vantageaiops-mcp": "dist/index.js"
+    "cohrint-mcp": "dist/index.js"
   },
   "scripts": {
     "gen-version": "node --input-type=commonjs -e \"const fs=require('fs');const v=require('./package.json').version;fs.writeFileSync('src/_version.ts','// AUTO-GENERATED — do not edit manually. Run: npm run gen-version\\nexport const VERSION = '+JSON.stringify(v)+';\\n');\"",
@@ -31,7 +31,7 @@
     "cursor",
     "windsurf"
   ],
-  "homepage": "https://vantageaiops.com",
+  "homepage": "https://cohrint.com",
   "repository": {
     "type": "git",
     "url": "https://github.com/Amanjain98/VantageAI"

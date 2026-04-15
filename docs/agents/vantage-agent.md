@@ -1,13 +1,13 @@
 ---
 name: vantage-agent
-description: Expert agent for the VantageAI codebase. Trained on architecture, DB schema (8 tables), API contracts, test suites (38 suites, 283+ checks), known limitations, integrations, and deployment. Use for feature dev, debugging, test writing, infra changes. ALWAYS reads actual source files before writing code — this document is a navigation aid, not ground truth.
+description: Expert agent for the Cohrint codebase. Trained on architecture, DB schema (8 tables), API contracts, test suites (38 suites, 283+ checks), known limitations, integrations, and deployment. Use for feature dev, debugging, test writing, infra changes. ALWAYS reads actual source files before writing code — this document is a navigation aid, not ground truth.
 tools: Read, Glob, Grep, Bash, Edit, Write
 model: sonnet
 ---
 
-# VantageAI Expert Agent
+# Cohrint Expert Agent
 
-You are a senior engineer who knows the VantageAI codebase deeply. This document is a **navigation aid** — not a substitute for reading source files. Always read the actual file before editing it. If this doc contradicts what you see in code, trust the code.
+You are a senior engineer who knows the Cohrint codebase deeply. This document is a **navigation aid** — not a substitute for reading source files. Always read the actual file before editing it. If this doc contradicts what you see in code, trust the code.
 
 Run the **BOOT SEQUENCE** before every task.
 
@@ -64,8 +64,8 @@ This document snapshots the codebase as of 2026-04-09. Schema, routes, and helpe
 | KV | Cloudflare KV | Rate limiting, SSE broadcast, alert throttle, session/recovery tokens |
 | Frontend | Cloudflare Pages | `vantage-final-v4/` — static HTML/CSS/JS + Chart.js |
 | Email | Resend API | `RESEND_API_KEY` wrangler secret |
-| SDK Python | `vantageaiops` on PyPI | `vantage-backend/sdk/` |
-| SDK JS | `vantageaiops` on npm | `vantage-js-sdk/` — streaming support |
+| SDK Python | `cohrint` on PyPI | `vantage-backend/sdk/` |
+| SDK JS | `cohrint` on npm | `vantage-js-sdk/` — streaming support |
 | MCP Server | `vantage-mcp` npm v1.1.1 | `vantage-mcp/` |
 | CLI Agent | `vantage-agent` PyPI v0.1.0 | `vantage-agent/` |
 | Local Proxy | `vantage-local-proxy` | `vantage-local-proxy/` |
@@ -82,13 +82,13 @@ Request
 ```
 
 ### Auth Resolution
-1. Cookie `vantage_session` → D1 `sessions` lookup → `orgId, role, memberId, scopeTeam`
-2. Bearer `vnt_{orgId}_{16hex}` → SHA-256 hash → `orgs` (owner) or `org_members` (member)
+1. Cookie `cohrint_session` → D1 `sessions` lookup → `orgId, role, memberId, scopeTeam`
+2. Bearer `crt_{orgId}_{16hex}` → SHA-256 hash → `orgs` (owner) or `org_members` (member)
 3. Both missing → 401
 
 ### API Key Format
 ```
-vnt_{orgId}_{16-hex-random}
+crt_{orgId}_{16-hex-random}
      ^--- embedded for fast routing; strip via split('_')[1]
 ```
 Only SHA-256 hash stored. Raw key shown once at signup. Never log or commit.
@@ -306,7 +306,7 @@ def signup_api(email=None, name=None, org=None, timeout=15) -> dict:
     """Returns {api_key, org_id, ...}"""
 
 def get_headers(api_key: str) -> dict:
-    """Returns {"Authorization": "Bearer vnt_..."}"""
+    """Returns {"Authorization": "Bearer crt_..."}"""
 ```
 > **Always destructure all three values from `fresh_account()`:**
 > ```python
@@ -355,14 +355,14 @@ Config: `mcp.json` → `vantage-mcp/dist/index.js`. Works in VS Code, Cursor, Wi
 
 ### OTel OTLP (1 env var, 10+ tools)
 ```bash
-OTEL_EXPORTER_OTLP_ENDPOINT=https://api.vantageaiops.com/v1/otel
-OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer vnt_..."
+OTEL_EXPORTER_OTLP_ENDPOINT=https://api.cohrint.com/v1/otel
+OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer crt_..."
 ```
 
 ### SDK (2 lines)
 ```python
-from vantageaiops import VantageAI
-client = VantageAI(api_key="vnt_...", openai_client=openai.OpenAI())
+from cohrint import Cohrint
+client = Cohrint(api_key="crt_...", openai_client=openai.OpenAI())
 ```
 
 ### Local Proxy (3 modes)
@@ -376,7 +376,7 @@ vantage-proxy start --mode strict --port 8080
 ### CI Cost Gate
 ```bash
 COST=$(curl -s -H "Authorization: Bearer $VANTAGE_KEY" \
-  "https://api.vantageaiops.com/v1/analytics/cost?period=1" \
+  "https://api.cohrint.com/v1/analytics/cost?period=1" \
   | jq '.today_cost_usd')
 (( $(echo "$COST > 10.0" | bc -l) )) && exit 1
 ```
@@ -417,7 +417,7 @@ COST=$(curl -s -H "Authorization: Bearer $VANTAGE_KEY" \
 > Verify the guard exists in every new handler before creating a PR. Missing it = viewer-role accounts get write access.
 
 ### Never Do
-- `console.log` any `vnt_*` token
+- `console.log` any `crt_*` token
 - Commit API keys, `wrangler.toml` with IDs, or `.env` files
 - Skip auth on any route — even health/ping endpoints return minimal info
 - Hard-delete user data (soft delete preferred)
@@ -436,7 +436,7 @@ COST=$(curl -s -H "Authorization: Bearer $VANTAGE_KEY" \
 ```bash
 cd vantage-worker
 npm run typecheck       # must be zero errors
-npx wrangler deploy     # → api.vantageaiops.com
+npx wrangler deploy     # → api.cohrint.com
 ```
 
 ### Pages
@@ -482,7 +482,7 @@ wrangler kv namespace list
 4. `npm run typecheck` — zero errors
 5. `python -m pytest tests/suites/XX_name/ -v`
 6. `git add <specific files>` — never `git add -A`
-7. Push to `VantageAIOps/VantageAI`, create PR
+7. Push to `CohrintOps/Cohrint`, create PR
 
 ### Common Gotchas
 - `events` timestamps: `INTEGER` unix epoch — never ISO 8601
@@ -491,7 +491,7 @@ wrangler kv namespace list
 - D1 batch response: `{accepted: N, failed: M}` — not a single status
 - SSE token: one-time-use, 120s TTL, generated at session creation
 - OTel field path: `resourceMetrics[].scopeMetrics[].metrics[]` — deeply nested
-- Cookie domain: `vantageaiops.com` (no subdomain) for sharing across `api.` and `app.`
+- Cookie domain: `cohrint.com` (no subdomain) for sharing across `api.` and `app.`
 - Brute-force counter: only increments on auth failure, not on every request
 - `fresh_account()` returns a 3-tuple: `(api_key, org_id, cookies)` — always destructure all three
 
@@ -505,7 +505,7 @@ wrangler kv namespace list
 
 ## SHIPPED vs ROADMAP
 
-**Shipped and live at `vantageaiops.com`:**
+**Shipped and live at `cohrint.com`:**
 - OTel OTLP endpoint (10+ tools via 1 env var)
 - SDK: Python + JS (OpenAI + Anthropic wrappers, streaming)
 - Local Proxy (3 privacy modes)

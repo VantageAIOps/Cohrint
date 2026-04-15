@@ -8,8 +8,8 @@ BEFORE:
     client = anthropic.Anthropic(api_key="sk-ant-...")
 
 AFTER:
-    import vantage; vantage.init("vnt_...")
-    from vantageaiops.proxy.anthropic_proxy import Anthropic
+    import vantage; vantage.init("crt_...")
+    from cohrint.proxy.anthropic_proxy import Anthropic
     client = Anthropic(api_key="sk-ant-...")
 """
 
@@ -17,7 +17,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from vantageaiops.proxy.universal import _build_event, _extract_messages
+from cohrint.proxy.universal import _build_event, _extract_messages
 
 try:
     import anthropic as _ant

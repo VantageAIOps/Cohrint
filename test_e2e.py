@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-VantageAI — End-to-End Test Suite
-Tests every endpoint of the live Cloudflare Worker at https://api.vantageaiops.com
+Cohrint — End-to-End Test Suite
+Tests every endpoint of the live Cloudflare Worker at https://api.cohrint.com
 and validates the Python + npm SDKs installed from PyPI/npm.
 
 Run:
   python test_e2e.py
 
-Requires:  pip install requests vantageaiops
+Requires:  pip install requests cohrint
 """
 
 import sys
@@ -19,7 +19,7 @@ import string
 import subprocess
 import requests
 
-API = "https://api.vantageaiops.com"
+API = "https://api.cohrint.com"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
@@ -106,8 +106,8 @@ try:
     d = r.json()
     API_KEY = d.get("api_key")
     ORG_ID  = d.get("org_id")
-    check("api_key returned and starts with vnt_",
-          isinstance(API_KEY, str) and API_KEY.startswith("vnt_"))
+    check("api_key returned and starts with crt_",
+          isinstance(API_KEY, str) and API_KEY.startswith("crt_"))
     check("org_id returned", bool(ORG_ID))
     check("dashboard URL returned", "dashboard" in d)
     print(f"       org_id={ORG_ID}  key={API_KEY[:20]}...")
@@ -165,7 +165,7 @@ except Exception as e:
 
 # Invalid key should 401
 try:
-    r = post("/v1/auth/session", json={"api_key": "vnt_badkey_abc"}, timeout=10)
+    r = post("/v1/auth/session", json={"api_key": "crt_badkey_abc"}, timeout=10)
     check("Invalid key returns 401", r.status_code == 401)
 except Exception as e:
     fail("Invalid key check failed", str(e))
@@ -321,7 +321,7 @@ try:
     d = r.json()
     member_id  = d.get("member_id")
     member_key = d.get("api_key")
-    check("member api_key returned", isinstance(member_key, str) and member_key.startswith("vnt_"))
+    check("member api_key returned", isinstance(member_key, str) and member_key.startswith("crt_"))
     check("scope_team echoed back", d.get("scope_team") == "backend")
 except Exception as e:
     fail("Member invite failed", str(e))
@@ -446,8 +446,8 @@ try:
           f"{r.status_code}: {r.text[:200]}")
     d = r.json()
     new_key = d.get("api_key")
-    check("New key returned and starts with vnt_",
-          isinstance(new_key, str) and new_key.startswith("vnt_"))
+    check("New key returned and starts with crt_",
+          isinstance(new_key, str) and new_key.startswith("crt_"))
     check("New key is different from old key", new_key != API_KEY)
     # Old key should now be invalid
     r_old = get("/v1/analytics/summary", headers=HEADERS, timeout=10)
@@ -484,20 +484,20 @@ except Exception as e:
     fail("Malformed JSON check failed", str(e))
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 13. Python SDK — vantageaiops package
+# 13. Python SDK — cohrint package
 # ─────────────────────────────────────────────────────────────────────────────
-section("13. Python SDK (import vantageaiops)")
+section("13. Python SDK (import cohrint)")
 try:
-    import vantageaiops
-    ok(f"import vantageaiops succeeded (v{vantageaiops.__version__})")
-    check("vantageaiops.init exists", callable(getattr(vantageaiops, "init", None)))
-    check("vantageaiops.trace exists", callable(getattr(vantageaiops, "trace", None)))
-    check("vantageaiops.flush exists", callable(getattr(vantageaiops, "flush", None)))
+    import cohrint
+    ok(f"import cohrint succeeded (v{cohrint.__version__})")
+    check("cohrint.init exists", callable(getattr(cohrint, "init", None)))
+    check("cohrint.trace exists", callable(getattr(cohrint, "trace", None)))
+    check("cohrint.flush exists", callable(getattr(cohrint, "flush", None)))
 except ImportError as e:
-    fail("import vantageaiops failed — run: pip install vantageaiops", str(e))
+    fail("import cohrint failed — run: pip install cohrint", str(e))
 
 try:
-    from vantageaiops.models.pricing import calculate_cost, find_cheapest
+    from cohrint.models.pricing import calculate_cost, find_cheapest
     cost = calculate_cost("gpt-4o", prompt=1000, completion=300)
     check("calculate_cost('gpt-4o') returns dict with total",
           isinstance(cost, dict) and "total" in cost,
@@ -508,7 +508,7 @@ except Exception as e:
     fail("Pricing utilities failed", str(e))
 
 try:
-    from vantageaiops.analysis.hallucination import _heuristic_scores
+    from cohrint.analysis.hallucination import _heuristic_scores
     scores = _heuristic_scores("What is Paris?", "Paris is the capital of France.")
     check("Hallucination heuristic returns scores dict",
           isinstance(scores, dict) and "hallucination_score" in scores)
@@ -519,25 +519,25 @@ except Exception as e:
 
 # Test import alias works (as shown in our docs)
 try:
-    import vantageaiops as vantage
-    ok("'import vantageaiops as vantage' works (matches docs examples)")
+    import cohrint as vantage
+    ok("'import cohrint as vantage' works (matches docs examples)")
 except Exception as e:
-    fail("import vantageaiops as vantage failed", str(e))
+    fail("import cohrint as vantage failed", str(e))
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 14. npm SDK — vantageaiops package
+# 14. npm SDK — cohrint package
 # ─────────────────────────────────────────────────────────────────────────────
-section("14. npm SDK (npm show vantageaiops)")
+section("14. npm SDK (npm show cohrint)")
 try:
     result = subprocess.run(
-        ["npm", "show", "vantageaiops", "version"],
+        ["npm", "show", "cohrint", "version"],
         capture_output=True, text=True, timeout=15
     )
     npm_version = result.stdout.strip()
-    check(f"npm package vantageaiops exists (v{npm_version})",
+    check(f"npm package cohrint exists (v{npm_version})",
           result.returncode == 0 and bool(npm_version))
 except Exception as e:
-    fail("npm show vantageaiops failed", str(e))
+    fail("npm show cohrint failed", str(e))
 
 # Verify dist/index.js is importable with node
 try:

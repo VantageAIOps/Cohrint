@@ -1,10 +1,10 @@
 """
-cli.py — Vantage Agent CLI with interactive REPL.
+cli.py — Cohrint Agent CLI with interactive REPL.
 
 Usage:
-  vantageai-agent                          # Start interactive REPL
-  vantageai-agent "fix the bug in main.py" # One-shot prompt
-  vantageai-agent --model claude-opus-4-6  # Use a specific model
+  cohrint-agent                          # Start interactive REPL
+  cohrint-agent "fix the bug in main.py" # One-shot prompt
+  cohrint-agent --model claude-opus-4-6  # Use a specific model
 """
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ from .tools import TOOL_MAP
 console = Console()
 
 BANNER = """
-  [bold]Vantage Agent[/bold] [dim]v{version}[/dim]
+  [bold]Cohrint Agent[/bold] [dim]v{version}[/dim]
   [dim]AI coding agent with per-tool permissions, cost tracking & optimization[/dim]
   [dim]Model: {model}  |  CWD: {cwd}[/dim]
 
@@ -54,7 +54,7 @@ BANNER = """
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Vantage Agent — AI coding assistant with cost tracking"
+        description="Cohrint Agent — AI coding assistant with cost tracking"
     )
     parser.add_argument("prompt", nargs="*", help="One-shot prompt (skip REPL)")
     parser.add_argument("--model", default=None, help=f"Model ID (default: {DEFAULT_MODEL})")
@@ -63,9 +63,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--system", default=None, help="Custom system prompt")
     parser.add_argument("--no-optimize", action="store_true", help="Disable prompt optimization")
     parser.add_argument("--api-key", default=None, help="Anthropic API key (or set ANTHROPIC_API_KEY)")
-    parser.add_argument("--vantage-key", default=None, help="VantageAI dashboard API key for telemetry")
+    parser.add_argument("--vantage-key", default=None, help="Cohrint dashboard API key for telemetry")
     parser.add_argument("--debug", action="store_true", help="Enable debug output")
-    parser.add_argument("--version", action="version", version=f"vantageai-agent {__version__}")
+    parser.add_argument("--version", action="version", version=f"cohrint-agent {__version__}")
     parser.add_argument(
         "--backend",
         choices=["api", "claude", "codex", "gemini"],
@@ -134,9 +134,9 @@ class _ClaudeCliClient:
 
 
 def _build_client(args: argparse.Namespace):
-    model = args.model or os.environ.get("VANTAGE_MODEL", DEFAULT_MODEL)
+    model = args.model or os.environ.get("COHRINT_MODEL", DEFAULT_MODEL)
     cwd = args.cwd or os.getcwd()
-    config_dir = Path(os.environ.get("VANTAGE_CONFIG_DIR", Path.home() / ".vantage-agent"))
+    config_dir = Path(os.environ.get("COHRINT_CONFIG_DIR", Path.home() / ".cohrint-agent"))
     permissions = PermissionManager(config_dir=config_dir)
     cost = SessionCost(model=model)
 
@@ -150,7 +150,7 @@ def _build_client(args: argparse.Namespace):
 
     # Dashboard tracker
     tracker = None
-    vantage_key = args.vantage_key or os.environ.get("VANTAGE_API_KEY", "")
+    vantage_key = args.vantage_key or os.environ.get("COHRINT_API_KEY", "")
     if vantage_key:
         tracker = Tracker(TrackerConfig(api_key=vantage_key, debug=args.debug))
         tracker.start()
@@ -285,7 +285,7 @@ def _handle_command(line: str, client: AgentClient) -> bool:
         return True
 
     if stripped == "/tier":
-        config_dir = Path(os.environ.get("VANTAGE_CONFIG_DIR", Path.home() / ".vantage-agent"))
+        config_dir = Path(os.environ.get("COHRINT_CONFIG_DIR", Path.home() / ".cohrint-agent"))
         _handle_tier_command(client.permissions, config_dir=config_dir)
         return True
 
@@ -303,7 +303,7 @@ def run_repl(client: AgentClient, tracker: Tracker | None = None) -> None:
     while True:
         try:
             console.print()
-            line = console.input("[bold cyan]vantage>[/bold cyan] ")
+            line = console.input("[bold cyan]cohrint>[/bold cyan] ")
         except (EOFError, KeyboardInterrupt):
             console.print("\n  [dim]Goodbye.[/dim]")
             break
@@ -338,7 +338,7 @@ def run_repl(client: AgentClient, tracker: Tracker | None = None) -> None:
             if not wait_for_token():
                 console.print("[yellow]Rate limit reached — waiting...[/yellow]")
             # Global budget guard
-            budget = float(os.environ.get("VANTAGE_BUDGET_USD", "0"))
+            budget = float(os.environ.get("COHRINT_BUDGET_USD", "0"))
             if budget > 0 and get_global_budget_used() >= budget:
                 console.print(f"[red]Global budget of ${budget:.2f} reached across all sessions.[/red]")
                 continue
@@ -373,7 +373,7 @@ def run_oneshot(client: AgentClient, prompt: str, tracker: Tracker | None = None
         if not wait_for_token():
             console.print("[yellow]Rate limit reached — waiting...[/yellow]")
         # Global budget guard
-        budget = float(os.environ.get("VANTAGE_BUDGET_USD", "0"))
+        budget = float(os.environ.get("COHRINT_BUDGET_USD", "0"))
         if budget > 0 and get_global_budget_used() >= budget:
             console.print(f"[red]Global budget of ${budget:.2f} reached across all sessions.[/red]")
             return
@@ -425,7 +425,7 @@ def _print_summary() -> None:
 
 
 def main() -> None:
-    # Handle `vantageai-agent summary` before argparse (avoids positional arg conflict)
+    # Handle `cohrint-agent summary` before argparse (avoids positional arg conflict)
     if len(sys.argv) == 2 and sys.argv[1] == "summary":
         _print_summary()
         return

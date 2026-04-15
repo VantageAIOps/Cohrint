@@ -95,7 +95,7 @@ if (resumeSessionId) {
 ### Data Flow After Fix
 ```
 # First run
-vantageai-local-proxy --api-key vnt_... --team eng
+vantageai-local-proxy --api-key crt_... --team eng
   → creates session abc-123
   → saves ~/.vantage/sessions/abc-123.json
 
@@ -168,7 +168,7 @@ ON CONFLICT (org_id, session_id) DO UPDATE SET
 
 **New API endpoint:** `GET /v1/sessions`
 ```
-Auth: Bearer vnt_...
+Auth: Bearer crt_...
 Query params:
   limit          integer  default 20, max 100
   provider       string   filter by provider

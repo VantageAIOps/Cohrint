@@ -25,8 +25,8 @@ export async function sendEmail(
 
   // Try custom domain first; fall back to Resend shared domain if not yet verified
   const senders = [
-    'VantageAI <noreply@vantageaiops.com>',
-    'VantageAI <onboarding@resend.dev>',
+    'Cohrint <noreply@cohrint.com>',
+    'Cohrint <onboarding@resend.dev>',
   ];
 
   try {
@@ -40,10 +40,10 @@ export async function sendEmail(
       const body = await res.json() as { name?: string };
       // Only retry with fallback sender on domain-not-verified error
       if (body.name !== 'validation_error') return;
-      console.warn('[vantage] sendEmail: custom domain not verified — retrying with shared sender');
+      console.warn('[cohrint] sendEmail: custom domain not verified — retrying with shared sender');
     }
   } catch {
-    console.warn('[vantage] sendEmail failed — Resend unreachable');
+    console.warn('[cohrint] sendEmail failed — Resend unreachable');
   }
 }
 
@@ -58,17 +58,17 @@ export function memberInviteEmail(opts: {
   apiKey:    string;
   keyHint:   string;
 }): { subject: string; html: string } {
-  const dashUrl = `https://vantageaiops.com/app.html?api_key=${opts.apiKey}&org=${opts.orgId}`;
+  const dashUrl = `https://cohrint.com/app.html?api_key=${opts.apiKey}&org=${opts.orgId}`;
   return {
-    subject: `You've been invited to ${opts.orgName} on VantageAI`,
+    subject: `You've been invited to ${opts.orgName} on Cohrint`,
     html: `
 <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#1a1a1a">
   <div style="margin-bottom:24px">
-    <img src="https://vantageaiops.com/og-image.png" alt="VantageAI" style="height:28px">
+    <img src="https://cohrint.com/og-image.png" alt="Cohrint" style="height:28px">
   </div>
   <h2 style="font-size:20px;margin:0 0 8px">You've been invited</h2>
   <p style="color:#555;margin:0 0 20px"><strong>${opts.invitedBy}</strong> has added you to
-    <strong>${opts.orgName}</strong> on VantageAI as <strong>${opts.role}</strong>
+    <strong>${opts.orgName}</strong> on Cohrint as <strong>${opts.role}</strong>
     ${opts.scopeTeam ? `(scoped to team: <strong>${opts.scopeTeam}</strong>)` : ''}.
   </p>
 
@@ -87,9 +87,9 @@ export function memberInviteEmail(opts: {
 
   <div style="font-size:12px;color:#888;border-top:1px solid #eee;padding-top:16px;margin-top:8px">
     <strong>Quick start:</strong><br>
-    <code style="font-size:11px">pip install vantageaiops</code> or
-    <code style="font-size:11px">npm install vantageaiops</code><br><br>
-    Questions? Reply to this email or visit <a href="https://vantageaiops.com/docs.html">docs</a>.
+    <code style="font-size:11px">pip install cohrint</code> or
+    <code style="font-size:11px">npm install cohrint</code><br><br>
+    Questions? Reply to this email or visit <a href="https://cohrint.com/docs.html">docs</a>.
   </div>
 </div>`,
   };
@@ -103,7 +103,7 @@ export function keyRecoveryEmail(opts: {
   redeemUrl?: string;  // one-time link to rotate key (owner only)
 }): { subject: string; html: string } {
   return {
-    subject: 'VantageAI — API key recovery',
+    subject: 'Cohrint — API key recovery',
     html: `
 <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#1a1a1a">
   <h2 style="font-size:20px;margin:0 0 12px">API key recovery</h2>
@@ -132,7 +132,7 @@ export function keyRecoveryEmail(opts: {
     <strong>To get a new key:</strong><br>
     Ask your org admin to revoke and re-issue your member key.
   </p>
-  <a href="https://vantageaiops.com/auth" style="display:inline-block;background:#00d4a1;color:#000;padding:11px 22px;border-radius:7px;text-decoration:none;font-weight:600;font-size:14px;margin-bottom:20px">
+  <a href="https://cohrint.com/auth" style="display:inline-block;background:#00d4a1;color:#000;padding:11px 22px;border-radius:7px;text-decoration:none;font-weight:600;font-size:14px;margin-bottom:20px">
     Sign in →
   </a>
   `}

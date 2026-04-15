@@ -1,5 +1,5 @@
 /**
- * VantageAI — Test Data Seed Engine
+ * Cohrint — Test Data Seed Engine
  * Generates 50,000+ realistic AI API call events across:
  *   - 23 models / 7 providers
  *   - 90 days of history

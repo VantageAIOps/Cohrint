@@ -1,5 +1,5 @@
 """
-log_viewer.py — CLI log viewer and filter for VantageAI test logs
+log_viewer.py — CLI log viewer and filter for Cohrint test logs
 =================================================================
 Purpose:
   Makes it easy to inspect structured JSON logs from test runs and
@@ -70,7 +70,7 @@ DEFAULT_LOG_FILE = _DEFAULT_ARTIFACTS / "run.jsonl"
 
 def parse_args():
     p = argparse.ArgumentParser(
-        description="VantageAI log viewer — filter and inspect structured JSON logs"
+        description="Cohrint log viewer — filter and inspect structured JSON logs"
     )
     p.add_argument("--file",    type=str,  default=str(DEFAULT_LOG_FILE),
                    help="Path to NDJSON log file")

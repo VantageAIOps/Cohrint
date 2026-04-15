@@ -1,7 +1,7 @@
 """
 Test Suite 26 — CLI Integration Tests (vantage-agent Python)
 =====================================================
-Suite CI: Comprehensive integration tests for the VantageAI Python agent including
+Suite CI: Comprehensive integration tests for the Cohrint Python agent including
 prompt optimization, cost calculation, agent detection, config, pipe mode,
 session mode tracking, and SSE live stream.
 

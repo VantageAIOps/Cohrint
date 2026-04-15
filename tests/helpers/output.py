@@ -1,5 +1,5 @@
 """
-output.py — Console output helpers and test result tracking for VantageAI test suite
+output.py — Console output helpers and test result tracking for Cohrint test suite
 """
 
 # ── Console colour helpers ────────────────────────────────────────────────────

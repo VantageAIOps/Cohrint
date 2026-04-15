@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 /**
- * VantageAI MCP Server
+ * Cohrint MCP Server
  *
- * Exposes VantageAI as an MCP server so AI coding assistants
+ * Exposes Cohrint as an MCP server so AI coding assistants
  * (Claude Desktop, Cursor, Windsurf, VS Code Copilot, Cline, etc.)
  * can track LLM costs and query analytics in real-time.
  *
  * Config:
- *   VANTAGE_API_KEY  — your vnt_... key (required)
- *   VANTAGE_ORG      — org id (auto-parsed from key if omitted)
- *   VANTAGE_API_BASE — default: https://api.vantageaiops.com
+ *   COHRINT_API_KEY  — your crt_... key (required)
+ *   COHRINT_ORG      — org id (auto-parsed from key if omitted)
+ *   COHRINT_API_BASE — default: https://api.cohrint.com
  *
  * Tools:
  *   track_llm_call        — ingest a single LLM event
@@ -44,9 +44,9 @@ import {
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const API_KEY  = process.env.VANTAGE_API_KEY  ?? '';
-const API_BASE = (process.env.VANTAGE_API_BASE ?? 'https://api.vantageaiops.com').replace(/\/+$/, '');
-const ORG      = process.env.VANTAGE_ORG      ?? parseOrgFromKey(API_KEY);
+const API_KEY  = process.env.COHRINT_API_KEY  ?? process.env.VANTAGE_API_KEY  ?? '';
+const API_BASE = (process.env.COHRINT_API_BASE ?? process.env.VANTAGE_API_BASE ?? 'https://api.cohrint.com').replace(/\/+$/, '');
+const ORG      = process.env.COHRINT_ORG      ?? process.env.VANTAGE_ORG      ?? parseOrgFromKey(API_KEY);
 
 function parseOrgFromKey(key: string): string {
   const parts = key.split('_');
@@ -66,13 +66,13 @@ function errorLog(context: string, err: unknown): void {
   const msg = err instanceof Error ? err.message : String(err);
   const ts = new Date().toISOString();
   const safe = msg.replace(new RegExp(API_KEY.slice(8), 'g'), '****');
-  process.stderr.write(`[vantage-mcp] ${ts} ERROR ${context}: ${safe}\n`);
+  process.stderr.write(`[cohrint-mcp] ${ts} ERROR ${context}: ${safe}\n`);
 }
 
 // ── API client ────────────────────────────────────────────────────────────────
 
 async function api(path: string, opts: RequestInit = {}): Promise<unknown> {
-  if (!API_KEY) throw new Error('VANTAGE_API_KEY is not set. Add it to your MCP config. Get a key at https://vantageaiops.com/signup.html');
+  if (!API_KEY) throw new Error('COHRINT_API_KEY is not set. Add it to your MCP config. Get a key at https://cohrint.com/signup.html');
 
   let res: Response;
   try {
@@ -90,16 +90,16 @@ async function api(path: string, opts: RequestInit = {}): Promise<unknown> {
     const msg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
     errorLog(`api ${path}`, fetchErr);
     if (msg.includes('abort') || msg.includes('timeout')) {
-      throw new Error(`Request to VantageAI API timed out (${path}). Check your network connection.`);
+      throw new Error(`Request to Cohrint API timed out (${path}). Check your network connection.`);
     }
-    throw new Error(`Cannot reach VantageAI API (${path}): ${msg.split('\n')[0]}`);
+    throw new Error(`Cannot reach Cohrint API (${path}): ${msg.split('\n')[0]}`);
   }
 
   let body: unknown;
   try {
     body = await res.json();
   } catch {
-    throw new Error(`VantageAI API returned invalid JSON (HTTP ${res.status} on ${path}).`);
+    throw new Error(`Cohrint API returned invalid JSON (HTTP ${res.status} on ${path}).`);
   }
   if (!res.ok) throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
   return body;
@@ -338,7 +338,7 @@ function getOptimizationTips(prompt: string): string[] {
 // ── MCP Server ────────────────────────────────────────────────────────────────
 
 const server = new Server(
-  { name: 'vantage-mcp', version: VERSION },
+  { name: 'cohrint-mcp', version: VERSION },
   { capabilities: { tools: {}, resources: {} } },
 );
 
@@ -348,7 +348,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     {
       name: 'track_llm_call',
-      description: 'Track an LLM API call — logs cost, tokens, latency, model, and team to VantageAI. Call this after every LLM completion.',
+      description: 'Track an LLM API call — logs cost, tokens, latency, model, and team to Cohrint. Call this after every LLM completion.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -581,7 +581,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'get_summary': {
         const data = await api('/v1/analytics/summary') as Record<string, unknown>;
         const lines = [
-          `📊 **VantageAI Summary** (org: ${ORG})`,
+          `📊 **Cohrint Summary** (org: ${ORG})`,
           ``,
           `| Metric | Value |`,
           `|--------|-------|`,
@@ -593,7 +593,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           `| Budget Used | ${Number(data.budget_pct ?? 0) > 0 ? `${Number(data.budget_pct).toFixed(1)}%` : 'No budget set'} |`,
           `| Plan | ${data.plan ?? 'free'} |`,
           ``,
-          `🔗 [View dashboard](https://vantageaiops.com/app.html)`,
+          `🔗 [View dashboard](https://cohrint.com/app.html)`,
         ];
         return { content: [{ type: 'text', text: lines.join('\n') }] };
       }
@@ -970,7 +970,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         // Resolve tips for the agent (fall back to generic)
         const agentKey = Object.keys(AGENT_TIPS).find(k => agent.includes(k)) ?? '';
         let tips: Tip[] = agentKey ? [...AGENT_TIPS[agentKey]] : [
-          { title: 'Track your costs', action: 'Use VantageAI SDK or MCP to monitor every LLM call', savings: 'Visibility enables 20-40% optimization', priority: 'high' },
+          { title: 'Track your costs', action: 'Use Cohrint SDK or MCP to monitor every LLM call', savings: 'Visibility enables 20-40% optimization', priority: 'high' },
           { title: 'Use the cheapest viable model', action: 'Run estimate_costs tool to compare models for your workload', savings: 'Up to 95% by switching models', priority: 'high' },
           { title: 'Compress prompts', action: 'Run optimize_prompt tool to remove filler and reduce tokens', savings: '10-30% token savings', priority: 'medium' },
         ];
@@ -1056,7 +1056,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         lines.push(
           `---`,
-          `Track all your AI costs at https://vantageaiops.com/app.html`,
+          `Track all your AI costs at https://cohrint.com/app.html`,
         );
 
         return { content: [{ type: 'text', text: lines.join('\n') }] };
@@ -1081,13 +1081,13 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => ({
   resources: [
     {
       uri: 'vantage://dashboard',
-      name: 'VantageAI Dashboard',
+      name: 'Cohrint Dashboard',
       description: 'Live cost analytics dashboard',
       mimeType: 'text/plain',
     },
     {
       uri: 'vantage://docs',
-      name: 'VantageAI Docs',
+      name: 'Cohrint Docs',
       description: 'SDK integration guides and API reference',
       mimeType: 'text/plain',
     },
@@ -1105,10 +1105,10 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
 
   switch (uri) {
     case 'vantage://dashboard':
-      return { contents: [{ uri, mimeType: 'text/plain', text: 'Dashboard: https://vantageaiops.com/app.html' }] };
+      return { contents: [{ uri, mimeType: 'text/plain', text: 'Dashboard: https://cohrint.com/app.html' }] };
 
     case 'vantage://docs':
-      return { contents: [{ uri, mimeType: 'text/plain', text: 'Docs: https://vantageaiops.com/docs.html' }] };
+      return { contents: [{ uri, mimeType: 'text/plain', text: 'Docs: https://cohrint.com/docs.html' }] };
 
     case 'vantage://config':
       return {
@@ -1201,16 +1201,16 @@ async function runSetup(): Promise<void> {
   }
 
   process.stdout.write('\n');
-  process.stdout.write('Setup complete! VantageAI will track costs on every Claude Code session.\n');
+  process.stdout.write('Setup complete! Cohrint will track costs on every Claude Code session.\n');
   process.stdout.write('\n');
   process.stdout.write('Next step: set your API key in your shell profile:\n');
-  process.stdout.write('  export VANTAGE_API_KEY=vnt_...\n');
+  process.stdout.write('  export COHRINT_API_KEY=crt_...\n');
   process.stdout.write('\n');
-  process.stdout.write('Get your free key at: https://vantageaiops.com/signup.html\n');
+  process.stdout.write('Get your free key at: https://cohrint.com/signup.html\n');
   process.stdout.write('\n');
   process.stdout.write('Optional env vars:\n');
-  process.stdout.write('  VANTAGE_TEAM=<team>      — tag all events with a team name\n');
-  process.stdout.write('  VANTAGE_PROJECT=<project> — tag all events with a project name\n');
+  process.stdout.write('  COHRINT_TEAM=<team>      — tag all events with a team name\n');
+  process.stdout.write('  COHRINT_PROJECT=<project> — tag all events with a project name\n');
 }
 
 // ── Start ─────────────────────────────────────────────────────────────────────
@@ -1224,14 +1224,14 @@ async function main() {
   }
 
   if (!API_KEY) {
-    process.stderr.write('[vantage-mcp] WARNING: VANTAGE_API_KEY is not set. Tools will fail until a key is provided.\n');
-    process.stderr.write('[vantage-mcp] Get your key at: https://vantageaiops.com/signup.html\n');
+    process.stderr.write('[cohrint-mcp] WARNING: COHRINT_API_KEY is not set. Tools will fail until a key is provided.\n');
+    process.stderr.write('[cohrint-mcp] Get your key at: https://cohrint.com/signup.html\n');
   } else {
-    process.stderr.write(`[vantage-mcp] org=${ORG} api=${API_BASE}\n`);
+    process.stderr.write(`[cohrint-mcp] org=${ORG} api=${API_BASE}\n`);
   }
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  process.stderr.write('[vantage-mcp] Server started\n');
+  process.stderr.write('[cohrint-mcp] Server started\n');
 }
 
 // Catch unhandled errors — log and exit so the process manager can restart clean
@@ -1245,6 +1245,6 @@ process.on('unhandledRejection', (reason) => {
 });
 
 main().catch((err) => {
-  process.stderr.write(`[vantage-mcp] Fatal: ${err.message}\n`);
+  process.stderr.write(`[cohrint-mcp] Fatal: ${err.message}\n`);
   process.exit(1);
 });

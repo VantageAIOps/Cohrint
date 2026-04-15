@@ -1,9 +1,9 @@
 """
 tracker.py — Dashboard telemetry client.
 
-Batches cost/usage events and sends them to the VantageAI backend API.
+Batches cost/usage events and sends them to the Cohrint backend API.
 Respects privacy modes: full, strict, anonymized, local-only.
-Cost tracking module for vantage-agent.
+Cost tracking module for cohrint-agent.
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from .telemetry import OTelExporter
 @dataclass
 class TrackerConfig:
     api_key: str = ""
-    api_base: str = "https://api.vantageaiops.com"
+    api_base: str = "https://api.cohrint.com"
     batch_size: int = 10
     flush_interval: float = 30.0  # seconds
     privacy: str = "full"  # full | strict | anonymized | local-only
@@ -42,7 +42,7 @@ class DashboardEvent:
     total_cost_usd: float
     latency_ms: int
     environment: str = "cli"
-    agent_name: str = "vantage-agent"
+    agent_name: str = "cohrint-agent"
     team: str = "default"
     session_id: str = ""
 
@@ -57,7 +57,7 @@ PROVIDER_MAP = {
 
 
 class Tracker:
-    """Batched telemetry sender for the VantageAI dashboard."""
+    """Batched telemetry sender for the Cohrint dashboard."""
 
     def __init__(self, config: TrackerConfig) -> None:
         self.config = config
@@ -85,7 +85,7 @@ class Tracker:
         output_tokens: int,
         cost_usd: float,
         latency_ms: int,
-        agent_name: str = "vantage-agent",
+        agent_name: str = "cohrint-agent",
         session_id: str = "",
     ) -> None:
         """Queue a usage event."""
@@ -160,7 +160,7 @@ class Tracker:
                 headers={
                     "Authorization": f"Bearer {self.config.api_key}",
                     "Content-Type": "application/json",
-                    "User-Agent": f"vantage-agent/{__version__}",
+                    "User-Agent": f"cohrint-agent/{__version__}",
                 },
                 timeout=10,
             )

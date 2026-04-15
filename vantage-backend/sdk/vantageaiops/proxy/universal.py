@@ -6,18 +6,18 @@ Mistral, LiteLLM, LangChain, and raw HTTP calls with one decorator.
 
 USAGE (any model):
     import vantage
-    vantage.init(api_key="vnt_...", org="acme", team="product")
+    vantage.init(api_key="crt_...", org="acme", team="product")
 
     # OpenAI
-    from vantageaiops.proxy import openai
+    from cohrint.proxy import openai
     client = openai.OpenAI(api_key="sk-...")
 
     # Anthropic
-    from vantageaiops.proxy import anthropic
+    from cohrint.proxy import anthropic
     client = anthropic.Anthropic(api_key="sk-ant-...")
 
     # ANY litellm-compatible model (Copilot, Gemini, Mistral, etc.)
-    from vantageaiops.proxy import litellm
+    from cohrint.proxy import litellm
     response = litellm.completion(model="gpt-4o", messages=[...])
 """
 
@@ -33,16 +33,16 @@ from dataclasses import dataclass, field, asdict
 from typing import Any, Callable, Optional
 from functools import wraps
 
-from vantageaiops.models.event import VantageEvent, TokenUsage, CostInfo, QualityMetrics
-from vantageaiops.models.pricing import calculate_cost, find_cheapest
-from vantageaiops.utils.queue import EventQueue
+from cohrint.models.event import CohrintEvent, TokenUsage, CostInfo, QualityMetrics
+from cohrint.models.pricing import calculate_cost, find_cheapest
+from cohrint.utils.queue import EventQueue
 
 
 # ── Thread/async context storage ────────────────────────────────────────────
 import contextvars
 
 _CTX_TAGS:    contextvars.ContextVar[dict] = contextvars.ContextVar("vantage_tags",    default={})
-_CTX_SESSION: contextvars.ContextVar[str]  = contextvars.ContextVar("vantage_session", default="")
+_CTX_SESSION: contextvars.ContextVar[str]  = contextvars.ContextVar("cohrint_session", default="")
 _CTX_USER:    contextvars.ContextVar[str]  = contextvars.ContextVar("vantage_user",    default="")
 _CTX_FEATURE: contextvars.ContextVar[str]  = contextvars.ContextVar("vantage_feature", default="")
 _CTX_PROJECT: contextvars.ContextVar[str]  = contextvars.ContextVar("vantage_project", default="")
@@ -98,14 +98,14 @@ def _build_event(
     extra_tags: dict,
     org_id: str,
     environment: str,
-) -> VantageEvent:
+) -> CohrintEvent:
     costs = calculate_cost(model, prompt_tokens, completion_tokens, cached_tokens)
     cheaper = find_cheapest(model, prompt_tokens, completion_tokens)
 
     # Fingerprint prompt for dedup/caching analysis
     prompt_hash = hashlib.md5(system_prompt.encode()).hexdigest()[:12] if system_prompt else ""
 
-    return VantageEvent(
+    return CohrintEvent(
         event_id    = str(uuid.uuid4()),
         timestamp   = time.time(),
         org_id      = org_id,

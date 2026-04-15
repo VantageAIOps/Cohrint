@@ -1,5 +1,5 @@
 """
-session_store.py — Persist/restore VantageSession state to ~/.vantage-agent/sessions/.
+session_store.py — Persist/restore VantageSession state to ~/.cohrint-agent/sessions/.
 """
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-DEFAULT_SESSIONS_DIR = Path(os.environ.get("VANTAGE_CONFIG_DIR", Path.home() / ".vantage-agent")) / "sessions"
+DEFAULT_SESSIONS_DIR = Path(os.environ.get("COHRINT_CONFIG_DIR", Path.home() / ".cohrint-agent")) / "sessions"
 
 
 class SessionNotFoundError(Exception):

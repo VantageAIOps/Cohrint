@@ -80,13 +80,13 @@ jobs:
           exit 1
 
       - name: Confirm deployment
-        run: echo "✅ vantageai-api deployed — https://api.vantageaiops.com"
+        run: echo "✅ cohrint-api deployed — https://api.cohrint.com"
 
       - name: Verify API health post-deploy
         run: |
           sleep 20
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             --retry 5 --retry-delay 5 --retry-all-errors \
-            https://api.vantageaiops.com/v1/health)
+            https://api.cohrint.com/v1/health)
           echo "Health check status: $STATUS"
           [ "$STATUS" = "200" ] && echo "✅ Worker is healthy" || echo "⚠️ Health check returned $STATUS (may still be propagating)"

@@ -4,8 +4,8 @@ from pathlib import Path
 
 TESTS_ROOT = Path(__file__).parent.parent
 
-SITE_URL = os.environ.get("VANTAGE_SITE_URL", "https://vantageaiops.com")
-API_URL  = os.environ.get("VANTAGE_API_URL",  "https://api.vantageaiops.com")
+SITE_URL = os.environ.get("VANTAGE_SITE_URL", "https://cohrint.com")
+API_URL  = os.environ.get("VANTAGE_API_URL",  "https://api.cohrint.com")
 HEADLESS = os.environ.get("HEADLESS", "1") != "0"
 
 ARTIFACTS_DIR = Path(os.environ.get("VANTAGE_TEST_ARTIFACTS_DIR", str(TESTS_ROOT / "artifacts")))

@@ -1,4 +1,4 @@
-# VantageAI — Backend SDK & Server
+# Cohrint — Backend SDK & Server
 
 Enterprise AI observability: token tracking, cost analysis, latency monitoring,
 efficiency scoring, and hallucination detection across all AI providers and agents.
@@ -410,7 +410,7 @@ This approach keeps schema changes versioned, reviewable, and consistent across 
 ```
 vantage-backend/
 │
-├── sdk/                          pip install vantageaiops
+├── sdk/                          pip install cohrint
 │   ├── pyproject.toml
 │   └── vantage/
 │       ├── __init__.py           vantage.init(), vantage.tag()
