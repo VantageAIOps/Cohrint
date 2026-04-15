@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
-import { authMiddleware, adminOnly } from '../middleware/auth';
+import { authMiddleware, adminOnly, hasRole } from '../middleware/auth';
 import { logAudit } from '../lib/audit';
 
 const admin = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -102,32 +102,54 @@ admin.get('/overview', async (c) => {
   });
 });
 
-// ── GET /v1/admin/audit — fetch audit log ─────────────────────────────────
+// ── GET /v1/admin/audit — fetch audit log (admin+ only) ───────────────────
 admin.get('/audit', async (c) => {
   const orgId = c.get('orgId');
   const role = c.get('role');
-  if (role !== 'owner' && role !== 'admin') {
-    return c.json({ error: 'Audit log requires owner or admin role' }, 403);
+  // Require at least admin (ceo/superadmin/owner also pass via hasRole)
+  if (!hasRole(role, 'admin')) {
+    return c.json({ error: 'Audit log requires admin or higher role' }, 403);
   }
 
-  const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10), 200);
+  const limit        = Math.min(parseInt(c.req.query('limit') ?? '50', 10), 500);
+  const since        = c.req.query('since') ?? null;
+  const until        = c.req.query('until') ?? null;
+  const actorRole    = c.req.query('actor_role') ?? null;
+  const resourceType = c.req.query('resource_type') ?? null;
+  const eventName    = c.req.query('event_name') ?? null;
+
+  const conditions: string[] = ['org_id = ?'];
+  const params: unknown[]    = [orgId];
+
+  if (since)        { conditions.push('created_at >= ?'); params.push(since); }
+  if (until)        { conditions.push('created_at <= ?'); params.push(until); }
+  if (actorRole)    { conditions.push('actor_role = ?');  params.push(actorRole); }
+  if (resourceType) { conditions.push('resource = ?');    params.push(resourceType); }
+  if (eventName)    { conditions.push('action LIKE ?');   params.push(eventName + '%'); }
+
+  params.push(limit);
   const { results } = await c.env.DB.prepare(`
-    SELECT action, actor_email, actor_role, resource, detail, ip_address, created_at
+    SELECT actor_email, actor_role, event_type, action, resource,
+           detail, ip_address, created_at
     FROM audit_events
-    WHERE org_id = ?
+    WHERE ${conditions.join(' AND ')}
     ORDER BY created_at DESC
     LIMIT ?
-  `).bind(orgId, limit).all();
+  `).bind(...params).all();
 
-  return c.json({ events: results });
+  return c.json({
+    events: results,
+    count: results.length,
+    filters: { since, until, actor_role: actorRole, resource_type: resourceType, event_name: eventName },
+  });
 });
 
-// ── GET /v1/admin/security — security overview stats ──────────────────────
+// ── GET /v1/admin/security — security overview stats (admin+ only) ────────
 admin.get('/security', async (c) => {
   const orgId = c.get('orgId');
   const role = c.get('role');
-  if (role !== 'owner' && role !== 'admin') {
-    return c.json({ error: 'Security view requires owner or admin role' }, 403);
+  if (!hasRole(role, 'admin')) {
+    return c.json({ error: 'Security view requires admin or higher role' }, 403);
   }
 
   const now = Math.floor(Date.now() / 1000);
@@ -160,7 +182,7 @@ admin.get('/security', async (c) => {
       api_key_hashing: 'SHA-256',
       session_security: 'HTTP-only, SameSite=Lax, Secure',
       data_encryption: 'AES-256 at rest (Cloudflare D1)',
-      access_control: 'RBAC (owner/admin/member/viewer)',
+      access_control: 'RBAC (owner/superadmin/ceo/admin/member/viewer)',
       rate_limiting: true,
     }
   });
@@ -303,6 +325,304 @@ admin.patch('/org', async (c) => {
 // proper authorization error rather than a 404 "not found".
 admin.get('/audit-log', (c) => {
   return c.json({ error: 'Forbidden: use /v1/audit-log for org audit logs' }, 403);
+});
+
+// ── Budget Policies CRUD ──────────────────────────────────────────────────────
+// scope:  'org' | 'team' | 'developer' | 'provider' | 'team_provider'
+// scope_target: team name / developer email / provider name / "team::provider" combo
+// provider_target: provider name when scope = 'team_provider' (scope_target = team)
+// enforcement: 'alert' | 'throttle' | 'block'
+
+const VALID_SCOPES = new Set(['org', 'team', 'developer', 'provider', 'team_provider']);
+const VALID_ENFORCEMENT = new Set(['alert', 'throttle', 'block']);
+
+// ── GET /v1/admin/budget-policies — list all budget policies ─────────────────
+admin.get('/budget-policies', adminOnly, async (c) => {
+  const orgId = c.get('orgId');
+
+  const { results } = await c.env.DB.prepare(`
+    SELECT id, scope, scope_target, provider_target,
+           monthly_limit_usd,
+           alert_threshold_50, alert_threshold_80, alert_threshold_100,
+           enforcement, created_at, updated_at
+    FROM budget_policies WHERE org_id = ?
+    ORDER BY scope, scope_target
+  `).bind(orgId).all();
+
+  return c.json({ policies: results });
+});
+
+// ── POST /v1/admin/budget-policies — create a budget policy ──────────────────
+admin.post('/budget-policies', async (c) => {
+  const orgId = c.get('orgId');
+
+  let body: {
+    scope: string;
+    scope_target?: string;
+    provider_target?: string;
+    monthly_limit_usd: number;
+    alert_threshold_50?: boolean;
+    alert_threshold_80?: boolean;
+    alert_threshold_100?: boolean;
+    enforcement?: string;
+  };
+  try { body = await c.req.json(); }
+  catch { return c.json({ error: 'Invalid JSON body' }, 400); }
+
+  if (!VALID_SCOPES.has(body.scope)) {
+    return c.json({ error: `scope must be one of: ${[...VALID_SCOPES].join(', ')}` }, 400);
+  }
+  if (typeof body.monthly_limit_usd !== 'number' || body.monthly_limit_usd <= 0) {
+    return c.json({ error: 'monthly_limit_usd must be a positive number' }, 400);
+  }
+  const enforcement = body.enforcement ?? 'alert';
+  if (!VALID_ENFORCEMENT.has(enforcement)) {
+    return c.json({ error: `enforcement must be one of: ${[...VALID_ENFORCEMENT].join(', ')}` }, 400);
+  }
+  // Scopes that require scope_target
+  if (['team', 'developer', 'provider', 'team_provider'].includes(body.scope) && !body.scope_target) {
+    return c.json({ error: `scope_target is required when scope = '${body.scope}'` }, 400);
+  }
+  // team_provider requires provider_target
+  if (body.scope === 'team_provider' && !body.provider_target) {
+    return c.json({ error: 'provider_target is required when scope = team_provider' }, 400);
+  }
+
+  const countResult = await c.env.DB.prepare(
+    'SELECT COUNT(*) as cnt FROM budget_policies WHERE org_id = ?'
+  ).bind(orgId).first<{ cnt: number }>();
+
+  if ((countResult?.cnt ?? 0) >= 100) {
+    return c.json({ error: 'Budget policy limit reached (max 100 per org)' }, 429);
+  }
+
+  const id = crypto.randomUUID();
+  await c.env.DB.prepare(`
+    INSERT INTO budget_policies
+      (id, org_id, scope, scope_target, provider_target,
+       monthly_limit_usd, alert_threshold_50, alert_threshold_80, alert_threshold_100,
+       enforcement, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+  `).bind(
+    id, orgId,
+    body.scope,
+    body.scope_target ?? null,
+    body.provider_target ?? null,
+    body.monthly_limit_usd,
+    body.alert_threshold_50 !== false ? 1 : 0,
+    body.alert_threshold_80 !== false ? 1 : 0,
+    body.alert_threshold_100 !== false ? 1 : 0,
+    enforcement,
+  ).run();
+
+  logAudit(c, {
+    event_type: 'admin_action', event_name: 'admin_action.budget_policy_created',
+    resource_type: 'budget_policy', resource_id: id,
+    metadata: { scope: body.scope, scope_target: body.scope_target, monthly_limit_usd: body.monthly_limit_usd },
+  });
+
+  return c.json({ ok: true, id }, 201);
+});
+
+// ── PUT /v1/admin/budget-policies/:id — update a budget policy ───────────────
+admin.put('/budget-policies/:id', async (c) => {
+  const orgId = c.get('orgId');
+  const policyId = c.req.param('id');
+
+  const existing = await c.env.DB.prepare(
+    'SELECT id FROM budget_policies WHERE id = ? AND org_id = ?'
+  ).bind(policyId, orgId).first();
+  if (!existing) return c.json({ error: 'Policy not found' }, 404);
+
+  let body: {
+    monthly_limit_usd?: number;
+    alert_threshold_50?: boolean;
+    alert_threshold_80?: boolean;
+    alert_threshold_100?: boolean;
+    enforcement?: string;
+  };
+  try { body = await c.req.json(); }
+  catch { return c.json({ error: 'Invalid JSON body' }, 400); }
+
+  const updates: string[] = ["updated_at = datetime('now')"];
+  const params: unknown[] = [];
+
+  if (body.monthly_limit_usd !== undefined) {
+    if (typeof body.monthly_limit_usd !== 'number' || body.monthly_limit_usd <= 0) {
+      return c.json({ error: 'monthly_limit_usd must be a positive number' }, 400);
+    }
+    updates.push('monthly_limit_usd = ?'); params.push(body.monthly_limit_usd);
+  }
+  if (typeof body.alert_threshold_50 === 'boolean') {
+    updates.push('alert_threshold_50 = ?'); params.push(body.alert_threshold_50 ? 1 : 0);
+  }
+  if (typeof body.alert_threshold_80 === 'boolean') {
+    updates.push('alert_threshold_80 = ?'); params.push(body.alert_threshold_80 ? 1 : 0);
+  }
+  if (typeof body.alert_threshold_100 === 'boolean') {
+    updates.push('alert_threshold_100 = ?'); params.push(body.alert_threshold_100 ? 1 : 0);
+  }
+  if (body.enforcement && VALID_ENFORCEMENT.has(body.enforcement)) {
+    updates.push('enforcement = ?'); params.push(body.enforcement);
+  }
+
+  params.push(policyId, orgId);
+  await c.env.DB.prepare(
+    `UPDATE budget_policies SET ${updates.join(', ')} WHERE id = ? AND org_id = ?`
+  ).bind(...params).run();
+
+  logAudit(c, {
+    event_type: 'admin_action', event_name: 'admin_action.budget_policy_updated',
+    resource_type: 'budget_policy', resource_id: policyId, metadata: body,
+  });
+
+  return c.json({ ok: true });
+});
+
+// ── DELETE /v1/admin/budget-policies/:id — remove a budget policy ─────────────
+admin.delete('/budget-policies/:id', async (c) => {
+  const orgId = c.get('orgId');
+  const policyId = c.req.param('id');
+
+  const result = await c.env.DB.prepare(
+    'DELETE FROM budget_policies WHERE id = ? AND org_id = ?'
+  ).bind(policyId, orgId).run();
+
+  if (result.meta.changes === 0) return c.json({ error: 'Policy not found' }, 404);
+
+  logAudit(c, {
+    event_type: 'admin_action', event_name: 'admin_action.budget_policy_deleted',
+    resource_type: 'budget_policy', resource_id: policyId, metadata: {},
+  });
+
+  return c.json({ ok: true });
+});
+
+// ── GET /v1/admin/developers/recommendations — ranked dev efficiency ──────────
+// Returns developers ranked by cost efficiency signals for superadmin review.
+admin.get('/developers/recommendations', async (c) => {
+  const orgId = c.get('orgId');
+  const days  = Math.min(parseInt(c.req.query('days') ?? '30', 10) || 30, 90);
+  const since = (() => {
+    const d = new Date(Date.now() - (days - 1) * 86400000);
+    return d.toISOString().slice(0, 10) + ' 00:00:00';
+  })();
+
+  const { results } = await c.env.DB.prepare(`
+    SELECT
+      developer_email,
+      team,
+      COALESCE(SUM(cost_usd), 0)       AS total_cost,
+      COALESCE(SUM(commits), 0)         AS commits,
+      COALESCE(SUM(pull_requests), 0)   AS pull_requests,
+      COALESCE(SUM(lines_added), 0)     AS lines_added,
+      COALESCE(SUM(lines_removed), 0)   AS lines_removed,
+      COALESCE(SUM(cached_tokens), 0)   AS cached_tokens,
+      COALESCE(SUM(input_tokens + output_tokens + cached_tokens), 0) AS total_tokens
+    FROM cross_platform_usage
+    WHERE org_id = ? AND created_at >= ? AND developer_email IS NOT NULL
+    GROUP BY developer_email, team
+    ORDER BY total_cost DESC
+    LIMIT 50
+  `).bind(orgId, since).all<{ developer_email: string; team: string; total_cost: number; commits: number; pull_requests: number; lines_added: number; lines_removed: number; cached_tokens: number; total_tokens: number }>();
+
+  const recs = (results ?? []).map((d) => {
+    const costPerPR     = d.pull_requests > 0 ? +(d.total_cost / d.pull_requests).toFixed(4) : null;
+    const costPerCommit = d.commits > 0       ? +(d.total_cost / d.commits).toFixed(4) : null;
+    const cacheRate     = d.total_tokens > 0  ? +(d.cached_tokens / d.total_tokens * 100).toFixed(1) : null;
+    const linesPerDollar = d.total_cost > 0   ? Math.round((d.lines_added + d.lines_removed) / d.total_cost) : null;
+
+    // Savings opportunity: if cache rate < 20%, rough estimate of potential savings at 40% cache rate
+    const savingsOpportunity = (cacheRate !== null && cacheRate < 20 && d.total_cost > 1)
+      ? +(d.total_cost * 0.15).toFixed(4)  // rough 15% savings with better caching
+      : 0;
+
+    return {
+      developer_email: d.developer_email,
+      team: d.team,
+      total_cost: d.total_cost,
+      cost_per_pr: costPerPR,
+      cost_per_commit: costPerCommit,
+      cache_hit_rate_pct: cacheRate,
+      lines_per_dollar: linesPerDollar,
+      savings_opportunity_usd: savingsOpportunity,
+    };
+  });
+
+  // Sort by savings_opportunity desc
+  recs.sort((a, b) => b.savings_opportunity_usd - a.savings_opportunity_usd);
+
+  return c.json({ period_days: days, recommendations: recs });
+});
+
+// ── GET /v1/admin/budget-alerts — individuals/teams that hit thresholds ────────
+admin.get('/budget-alerts', async (c) => {
+  const orgId    = c.get('orgId');
+  const threshold = Math.max(0, Math.min(100, parseFloat(c.req.query('threshold_pct') ?? '80')));
+
+  // Get all budget policies with their current MTD spend
+  const startOfMonth = new Date();
+  startOfMonth.setUTCDate(1); startOfMonth.setUTCHours(0, 0, 0, 0);
+  const monthStartIso  = startOfMonth.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+  const monthStartUnix = Math.floor(startOfMonth.getTime() / 1000);
+
+  const { results: policies } = await c.env.DB.prepare(`
+    SELECT id, scope, scope_target, monthly_limit_usd, enforcement
+    FROM budget_policies
+    WHERE org_id = ?
+  `).bind(orgId).all<{ id: string; scope: string; scope_target: string | null; monthly_limit_usd: number; enforcement: string }>();
+
+  const alerts: unknown[] = [];
+
+  for (const p of policies) {
+    let mtdCost = 0;
+
+    if (p.scope === 'org') {
+      const row = await c.env.DB.prepare(`
+        SELECT COALESCE(SUM(cost_usd),0) AS t FROM cross_platform_usage WHERE org_id = ? AND created_at >= ?
+      `).bind(orgId, monthStartIso).first<{ t: number }>();
+      const row2 = await c.env.DB.prepare(`
+        SELECT COALESCE(SUM(cost_usd),0) AS t FROM events WHERE org_id = ? AND created_at >= ?
+      `).bind(orgId, monthStartUnix).first<{ t: number }>();
+      mtdCost = (row?.t ?? 0) + (row2?.t ?? 0);
+    } else if (p.scope === 'team' && p.scope_target) {
+      const row = await c.env.DB.prepare(`
+        SELECT COALESCE(SUM(cost_usd),0) AS t FROM cross_platform_usage WHERE org_id = ? AND team = ? AND created_at >= ?
+      `).bind(orgId, p.scope_target, monthStartIso).first<{ t: number }>();
+      mtdCost = row?.t ?? 0;
+    } else if (p.scope === 'developer' && p.scope_target) {
+      const row = await c.env.DB.prepare(`
+        SELECT COALESCE(SUM(cost_usd),0) AS t FROM cross_platform_usage WHERE org_id = ? AND developer_email = ? AND created_at >= ?
+      `).bind(orgId, p.scope_target, monthStartIso).first<{ t: number }>();
+      const row2 = await c.env.DB.prepare(`
+        SELECT COALESCE(SUM(cost_usd),0) AS t FROM events WHERE org_id = ? AND developer_email = ? AND created_at >= ?
+      `).bind(orgId, p.scope_target, monthStartUnix).first<{ t: number }>();
+      mtdCost = (row?.t ?? 0) + (row2?.t ?? 0);
+    } else if (p.scope === 'provider' && p.scope_target) {
+      const row = await c.env.DB.prepare(`
+        SELECT COALESCE(SUM(cost_usd),0) AS t FROM cross_platform_usage WHERE org_id = ? AND provider = ? AND created_at >= ?
+      `).bind(orgId, p.scope_target, monthStartIso).first<{ t: number }>();
+      mtdCost = row?.t ?? 0;
+    }
+
+    const pct = p.monthly_limit_usd > 0 ? Math.round((mtdCost / p.monthly_limit_usd) * 100) : 0;
+    if (pct >= threshold) {
+      alerts.push({
+        policy_id:          p.id,
+        scope:              p.scope,
+        scope_target:       p.scope_target,
+        monthly_limit_usd:  p.monthly_limit_usd,
+        mtd_cost_usd:       Math.round(mtdCost * 10000) / 10000,
+        budget_pct:         pct,
+        enforcement:        p.enforcement,
+        status:             pct >= 100 ? 'exceeded' : 'warning',
+      });
+    }
+  }
+
+  alerts.sort((a, b) => (b as { budget_pct: number }).budget_pct - (a as { budget_pct: number }).budget_pct);
+
+  return c.json({ alerts, threshold_pct: threshold, generated_at: new Date().toISOString() });
 });
 
 export { admin };

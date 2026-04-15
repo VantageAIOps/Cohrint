@@ -1,6 +1,22 @@
 import { Context, Next } from 'hono';
-import { Bindings, Variables } from '../types';
+import { Bindings, Variables, OrgRole } from '../types';
 import { logAudit, logAuditRaw } from '../lib/audit';
+
+// ── Role hierarchy ────────────────────────────────────────────────────────────
+// Higher index = higher privilege
+const ROLE_RANK: Record<OrgRole, number> = {
+  viewer:     0,
+  member:     1,
+  admin:      2,
+  ceo:        3,
+  superadmin: 4,
+  owner:      5,
+};
+
+/** Returns true if `role` meets or exceeds the required minimum role. */
+export function hasRole(role: string, minimum: OrgRole): boolean {
+  return (ROLE_RANK[role as OrgRole] ?? -1) >= ROLE_RANK[minimum];
+}
 
 // ── SHA-256 helper ────────────────────────────────────────────────────────────
 export async function sha256hex(text: string): Promise<string> {
@@ -59,7 +75,7 @@ export async function authMiddleware(
         memberEmail = m?.email ?? null;
       }
       c.set('orgId',       session.org_id);
-      c.set('role',        session.role);
+      c.set('role',        (session.role as OrgRole) || 'member');
       c.set('scopeTeam',   scopeTeam);
       c.set('memberId',    session.member_id);
       c.set('memberEmail', memberEmail);
@@ -108,7 +124,7 @@ export async function authMiddleware(
 
   if (org) {
     c.set('orgId',       org.id);
-    c.set('role',        'owner');
+    c.set('role',        'owner' as OrgRole);
     c.set('scopeTeam',   null);
     c.set('memberId',    null);
     c.set('memberEmail', null);
@@ -129,7 +145,7 @@ export async function authMiddleware(
       return c.json({ error: 'API key not found. Sign up at vantageaiops.com' }, 401);
     } else {
       c.set('orgId',       member.org_id);
-      c.set('role',        member.role);
+      c.set('role',        (member.role as OrgRole) || 'member');
       c.set('scopeTeam',   member.scope_team ?? null);
       c.set('memberId',    member.id);
       c.set('memberEmail', member.email ?? null);
@@ -155,14 +171,37 @@ export async function authMiddleware(
   return await next();
 }
 
-// ── Admin-only guard — call after authMiddleware ──────────────────────────────
+// ── Role guards — call after authMiddleware ───────────────────────────────────
+
+/** Allows: owner, superadmin, ceo, admin */
 export async function adminOnly(
   c: Context<{ Bindings: Bindings; Variables: Variables }>,
   next: Next,
 ) {
-  const role = c.get('role');
-  if (role !== 'owner' && role !== 'admin') {
+  if (!hasRole(c.get('role'), 'admin')) {
     return c.json({ error: 'Admin access required' }, 403);
+  }
+  return await next();
+}
+
+/** Allows: owner, superadmin, ceo only */
+export async function executiveOnly(
+  c: Context<{ Bindings: Bindings; Variables: Variables }>,
+  next: Next,
+) {
+  if (!hasRole(c.get('role'), 'ceo')) {
+    return c.json({ error: 'Executive access required (ceo or above)' }, 403);
+  }
+  return await next();
+}
+
+/** Allows: owner, superadmin only */
+export async function superadminOnly(
+  c: Context<{ Bindings: Bindings; Variables: Variables }>,
+  next: Next,
+) {
+  if (!hasRole(c.get('role'), 'superadmin')) {
+    return c.json({ error: 'Superadmin access required' }, 403);
   }
   return await next();
 }

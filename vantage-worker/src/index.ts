@@ -79,6 +79,7 @@ import { sessions }    from './routes/sessions';
 import { copilot, syncCopilotMetrics } from './routes/copilot';
 import { datadog, syncDatadogMetrics } from './routes/datadog';
 import { benchmark, syncBenchmarkContributions } from './routes/benchmark';
+import { executive } from './routes/executive';
 import { runAnomalyDetection } from './lib/anomaly';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -114,6 +115,7 @@ app.route('/v1/sessions',       sessions);  // OTel session rollup
 app.route('/v1/copilot',        copilot);   // GitHub Copilot Metrics API adapter
 app.route('/v1/datadog',        datadog);   // Datadog metrics exporter
 app.route('/v1/benchmark',      benchmark); // Anonymized cross-company benchmarks
+app.route('/v1/analytics/executive', executive); // CEO/superadmin unified dashboard
 
 // ── 404 fallback ──────────────────────────────────────────────────────────────
 app.notFound((c) => c.json({

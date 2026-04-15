@@ -169,7 +169,7 @@ All items below are shipped and live at `vantageaiops.com` as of 2026-04-14.
 |-------|---------|
 | `events` | Core LLM call events — provider, model, tokens, cost_usd, team, trace_id, quality scores |
 | `orgs` | Org accounts — plan, budget_usd, benchmark opt-in flag |
-| `org_members` | RBAC — role (owner/admin/member/viewer), scope_team, api_key_hash |
+| `org_members` | RBAC — 6-level role hierarchy (owner/superadmin/ceo/admin/member/viewer), scope_team, api_key_hash |
 | `sessions` | Auth session tokens — org_id, role, expires_at |
 | `team_budgets` | Per-team budget limits |
 | `alert_configs` | Slack webhook URLs, threshold triggers |
@@ -206,7 +206,7 @@ All items below are shipped and live at `vantageaiops.com` as of 2026-04-14.
 - [x] Slack webhook delivery — budget alerts pushed on threshold breach + anomaly detection
 - [x] CI/CD cost gate — `GET /v1/analytics/cost` designed for GitHub Actions
 - [x] Real-time SSE stream — live cost events, SSE teardown on tab exit
-- [x] RBAC — owner / admin / member / viewer + team-scoped data isolation
+- [x] RBAC — 6-level hierarchy (owner / superadmin / ceo / admin / member / viewer) + team-scoped data isolation + escalation guard
 - [x] Audit log — full event stream of every admin API action, indexed by org_id + created_at DESC
 - [x] Brute-force protection — 10 failed attempts per 5-minute window per IP
 - [x] Rate limiting — 1,000 RPM per org via KV, returns 429 with Retry-After header
@@ -281,7 +281,7 @@ All items below are shipped and live at `vantageaiops.com` as of 2026-04-14.
 **Auth System**
 - [x] API keys (Bearer token)
 - [x] Session cookies with recovery flow
-- [x] RBAC — owner/admin/member/viewer
+- [x] RBAC — owner/superadmin/ceo/admin/member/viewer (6-level hierarchy)
 - [x] Rate limiting on all auth endpoints
 
 **MCP Server (12 tools in Claude Code, Cursor, Windsurf)**

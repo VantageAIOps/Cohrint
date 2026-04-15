@@ -21,9 +21,11 @@ export type Bindings = {
   TOKEN_ENCRYPTION_SECRET?: string;
 };
 
+export type OrgRole = 'owner' | 'superadmin' | 'ceo' | 'admin' | 'member' | 'viewer';
+
 export type Variables = {
   orgId:       string;
-  role:        string;        // 'owner' | 'admin' | 'member' | 'viewer'
+  role:        OrgRole;       // role hierarchy: owner > superadmin > ceo > admin > member > viewer
   scopeTeam:   string | null; // null = see all; 'backend' = scoped to that team
   memberId:    string | null; // null when using the org owner key
   memberEmail: string | null; // actual member email; null for owner key

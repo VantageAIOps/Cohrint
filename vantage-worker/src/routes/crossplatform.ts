@@ -219,10 +219,20 @@ crossplatform.get('/developers', async (c) => {
   }
   const since = sqliteDateSince(days);
 
+  // Optional team and business_unit filters
+  const teamFilter   = c.req.query('team') ?? null;
+  const businessUnit = c.req.query('business_unit') ?? null;
+  let filterClause = '';
+  const baseArgs: unknown[] = [orgId, since];
+  if (teamFilter)   { filterClause += ' AND team = ?';          baseArgs.push(teamFilter); }
+  if (businessUnit) { filterClause += ' AND business_unit = ?'; baseArgs.push(businessUnit); }
+
   const developers = await c.env.DB.prepare(`
     SELECT
       developer_id,
       developer_email,
+      team,
+      business_unit,
       COALESCE(SUM(cost_usd), 0)       AS total_cost,
       COALESCE(SUM(input_tokens), 0)    AS input_tokens,
       COALESCE(SUM(output_tokens), 0)   AS output_tokens,
@@ -235,11 +245,11 @@ crossplatform.get('/developers', async (c) => {
       GROUP_CONCAT(DISTINCT provider)   AS providers,
       COUNT(*)                          AS records
     FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ?
+    WHERE org_id = ? AND created_at >= ?${filterClause}
       AND developer_email IS NOT NULL
-    GROUP BY developer_id, developer_email
+    GROUP BY developer_id, developer_email, team, business_unit
     ORDER BY total_cost DESC
-  `).bind(orgId, since).all();
+  `).bind(...baseArgs).all();
 
   // Per-developer per-provider cost breakdown (for bar chart segmentation)
   const byProviderRows = await c.env.DB.prepare(`
@@ -248,10 +258,10 @@ crossplatform.get('/developers', async (c) => {
            COALESCE(SUM(cost_usd), 0) as cost,
            COUNT(*) as records
     FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ? AND developer_email IS NOT NULL
+    WHERE org_id = ? AND created_at >= ?${filterClause} AND developer_email IS NOT NULL
     GROUP BY developer_id, developer_email, provider
     ORDER BY developer_email, cost DESC
-  `).bind(orgId, since).all();
+  `).bind(...baseArgs).all();
 
   const byProviderMap: Record<string, { provider: string; cost: number; records: number }[]> = {};
   for (const row of (byProviderRows.results ?? []) as any[]) {
@@ -260,14 +270,28 @@ crossplatform.get('/developers', async (c) => {
   }
 
   // Calculate ROI metrics per developer
-  const isAdmin = role === 'owner' || role === 'admin';
+  // Superadmin/CEO/owner/admin see full emails; member/viewer get redacted
+  const { hasRole } = await import('../middleware/auth');
+  const isPrivileged = hasRole(role, 'admin');
   const devList = (developers.results ?? []).map((d: any) => {
     const costPerPR = d.pull_requests > 0 ? (d.total_cost / d.pull_requests) : null;
     const costPerCommit = d.commits > 0 ? (d.total_cost / d.commits) : null;
     const linesPerDollar = d.total_cost > 0 ? Math.round((d.lines_added + d.lines_removed) / d.total_cost) : null;
     return {
-      ...d,
-      developer_email: isAdmin ? d.developer_email : redactEmail(d.developer_email),
+      developer_id:    d.developer_id,
+      developer_email: isPrivileged ? d.developer_email : redactEmail(d.developer_email),
+      team:            d.team ?? null,
+      business_unit:   d.business_unit ?? null,
+      total_cost:      d.total_cost,
+      input_tokens:    d.input_tokens,
+      output_tokens:   d.output_tokens,
+      commits:         d.commits,
+      pull_requests:   d.pull_requests,
+      lines_added:     d.lines_added,
+      lines_removed:   d.lines_removed,
+      active_time_s:   d.active_time_s,
+      providers_used:  d.providers_used,
+      records:         d.records,
       providers: d.providers ? d.providers.split(',') : [],
       by_provider: byProviderMap[d.developer_id] ?? [],
       cost_per_pr: costPerPR ? Math.round(costPerPR * 100) / 100 : null,
@@ -276,7 +300,7 @@ crossplatform.get('/developers', async (c) => {
     };
   });
 
-  return c.json({ period_days: days, developers: devList });
+  return c.json({ period_days: days, developers: devList, team_filter: teamFilter, business_unit_filter: businessUnit });
 });
 
 // ── GET /developer/:id — single developer drill-down (admin/owner only) ──────
@@ -291,8 +315,9 @@ crossplatform.get('/developer/:id', async (c) => {
     return c.json({ error: 'Invalid id' }, 400);
   }
 
-  // Access control: owner/admin see all; member/viewer may only view their own data
-  if (role !== 'owner' && role !== 'admin') {
+  // Access control: admin+ see all; member/viewer may only view their own data
+  const { hasRole: hr } = await import('../middleware/auth');
+  if (!hr(role, 'admin')) {
     const memberEmail = c.get('memberEmail');
     const owns = await c.env.DB.prepare(`
       SELECT 1 FROM cross_platform_usage
@@ -354,9 +379,16 @@ crossplatform.get('/developer/:id', async (c) => {
     WHERE org_id = ? AND developer_id = ? LIMIT 1
   `).bind(orgId, id).first<{ developer_email: string }>();
 
+  // Fetch team for this developer
+  const teamRow = await c.env.DB.prepare(`
+    SELECT team FROM cross_platform_usage
+    WHERE org_id = ? AND developer_id = ? AND team IS NOT NULL LIMIT 1
+  `).bind(orgId, id).first<{ team: string }>();
+
   return c.json({
     developer_id:    id,
     developer_email: meta?.developer_email ?? null,
+    team:            teamRow?.team ?? null,
     period_days:     days,
     by_provider:     byProvider.results,
     by_model:        byModel.results,
@@ -373,19 +405,92 @@ function redactEmail(email: string | null): string | null {
   return email[0] + '***' + email.slice(at);
 }
 
+// ── GET /active-developers — who is using AI right now (last 60 seconds) ──────
+crossplatform.get('/active-developers', async (c) => {
+  const orgId = c.get('orgId');
+  const role  = c.get('role');
+  const { hasRole } = await import('../middleware/auth');
+  const isPrivileged = hasRole(role, 'admin');
+
+  const windowSec = Math.max(30, Math.min(300, parseInt(c.req.query('window_sec') ?? '60', 10)));
+  const since = new Date(Date.now() - windowSec * 1000).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+
+  const { results } = await c.env.DB.prepare(`
+    SELECT
+      developer_email,
+      team,
+      agent_name,
+      provider,
+      model,
+      MAX(timestamp)                              AS last_seen_at,
+      SUM(tokens_in + tokens_out)                 AS total_tokens,
+      SUM(cost_usd)                               AS session_cost,
+      COUNT(*)                                    AS event_count,
+      ROUND(SUM(tokens_in + tokens_out) * 1.0 /
+        MAX(1, (strftime('%s','now') - strftime('%s', MIN(timestamp)))), 1) AS token_rate_per_sec
+    FROM otel_events
+    WHERE org_id = ? AND timestamp >= ?
+    GROUP BY developer_email, team, agent_name, provider
+    ORDER BY last_seen_at DESC
+    LIMIT 50
+  `).bind(orgId, since).all();
+
+  const developers = (results as any[]).map(r => ({
+    developer_email: isPrivileged ? r.developer_email : redactEmail(r.developer_email),
+    team:            r.team ?? null,
+    agent_name:      r.agent_name ?? null,
+    provider:        r.provider,
+    model:           r.model ?? null,
+    last_seen_at:    r.last_seen_at,
+    total_tokens:    r.total_tokens,
+    session_cost:    r.session_cost,
+    event_count:     r.event_count,
+    token_rate_per_sec: r.token_rate_per_sec ?? null,
+    is_active:       true,
+  }));
+
+  return c.json({
+    active_count: developers.length,
+    window_sec:   windowSec,
+    developers,
+    generated_at: new Date().toISOString(),
+  });
+});
+
 // ── GET /live — latest OTel events for real-time feed ───────────────────────
 
 crossplatform.get('/live', async (c) => {
   const orgId  = c.get('orgId');
   const role   = c.get('role');
-  const isAdmin = role === 'owner' || role === 'admin';
+  const { hasRole } = await import('../middleware/auth');
+  const isPrivileged = hasRole(role, 'admin'); // superadmin/ceo/admin/owner see full emails
   const rawLimit = parseInt(c.req.query('limit') ?? '50', 10);
   const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 200) : 50;
+
+  function enrichEvent(e: any) {
+    const tokenRate = e.duration_ms > 0
+      ? +((e.tokens_in + e.tokens_out) / (e.duration_ms / 1000)).toFixed(1)
+      : null;
+    return {
+      provider:        e.provider,
+      developer_email: isPrivileged ? e.developer_email : redactEmail(e.developer_email),
+      team:            e.team ?? null,
+      model:           e.model,
+      agent_name:      e.agent_name ?? null,
+      event_name:      e.event_name,
+      cost_usd:        e.cost_usd,
+      tokens_in:       e.tokens_in,
+      tokens_out:      e.tokens_out,
+      token_rate_per_sec: tokenRate,
+      duration_ms:     e.duration_ms,
+      timestamp:       e.timestamp,
+    };
+  }
 
   // Primary: last 5 minutes only (truly live)
   const recent = await c.env.DB.prepare(`
     SELECT
-      provider, developer_email, model, event_name,
+      provider, developer_email, team, model, agent_name, event_name,
       cost_usd, tokens_in, tokens_out, duration_ms, timestamp
     FROM otel_events
     WHERE org_id = ? AND timestamp > datetime('now', '-5 minutes')
@@ -394,17 +499,13 @@ crossplatform.get('/live', async (c) => {
   `).bind(orgId, limit).all();
 
   if (recent.results && recent.results.length > 0) {
-    const events = (recent.results as any[]).map(e => ({
-      ...e,
-      developer_email: isAdmin ? e.developer_email : redactEmail(e.developer_email),
-    }));
-    return c.json({ events, is_stale: false });
+    return c.json({ events: (recent.results as any[]).map(enrichEvent), is_stale: false });
   }
 
   // Fallback: no recent activity — return last known events with staleness flag
   const fallback = await c.env.DB.prepare(`
     SELECT
-      provider, developer_email, model, event_name,
+      provider, developer_email, team, model, agent_name, event_name,
       cost_usd, tokens_in, tokens_out, duration_ms, timestamp
     FROM otel_events
     WHERE org_id = ?
@@ -412,12 +513,8 @@ crossplatform.get('/live', async (c) => {
     LIMIT ?
   `).bind(orgId, Math.min(limit, 20)).all();
 
-  const events = (fallback.results ?? [] as any[]).map((e: any) => ({
-    ...e,
-    developer_email: isAdmin ? e.developer_email : redactEmail(e.developer_email),
-  }));
   return c.json({
-    events,
+    events: (fallback.results ?? []).map(enrichEvent),
     is_stale: true,
     message: 'No activity in the last 5 minutes — showing most recent events',
   });

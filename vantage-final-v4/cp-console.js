@@ -277,7 +277,7 @@
 
     var thead = table.createTHead();
     var hrow  = thead.insertRow();
-    ['Developer', 'Tools', 'Spend', 'Commits', '$/commit'].forEach(function (h) {
+    ['Developer', 'Team', 'Tools', 'Spend', 'Commits', '$/commit'].forEach(function (h) {
       var th = document.createElement('th');
       th.textContent = h;
       th.style.cssText = 'padding:4px 6px;text-align:left;font-size:10px;opacity:.5;font-weight:500;border-bottom:1px solid rgba(255,255,255,.08)';
@@ -291,6 +291,7 @@
       if (hasId) {
         row.dataset.devId    = d.developer_id;
         row.dataset.devEmail = d.developer_email || '';
+        row.dataset.devTeam  = d.team || '';
         row.className = 'cp-dev-row';
         row.style.cursor = 'pointer';
       } else {
@@ -301,6 +302,10 @@
       var emailTd = row.insertCell();
       emailTd.textContent = d.developer_email || d.developer_id || '—';
       emailTd.style.cssText = 'padding:7px 6px;font-size:12px';
+
+      var teamTd = row.insertCell();
+      teamTd.textContent = d.team || '—';
+      teamTd.style.cssText = 'padding:7px 6px;font-size:11px;opacity:.5';
 
       var toolsTd = row.insertCell();
       toolsTd.style.cssText = 'padding:7px 6px';
@@ -329,30 +334,31 @@
 
     el.querySelectorAll('.cp-dev-row').forEach(function (row) {
       row.addEventListener('click', function () {
-        openDevModal(row.dataset.devId, row.dataset.devEmail);
+        openDevModal(row.dataset.devId, row.dataset.devEmail, row.dataset.devTeam);
       });
     });
   }
 
   // ── Developer detail modal ────────────────────────────────────────────────
-  function openDevModal(devId, devEmail) {
+  function openDevModal(devId, devEmail, devTeam) {
     var modal = document.getElementById('devDetailModal');
     var title = document.getElementById('devDetailTitle');
     var body  = document.getElementById('devDetailBody');
     if (!modal || !title || !body) return;
 
-    title.textContent = devEmail || devId;
+    title.textContent = (devEmail || devId) + (devTeam ? ' (' + devTeam + ')' : '');
     body.textContent  = 'Loading\u2026';
     modal.classList.add('active');
 
-    apiFetch('/v1/cross-platform/developer/' + encodeURIComponent(devId))
-      .then(function (data) { renderDevModalBody(body, data); })
+    var days = (typeof period !== 'undefined' ? period : 30);
+    apiFetch('/v1/cross-platform/developer/' + encodeURIComponent(devId) + '?days=' + days)
+      .then(function (data) { renderDevModalBody(body, data, devEmail); })
       .catch(function (e) {
         body.textContent = '\u26A0 ' + (e.message || 'Failed to load');
       });
   }
 
-  function renderDevModalBody(body, data) {
+  function renderDevModalBody(body, data, devEmail) {
     body.textContent = '';
 
     // 1. By-tool cost table
@@ -442,6 +448,60 @@
       prodGrid.appendChild(box);
     });
     body.appendChild(prodGrid);
+
+    // 4. Recommendations section
+    var recsSection = document.createElement('div');
+    recsSection.style.cssText = 'margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08)';
+    var recsTitle = document.createElement('div');
+    recsTitle.style.cssText = 'font-size:12px;font-weight:600;margin-bottom:8px;opacity:.7';
+    recsTitle.textContent = 'COST RECOMMENDATIONS';
+    recsSection.appendChild(recsTitle);
+    body.appendChild(recsSection);
+
+    apiFetch('/v1/admin/developers/recommendations').then(function(recData) {
+      var recs   = (recData && recData.recommendations) || [];
+      var devRec = recs.find(function(r) { return r.developer_email === devEmail; });
+
+      function appendNote(text) {
+        var p = document.createElement('p');
+        p.style.cssText = 'font-size:11px;opacity:.4;margin:0';
+        p.textContent = text;
+        recsSection.appendChild(p);
+      }
+
+      if (!devRec) { appendNote('No optimization opportunities found.'); return; }
+
+      var itemDefs = [];
+      if (devRec.savings_opportunity_usd > 0) {
+        itemDefs.push({ prefix: '\u2022 Est. monthly savings: ', highlight: '$' + fmt2(devRec.savings_opportunity_usd) });
+      }
+      if (devRec.cache_hit_rate_pct < 20) {
+        itemDefs.push({ prefix: '\u2022 Low cache hit rate (' + Number(devRec.cache_hit_rate_pct).toFixed(1) + '%) \u2014 consider prompt caching' });
+      }
+      if (devRec.cost_per_pr > 5) {
+        itemDefs.push({ prefix: '\u2022 High cost per PR ($' + fmt2(devRec.cost_per_pr) + ') \u2014 review prompt length' });
+      }
+
+      if (!itemDefs.length) { appendNote('No optimization opportunities found.'); return; }
+
+      itemDefs.forEach(function(item) {
+        var p = document.createElement('p');
+        p.style.cssText = 'font-size:11px;margin:4px 0;opacity:.8';
+        p.appendChild(document.createTextNode(item.prefix));
+        if (item.highlight) {
+          var span = document.createElement('span');
+          span.style.color = '#4ade80';
+          span.textContent = item.highlight;
+          p.appendChild(span);
+        }
+        recsSection.appendChild(p);
+      });
+    }).catch(function() {
+      var err = document.createElement('p');
+      err.style.cssText = 'font-size:11px;opacity:.4;margin:0';
+      err.textContent = 'Recommendations unavailable.';
+      recsSection.appendChild(err);
+    });
   }
 
   // ── Live feed ─────────────────────────────────────────────────────────────
@@ -465,11 +525,18 @@
 
     events.slice(0, 15).forEach(function (e) {
       var row = document.createElement('div');
-      row.style.cssText = 'display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:11px';
+      row.style.cssText = 'display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:11px';
 
       var left = document.createElement('span');
-      left.textContent = (e.provider || '') + ' \u00b7 ' + (e.model || '');
+      var providerLabel = (e.provider || '').replace(/_/g, ' ');
+      var agentLabel    = e.agent_name && e.agent_name !== e.provider ? ' [' + e.agent_name + ']' : '';
+      var teamLabel     = e.team ? ' \u00b7 ' + e.team : '';
+      left.textContent = providerLabel + agentLabel + teamLabel + ' \u00b7 ' + (e.model || '');
       left.style.opacity = '0.8';
+
+      var rate = document.createElement('span');
+      rate.textContent = e.token_rate_per_sec ? (e.token_rate_per_sec.toFixed(0) + ' tok/s') : '';
+      rate.style.cssText = 'opacity:0.5;font-size:10px';
 
       var cost = document.createElement('span');
       cost.textContent = '$' + fmt2(e.cost_usd);
@@ -480,6 +547,7 @@
       ts.style.opacity = '0.4';
 
       row.appendChild(left);
+      row.appendChild(rate);
       row.appendChild(cost);
       row.appendChild(ts);
       el.appendChild(row);
@@ -487,7 +555,7 @@
 
     if (data.is_stale) {
       var staleNote = document.createElement('p');
-      staleNote.textContent = '\u26A0 stale — no activity in last 5 min';
+      staleNote.textContent = '\u26A0 stale \u2014 no activity in last 5 min';
       staleNote.style.cssText = 'font-size:10px;color:#fb923c;margin-top:4px';
       el.appendChild(staleNote);
     }
@@ -512,6 +580,10 @@
             cpLiveRestart = setTimeout(startCpLivePoll, 120000);
           }
         });
+      // Also refresh Active Now panel on each live poll tick
+      if (typeof window.loadActiveDevelopers === 'function') {
+        window.loadActiveDevelopers();
+      }
     }
 
     tick(); // fire immediately; don't wait 15s for first update

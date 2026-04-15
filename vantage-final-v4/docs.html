@@ -1009,11 +1009,13 @@ members: `
 <p>Each team member gets their own <code>vnt_…</code> API key. Member keys can be scoped to a specific team — they will only see and ingest events for that team.</p>
 
 <h2>Roles</h2>
-<table class="api-table"><thead><tr><th>Role</th><th>Ingest events</th><th>Read analytics</th><th>Manage members</th></tr></thead><tbody>
-<tr><td><code>owner</code></td><td>✅ All teams</td><td>✅ All teams</td><td>✅</td></tr>
-<tr><td><code>admin</code></td><td>✅ All teams</td><td>✅ All teams</td><td>✅</td></tr>
-<tr><td><code>member</code></td><td>✅ Scoped team</td><td>✅ Scoped team</td><td>❌</td></tr>
-<tr><td><code>viewer</code></td><td>❌ Read-only</td><td>✅ Scoped team</td><td>❌</td></tr>
+<table class="api-table"><thead><tr><th>Role</th><th>Ingest events</th><th>Read analytics</th><th>Executive dashboard</th><th>Manage members</th></tr></thead><tbody>
+<tr><td><code>owner</code></td><td>✅ All teams</td><td>✅ All teams</td><td>✅</td><td>✅</td></tr>
+<tr><td><code>superadmin</code></td><td>✅ All teams</td><td>✅ All teams</td><td>✅</td><td>✅</td></tr>
+<tr><td><code>ceo</code></td><td>✅ All teams</td><td>✅ All teams</td><td>✅</td><td>❌</td></tr>
+<tr><td><code>admin</code></td><td>✅ All teams</td><td>✅ All teams</td><td>❌</td><td>✅</td></tr>
+<tr><td><code>member</code></td><td>✅ Scoped team</td><td>✅ Scoped team</td><td>❌</td><td>❌</td></tr>
+<tr><td><code>viewer</code></td><td>❌ Read-only</td><td>✅ Scoped team</td><td>❌</td><td>❌</td></tr>
 </tbody></table>
 
 <h2>Invite a member (API)</h2>
@@ -1055,7 +1057,31 @@ curl -X PUT https://api.vantageaiops.com/v1/admin/team-budgets/backend \\
 GET /v1/admin/team-budgets
 
 <span class="c-comment"># Full org overview — all teams + budgets + members</span>
-GET /v1/admin/overview</pre>`,
+GET /v1/admin/overview</pre>
+
+<h2>Budget policies (CRUD)</h2>
+<p>Fine-grained budget rules scoped to org, team, or individual developer. Requires <code>admin</code> or <code>owner</code> key.</p>
+<pre><span class="c-comment"># Create a policy — block ingest when backend team exceeds $500/month</span>
+curl -X POST https://api.vantageaiops.com/v1/admin/budget-policies \\
+  -H "Authorization: Bearer vnt_your_owner_key" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "scope": "team",
+    "scope_value": "backend",
+    "budget_usd": 500,
+    "period": "month",
+    "enforcement": "block"
+  }'
+
+GET    /v1/admin/budget-policies          <span class="c-comment"># list all</span>
+PUT    /v1/admin/budget-policies/:id      <span class="c-comment"># update budget_usd / period / enforcement</span>
+DELETE /v1/admin/budget-policies/:id      <span class="c-comment"># remove</span></pre>
+<p><code>enforcement: "alert"</code> sends a notification when the threshold is exceeded. <code>enforcement: "block"</code> returns <code>429</code> on event ingest.</p>
+
+<h2>Executive dashboard</h2>
+<p>Requires <code>ceo</code>, <code>superadmin</code>, or <code>owner</code> role. Returns a cross-source spend roll-up.</p>
+<pre>GET /v1/analytics/executive
+Authorization: Bearer vnt_your_ceo_key</pre>`,
 
 "local-proxy": `
 <h1>Local Proxy — Privacy-First LLM Tracking</h1>

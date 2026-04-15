@@ -116,6 +116,8 @@ interface ParsedOTelRecord {
   developer_id: string | null;
   team: string | null;
   cost_center: string | null;
+  agent_name: string | null;
+  business_unit: string | null;
   model: string | null;
   input_tokens: number;
   output_tokens: number;
@@ -256,8 +258,10 @@ otel.post('/v1/metrics', async (c) => {
     const developerId = getAttr(resAttrs, 'developer.id') ?? getAttr(resAttrs, 'user.account_uuid') ?? getAttr(resAttrs, 'user.account_id') ?? getAttr(resAttrs, 'user.id');
     const sessionId = getAttr(resAttrs, 'session.id');
     const terminalType = getAttr(resAttrs, 'terminal.type');
-    const team = getAttr(resAttrs, 'team.id') ?? getAttr(resAttrs, 'department');
-    const costCenter = getAttr(resAttrs, 'cost_center');
+    const team         = getAttr(resAttrs, 'team.id') ?? getAttr(resAttrs, 'department');
+    const costCenter   = getAttr(resAttrs, 'cost_center');
+    const agentName    = getAttr(resAttrs, 'agent_name') ?? getAttr(resAttrs, 'gen_ai.agent.name') ?? serviceName;
+    const businessUnit = getAttr(resAttrs, 'business_unit') ?? getAttr(resAttrs, 'cost_center');
 
     for (const sm of rm.scopeMetrics ?? []) {
       for (const metric of sm.metrics ?? []) {
@@ -285,6 +289,8 @@ otel.post('/v1/metrics', async (c) => {
             developer_id: developerId,
             team,
             cost_center: costCenter,
+            agent_name: agentName,
+            business_unit: businessUnit,
             model,
             input_tokens: 0,
             output_tokens: 0,
@@ -416,7 +422,7 @@ otel.post('/v1/metrics', async (c) => {
             const record: ParsedOTelRecord = {
               org_id: orgId, provider, tool_type, source: 'otel',
               developer_email: developerEmail, developer_id: developerId,
-              team, cost_center: costCenter, model,
+              team, cost_center: costCenter, agent_name: agentName, business_unit: businessUnit, model,
               input_tokens: tokenType === 'input' ? hp.sum : 0,
               output_tokens: tokenType === 'output' ? hp.sum : 0,
               cached_tokens: 0, cache_creation_tokens: 0, total_requests: 0, cost_usd: 0,
@@ -432,7 +438,7 @@ otel.post('/v1/metrics', async (c) => {
             const record: ParsedOTelRecord = {
               org_id: orgId, provider, tool_type, source: 'otel',
               developer_email: developerEmail, developer_id: developerId,
-              team, cost_center: costCenter, model,
+              team, cost_center: costCenter, agent_name: agentName, business_unit: businessUnit, model,
               input_tokens: 0, output_tokens: 0, cached_tokens: 0,
               cache_creation_tokens: 0, total_requests: 0, cost_usd: 0,
               session_id: sessionId, terminal_type: terminalType,
@@ -448,7 +454,7 @@ otel.post('/v1/metrics', async (c) => {
             const record: ParsedOTelRecord = {
               org_id: orgId, provider, tool_type, source: 'otel',
               developer_email: developerEmail, developer_id: developerId,
-              team, cost_center: costCenter, model,
+              team, cost_center: costCenter, agent_name: agentName, business_unit: businessUnit, model,
               input_tokens: 0, output_tokens: 0, cached_tokens: 0,
               cache_creation_tokens: 0, total_requests: 0, cost_usd: 0,
               session_id: sessionId, terminal_type: terminalType,
@@ -526,8 +532,9 @@ otel.post('/v1/metrics', async (c) => {
     const eventStmt = c.env.DB.prepare(`
       INSERT INTO otel_events (
         org_id, provider, session_id, developer_email, event_name,
-        model, cost_usd, tokens_in, tokens_out, duration_ms, timestamp, raw_attrs
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        model, cost_usd, tokens_in, tokens_out, duration_ms, timestamp, raw_attrs,
+        agent_name, team, business_unit
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     for (const r of tokenRecords) {
       batch.push(eventStmt.bind(
@@ -535,6 +542,7 @@ otel.post('/v1/metrics', async (c) => {
         r.raw_metric_name, r.model, r.cost_usd,
         r.input_tokens, r.output_tokens, r.latency_ms ?? 0,
         r.timestamp, JSON.stringify({ metric: r.raw_metric_name, source: 'otel_metrics' }),
+        r.agent_name, r.team, r.business_unit,
       ));
     }
 
@@ -668,9 +676,12 @@ otel.post('/v1/logs', async (c) => {
     const resAttrs = rl.resource?.attributes ?? [];
     const serviceName = getAttr(resAttrs, 'service.name') ?? 'unknown';
     const { provider } = detectProvider(serviceName);
-    const developerEmail = getAttr(resAttrs, 'user.email');
-    const developerId = getAttr(resAttrs, 'developer.id') ?? getAttr(resAttrs, 'user.account_uuid') ?? getAttr(resAttrs, 'user.id');
-    const sessionId = getAttr(resAttrs, 'session.id');
+    const developerEmail  = getAttr(resAttrs, 'user.email');
+    const developerId     = getAttr(resAttrs, 'developer.id') ?? getAttr(resAttrs, 'user.account_uuid') ?? getAttr(resAttrs, 'user.id');
+    const sessionId       = getAttr(resAttrs, 'session.id');
+    const logTeam         = getAttr(resAttrs, 'team.id') ?? getAttr(resAttrs, 'department');
+    const logAgentName    = getAttr(resAttrs, 'agent_name') ?? getAttr(resAttrs, 'gen_ai.agent.name') ?? serviceName;
+    const logBusinessUnit = getAttr(resAttrs, 'business_unit') ?? getAttr(resAttrs, 'cost_center');
 
     for (const sl of rl.scopeLogs ?? []) {
       for (const log of sl.logRecords ?? []) {
@@ -717,12 +728,14 @@ otel.post('/v1/logs', async (c) => {
           await c.env.DB.prepare(`
             INSERT INTO otel_events (
               org_id, provider, session_id, developer_email, event_name,
-              model, cost_usd, tokens_in, tokens_out, duration_ms, timestamp, raw_attrs
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              model, cost_usd, tokens_in, tokens_out, duration_ms, timestamp, raw_attrs,
+              agent_name, team, business_unit
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `).bind(
             orgId, provider, sessionId, developerEmail, eventName,
             model, costUsd, inputTokens, outputTokens, durationMs, ts,
             JSON.stringify(Object.fromEntries(logAttrs.map(a => [a.key, a.value.stringValue ?? a.value.intValue ?? a.value.doubleValue]))),
+            logAgentName, logTeam, logBusinessUnit,
           ).run();
           eventCount++;
         } catch {

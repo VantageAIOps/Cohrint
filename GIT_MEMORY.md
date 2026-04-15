@@ -2,50 +2,78 @@
 _Last updated: 2026-04-15_
 
 ## Current Branch
-`fix/landing-page-positioning`
+`feat/enterprise-rbac-multiuser`
 
 ## Open PRs
 | # | Title | Branch |
 |---|-------|--------|
-| 58 | fix(landing): remove algorithm exposure + reframe hero for enterprise buyers | fix/landing-page-positioning |
+| 60 | feat(enterprise): multi-team RBAC, CEO dashboard, budget policies, team attribution | feat/enterprise-rbac-multiuser |
+| 59 | fix(ui): landing page polish + dashboard chart/layout fixes | fix/landing-page-positioning |
 
 ## Latest 15 Commits
 ```
-4dd249f fix(landing): remove algo exposure, reframe hero for enterprise buyers
-e0f7165 Merge pull request #57 from VantageAIOps/feat/claude-intelligence-customer-integration
-34790d8 feat(trust): update security page with Claude Code hook architecture
-077038a docs: update ADMIN_GUIDE + PRODUCT_STRATEGY with claude-intelligence architecture
-a61a684 fix(claude-intelligence): address code review issues from PR #57
-5a3a553 chore: update GIT_MEMORY.md for PR #57 state
-bf893aa feat(claude-intelligence): full customer integration — track, setup, dashboard, npm package
-3b2b249 docs: add GIT_HISTORY.md — complete 440-commit log with PR index and phase summary
-99f4db4 Merge pull request #56 from VantageAIOps/fix/ui-finetune-dashboard
-dea95d0 docs: comprehensive update — PRODUCT_STRATEGY v7.0, ADMIN_GUIDE +503 lines, docs.html new endpoints
-2587b40 fix(ui): stack install-box commands vertically on mobile to prevent line breaks
-e975937 chore: update GIT_MEMORY.md — PR #56 state, branch fix/ui-finetune-dashboard
-b681a78 fix(ui): close modal via closeModal() on Escape/overlay to reset form fields
-999fec8 fix(ui): dashboard polish — layout, UX, accessibility, mobile fixes
-73c089f Merge pull request #55 from VantageAIOps/feat/free-tier-50k
+f470821 feat(enterprise): implement all P0/P1 gaps from business case analysis
+8ec0ef7 chore: update GIT_MEMORY.md — all P1/P2 items complete, PR #60 ready for review
+629635e feat(enterprise): P1/P2 gaps — budget enforcement, policy CRUD UI, live feed, alerts
+6974fab chore: update GIT_MEMORY.md — PR #60 P0 fixes, outstanding P1/P2 items
+0664316 fix(enterprise): P0 gaps — role allowlist, otel enriched fields, developer team
+31d2a59 feat(enterprise): multi-team RBAC, CEO dashboard, budget policies, team attribution
+54c3bdf chore: update GIT_MEMORY.md — PR #59 state
+08a1cb3 fix(dashboard+auth): 9 remaining issues from rescan
+249f655 fix(dashboard+auth): 11 crash/flow fixes from full audit
+c69136d fix(dashboard): stale donut legend on empty period + mobile flex breakpoint
+ba0aa10 fix(dashboard): 75/25 split layout for spend trend + donut cards
+2e72278 fix(dashboard): reduce Tool Cost Share donut size + proper alignment
+c4380ba fix(dashboard): chart proportions, connected tools stale dates, vega bot overlap
+f8028ff fix(landing): fix footer wrapping on mobile
+d394858 fix(landing): strip security implementation details + replace gmail with sales email
 ```
 
 ## Recent Merged PRs
-| PR | Title | Branch |
-|----|-------|--------|
-| #57 | feat(claude-intelligence): customer integration — setup subcommand, dashboard connect flow, npm package | feat/claude-intelligence-customer-integration |
-| #56 | fix(ui): dashboard polish — layout, UX, accessibility, mobile | fix/ui-finetune-dashboard |
-| #55 | feat: P1+P2 sprint — trust page, Copilot adapter, enterprise pricing, report | feat/free-tier-50k |
-| #54 | feat(pricing): raise free tier from 10K to 50K events/month | feat/free-tier-50k |
-| #53 | fix(auth): remove duplicate rate-limit block that bypassed CI bypass | fix/ci-signup-rate-limit |
+- #57 feat/claude-intelligence-customer-integration
+- #56 fix/ui-finetune-dashboard
+- #55 feat/free-tier-50k
+- #54 feat/free-tier-50k
+- #53 fix/ci-signup-rate-limit
 
 ## Package Versions
-| Package | npm name | Version |
-|---------|----------|---------|
-| vantage-mcp | vantageaiops-mcp | 1.1.1 |
-| vantage-js-sdk | vantageaiops | 1.0.1 |
-| claude-intelligence | @vantageaiops/claude-code | 1.0.0 |
+| Package | Version |
+|---------|---------|
+| vantage-worker | 1.0.0 |
+| vantage-js-sdk | 1.0.1 |
+| vantage-mcp | 1.1.1 |
 
-## Outstanding Items
-- **PR #58** — landing page positioning fix + competitive analysis docs; awaiting review + merge
-- After PR #58 merges: deploy frontend via `npx wrangler pages deploy ./vantage-final-v4 --project-name=vantageai`
-- **PRODUCT_STRATEGY.md § 15** added: full palma.ai competitive teardown — read before any enterprise sales call
-- **60-day roadmap items** tracked in TODO.md (competitive intelligence section, 2026-04-15): cost forecasting widget, chargeback reports, model switch advisor, GitHub Actions landing page, app-layer attribution, quality/cost tradeoff tooling
+## PR #60 Status — Enterprise RBAC (feat/enterprise-rbac-multiuser)
+All P0 + P1 gaps implemented. Docs updated. Ready for review + merge.
+
+### Completed (this branch, 5 commits)
+**Schema & Data Layer**
+- migration/0015: business_unit/team/agent_name to otel_events; budget_policies enhancements; superadmin/ceo roles added to org_members
+- migration/0016: developer_email + business_unit to events table; 6 compound indexes
+
+**Backend Routes**
+- auth.ts: full role hierarchy (owner>superadmin>ceo>admin>member>viewer); invite allowlist fixed; escalation guard; logAudit on PATCH
+- executive.ts: GET /v1/analytics/executive (ceo+ only); UNION events+cross_platform_usage
+- admin.ts: budget policies CRUD (GET/POST/PUT/DELETE /v1/admin/budget-policies); GET /developers/recommendations; GET /budget-alerts?threshold_pct
+- admin.ts: GET /audit-log now supports ?since, ?until, ?actor_role, ?resource_type, ?event_name
+- analytics.ts: GET /business-units (spend per BU×team×provider); /teams COALESCE budget_policies
+- crossplatform.ts: GET /active-developers (live presence); ?business_unit= filter on /developers
+- events.ts: checkBudgetPolicy() enforcement at ingest; maybeSendBudgetAlert wired
+- superadmin.ts: logAuditRaw on all 7 route handlers
+
+**Frontend**
+- app.html: Executive view (ceo+); budget alert sticky banner; + New Policy modal; Active Now card
+- app.html: Members table Spend MTD + Rec columns; invite modal adds ceo/superadmin options
+- cp-console.js: live feed 4-col grid (agent_name, team, tok/s); dev modal Recommendations section
+
+**Tests**
+- tests/suites/43_enterprise_rbac: 14 sections (ER-A through ER-N), 80+ checks
+
+**Docs**
+- ADMIN_GUIDE.md: 6-level RBAC section, executive endpoint §11.4, budget policies CRUD §11.5, member ID-based delete/rotate notes, audit log filters, Quick Reference updated
+- docs.html: roles table expanded to 6 roles + executive dashboard column; budget policies CRUD + executive endpoint sections added
+
+## PR #59 Status — UI Polish (fix/landing-page-positioning)
+Merged. Changes: mobile sidebar toggle, landing page email/security badge updates, dashboard chart/layout fixes, auth cookie improvements.
+
+### No remaining outstanding items

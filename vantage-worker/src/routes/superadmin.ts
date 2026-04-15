@@ -17,6 +17,7 @@
 
 import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
+import { logAuditRaw } from '../lib/audit';
 
 const superadmin = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -91,6 +92,16 @@ superadmin.get('/stats', async (c) => {
     `).bind(since).first<{ views: number; sessions: number }>(),
   ]);
 
+  logAuditRaw(c.env.DB, c.executionCtx,
+    c.req.header('CF-Connecting-IP') ?? 'unknown',
+    'superadmin', 'superadmin', 'superadmin',
+    {
+      event_type: 'admin_action',
+      event_name: 'admin_action.superadmin_access',
+      metadata: { path: c.req.path, method: c.req.method },
+    }
+  );
+
   return c.json({
     period_days:      period,
     orgs:             orgRow,
@@ -134,6 +145,16 @@ superadmin.get('/users', async (c) => {
     `).bind(since).first<{ avg_duration_sec: number }>(),
   ]);
 
+  logAuditRaw(c.env.DB, c.executionCtx,
+    c.req.header('CF-Connecting-IP') ?? 'unknown',
+    'superadmin', 'superadmin', 'superadmin',
+    {
+      event_type: 'admin_action',
+      event_name: 'admin_action.superadmin_access',
+      metadata: { path: c.req.path, method: c.req.method },
+    }
+  );
+
   return c.json({
     period_days:   period,
     signups:       signups.results,
@@ -163,6 +184,16 @@ superadmin.get('/geography', async (c) => {
       GROUP BY colo ORDER BY requests DESC LIMIT 30
     `).bind(since).all<{ colo: string; requests: number }>(),
   ]);
+
+  logAuditRaw(c.env.DB, c.executionCtx,
+    c.req.header('CF-Connecting-IP') ?? 'unknown',
+    'superadmin', 'superadmin', 'superadmin',
+    {
+      event_type: 'admin_action',
+      event_name: 'admin_action.superadmin_access',
+      metadata: { path: c.req.path, method: c.req.method },
+    }
+  );
 
   return c.json({
     period_days: period,
@@ -202,6 +233,16 @@ superadmin.get('/features', async (c) => {
     `).bind(since).all<{ provider: string; events: number; cost_usd: number }>(),
   ]);
 
+  logAuditRaw(c.env.DB, c.executionCtx,
+    c.req.header('CF-Connecting-IP') ?? 'unknown',
+    'superadmin', 'superadmin', 'superadmin',
+    {
+      event_type: 'admin_action',
+      event_name: 'admin_action.superadmin_access',
+      metadata: { path: c.req.path, method: c.req.method },
+    }
+  );
+
   return c.json({
     period_days: period,
     features:    features.results,
@@ -236,6 +277,16 @@ superadmin.get('/traffic', async (c) => {
     `).bind(since).all<{ day: string; pageviews: number; sessions: number }>(),
   ]);
 
+  logAuditRaw(c.env.DB, c.executionCtx,
+    c.req.header('CF-Connecting-IP') ?? 'unknown',
+    'superadmin', 'superadmin', 'superadmin',
+    {
+      event_type: 'admin_action',
+      event_name: 'admin_action.superadmin_access',
+      metadata: { path: c.req.path, method: c.req.method },
+    }
+  );
+
   return c.json({
     period_days:  period,
     api_traffic:  apiTraffic.results,
@@ -268,6 +319,16 @@ superadmin.get('/storage', async (c) => {
     const kv = await c.env.KV.list({ limit: 1000 });
     kvCount = kv.keys.length + (kv.list_complete ? 0 : 1000); // rough estimate if truncated
   } catch { /* best effort */ }
+
+  logAuditRaw(c.env.DB, c.executionCtx,
+    c.req.header('CF-Connecting-IP') ?? 'unknown',
+    'superadmin', 'superadmin', 'superadmin',
+    {
+      event_type: 'admin_action',
+      event_name: 'admin_action.superadmin_access',
+      metadata: { path: c.req.path, method: c.req.method },
+    }
+  );
 
   return c.json({
     db_tables:    counts,
@@ -353,6 +414,16 @@ superadmin.post('/reset', async (c) => {
   }
 
   if (results.length === 0) results.push('no operations performed');
+
+  logAuditRaw(c.env.DB, c.executionCtx,
+    c.req.header('CF-Connecting-IP') ?? 'unknown',
+    'superadmin', 'superadmin', 'superadmin',
+    {
+      event_type: 'admin_action',
+      event_name: 'admin_action.superadmin_access',
+      metadata: { path: c.req.path, method: c.req.method, target, mode, results },
+    }
+  );
 
   return c.json({
     ok:      true,
