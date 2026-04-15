@@ -89,7 +89,7 @@ auth.post('/signup', async (c) => {
     org_id:       orgId,
     account_type: accountType,
     hint:         keyHint,
-    dashboard:    `https://cohrint.com/app.html?api_key=${rawKey}&org=${orgId}`,
+    dashboard:    `https://cohrint.com/app.html?org=${orgId}`,
   }, 201);
 });
 
@@ -367,7 +367,10 @@ auth.patch('/members/:id', authMiddleware, adminOnly, async (c) => {
   const updates: string[] = [];
   const params: unknown[] = [];
   if (body.role) {
-    const VALID_ROLES = ['viewer', 'member', 'admin', 'ceo', 'superadmin'];
+    const patchAccountType = c.get('accountType');
+    const VALID_ROLES = patchAccountType === 'team'
+      ? ['member', 'viewer']
+      : ['viewer', 'member', 'admin', 'ceo', 'superadmin'];
     const updaterRole = c.get('role') as string;
     const { hasRole: hr } = await import('../middleware/auth');
     // Can only assign roles up to your own level
@@ -661,8 +664,10 @@ auth.delete('/session', async (c) => {
 
   const res = c.json({ ok: true });
   const isProdLogout = (c.env.ENVIRONMENT ?? 'production') === 'production';
+  // Must match the SameSite=None used when setting the cookie — browsers treat
+  // SameSite=Lax and SameSite=None as different cookies and won't clear the original.
   const clearCookie = isProdLogout
-    ? 'cohrint_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax; Secure; Domain=cohrint.com'
+    ? 'cohrint_session=; Path=/; HttpOnly; Max-Age=0; SameSite=None; Secure; Domain=cohrint.com'
     : 'cohrint_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax';
   (await res).headers.set('Set-Cookie', clearCookie);
   return res;
@@ -681,7 +686,7 @@ auth.post('/logout', async (c) => {
   const res = c.json({ ok: true });
   const isProd = (c.env.ENVIRONMENT ?? 'production') === 'production';
   const clearCookie = isProd
-    ? 'cohrint_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax; Secure; Domain=cohrint.com'
+    ? 'cohrint_session=; Path=/; HttpOnly; Max-Age=0; SameSite=None; Secure; Domain=cohrint.com'
     : 'cohrint_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax';
   (await res).headers.set('Set-Cookie', clearCookie);
   return res;

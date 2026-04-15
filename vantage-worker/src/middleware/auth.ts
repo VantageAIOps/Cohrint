@@ -68,16 +68,20 @@ export async function authMiddleware(
     if (session) {
       let scopeTeam: string | null = null;
       let memberEmail: string | null = null;
+      let sessionTeamId: string | null = null;
       if (session.member_id) {
+        // Single query for all member fields — avoids N+1 and race between two reads
         const m = await c.env.DB.prepare(
-          'SELECT scope_team, email FROM org_members WHERE id = ?'
-        ).bind(session.member_id).first<{ scope_team: string | null; email: string | null }>();
-        scopeTeam   = m?.scope_team ?? null;
-        memberEmail = m?.email ?? null;
+          'SELECT scope_team, email, team_id FROM org_members WHERE id = ?'
+        ).bind(session.member_id).first<{ scope_team: string | null; email: string | null; team_id: string | null }>();
+        scopeTeam     = m?.scope_team ?? null;
+        memberEmail   = m?.email ?? null;
+        sessionTeamId = m?.team_id ?? null;
       }
       c.set('orgId',       session.org_id);
       c.set('role',        (session.role as OrgRole) || 'member');
       c.set('scopeTeam',   scopeTeam);
+      c.set('teamId',      sessionTeamId);
       c.set('memberId',    session.member_id);
       c.set('memberEmail', memberEmail);
 
@@ -86,16 +90,6 @@ export async function authMiddleware(
         'SELECT account_type FROM orgs WHERE id = ?'
       ).bind(session.org_id).first<{ account_type: string }>();
       c.set('accountType', (orgMeta?.account_type ?? 'organization') as import('../types').AccountType);
-
-      // Resolve teamId if member has one
-      let sessionTeamId: string | null = null;
-      if (session.member_id) {
-        const tm = await c.env.DB.prepare(
-          'SELECT team_id FROM org_members WHERE id = ?'
-        ).bind(session.member_id).first<{ team_id: string | null }>();
-        sessionTeamId = tm?.team_id ?? null;
-      }
-      c.set('teamId', sessionTeamId);
 
       const rpm     = parseInt(c.env.RATE_LIMIT_RPM ?? '1000', 10);
       const allowed = await checkRateLimit(c.env.KV, session.org_id, rpm);

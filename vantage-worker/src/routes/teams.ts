@@ -107,8 +107,8 @@ teams.delete('/:id', adminOnly, async (c) => {
   return c.json({ ok: true });
 });
 
-// ── GET /v1/teams/:id/members — list members of a team ───────────────────────
-teams.get('/:id/members', async (c) => {
+// ── GET /v1/teams/:id/members — list members of a team (admin+ only) ─────────
+teams.get('/:id/members', adminOnly, async (c) => {
   const orgId  = c.get('orgId');
   const teamId = c.req.param('id');
 
