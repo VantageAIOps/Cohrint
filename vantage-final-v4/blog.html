@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blog — AI Coding Cost Insights for Engineering Teams | Cohrint</title>
+<meta name="description" content="Insights, benchmarks, and guides on AI coding tool costs — Claude Code, Gemini CLI, GitHub Copilot, and engineering FinOps best practices.">
+<meta name="keywords" content="AI coding cost blog, Claude Code cost insights, engineering FinOps, LLM cost guides, AI developer tools blog">
+<meta name="author" content="Cohrint">
+<meta name="robots" content="index, follow">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Cohrint">
+<meta property="og:title" content="Blog — AI Coding Cost Insights | Cohrint">
+<meta property="og:description" content="Benchmarks, guides, and insights on AI coding tool costs for engineering teams.">
+<meta property="og:url" content="https://cohrint.com/blog">
+<meta property="og:image" content="https://cohrint.com/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Cohrint Blog — AI Coding Cost Insights">
+<meta name="twitter:description" content="Benchmarks, guides, and insights on AI coding tool costs.">
+<meta name="twitter:image" content="https://cohrint.com/og-image.png">
+<link rel="canonical" href="https://cohrint.com/blog">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#00d4a1">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Blog",
+  "name": "Cohrint Blog",
+  "url": "https://cohrint.com/blog",
+  "description": "AI coding cost insights, benchmarks, and guides for engineering teams.",
+  "publisher": { "@type": "Organization", "name": "Cohrint", "url": "https://cohrint.com" }
+}
+</script>
+<style>
+:root{--bg:#080c0f;--bg2:#0d1318;--bg3:#121920;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);--text:#e8edf2;--muted:#6b7b8a;--dim:#3a4550;--accent:#00d4a1;--mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;--serif:'Instrument Serif',Georgia,serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:16px;line-height:1.6;overflow-x:hidden}
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:18px 48px;border-bottom:1px solid var(--border);background:rgba(8,12,15,.88);backdrop-filter:blur(16px)}
+.nav-logo{font-family:var(--mono);font-size:15px;letter-spacing:.08em;color:var(--text);text-decoration:none;display:flex;align-items:center;gap:10px}
+.logo-dot{width:8px;height:8px;background:var(--accent);border-radius:50%;box-shadow:0 0 12px var(--accent)}
+.nav-links{display:flex;align-items:center;gap:32px}
+.nav-links a{font-size:13px;color:var(--muted);text-decoration:none;transition:color .2s}
+.nav-links a:hover,.nav-links a.active{color:var(--text)}
+.nav-cta{background:var(--accent)!important;color:#fff!important;padding:8px 20px;border-radius:6px;font-weight:500!important}
+@media(max-width:768px){nav{padding:16px 20px}.nav-links{display:none}}
+.page-header{padding:140px 48px 60px;max-width:900px;margin:0 auto}
+@media(max-width:768px){.page-header{padding:120px 20px 40px}}
+.page-label{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:16px}
+h1{font-family:var(--serif);font-size:clamp(36px,5vw,60px);font-weight:400;line-height:1.1;margin-bottom:16px}
+.page-sub{font-size:17px;color:var(--muted);max-width:500px;line-height:1.7}
+.posts{max-width:900px;margin:0 auto;padding:0 48px 80px;display:grid;gap:20px}
+@media(max-width:768px){.posts{padding:0 20px 60px}}
+.post-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:32px;text-decoration:none;display:block;transition:border-color .2s}
+.post-card:hover{border-color:var(--border2)}
+.post-card-meta{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.06em;margin-bottom:12px}
+.post-card h2{font-family:var(--serif);font-size:24px;font-weight:400;color:var(--text);margin-bottom:10px;line-height:1.2}
+.post-card p{font-size:14px;color:var(--muted);line-height:1.6}
+.post-card-tag{display:inline-block;background:rgba(0,212,161,.08);border:1px solid rgba(0,212,161,.2);color:var(--accent);padding:3px 10px;border-radius:20px;font-family:var(--mono);font-size:10px;margin-top:16px}
+footer{border-top:1px solid var(--border);padding:36px 48px;display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--muted);font-family:var(--mono);flex-wrap:wrap;gap:16px}
+footer a{color:var(--muted);text-decoration:none;transition:color .2s}
+footer a:hover{color:var(--text)}
+@media(max-width:640px){footer{flex-direction:column;padding:28px 20px}}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo"><span class="logo-dot"></span>COHRINT</a>
+  <div class="nav-links">
+    <a href="/calculator">Calculator</a>
+    <a href="/docs">Docs</a>
+    <a href="/report">Report</a>
+    <a href="/blog" class="active">Blog</a>
+    <a href="/auth.html">Sign in</a>
+    <a href="/signup.html" class="nav-cta">Request Access →</a>
+  </div>
+</nav>
+
+<div class="page-header">
+  <div class="page-label">Blog</div>
+  <h1>AI Coding Cost Insights</h1>
+  <p class="page-sub">Benchmarks, guides, and data on what engineering teams spend on AI coding tools — and how to control it.</p>
+</div>
+
+<div class="posts">
+  <a href="/blog/ai-coding-cost-benchmarks-2026" class="post-card">
+    <div class="post-card-meta">April 15, 2026 · 5 min read</div>
+    <h2>AI Coding Cost Benchmarks 2026 — What Engineering Teams Actually Spend</h2>
+    <p>Data from 200+ engineering teams: average Claude Code spend per developer, Gemini CLI vs Copilot cost comparison, and how top teams control their AI coding budgets.</p>
+    <span class="post-card-tag">Benchmarks</span>
+  </a>
+
+  <a href="/blog/how-to-track-claude-code-spend" class="post-card">
+    <div class="post-card-meta">April 15, 2026 · 4 min read</div>
+    <h2>How to Track Claude Code Spend Per Developer</h2>
+    <p>A practical guide to tracking Claude Code costs per developer, per model, and per session. Set up Cohrint in under 5 minutes and never be surprised by your Anthropic invoice again.</p>
+    <span class="post-card-tag">Guide</span>
+  </a>
+</div>
+
+<footer>
+  <a href="/">Cohrint</a>
+  <div style="display:flex;gap:24px;flex-wrap:wrap">
+    <a href="/docs">Docs</a>
+    <a href="/calculator">Calculator</a>
+    <a href="/report">Report</a>
+    <a href="mailto:support@cohrint.com">Contact</a>
+    <a href="/privacy">Privacy</a>
+    <a href="/terms">Terms</a>
+  </div>
+  <span style="color:var(--dim)">© 2026 Cohrint</span>
+</footer>
+
+</body>
+</html>

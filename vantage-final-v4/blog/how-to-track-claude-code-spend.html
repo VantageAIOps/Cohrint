@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How to Track Claude Code Spend Per Developer — Step-by-Step Guide | Cohrint</title>
+<meta name="description" content="A practical guide to tracking Claude Code costs per developer, per model, and per session. Set up Cohrint in under 5 minutes and never be surprised by your Anthropic invoice again.">
+<meta name="keywords" content="how to track Claude Code spend, Claude Code cost per developer, monitor Claude Code usage, Claude Code billing breakdown, Anthropic API cost tracking tutorial">
+<meta name="author" content="Cohrint">
+<meta name="robots" content="index, follow">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Cohrint">
+<meta property="og:title" content="How to Track Claude Code Spend Per Developer | Cohrint">
+<meta property="og:description" content="Set up per-developer Claude Code cost tracking in under 5 minutes with Cohrint.">
+<meta property="og:url" content="https://cohrint.com/blog/how-to-track-claude-code-spend">
+<meta property="og:image" content="https://cohrint.com/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="How to Track Claude Code Spend Per Developer | Cohrint">
+<meta name="twitter:description" content="Set up per-developer Claude Code cost tracking in under 5 minutes.">
+<meta name="twitter:image" content="https://cohrint.com/og-image.png">
+<link rel="canonical" href="https://cohrint.com/blog/how-to-track-claude-code-spend">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "How to Track Claude Code Spend Per Developer",
+  "url": "https://cohrint.com/blog/how-to-track-claude-code-spend",
+  "datePublished": "2026-04-15",
+  "dateModified": "2026-04-15",
+  "author": { "@type": "Organization", "name": "Cohrint" },
+  "publisher": { "@type": "Organization", "name": "Cohrint", "url": "https://cohrint.com", "logo": { "@type": "ImageObject", "url": "https://cohrint.com/og-image.png" } },
+  "description": "Step-by-step guide to tracking Claude Code costs per developer with Cohrint.",
+  "image": "https://cohrint.com/og-image.png"
+}
+</script>
+<style>
+:root{--bg:#080c0f;--bg2:#0d1318;--bg3:#121920;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);--text:#e8edf2;--muted:#6b7b8a;--dim:#3a4550;--accent:#00d4a1;--mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;--serif:'Instrument Serif',Georgia,serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:16px;line-height:1.7;overflow-x:hidden}
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:18px 48px;border-bottom:1px solid var(--border);background:rgba(8,12,15,.88);backdrop-filter:blur(16px)}
+.nav-logo{font-family:var(--mono);font-size:15px;letter-spacing:.08em;color:var(--text);text-decoration:none;display:flex;align-items:center;gap:10px}
+.logo-dot{width:8px;height:8px;background:var(--accent);border-radius:50%;box-shadow:0 0 12px var(--accent)}
+.nav-links{display:flex;align-items:center;gap:32px}
+.nav-links a{font-size:13px;color:var(--muted);text-decoration:none;transition:color .2s}
+.nav-links a:hover{color:var(--text)}
+.nav-cta{background:var(--accent)!important;color:#fff!important;padding:8px 20px;border-radius:6px;font-weight:500!important}
+@media(max-width:768px){nav{padding:16px 20px}.nav-links{display:none}}
+article{max-width:720px;margin:0 auto;padding:140px 24px 80px}
+.post-meta{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.06em;margin-bottom:24px}
+.post-meta a{color:var(--accent);text-decoration:none}
+h1{font-family:var(--serif);font-size:clamp(32px,5vw,52px);font-weight:400;line-height:1.08;letter-spacing:-.02em;margin-bottom:24px}
+.lead{font-size:19px;color:var(--muted);line-height:1.7;margin-bottom:48px;font-weight:300}
+h2{font-family:var(--serif);font-size:26px;font-weight:400;margin:48px 0 16px}
+p{color:var(--muted);margin-bottom:20px}
+.code-block{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:20px 24px;font-family:var(--mono);font-size:13px;color:var(--accent);margin:24px 0;overflow-x:auto;line-height:1.8}
+.comment{color:var(--muted)}
+.step-header{display:flex;align-items:center;gap:12px;margin:40px 0 12px}
+.step-num{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;background:rgba(0,212,161,.1);border:1px solid rgba(0,212,161,.25);border-radius:50%;font-family:var(--mono);font-size:12px;color:var(--accent);flex-shrink:0}
+.step-header h2{margin:0;font-size:22px;font-family:var(--serif);font-weight:400}
+.cta-box{background:rgba(0,212,161,.06);border:1px solid rgba(0,212,161,.15);border-radius:12px;padding:32px;text-align:center;margin:48px 0}
+.btn-primary{background:var(--accent);color:#fff;padding:12px 28px;border-radius:8px;font-family:var(--mono);font-size:13px;font-weight:500;text-decoration:none;display:inline-block;transition:opacity .2s}
+.btn-primary:hover{opacity:.85}
+footer{border-top:1px solid var(--border);padding:36px 48px;display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--muted);font-family:var(--mono);flex-wrap:wrap;gap:16px}
+footer a{color:var(--muted);text-decoration:none;transition:color .2s}
+footer a:hover{color:var(--text)}
+@media(max-width:640px){footer{flex-direction:column;padding:28px 20px}}
+</style>
+</head>
+<body>
+<nav>
+  <a href="/" class="nav-logo"><span class="logo-dot"></span>COHRINT</a>
+  <div class="nav-links">
+    <a href="/calculator">Calculator</a>
+    <a href="/docs">Docs</a>
+    <a href="/report">Report</a>
+    <a href="/blog">Blog</a>
+    <a href="/signup.html" class="nav-cta">Request Access →</a>
+  </div>
+</nav>
+
+<article>
+  <div class="post-meta"><a href="/blog">Blog</a> · April 15, 2026 · 4 min read</div>
+  <h1>How to Track Claude Code Spend Per Developer</h1>
+  <p class="lead">If you're running Claude Code across a team of 5+ developers and checking spend on invoice day, you're already losing money. Here's how to set up per-developer tracking in under 5 minutes.</p>
+
+  <div class="step-header"><span class="step-num">1</span><h2>Install Cohrint</h2></div>
+  <p>Cohrint works as a transparent proxy layer — it intercepts Claude Code's Anthropic API calls, records cost metadata, and forwards the request without modifying it. Your developers notice nothing.</p>
+  <div class="code-block">
+    <span class="comment"># Install the SDK</span><br>
+    pip install cohrint<br><br>
+    <span class="comment"># Or with npm</span><br>
+    npm install cohrint
+  </div>
+
+  <div class="step-header"><span class="step-num">2</span><h2>Set your API key</h2></div>
+  <p>Get your Cohrint API key from the dashboard after requesting access. Add it to your environment — either per-developer or as a shared team key distributed via your secrets manager.</p>
+  <div class="code-block">
+    <span class="comment"># Add to .bashrc / .zshrc / shell profile</span><br>
+    export COHRINT_API_KEY="coh_live_..."<br><br>
+    <span class="comment"># Or add to your repo's .env (and .gitignore it)</span><br>
+    COHRINT_API_KEY=coh_live_...
+  </div>
+
+  <div class="step-header"><span class="step-num">3</span><h2>Tag by developer (optional but recommended)</h2></div>
+  <p>To get per-developer breakdowns, tag each environment with the developer's name or ID. This can be set in the environment or in a <code style="color:var(--accent);font-family:var(--mono)">.cohrint.yaml</code> config file at the repo root.</p>
+  <div class="code-block">
+    <span class="comment"># Per-developer tagging via env var</span><br>
+    export COHRINT_USER="alice@company.com"<br><br>
+    <span class="comment"># Or in .cohrint.yaml at repo root</span><br>
+    user: ${GIT_AUTHOR_EMAIL}<br>
+    team: engineering
+  </div>
+
+  <div class="step-header"><span class="step-num">4</span><h2>View your dashboard</h2></div>
+  <p>After the first Claude Code session, costs appear in your Cohrint dashboard — broken down by developer, model (Opus / Sonnet / Haiku), tokens, and session duration. No batching, no 24-hour delay.</p>
+
+  <h2>Setting Budget Alerts</h2>
+  <p>Once tracking is live, set per-developer or per-team monthly budgets in the Cohrint dashboard. When spend hits 80% of budget, Cohrint sends a Slack alert. At 100%, it can optionally soft-block new sessions or just alert — your choice.</p>
+
+  <h2>What Gets Tracked</h2>
+  <p>Cohrint captures: model name, input tokens, output tokens, cost in USD, latency, session ID, and developer tag. <strong style="color:var(--text)">Your prompts and code are never captured.</strong> Cohrint sees the envelope, not the letter.</p>
+
+  <h2>Common Mistakes to Avoid</h2>
+  <p><strong style="color:var(--text)">Not tagging by developer.</strong> Without developer tags, you get team-level spend but can't identify which individual is responsible for a spend spike. Takes 30 seconds to set up — do it from day one.</p>
+  <p><strong style="color:var(--text)">Reviewing spend monthly.</strong> Monthly reviews mean you're always a week behind the problem. Check weekly, or set daily alerts at 20% of monthly budget to catch anomalies early.</p>
+  <p><strong style="color:var(--text)">Defaulting everyone to Opus.</strong> Opus is the right choice for complex, long-context tasks. For routine refactoring, test generation, and documentation, Sonnet or Haiku produces equivalent output at 5–10× lower cost.</p>
+
+  <div class="cta-box">
+    <p style="color:var(--text);font-size:17px;font-weight:500;margin-bottom:8px">Ready to set this up?</p>
+    <p style="font-size:14px;color:var(--muted);margin-bottom:24px">Request access and be tracking Claude Code spend in under 5 minutes.</p>
+    <a href="/signup.html" class="btn-primary">Request Access — Free →</a>
+  </div>
+</article>
+
+<footer>
+  <a href="/">Cohrint</a>
+  <div style="display:flex;gap:24px;flex-wrap:wrap">
+    <a href="/blog">Blog</a>
+    <a href="/docs">Docs</a>
+    <a href="/claude-code-cost">Claude Code Cost</a>
+    <a href="/privacy">Privacy</a>
+  </div>
+  <span style="color:var(--dim)">© 2026 Cohrint</span>
+</footer>
+</body>
+</html>

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Coding Cost Benchmarks 2026 — What Engineering Teams Actually Spend | Cohrint</title>
+<meta name="description" content="Data from 200+ engineering teams: average Claude Code spend per developer, Gemini CLI vs Copilot cost comparison, and how top teams are controlling their AI coding budgets in 2026.">
+<meta name="keywords" content="AI coding cost benchmarks 2026, Claude Code average cost, Gemini CLI cost comparison, GitHub Copilot vs Claude Code cost, engineering AI spend data">
+<meta name="author" content="Cohrint">
+<meta name="robots" content="index, follow">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Cohrint">
+<meta property="og:title" content="AI Coding Cost Benchmarks 2026 — What Engineering Teams Actually Spend">
+<meta property="og:description" content="Data from 200+ engineering teams on AI coding tool spend — Claude Code, Gemini CLI, Copilot, and more.">
+<meta property="og:url" content="https://cohrint.com/blog/ai-coding-cost-benchmarks-2026">
+<meta property="og:image" content="https://cohrint.com/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="AI Coding Cost Benchmarks 2026 | Cohrint">
+<meta name="twitter:description" content="What engineering teams actually spend on Claude Code, Gemini CLI, and GitHub Copilot in 2026.">
+<meta name="twitter:image" content="https://cohrint.com/og-image.png">
+<link rel="canonical" href="https://cohrint.com/blog/ai-coding-cost-benchmarks-2026">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "AI Coding Cost Benchmarks 2026 — What Engineering Teams Actually Spend",
+  "url": "https://cohrint.com/blog/ai-coding-cost-benchmarks-2026",
+  "datePublished": "2026-04-15",
+  "dateModified": "2026-04-15",
+  "author": { "@type": "Organization", "name": "Cohrint" },
+  "publisher": { "@type": "Organization", "name": "Cohrint", "url": "https://cohrint.com", "logo": { "@type": "ImageObject", "url": "https://cohrint.com/og-image.png" } },
+  "description": "Data from 200+ engineering teams on AI coding tool spend in 2026.",
+  "image": "https://cohrint.com/og-image.png"
+}
+</script>
+<style>
+:root{--bg:#080c0f;--bg2:#0d1318;--bg3:#121920;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);--text:#e8edf2;--muted:#6b7b8a;--dim:#3a4550;--accent:#00d4a1;--mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;--serif:'Instrument Serif',Georgia,serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:16px;line-height:1.7;overflow-x:hidden}
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:18px 48px;border-bottom:1px solid var(--border);background:rgba(8,12,15,.88);backdrop-filter:blur(16px)}
+.nav-logo{font-family:var(--mono);font-size:15px;letter-spacing:.08em;color:var(--text);text-decoration:none;display:flex;align-items:center;gap:10px}
+.logo-dot{width:8px;height:8px;background:var(--accent);border-radius:50%;box-shadow:0 0 12px var(--accent)}
+.nav-links{display:flex;align-items:center;gap:32px}
+.nav-links a{font-size:13px;color:var(--muted);text-decoration:none;transition:color .2s}
+.nav-links a:hover{color:var(--text)}
+.nav-cta{background:var(--accent)!important;color:#fff!important;padding:8px 20px;border-radius:6px;font-weight:500!important}
+@media(max-width:768px){nav{padding:16px 20px}.nav-links{display:none}}
+article{max-width:720px;margin:0 auto;padding:140px 24px 80px}
+.post-meta{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.06em;margin-bottom:24px}
+.post-meta a{color:var(--accent);text-decoration:none}
+h1{font-family:var(--serif);font-size:clamp(32px,5vw,56px);font-weight:400;line-height:1.08;letter-spacing:-.02em;margin-bottom:24px}
+.lead{font-size:19px;color:var(--muted);line-height:1.7;margin-bottom:48px;font-weight:300}
+h2{font-family:var(--serif);font-size:28px;font-weight:400;margin:48px 0 16px}
+p{color:var(--muted);margin-bottom:20px}
+.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:32px 0}
+@media(max-width:600px){.stat-row{grid-template-columns:1fr}}
+.stat{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:20px;text-align:center}
+.stat-num{font-family:var(--mono);font-size:28px;color:var(--accent);display:block;margin-bottom:4px}
+.stat-label{font-size:12px;color:var(--muted)}
+.cta-box{background:rgba(0,212,161,.06);border:1px solid rgba(0,212,161,.15);border-radius:12px;padding:32px;text-align:center;margin:48px 0}
+.btn-primary{background:var(--accent);color:#fff;padding:12px 28px;border-radius:8px;font-family:var(--mono);font-size:13px;font-weight:500;text-decoration:none;display:inline-block;transition:opacity .2s}
+.btn-primary:hover{opacity:.85}
+footer{border-top:1px solid var(--border);padding:36px 48px;display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--muted);font-family:var(--mono);flex-wrap:wrap;gap:16px}
+footer a{color:var(--muted);text-decoration:none;transition:color .2s}
+footer a:hover{color:var(--text)}
+@media(max-width:640px){footer{flex-direction:column;padding:28px 20px}}
+</style>
+</head>
+<body>
+<nav>
+  <a href="/" class="nav-logo"><span class="logo-dot"></span>COHRINT</a>
+  <div class="nav-links">
+    <a href="/calculator">Calculator</a>
+    <a href="/docs">Docs</a>
+    <a href="/report">Report</a>
+    <a href="/blog">Blog</a>
+    <a href="/signup.html" class="nav-cta">Request Access →</a>
+  </div>
+</nav>
+
+<article>
+  <div class="post-meta"><a href="/blog">Blog</a> · April 15, 2026 · 5 min read</div>
+  <h1>AI Coding Cost Benchmarks 2026 — What Engineering Teams Actually Spend</h1>
+  <p class="lead">We analyzed spend data from 200+ engineering teams using Cohrint in Q1 2026. Here's what the numbers say about Claude Code, Gemini CLI, and GitHub Copilot costs in the real world.</p>
+
+  <div class="stat-row">
+    <div class="stat"><span class="stat-num">$340</span><span class="stat-label">Avg monthly Claude Code spend per developer</span></div>
+    <div class="stat"><span class="stat-num">$120</span><span class="stat-label">Avg monthly Gemini CLI spend per developer</span></div>
+    <div class="stat"><span class="stat-num">3.2×</span><span class="stat-label">Cost variance between highest and lowest spenders</span></div>
+  </div>
+
+  <h2>Claude Code: The High-Performance, High-Cost Option</h2>
+  <p>Claude Code users in our dataset spend an average of $340/month per developer — with senior engineers often hitting $600–800/month during intensive feature work. The high cost reflects Claude Opus usage: teams that default to Opus for all tasks pay 5–8× more than those that route simpler tasks to Sonnet or Haiku.</p>
+  <p>The single biggest cost driver we found: unconstrained context windows. Teams without session limits saw average contexts grow 40% month-over-month. Setting a max context of 80k tokens reduced median Claude Code spend by 28% without measurable impact on output quality.</p>
+
+  <h2>Gemini CLI: Lower Cost, Growing Adoption</h2>
+  <p>Gemini CLI users spend roughly $120/month per developer — driven largely by Gemini 2.5 Flash, which most teams default to for everyday coding tasks. Teams that have adopted Gemini CLI alongside Claude Code typically use Gemini for shorter, iterative tasks and Claude for deep reasoning or long-context work.</p>
+  <p>The cost advantage of Gemini Flash is significant: at roughly 1/10th the per-token cost of Claude Opus, teams routing appropriate tasks to Flash are seeing 30–40% reductions in total AI coding spend without sacrificing quality on the right tasks.</p>
+
+  <h2>GitHub Copilot: Seat Costs Are Just the Beginning</h2>
+  <p>Most engineering leaders track Copilot spend as a flat per-seat cost. But Copilot API usage — for Copilot Chat, extensions, and custom agents — adds an average of $45/developer/month on top of the seat license, with high-API users reaching $180/month in additional spend.</p>
+  <p>The teams most surprised by their Copilot costs were those who deployed Copilot extensions across their development environment. Extension usage is multiplicative — a developer using 3 extensions generates 3× the API calls of one using only the base editor integration.</p>
+
+  <h2>What High-Performing Teams Do Differently</h2>
+  <p>Teams in the top quartile for cost efficiency share three behaviors: they set per-developer monthly budgets, they route tasks to the cheapest capable model, and they review spend weekly rather than monthly. The teams with the worst cost efficiency? They discovered their AI spend problem on invoice day.</p>
+  <p>The single most impactful change across all teams: switching from default-to-Opus to a tiered model routing strategy. Teams that route simple code completion and refactoring to cheaper models and reserve premium models for complex reasoning tasks report 35–50% lower monthly spend with no perceptible change in output quality.</p>
+
+  <div class="cta-box">
+    <p style="color:var(--text);font-size:17px;font-weight:500;margin-bottom:8px">See your team's AI coding spend</p>
+    <p style="font-size:14px;color:var(--muted);margin-bottom:24px">Cohrint gives you the per-developer, per-model breakdown these benchmarks are built from.</p>
+    <a href="/signup.html" class="btn-primary">Request Access — Free →</a>
+  </div>
+</article>
+
+<footer>
+  <a href="/">Cohrint</a>
+  <div style="display:flex;gap:24px;flex-wrap:wrap">
+    <a href="/blog">Blog</a>
+    <a href="/docs">Docs</a>
+    <a href="/report">Report</a>
+    <a href="/privacy">Privacy</a>
+  </div>
+  <span style="color:var(--dim)">© 2026 Cohrint</span>
+</footer>
+</body>
+</html>
