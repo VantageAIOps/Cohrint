@@ -149,7 +149,7 @@ binding = "KV"
 
 # Env vars (non-secret)
 ENVIRONMENT = "production"
-ALLOWED_ORIGINS = "https://cohrint.com,https://www.cohrint.com,https://vantageai.pages.dev"
+ALLOWED_ORIGINS = "https://cohrint.com,https://www.cohrint.com,https://cohrint.pages.dev"
 RATE_LIMIT_RPM = "1000"
 
 # Secrets (set via: wrangler secret put)
@@ -1437,7 +1437,7 @@ For scoped members, `teamScope()` appends `AND team = ?` to every analytics quer
 ### 16.3 CORS Policy
 
 ```typescript
-ALLOWED_ORIGINS = "https://cohrint.com,https://www.cohrint.com,https://vantageai.pages.dev"
+ALLOWED_ORIGINS = "https://cohrint.com,https://www.cohrint.com,https://cohrint.pages.dev"
 
 // Pattern matching supports wildcard suffix: "https://*.cohrint.com"
 const isAllowed = allowed.includes(origin) ||

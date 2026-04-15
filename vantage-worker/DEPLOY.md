@@ -39,8 +39,11 @@ npm run db:migrate:remote
 
 ## 5. Set secrets
 ```bash
-wrangler secret put SUPABASE_SERVICE_KEY
-# paste your Supabase service_role key when prompted
+wrangler secret put RESEND_API_KEY
+# paste your Resend API key when prompted
+
+wrangler secret put TOKEN_ENCRYPTION_SECRET
+# generate with: openssl rand -base64 32
 ```
 
 ## 6. Deploy

@@ -81,7 +81,7 @@ jobs:
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
               --connect-timeout 10 --max-time 15 \
               --retry 3 --retry-delay 5 --retry-all-errors \
-              https://api.vantageaiops.com/v1/health 2>/dev/null || echo "000")
+              https://api.cohrint.com/v1/health 2>/dev/null || echo "000")
             echo "Attempt $attempt: API health = $STATUS"
             if [ "$STATUS" = "200" ]; then
               echo "✅ API is live"
@@ -96,7 +96,7 @@ jobs:
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             --retry 3 --retry-delay 5 \
-            https://vantageaiops.com/)
+            https://cohrint.com/)
           echo "Frontend: $STATUS"
           [ "$STATUS" = "200" ] || { echo "❌ Frontend not responding (got $STATUS)"; exit 1; }
           echo "✅ Frontend is live"
@@ -104,7 +104,7 @@ jobs:
       - name: Check auth endpoint
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            https://vantageaiops.com/auth)
+            https://cohrint.com/auth)
           echo "Auth page: $STATUS"
           [ "$STATUS" = "200" ] || { echo "⚠️ Auth page returned $STATUS"; }
 
@@ -232,14 +232,14 @@ jobs:
           BRANCH: ${{ github.head_ref }}
         run: |
           npx wrangler@latest pages deploy ./vantage-final-v4 \
-            --project-name=vantageai \
+            --project-name=cohrint \
             --branch="$BRANCH" \
             --config=wrangler.toml \
             --commit-dirty=true 2>&1 | tee /tmp/deploy-output.txt || true
-          PREVIEW_URL=$(grep -oE 'https://[a-z0-9-]+\.vantageai\.pages\.dev' /tmp/deploy-output.txt | head -1 || true)
+          PREVIEW_URL=$(grep -oE 'https://[a-z0-9-]+\.cohrint\.pages\.dev' /tmp/deploy-output.txt | head -1 || true)
           if [ -z "$PREVIEW_URL" ]; then
             SLUG=$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | head -c 28)
-            PREVIEW_URL="https://${SLUG}.vantageai.pages.dev"
+            PREVIEW_URL="https://${SLUG}.cohrint.pages.dev"
           fi
           echo "preview_url=$PREVIEW_URL" >> $GITHUB_OUTPUT
           echo "Preview URL: $PREVIEW_URL"
