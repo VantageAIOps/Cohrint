@@ -194,7 +194,7 @@ CREATE TABLE org_members (
   org_id        TEXT NOT NULL,        -- FK → orgs.id
   email         TEXT NOT NULL,
   name          TEXT,
-  role          TEXT NOT NULL,        -- 'admin' | 'member' | 'viewer'
+  role          TEXT NOT NULL,        -- 'owner' | 'superadmin' | 'ceo' | 'admin' | 'member' | 'viewer'
   api_key_hash  TEXT NOT NULL,
   api_key_hint  TEXT,
   scope_team    TEXT,                 -- NULL = see all; 'backend' = scoped
@@ -202,11 +202,13 @@ CREATE TABLE org_members (
 );
 ```
 
-**RBAC model:**
-- `owner` — only in `orgs` table, full access, can rotate root key
-- `admin` — in `org_members`, can invite/remove/rotate members
-- `member` — can ingest events, read analytics
-- `viewer` — read-only (403 on POST /events)
+**RBAC model (6-level hierarchy, highest → lowest):**
+- `owner` — only in `orgs` table; full access, rotates root key, cannot be demoted
+- `superadmin` — platform-wide admin; manages all orgs, all routes, audit access (migration 0015+)
+- `ceo` — executive read access; `GET /v1/analytics/executive` and full analytics; cannot manage members
+- `admin` — org-level admin; invites/removes/rotates members, manages budgets and policies
+- `member` — can ingest events and read analytics (scoped to `scope_team` if set)
+- `viewer` — read-only; 403 on `POST /v1/otel/v1/*` and event ingest
 - `scope_team` — non-null means this member's analytics are filtered to only that team's data
 
 ### 3.3 `sessions` — HTTP-only cookie sessions
@@ -512,15 +514,19 @@ Request arrives
 
 ```
 owner (org owner — in orgs table)
-  └── admin (org_members, role='admin')
-       └── member (org_members, role='member')
-            └── viewer (org_members, role='viewer', read-only)
+  └── superadmin (org_members, role='superadmin')
+       └── ceo (org_members, role='ceo')
+            └── admin (org_members, role='admin')
+                 └── member (org_members, role='member')
+                      └── viewer (org_members, role='viewer', read-only)
 ```
 
 Role checks:
-- **`adminOnly` guard:** `role === 'owner' || role === 'admin'` — applied to member management, admin overview, team budgets
-- **`viewer` block:** `role === 'viewer'` → 403 on POST /events (inline guard, not middleware)
-- **`owner` only:** POST /rotate (only owner can rotate the root key)
+- **`adminOnly` guard:** `['owner','superadmin','admin'].includes(role)` — member management, admin overview, team budgets
+- **`ceoOrAbove` guard:** `['owner','superadmin','ceo'].includes(role)` — `GET /v1/analytics/executive`
+- **`viewer` block:** `role === 'viewer'` → 403 on event ingest (inline guard, not middleware)
+- **`owner` only:** `POST /v1/auth/rotate` (only owner can rotate the root key)
+- **Escalation guard:** admins cannot invite/update members to `superadmin` or `owner` roles
 
 ### 4.4 Session Security Properties
 
@@ -941,7 +947,7 @@ POST /v1/auth/members (adminOnly)
 {
   email: "alice@company.com",
   name: "Alice",
-  role: "member",          // 'admin' | 'member' | 'viewer'
+  role: "member",          // 'ceo' | 'admin' | 'member' | 'viewer' (superadmin/owner require owner auth)
   scope_team: "backend"    // optional — scoped data access
 }
 
@@ -962,8 +968,13 @@ Owner key rotation (`POST /v1/auth/rotate`):
 - Note in response: "Update it everywhere before closing this response"
 
 Member key rotation (`POST /v1/auth/members/:id/rotate`, admin only):
+- Targets member by ID (`:id` is the `member_id` field, **not** email)
 - Same as owner rotation but targets `org_members` table
 - Sends email to member with new key
+
+Member removal (`DELETE /v1/auth/members/:id`, admin only):
+- Targets member by ID (`:id` is the `member_id` field, **not** email)
+- Key immediately invalid; session cookies for that member are invalidated
 
 ### 11.3 Admin Overview
 
@@ -979,6 +990,46 @@ Member key rotation (`POST /v1/auth/members/:id/rotate`, admin only):
 ```
 
 This single call powers the admin panel in the dashboard (avoids multiple round-trips).
+
+### 11.4 Executive Dashboard
+
+`GET /v1/analytics/executive` — requires `ceo`, `superadmin`, or `owner` role.
+
+Returns a cross-source spend roll-up (UNION of `events` + `cross_platform_usage`):
+```json
+{
+  "total_spend_usd": 1234.56,
+  "spend_by_provider": [ { "provider": "anthropic", "cost_usd": 800.00 } ],
+  "spend_by_team": [ { "team": "backend", "cost_usd": 450.00 } ],
+  "spend_by_business_unit": [ { "business_unit": "engineering", "cost_usd": 1000.00 } ],
+  "budget_status": [ { "scope": "org", "budget_usd": 2000, "spent_usd": 1234.56, "pct": 61.7 } ],
+  "period_days": 30
+}
+```
+
+### 11.5 Budget Policies CRUD
+
+All routes require `admin` or `owner` role. Policies live in the `budget_policies` table.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/v1/admin/budget-policies` | List all policies for the org |
+| `POST` | `/v1/admin/budget-policies` | Create a new policy |
+| `PUT` | `/v1/admin/budget-policies/:id` | Update `budget_usd`, `period`, or `enforcement` |
+| `DELETE` | `/v1/admin/budget-policies/:id` | Remove a policy |
+
+`POST` body:
+```json
+{
+  "scope": "team",           // 'org' | 'team' | 'developer'
+  "scope_value": "backend",  // team name or developer_id; omit for org-wide
+  "budget_usd": 500,
+  "period": "month",         // 'day' | 'week' | 'month'
+  "enforcement": "alert"     // 'alert' | 'block'
+}
+```
+
+`enforcement: "block"` causes `POST /v1/events` to return 429 when the budget is exceeded for the matching scope.
 
 ---
 
@@ -1940,7 +1991,7 @@ All date comparisons in cross-platform queries use SQLite-native format: `YYYY-M
 `vnt_{orgId}_{16-hex-random}` — 128-bit entropy, SHA-256 hashed for storage
 
 ### Role Hierarchy
-`owner` > `admin` > `member` > `viewer`
+`owner` > `superadmin` > `ceo` > `admin` > `member` > `viewer`
 
 ### Free Tier
 50,000 events/calendar-month per org
@@ -3365,9 +3416,10 @@ CREATE TABLE audit_events (
 GET /v1/audit/log?limit=50&offset=0
 ```
 
-- **Auth:** `admin` or `owner` role required (403 for `member` and `viewer`)
+- **Auth:** `admin`, `superadmin`, or `owner` role required (403 for `ceo`, `member`, `viewer`)
 - **Response:** `{ events: AuditEvent[], total: number }`
 - **Pagination:** `limit` (max 200) + `offset`
+- **Filters:** `?since=`, `?until=` (ISO date), `?actor_role=`, `?resource_type=`, `?event_name=`
 
 ### Written By
 
@@ -3381,6 +3433,9 @@ Audit events are created by the following routes (using `waitUntil` for non-bloc
 | `POST /v1/auth/rotate` | `key.rotated` (owner) |
 | `POST /v1/alerts/slack/:orgId` | `alert.configured` |
 | `PUT /v1/admin/team-budgets/:team` | `budget.changed` |
+| `POST /v1/admin/budget-policies` | `budget.policy.created` |
+| `PUT /v1/admin/budget-policies/:id` | `budget.policy.updated` |
+| `DELETE /v1/admin/budget-policies/:id` | `budget.policy.deleted` |
 | `POST /v1/copilot/connect` | `copilot.connected` |
 | `DELETE /v1/copilot/connect` | `copilot.disconnected` |
 | `POST /v1/datadog/connect` | `datadog.connected` |

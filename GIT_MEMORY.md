@@ -44,17 +44,17 @@ d394858 fix(landing): strip security implementation details + replace gmail with
 | vantage-mcp | 1.1.1 |
 
 ## PR #60 Status — Enterprise RBAC (feat/enterprise-rbac-multiuser)
-All P0 + P1 gaps implemented. Ready for review + merge.
+All P0 + P1 gaps implemented. Docs updated. Ready for review + merge.
 
 ### Completed (this branch, 5 commits)
 **Schema & Data Layer**
-- migration/0015: business_unit/team/agent_name to otel_events; budget_policies enhancements
+- migration/0015: business_unit/team/agent_name to otel_events; budget_policies enhancements; superadmin/ceo roles added to org_members
 - migration/0016: developer_email + business_unit to events table; 6 compound indexes
 
 **Backend Routes**
 - auth.ts: full role hierarchy (owner>superadmin>ceo>admin>member>viewer); invite allowlist fixed; escalation guard; logAudit on PATCH
 - executive.ts: GET /v1/analytics/executive (ceo+ only); UNION events+cross_platform_usage
-- admin.ts: budget policies CRUD; GET /developers/recommendations; GET /budget-alerts?threshold_pct
+- admin.ts: budget policies CRUD (GET/POST/PUT/DELETE /v1/admin/budget-policies); GET /developers/recommendations; GET /budget-alerts?threshold_pct
 - admin.ts: GET /audit-log now supports ?since, ?until, ?actor_role, ?resource_type, ?event_name
 - analytics.ts: GET /business-units (spend per BU×team×provider); /teams COALESCE budget_policies
 - crossplatform.ts: GET /active-developers (live presence); ?business_unit= filter on /developers
@@ -68,5 +68,12 @@ All P0 + P1 gaps implemented. Ready for review + merge.
 
 **Tests**
 - tests/suites/43_enterprise_rbac: 14 sections (ER-A through ER-N), 80+ checks
+
+**Docs**
+- ADMIN_GUIDE.md: 6-level RBAC section, executive endpoint §11.4, budget policies CRUD §11.5, member ID-based delete/rotate notes, audit log filters, Quick Reference updated
+- docs.html: roles table expanded to 6 roles + executive dashboard column; budget policies CRUD + executive endpoint sections added
+
+## PR #59 Status — UI Polish (fix/landing-page-positioning)
+Merged. Changes: mobile sidebar toggle, landing page email/security badge updates, dashboard chart/layout fixes, auth cookie improvements.
 
 ### No remaining outstanding items

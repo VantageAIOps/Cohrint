@@ -3221,7 +3221,7 @@ function inviteMember() {
 
 function rotateMemberKey(memberId, email) {
   if (!confirm('Rotate API key for ' + email + '?')) return;
-  apiFetch('/v1/auth/members/' + memberId + '/rotate', {
+  apiFetch('/v1/auth/members/' + encodeURIComponent(memberId) + '/rotate', {
     method: 'POST',
     body: JSON.stringify({}),
   }).then(function() {
@@ -3233,7 +3233,7 @@ function rotateMemberKey(memberId, email) {
 
 function revokeMember(memberId, email) {
   if (!confirm('Revoke access for ' + email + '?')) return;
-  apiFetch('/v1/auth/members/' + memberId, {
+  apiFetch('/v1/auth/members/' + encodeURIComponent(memberId), {
     method: 'DELETE',
   }).then(function() {
     loadMembers();
@@ -4225,12 +4225,15 @@ function rotateApiKey() {
 
 function toggleSidebar() {
   var sidebar = document.querySelector('.sidebar');
+  if (!sidebar) return;
   var backdrop = document.getElementById('sidebar-backdrop');
   sidebar.classList.toggle('mobile-open');
   backdrop.classList.toggle('active');
 }
 function closeSidebar() {
-  document.querySelector('.sidebar').classList.remove('mobile-open');
+  var sidebar = document.querySelector('.sidebar');
+  if (!sidebar) return;
+  sidebar.classList.remove('mobile-open');
   document.getElementById('sidebar-backdrop').classList.remove('active');
 }
 

@@ -370,12 +370,22 @@ auth.patch('/members/:id', authMiddleware, adminOnly, async (c) => {
 
 // ── DELETE /v1/auth/members/:id — revoke member key (admin/owner only) ───────
 auth.delete('/members/:id', authMiddleware, adminOnly, async (c) => {
-  const orgId    = c.get('orgId');
-  const memberId = c.req.param('id');
+  const orgId      = c.get('orgId');
+  const memberId   = c.req.param('id');
+  const callerRole = c.get('role') as string;
 
   const removed = await c.env.DB.prepare(
     'SELECT email, role FROM org_members WHERE id = ? AND org_id = ?'
   ).bind(memberId, orgId).first<{ email: string; role: string }>();
+
+  if (removed) {
+    const ROLE_RANK: Record<string, number> = { viewer: 0, member: 1, admin: 2, ceo: 3, superadmin: 4, owner: 5 };
+    const callerRank = ROLE_RANK[callerRole] ?? -1;
+    const targetRank = ROLE_RANK[removed.role] ?? -1;
+    if (targetRank >= callerRank) {
+      return c.json({ error: 'Cannot remove a peer or higher-privileged member' }, 403);
+    }
+  }
 
   await c.env.DB.prepare(
     'DELETE FROM org_members WHERE id = ? AND org_id = ?'
@@ -397,10 +407,19 @@ auth.post('/members/:id/rotate', authMiddleware, adminOnly, async (c) => {
   const orgId    = c.get('orgId');
   const memberId = c.req.param('id');
 
+  const callerRole = c.get('role') as string;
+
   const member = await c.env.DB.prepare(
     'SELECT email, name, role, scope_team FROM org_members WHERE id = ? AND org_id = ?'
   ).bind(memberId, orgId).first<{ email: string; name: string; role: string; scope_team: string | null }>();
   if (!member) return c.json({ error: 'Member not found' }, 404);
+
+  const ROLE_RANK: Record<string, number> = { viewer: 0, member: 1, admin: 2, ceo: 3, superadmin: 4, owner: 5 };
+  const callerRank = ROLE_RANK[callerRole] ?? -1;
+  const targetRank = ROLE_RANK[member.role] ?? -1;
+  if (targetRank >= callerRank) {
+    return c.json({ error: 'Cannot rotate key for a peer or higher-privileged member' }, 403);
+  }
 
   const rawKey  = `vnt_${orgId}_${randomHex(16)}`;
   const keyHash = await sha256hex(rawKey);
@@ -612,7 +631,7 @@ auth.delete('/session', async (c) => {
   const isProdLogout = (c.env.ENVIRONMENT ?? 'production') === 'production';
   const clearCookie = isProdLogout
     ? 'vantage_session=; Path=/; HttpOnly; Max-Age=0; SameSite=None; Secure; Domain=vantageaiops.com'
-    : 'vantage_session=; Path=/; HttpOnly; Max-Age=0; SameSite=None; Secure';
+    : 'vantage_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax';
   (await res).headers.set('Set-Cookie', clearCookie);
   return res;
 });
@@ -631,7 +650,7 @@ auth.post('/logout', async (c) => {
   const isProd = (c.env.ENVIRONMENT ?? 'production') === 'production';
   const clearCookie = isProd
     ? 'vantage_session=; Path=/; HttpOnly; Max-Age=0; SameSite=None; Secure; Domain=vantageaiops.com'
-    : 'vantage_session=; Path=/; HttpOnly; Max-Age=0; SameSite=None; Secure';
+    : 'vantage_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax';
   (await res).headers.set('Set-Cookie', clearCookie);
   return res;
 });

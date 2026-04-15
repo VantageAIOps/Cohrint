@@ -337,7 +337,7 @@ const VALID_SCOPES = new Set(['org', 'team', 'developer', 'provider', 'team_prov
 const VALID_ENFORCEMENT = new Set(['alert', 'throttle', 'block']);
 
 // ── GET /v1/admin/budget-policies — list all budget policies ─────────────────
-admin.get('/budget-policies', async (c) => {
+admin.get('/budget-policies', adminOnly, async (c) => {
   const orgId = c.get('orgId');
 
   const { results } = await c.env.DB.prepare(`
@@ -439,7 +439,10 @@ admin.put('/budget-policies/:id', async (c) => {
   const updates: string[] = ["updated_at = datetime('now')"];
   const params: unknown[] = [];
 
-  if (typeof body.monthly_limit_usd === 'number' && body.monthly_limit_usd > 0) {
+  if (body.monthly_limit_usd !== undefined) {
+    if (typeof body.monthly_limit_usd !== 'number' || body.monthly_limit_usd <= 0) {
+      return c.json({ error: 'monthly_limit_usd must be a positive number' }, 400);
+    }
     updates.push('monthly_limit_usd = ?'); params.push(body.monthly_limit_usd);
   }
   if (typeof body.alert_threshold_50 === 'boolean') {
@@ -513,9 +516,9 @@ admin.get('/developers/recommendations', async (c) => {
     GROUP BY developer_email, team
     ORDER BY total_cost DESC
     LIMIT 50
-  `).bind(orgId, since).all();
+  `).bind(orgId, since).all<{ developer_email: string; team: string; total_cost: number; commits: number; pull_requests: number; lines_added: number; lines_removed: number; cached_tokens: number; total_tokens: number }>();
 
-  const recs = (results ?? []).map((d: any) => {
+  const recs = (results ?? []).map((d) => {
     const costPerPR     = d.pull_requests > 0 ? +(d.total_cost / d.pull_requests).toFixed(4) : null;
     const costPerCommit = d.commits > 0       ? +(d.total_cost / d.commits).toFixed(4) : null;
     const cacheRate     = d.total_tokens > 0  ? +(d.cached_tokens / d.total_tokens * 100).toFixed(1) : null;
@@ -609,7 +612,7 @@ admin.get('/budget-alerts', async (c) => {
     }
   }
 
-  alerts.sort((a: any, b: any) => b.budget_pct - a.budget_pct);
+  alerts.sort((a, b) => (b as { budget_pct: number }).budget_pct - (a as { budget_pct: number }).budget_pct);
 
   return c.json({ alerts, threshold_pct: threshold, generated_at: new Date().toISOString() });
 });

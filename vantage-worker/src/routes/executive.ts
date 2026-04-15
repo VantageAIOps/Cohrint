@@ -40,8 +40,8 @@ executive.get('/', async (c) => {
 
   // ── 1. Org summary ─────────────────────────────────────────────────────────
   const org = await c.env.DB.prepare(
-    'SELECT name, email, plan, budget_usd FROM orgs WHERE id = ?'
-  ).bind(orgId).first<{ name: string; email: string; plan: string; budget_usd: number }>();
+    'SELECT name, plan, budget_usd FROM orgs WHERE id = ?'
+  ).bind(orgId).first<{ name: string; plan: string; budget_usd: number }>();
 
   // UNION totals from both tables
   const orgTotals = await c.env.DB.prepare(`
@@ -175,17 +175,24 @@ executive.get('/', async (c) => {
     FROM all_usage
     GROUP BY developer_email, team
     ORDER BY cost DESC LIMIT 15
-  `).bind(orgId, sinceIso, orgId, sinceUnix).all<any>();
+  `).bind(orgId, sinceIso, orgId, sinceUnix).all<{ developer_email: string; team: string; cost: number; pull_requests: number; commits: number; lines_added: number; providers: string | null }>();
 
   // ── 5. Budget policies overview ────────────────────────────────────────────
+  interface PolicyRow {
+    scope: string;
+    scope_target: string | null;
+    provider_target: string | null;
+    monthly_limit_usd: number;
+    enforcement: string;
+  }
   const { results: policies } = await c.env.DB.prepare(`
     SELECT scope, scope_target, provider_target, monthly_limit_usd, enforcement
     FROM budget_policies WHERE org_id = ?
     ORDER BY scope, scope_target
-  `).bind(orgId).all<any>();
+  `).bind(orgId).all<PolicyRow>();
 
   // Attach current MTD spend to each policy
-  const policiesWithSpend = await Promise.all((policies ?? []).map(async (p: any) => {
+  const policiesWithSpend = await Promise.all((policies ?? []).map(async (p: PolicyRow) => {
     let spend = 0;
     if (p.scope === 'org') {
       spend = mtdCost;
@@ -271,7 +278,7 @@ executive.get('/', async (c) => {
     },
     by_team:       [...teamMap.values()],
     by_provider:   providerRows ?? [],
-    top_developers: (topDevs ?? []).map((d: any) => ({
+    top_developers: (topDevs ?? []).map((d) => ({
       developer_email: d.developer_email,
       team:            d.team,
       cost:            +(d.cost ?? 0).toFixed(4),
