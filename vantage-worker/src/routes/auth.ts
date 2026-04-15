@@ -25,9 +25,15 @@ function randomHex(bytes = 8): string {
 
 // ── POST /v1/auth/signup — public, creates org + owner key ───────────────────
 auth.post('/signup', async (c) => {
-  let body: { email?: string; name?: string; org?: string };
+  let body: { email?: string; name?: string; org?: string; account_type?: string };
   try { body = await c.req.json(); }
   catch { return c.json({ error: 'Invalid JSON body' }, 400); }
+
+  const VALID_ACCOUNT_TYPES = ['individual', 'team', 'organization'] as const;
+  const rawAccountType = body.account_type ?? 'organization';
+  const accountType = (VALID_ACCOUNT_TYPES as readonly string[]).includes(rawAccountType)
+    ? rawAccountType as 'individual' | 'team' | 'organization'
+    : 'organization';
 
   // Rate limit signup: 30 per IP per hour (degrade gracefully if KV unavailable)
   // CI bypass: X-Vantage-CI header with matching secret skips rate limiting
@@ -73,16 +79,17 @@ auth.post('/signup', async (c) => {
   const keyHint = `${rawKey.slice(0, 12)}...`;
 
   await c.env.DB.prepare(`
-    INSERT INTO orgs (id, api_key_hash, api_key_hint, name, email, plan, created_at)
-    VALUES (?, ?, ?, ?, ?, 'free', unixepoch())
-  `).bind(orgId, keyHash, keyHint, name || orgId, email).run();
+    INSERT INTO orgs (id, api_key_hash, api_key_hint, name, email, plan, account_type, created_at)
+    VALUES (?, ?, ?, ?, ?, 'free', ?, unixepoch())
+  `).bind(orgId, keyHash, keyHint, name || orgId, email, accountType).run();
 
   return c.json({
-    ok:        true,
-    api_key:   rawKey,
-    org_id:    orgId,
-    hint:      keyHint,
-    dashboard: `https://cohrint.com/app.html?api_key=${rawKey}&org=${orgId}`,
+    ok:           true,
+    api_key:      rawKey,
+    org_id:       orgId,
+    account_type: accountType,
+    hint:         keyHint,
+    dashboard:    `https://cohrint.com/app.html?api_key=${rawKey}&org=${orgId}`,
   }, 201);
 });
 
@@ -235,15 +242,24 @@ auth.post('/recover/redeem', async (c) => {
 // ── POST /v1/auth/members — invite a member (admin/owner only) ────────────────
 auth.post('/members', authMiddleware, adminOnly, async (c) => {
   const orgId = c.get('orgId');
-  let body: { email?: string; name?: string; role?: string; scope_team?: string };
+  const accountType = c.get('accountType');
+
+  // Individual accounts cannot have members
+  if (accountType === 'individual') {
+    return c.json({ error: 'Individual accounts cannot have team members.' }, 403);
+  }
+
+  let body: { email?: string; name?: string; role?: string; scope_team?: string; team_id?: string };
   try { body = await c.req.json(); }
   catch { return c.json({ error: 'Invalid JSON body' }, 400); }
 
   const email     = (body.email ?? '').trim().toLowerCase();
   const name      = (body.name  ?? '').trim();
-  // Only allow assigning roles up to (but not exceeding) the inviter's own role.
-  // owner/superadmin can assign any role; admin can assign admin and below; etc.
-  const VALID_ROLES = ['viewer', 'member', 'admin', 'ceo', 'superadmin'];
+  // team accounts: only member/viewer (owner is implicit admin)
+  // organization accounts: superadmin/member/viewer
+  const VALID_ROLES = accountType === 'team'
+    ? ['member', 'viewer']
+    : ['viewer', 'member', 'superadmin', 'admin'];
   const inviterRole = c.get('role') as string;
   const { hasRole: hr } = await import('../middleware/auth');
   const requestedRole = body.role ?? 'member';
@@ -252,6 +268,22 @@ auth.post('/members', authMiddleware, adminOnly, async (c) => {
     ? requestedRole
     : 'member';
   const scopeTeam = body.scope_team?.trim() || null;
+
+  // For organization accounts, require and validate team_id
+  const rawTeamId = body.team_id?.trim() || null;
+  let inviteTeamId: string | null = null;
+  if (accountType === 'organization') {
+    if (!rawTeamId) {
+      return c.json({ error: 'organization accounts require a team_id when inviting members.' }, 400);
+    }
+    const team = await c.env.DB.prepare(
+      'SELECT id FROM teams WHERE id = ? AND org_id = ? AND deleted_at IS NULL'
+    ).bind(rawTeamId, orgId).first<{ id: string }>();
+    if (!team) {
+      return c.json({ error: `Team '${rawTeamId}' not found in this org.` }, 404);
+    }
+    inviteTeamId = rawTeamId;
+  }
 
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return c.json({ error: 'Valid email is required' }, 400);
@@ -268,9 +300,9 @@ auth.post('/members', authMiddleware, adminOnly, async (c) => {
   const keyHint  = `${rawKey.slice(0, 12)}...`;
 
   await c.env.DB.prepare(`
-    INSERT INTO org_members (id, org_id, email, name, role, api_key_hash, api_key_hint, scope_team, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, unixepoch())
-  `).bind(memberId, orgId, email, name || null, role, keyHash, keyHint, scopeTeam).run();
+    INSERT INTO org_members (id, org_id, email, name, role, api_key_hash, api_key_hint, scope_team, team_id, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, unixepoch())
+  `).bind(memberId, orgId, email, name || null, role, keyHash, keyHint, scopeTeam, inviteTeamId).run();
 
   // Get org name for the invite email
   const org = await c.env.DB.prepare('SELECT name, email FROM orgs WHERE id = ?')
