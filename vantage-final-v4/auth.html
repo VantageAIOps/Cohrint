@@ -150,9 +150,14 @@ function _checkExistingSession() {
   fetch(`${API}/v1/auth/session`, { credentials: 'include' })
     .then(res => {
       if (res.ok) {
-        const raw  = new URLSearchParams(window.location.search).get('next') || '/app.html';
-        const dest = (raw.startsWith('/') && !raw.startsWith('//') && !raw.startsWith('/auth')) ? raw : '/app.html';
-        window.location.replace(dest);
+        const raw  = new URLSearchParams(window.location.search).get('next') || '';
+        const dest = (raw.startsWith('/') && !raw.startsWith('//') && !raw.startsWith('/auth')) ? raw : '';
+        if (dest) { window.location.replace(dest); return; }
+        res.json().then(function(data) {
+          var role = (data && data.role) || 'member';
+          var defaultView = role === 'ceo' ? 'executive' : (role === 'superadmin' || role === 'owner') ? 'admin' : 'overview';
+          window.location.replace('/app.html?view=' + defaultView);
+        }).catch(function() { window.location.replace('/app.html'); });
       }
     })
     .catch(() => { /* not signed in, show form */ });
@@ -208,9 +213,13 @@ async function doSignIn() {
       throw new Error('invalid');
     }
     if (!res.ok) throw new Error('server');
-    const raw = new URLSearchParams(window.location.search).get('next') || '/app.html';
-    const next = (raw.startsWith('/') && !raw.startsWith('//') && !raw.startsWith('/auth')) ? raw : '/app.html';
-    window.location.replace(next);
+    const raw = new URLSearchParams(window.location.search).get('next') || '';
+    const next = (raw.startsWith('/') && !raw.startsWith('//') && !raw.startsWith('/auth')) ? raw : '';
+    if (next) { window.location.replace(next); return; }
+    const sessionData = await res.json().catch(() => ({}));
+    var role = sessionData.role || 'member';
+    var defaultView = role === 'ceo' ? 'executive' : (role === 'superadmin' || role === 'owner') ? 'admin' : 'overview';
+    window.location.replace('/app.html?view=' + defaultView);
   } catch(e) {
     btn.disabled = false;
     btn.textContent = 'Sign in →';

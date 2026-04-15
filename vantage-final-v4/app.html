@@ -1918,9 +1918,27 @@ function applyRoleUI(role) {
   var execSection = document.getElementById('sb-section-executive');
   if (execSection) execSection.style.display = isExec ? '' : 'none';
 
+  // Remove executive nav from DOM entirely for non-ceo roles
+  if (!isExec) {
+    var execNavBtn = document.getElementById('sb-executive');
+    if (execNavBtn) {
+      var execLi = execNavBtn.closest('li, .nav-item') || execNavBtn.parentElement;
+      if (execLi) execLi.remove(); else execNavBtn.remove();
+    }
+  }
+
   // Role badge on executive view
   var roleBadge = document.getElementById('exec-role-badge');
   if (roleBadge) roleBadge.textContent = role.toUpperCase();
+
+  // Handle ?view= URL param now that role is known
+  var _urlView = new URLSearchParams(window.location.search).get('view');
+  if (_urlView) {
+    // Guard: redirect non-ceo away from executive
+    if (_urlView === 'executive' && !isExec) _urlView = 'overview';
+    var _navBtn = document.querySelector('[onclick*="nav(\'' + _urlView + '\'"]') || null;
+    nav(_urlView, _navBtn);
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1928,6 +1946,12 @@ function applyRoleUI(role) {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function nav(view, btn) {
+  // Guard: block non-ceo from accessing executive view
+  var _navRole = (_session && (_session.role || (_session.user && _session.user.role))) || 'member';
+  if (view === 'executive' && !hasRole(_navRole, 'ceo')) {
+    view = 'overview';
+    btn = document.querySelector('[onclick*="nav(\'overview\'"]') || null;
+  }
   // Tear down SSE when leaving overview to avoid idle connections
   if (activeView === 'overview' && view !== 'overview') {
     if (_sseSource) { _sseSource.close(); _sseSource = null; }
