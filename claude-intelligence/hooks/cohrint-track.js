@@ -152,7 +152,7 @@ async function parseNewMessages(filePath, uploadedIds) {
         prompt_tokens:     inputTokens,
         completion_tokens: outputTokens,
         cache_tokens:      cacheRead,
-        total_tokens:      inputTokens + outputTokens + cacheWrite,
+        total_tokens:      inputTokens + outputTokens,
         total_cost_usd:    calcCost(model, inputTokens, outputTokens, cacheRead, cacheWrite),
         environment:       'local',
         agent_name:        'claude-code',

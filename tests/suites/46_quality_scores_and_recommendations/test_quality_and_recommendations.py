@@ -186,15 +186,15 @@ class TestQualityScoresIngestion:
         })
         chk("QS.06 member key can submit scores", r.status_code == 200, f"got {r.status_code}")
 
-    def test_qs07_org_isolation_cross_org_score_ignored(self):
-        """Score update on a different org's event_id should silently no-op (rows_affected=0)."""
+    def test_qs07_org_isolation_cross_org_score_rejected(self):
+        """Score update on a fabricated/cross-org event_id should return 404 (event not found in this org)."""
         # Use a fabricated event_id that doesn't belong to this org
         fake_id = f"cross-org-{uuid.uuid4()}"
         r = _api("patch", f"/v1/events/{fake_id}/scores", key=MEMBER_KEY, json={
             "hallucination_score": 0.99,
         })
-        # API returns 200 ok:true regardless (SQL WHERE id=? AND org_id=? filters it)
-        chk("QS.07 cross-org score → 200 (no-op, not 403)", r.status_code == 200, f"got {r.status_code}")
+        # API now does an existence check before updating — returns 404 if not found in this org
+        chk("QS.07 cross-org score → 404 (event not found, org isolation enforced)", r.status_code == 404, f"got {r.status_code}")
 
     def test_qs08_score_zero_is_valid(self):
         event_id = _ingest_event()

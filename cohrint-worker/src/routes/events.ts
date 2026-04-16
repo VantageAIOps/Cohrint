@@ -391,8 +391,8 @@ events.patch('/:id/scores', async (c) => {
   for (const field of FLOAT_FIELDS) {
     if (field in body) {
       const v = body[field];
-      if (typeof v !== 'number' || v < 0 || v > 1) {
-        errors.push(`${field} must be a number between 0.0 and 1.0`);
+      if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 1) {
+        errors.push(`${field} must be a finite number between 0.0 and 1.0`);
       }
     }
   }

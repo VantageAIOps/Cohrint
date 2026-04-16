@@ -577,9 +577,16 @@ admin.get('/developers/recommendations', async (c) => {
   recs.sort((a, b) => b.savings_opportunity_usd - a.savings_opportunity_usd);
 
   // Explain when empty — helps the dashboard show a meaningful message
-  const empty_reason = recs.length === 0
-    ? 'No cross-platform usage data. Connect GitHub via the Integrations tab to populate developer efficiency metrics.'
-    : null;
+  // Check whether the org has *any* cross-platform data at all (not just in this period)
+  let empty_reason: string | null = null;
+  if (recs.length === 0) {
+    const anyData = await c.env.DB.prepare(
+      'SELECT 1 FROM cross_platform_usage WHERE org_id = ? LIMIT 1'
+    ).bind(orgId).first();
+    empty_reason = anyData
+      ? `No developer efficiency data for the selected period (${days}d). Try a longer range.`
+      : 'No cross-platform usage data yet. Connect GitHub via the Integrations tab to populate developer efficiency metrics.';
+  }
 
   return c.json({ period_days: days, recommendations: recs, empty_reason });
 });
