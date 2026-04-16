@@ -1952,7 +1952,7 @@ function toolInitial(provider) {
 // ── API cache (localStorage) ──
 function _cacheKey(path) {
   var orgId = _session ? ((_session.user || _session).org_id || '') : '';
-  return 'vantage_cache:' + orgId + ':' + path;
+  return 'cohrint_cache:' + orgId + ':' + path;
 }
 function _cacheGet(path) {
   try {
@@ -4884,7 +4884,7 @@ function signOut() {
   // Clear cached API responses so next user can't see previous user's data
   try {
     Object.keys(localStorage).forEach(function(k) {
-      if (k.startsWith('vantage_cache:')) localStorage.removeItem(k);
+      if (k.startsWith('cohrint_cache:') || k.startsWith('vantage_cache:')) localStorage.removeItem(k);
     });
   } catch (_) {}
   // Close SSE if open

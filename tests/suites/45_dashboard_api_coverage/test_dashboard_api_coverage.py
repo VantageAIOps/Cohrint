@@ -22,6 +22,7 @@ import json
 import random
 import sys
 import time
+import uuid
 from pathlib import Path
 
 import pytest
@@ -59,6 +60,7 @@ def _load_seed_state() -> dict | None:
 def _seed_event(headers: dict, model: str = "claude-sonnet-4-6", streaming: bool = False) -> None:
     """Ingest one synthetic event so analytics endpoints have data."""
     payload = {
+        "event_id": f"da45-{uuid.uuid4()}",
         "provider": "anthropic",
         "model": model,
         "prompt_tokens": random.randint(500, 2000),
@@ -69,7 +71,8 @@ def _seed_event(headers: dict, model: str = "claude-sonnet-4-6", streaming: bool
     }
     if streaming:
         payload["streaming"] = True
-    requests.post(f"{API_URL}/v1/events", json=payload, headers=headers, timeout=10)
+    r = requests.post(f"{API_URL}/v1/events", json=payload, headers=headers, timeout=10)
+    assert r.status_code in (200, 201), f"_seed_event failed: {r.status_code} {r.text[:200]}"
 
 
 def _seed_events(headers: dict, count: int = 5) -> None:

@@ -62,7 +62,9 @@ function lookupPrice(model) {
 
 function calcCost(model, inputTokens, outputTokens, cacheRead, cacheWrite) {
   const p = lookupPrice(model) ?? { input: 3, output: 15, cache: 0.3, cacheWrite: 3.75 };
-  const regularInput = Math.max(0, inputTokens - cacheRead - cacheWrite);
+  // Anthropic's input_tokens already excludes cache_creation_input_tokens but includes cache_read_input_tokens.
+  // Only subtract cacheRead to get the non-cached regular input portion.
+  const regularInput = Math.max(0, inputTokens - cacheRead);
   return (regularInput  / 1e6) * p.input
        + (cacheRead     / 1e6) * p.cache
        + (cacheWrite    / 1e6) * p.cacheWrite
@@ -152,7 +154,7 @@ async function parseNewMessages(filePath, uploadedIds) {
         prompt_tokens:     inputTokens,
         completion_tokens: outputTokens,
         cache_tokens:      cacheRead,
-        total_tokens:      inputTokens + outputTokens + cacheWrite,
+        total_tokens:      inputTokens + outputTokens,
         total_cost_usd:    calcCost(model, inputTokens, outputTokens, cacheRead, cacheWrite),
         environment:       'local',
         agent_name:        'claude-code',

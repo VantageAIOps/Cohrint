@@ -1143,19 +1143,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 server.setRequestHandler(ListResourcesRequestSchema, async () => ({
   resources: [
     {
-      uri: 'vantage://dashboard',
+      uri: 'cohrint://dashboard',
       name: 'Cohrint Dashboard',
       description: 'Live cost analytics dashboard',
       mimeType: 'text/plain',
     },
     {
-      uri: 'vantage://docs',
+      uri: 'cohrint://docs',
       name: 'Cohrint Docs',
       description: 'SDK integration guides and API reference',
       mimeType: 'text/plain',
     },
     {
-      uri: 'vantage://config',
+      uri: 'cohrint://config',
       name: 'Current MCP Config',
       description: 'Active API key, org, and base URL',
       mimeType: 'text/plain',
@@ -1167,13 +1167,13 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   const { uri } = request.params;
 
   switch (uri) {
-    case 'vantage://dashboard':
+    case 'cohrint://dashboard':
       return { contents: [{ uri, mimeType: 'text/plain', text: 'Dashboard: https://cohrint.com/app.html' }] };
 
-    case 'vantage://docs':
+    case 'cohrint://docs':
       return { contents: [{ uri, mimeType: 'text/plain', text: 'Docs: https://cohrint.com/docs.html' }] };
 
-    case 'vantage://config':
+    case 'cohrint://config':
       return {
         contents: [{
           uri,

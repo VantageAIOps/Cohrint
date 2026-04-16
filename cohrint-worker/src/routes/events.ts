@@ -285,11 +285,17 @@ events.post('/batch', async (c) => {
     }, 429);
   }
 
-  const batchCost = body.events.reduce((s, ev) => s + (ev.total_cost_usd ?? ev.cost_total_usd ?? 0), 0);
-  const batchTeam = body.events[0]?.team ?? null;
-  const batchBudgetCheck = await checkBudgetPolicy(c.env.DB, c.env.KV, orgId, batchCost, batchTeam ?? null);
-  if (batchBudgetCheck.blocked) {
-    return c.json({ error: 'Budget limit exceeded', budget_pct: batchBudgetCheck.pct, policy_id: batchBudgetCheck.policy_id }, 429);
+  // Check budget per unique team in the batch (not just events[0]) to enforce all team-level policies
+  const teamCosts = new Map<string | null, number>();
+  for (const ev of body.events) {
+    const t = ev.team ?? null;
+    teamCosts.set(t, (teamCosts.get(t) ?? 0) + (ev.total_cost_usd ?? ev.cost_total_usd ?? 0));
+  }
+  for (const [team, cost] of teamCosts) {
+    const budgetCheck = await checkBudgetPolicy(c.env.DB, c.env.KV, orgId, cost, team);
+    if (budgetCheck.blocked) {
+      return c.json({ error: 'Budget limit exceeded', budget_pct: budgetCheck.pct, policy_id: budgetCheck.policy_id }, 429);
+    }
   }
 
   // Prompt-hash dedup — check KV for each event that includes a prompt_hash
@@ -391,8 +397,8 @@ events.patch('/:id/scores', async (c) => {
   for (const field of FLOAT_FIELDS) {
     if (field in body) {
       const v = body[field];
-      if (typeof v !== 'number' || v < 0 || v > 1) {
-        errors.push(`${field} must be a number between 0.0 and 1.0`);
+      if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 1) {
+        errors.push(`${field} must be a finite number between 0.0 and 1.0`);
       }
     }
   }
