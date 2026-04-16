@@ -24,7 +24,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).parent.parent.parent.parent
-sys.path.insert(0, str(ROOT / "vantage-agent"))
+sys.path.insert(0, str(ROOT / "cohrint-agent"))
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from config.settings import API_URL
@@ -39,7 +39,7 @@ from vantage_agent.recommendations import (
     get_recommendations, SessionMetrics, normalize_agent_name,
 )
 
-AGENT_DIR = ROOT / "vantage-agent" / "vantage_agent"
+AGENT_DIR = ROOT / "cohrint-agent" / "vantage_agent"
 
 
 def file_exists(path: Path) -> bool:
@@ -351,15 +351,15 @@ class TestConfigAndErrors:
 
     def test_ci34_pyproject_or_setup_valid(self):
         section("F --- Config & Module Checks")
-        pyproject = ROOT / "vantage-agent" / "pyproject.toml"
-        setup_py = ROOT / "vantage-agent" / "setup.py"
+        pyproject = ROOT / "cohrint-agent" / "pyproject.toml"
+        setup_py = ROOT / "cohrint-agent" / "setup.py"
         has_config = pyproject.exists() or setup_py.exists()
         chk("CI.34 pyproject.toml or setup.py exists", has_config)
         assert has_config
 
     def test_ci35_no_heavy_runtime_deps(self):
         """vantage-agent should not depend on heavy npm-style libraries."""
-        pyproject = ROOT / "vantage-agent" / "pyproject.toml"
+        pyproject = ROOT / "cohrint-agent" / "pyproject.toml"
         if not pyproject.exists():
             pytest.skip("pyproject.toml not found")
         content = pyproject.read_text()
@@ -371,7 +371,7 @@ class TestConfigAndErrors:
 
     def test_ci36_cli_entrypoint_configured(self):
         """vantage-agent should expose a CLI entrypoint."""
-        pyproject = ROOT / "vantage-agent" / "pyproject.toml"
+        pyproject = ROOT / "cohrint-agent" / "pyproject.toml"
         if not pyproject.exists():
             pytest.skip("pyproject.toml not found")
         content = pyproject.read_text()

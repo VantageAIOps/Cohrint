@@ -8,7 +8,7 @@ on:
     branches:
       - main
     paths:
-      - 'vantage-worker/**'
+      - 'cohrint-worker/**'
       - '.github/workflows/deploy-worker.yml'
   workflow_dispatch:  # manual trigger from GitHub Actions UI
 
@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: vantage-worker
+        working-directory: cohrint-worker
 
     steps:
       - uses: actions/checkout@v4
@@ -28,7 +28,7 @@ jobs:
         with:
           node-version: '24'
           cache: 'npm'
-          cache-dependency-path: vantage-worker/package-lock.json
+          cache-dependency-path: cohrint-worker/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -42,7 +42,7 @@ jobs:
     needs: typecheck
     defaults:
       run:
-        working-directory: vantage-worker
+        working-directory: cohrint-worker
 
     steps:
       - uses: actions/checkout@v4
@@ -52,7 +52,7 @@ jobs:
         with:
           node-version: '24'
           cache: 'npm'
-          cache-dependency-path: vantage-worker/package-lock.json
+          cache-dependency-path: cohrint-worker/package-lock.json
 
       - name: Install dependencies
         run: npm ci

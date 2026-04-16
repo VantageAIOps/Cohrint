@@ -1,6 +1,6 @@
 name = "cohrint"
 compatibility_date = "2024-01-01"
-pages_build_output_dir = "./vantage-final-v4"
+pages_build_output_dir = "./cohrint-frontend"
 
 # ── Environment variables (non-secret, commit-safe)
 [vars]

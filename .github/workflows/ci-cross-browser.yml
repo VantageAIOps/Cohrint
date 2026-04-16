@@ -17,7 +17,7 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'vantage-final-v4/**'
+      - 'cohrint-frontend/**'
       - 'tests/suites/15_cross_browser/**'
       - 'tests/helpers/browser.py'
       - '.github/workflows/ci-cross-browser.yml'

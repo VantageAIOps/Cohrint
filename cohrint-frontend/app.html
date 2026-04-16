@@ -1428,6 +1428,35 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
               </div>
             </div>
           </div>
+          <!-- ── Team Management (org accounts only) ── -->
+          <div class="card" id="teamMgmtCard" style="display:none;">
+            <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+              <div class="card-title" style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:18px;">👥</span> Teams
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="showCreateTeamForm()">+ New Team</button>
+            </div>
+            <p style="font-size:12px;color:var(--text-secondary);margin-bottom:14px;">
+              Manage teams within your organization. Invite members directly to a team.
+            </p>
+
+            <!-- Create team form (hidden by default) -->
+            <div id="createTeamForm" style="display:none;margin-bottom:16px;padding:12px;background:var(--bg-secondary);border-radius:6px;border:1px solid var(--border);">
+              <div class="form-group" style="margin-bottom:10px;">
+                <label>Team Name</label>
+                <input type="text" id="newTeamName" placeholder="e.g. Backend, ML, Platform" autocomplete="off">
+              </div>
+              <div style="display:flex;gap:8px;">
+                <button class="btn btn-primary btn-sm" onclick="createTeam()">Create</button>
+                <button class="btn btn-sm" onclick="hideCreateTeamForm()">Cancel</button>
+              </div>
+              <div id="createTeamStatus" style="margin-top:8px;font-size:11px;font-family:var(--font-mono);color:var(--text-muted);"></div>
+            </div>
+
+            <!-- Teams list -->
+            <div id="teamsList" style="display:flex;flex-direction:column;gap:8px;"></div>
+            <div id="teamsEmpty" style="display:none;font-size:12px;color:var(--text-muted);font-style:italic;">No teams yet. Create one above.</div>
+          </div>
         </div>
       </div>
 
@@ -1680,6 +1709,12 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
         <option value="admin">Admin</option>
         <option value="ceo" class="invite-elevated-role">CEO</option>
         <option value="superadmin" class="invite-elevated-role">Superadmin</option>
+      </select>
+    </div>
+    <div class="form-group" id="inviteTeamIdGroup" style="display:none;">
+      <label>Assign to Team <span style="color:var(--danger,#e74c3c)">*</span></label>
+      <select id="inviteTeamId">
+        <option value="">— select a team —</option>
       </select>
     </div>
     <div class="form-group">
@@ -2016,6 +2051,10 @@ function applyRoleUI(role) {
   // Role badge on executive view
   var roleBadge = document.getElementById('exec-role-badge');
   if (roleBadge) roleBadge.textContent = role.toUpperCase();
+
+  // Settings tab: admin+ only
+  var settingsBtn = document.getElementById('sb-settings');
+  if (settingsBtn) settingsBtn.style.display = isAdmin ? '' : 'none';
 
   // Budget Control Center: superadmin/owner only
   var bcPanel = document.getElementById('budget-control-panel');
@@ -3135,7 +3174,7 @@ function loadMembers() {
         tr.appendChild(td3);
 
         var td4 = document.createElement('td');
-        td4.textContent = m.scope_team || m.team || '-';
+        td4.textContent = m.team_id || m.scope_team || m.team || '-';
         tr.appendChild(td4);
 
         // Spend MTD cell
@@ -3302,6 +3341,28 @@ function showInviteModal() {
   elevatedOpts.forEach(function(el) {
     el.style.display = hasRole(currentRole, 'superadmin') ? '' : 'none';
   });
+  // For org accounts, load teams and show team_id selector
+  var accountType = (_session && (_session.account_type || (_session.org && _session.org.account_type))) || 'organization';
+  var teamIdGroup = document.getElementById('inviteTeamIdGroup');
+  if (accountType === 'organization') {
+    teamIdGroup.style.display = '';
+    apiFetch('/v1/teams').then(function(data) {
+      var sel = document.getElementById('inviteTeamId');
+      while (sel.options.length > 0) sel.remove(0);
+      var placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = '\u2014 select a team \u2014';
+      sel.appendChild(placeholder);
+      (data.teams || []).forEach(function(t) {
+        var opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = t.name + ' (' + t.id + ')';
+        sel.appendChild(opt);
+      });
+    }).catch(function() {});
+  } else {
+    teamIdGroup.style.display = 'none';
+  }
 }
 
 function closeModal(id) {
@@ -3319,12 +3380,17 @@ function inviteMember() {
   var name = document.getElementById('inviteName').value.trim();
   var role = document.getElementById('inviteRole').value;
   var team = document.getElementById('inviteTeam').value.trim();
+  var teamId = document.getElementById('inviteTeamId').value.trim();
 
   if (!email) { alert('Email is required'); return; }
 
+  var payload = { email: email, name: name, role: role };
+  if (team) payload.scope_team = team;
+  if (teamId) payload.team_id = teamId;
+
   apiFetch('/v1/auth/members', {
     method: 'POST',
-    body: JSON.stringify({ email: email, name: name, role: role, scope_team: team || undefined }),
+    body: JSON.stringify(payload),
   }).then(function() {
     closeModal('inviteModal');
     loadMembers();
@@ -3586,6 +3652,88 @@ function loadSettings() {
   loadBenchmarkOptIn();
   loadCopilotStatus();
   loadClaudeCodeStatus();
+  loadTeamMgmt();
+}
+
+/* ── Team Management ── */
+
+function loadTeamMgmt() {
+  var accountType = (_session && (_session.account_type || (_session.org && _session.org.account_type))) || 'organization';
+  var role        = (_session && (_session.role || (_session.user && _session.user.role))) || 'member';
+  var card = document.getElementById('teamMgmtCard');
+  if (!card) return;
+  if (accountType !== 'organization' || !hasRole(role, 'admin')) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  refreshTeamsList();
+}
+
+function refreshTeamsList() {
+  apiFetch('/v1/teams').then(function(data) {
+    var teams = data.teams || [];
+    var list  = document.getElementById('teamsList');
+    var empty = document.getElementById('teamsEmpty');
+    while (list.firstChild) list.removeChild(list.firstChild);
+    if (teams.length === 0) { empty.style.display = ''; return; }
+    empty.style.display = 'none';
+    teams.forEach(function(t) {
+      var row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--bg-secondary);border-radius:6px;border:1px solid var(--border);';
+
+      var info = document.createElement('div');
+      var nameSpan = document.createElement('span');
+      nameSpan.style.cssText = 'font-size:13px;font-weight:600;color:var(--text-primary);';
+      nameSpan.textContent = t.name;
+      var idSpan = document.createElement('span');
+      idSpan.style.cssText = 'font-size:10px;font-family:var(--font-mono);color:var(--text-muted);margin-left:8px;';
+      idSpan.textContent = t.id;
+      info.appendChild(nameSpan);
+      info.appendChild(idSpan);
+
+      var btn = document.createElement('button');
+      btn.className = 'btn btn-danger btn-sm';
+      btn.textContent = 'Delete';
+      btn.onclick = (function(tid) { return function() { deleteTeam(tid); }; })(t.id);
+
+      row.appendChild(info);
+      row.appendChild(btn);
+      list.appendChild(row);
+    });
+  }).catch(function() {});
+}
+
+function showCreateTeamForm() {
+  document.getElementById('createTeamForm').style.display = '';
+  document.getElementById('newTeamName').focus();
+}
+
+function hideCreateTeamForm() {
+  document.getElementById('createTeamForm').style.display = 'none';
+  document.getElementById('newTeamName').value = '';
+  document.getElementById('createTeamStatus').textContent = '';
+}
+
+function createTeam() {
+  var name = document.getElementById('newTeamName').value.trim();
+  var status = document.getElementById('createTeamStatus');
+  if (!name) { status.textContent = 'Team name is required.'; return; }
+  status.textContent = 'Creating\u2026';
+  apiFetch('/v1/teams', { method: 'POST', body: JSON.stringify({ name: name }) }).then(function(d) {
+    status.textContent = '\u2713 Team created.';
+    document.getElementById('newTeamName').value = '';
+    refreshTeamsList();
+    setTimeout(hideCreateTeamForm, 1200);
+  }).catch(function(e) {
+    status.textContent = '\u2717 ' + (e.message || 'Failed to create team.');
+  });
+}
+
+function deleteTeam(teamId) {
+  if (!confirm('Delete team "' + teamId + '"? Members will be unassigned but not removed.')) return;
+  apiFetch('/v1/teams/' + encodeURIComponent(teamId), { method: 'DELETE' }).then(function() {
+    refreshTeamsList();
+  }).catch(function(e) {
+    alert('Failed to delete team: ' + (e.message || 'unknown error'));
+  });
 }
 
 /* ── GitHub Copilot ── */

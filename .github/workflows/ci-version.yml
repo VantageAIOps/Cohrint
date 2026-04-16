@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: vantage-worker
+        working-directory: cohrint-worker
     steps:
       - uses: actions/checkout@v4
 
@@ -48,7 +48,7 @@ jobs:
         with:
           node-version: '24'
           cache: 'npm'
-          cache-dependency-path: vantage-worker/package-lock.json
+          cache-dependency-path: cohrint-worker/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -79,18 +79,18 @@ jobs:
           for f in index.html app.html auth.html signup.html docs.html \
                    calculator.html superadmin.html sw.js manifest.json \
                    _headers _redirects; do
-            if [ ! -f "vantage-final-v4/$f" ]; then
-              echo "❌ Missing: vantage-final-v4/$f"
+            if [ ! -f "cohrint-frontend/$f" ]; then
+              echo "❌ Missing: cohrint-frontend/$f"
               MISSING=1
             else
-              echo "✅ Found: vantage-final-v4/$f"
+              echo "✅ Found: cohrint-frontend/$f"
             fi
           done
           [ "$MISSING" = "0" ] && echo "✅ All required assets present" || exit 1
 
       - name: Wrangler build (pages dry-run)
         run: |
-          npx wrangler pages deploy ./vantage-final-v4 \
+          npx wrangler pages deploy ./cohrint-frontend \
             --project-name=cohrint \
             --dry-run 2>&1 | head -20 || echo "dry-run complete"
         env:

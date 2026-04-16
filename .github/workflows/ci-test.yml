@@ -100,28 +100,28 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install -r tests/requirements.txt
-          pip install -e vantage-agent
+          pip install -e cohrint-agent
 
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: 'npm'
-          cache-dependency-path: vantage-mcp/package-lock.json
+          cache-dependency-path: cohrint-mcp/package-lock.json
 
       - name: Install MCP dependencies
-        working-directory: vantage-mcp
+        working-directory: cohrint-mcp
         run: npm ci
 
       - name: Build MCP (required for dist/ + functional tests)
-        working-directory: vantage-mcp
+        working-directory: cohrint-mcp
         run: npm run build
 
       - name: Install proxy dependencies
-        working-directory: vantage-local-proxy
+        working-directory: cohrint-local-proxy
         run: npm ci
 
       - name: Build proxy (required for dist/ + functional tests)
-        working-directory: vantage-local-proxy
+        working-directory: cohrint-local-proxy
         run: npm run build
 
       - name: Run API + core suites (no browser)

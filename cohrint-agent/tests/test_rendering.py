@@ -468,7 +468,7 @@ class TestCLICommandRendering:
 
     def test_help_shows_banner(self):
         from vantage_agent.cli import BANNER
-        assert "Vantage Agent" in BANNER
+        assert "Cohrint Agent" in BANNER
         assert "/help" in BANNER
         assert "/allow" in BANNER
         assert "/cost" in BANNER

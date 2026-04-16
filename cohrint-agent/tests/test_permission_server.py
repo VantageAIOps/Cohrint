@@ -24,7 +24,7 @@ def test_install_hook_script_creates_executable(tmp_path):
     assert hook.exists()
     assert os.access(hook, os.X_OK)
     content = hook.read_text()
-    assert "VANTAGE_SOCKET" in content
+    assert "COHRINT_SOCKET" in content
     assert "always_approved" in content
 
 
@@ -40,7 +40,7 @@ def test_build_session_settings_file_with_no_user_settings(tmp_path):
     data = json.loads(settings_path.read_text())
     hooks = data["hooks"]["PreToolUse"]
     assert len(hooks) == 1
-    assert hooks[0]["hooks"][0]["env"]["VANTAGE_SOCKET"] == sock_path
+    assert hooks[0]["hooks"][0]["env"]["COHRINT_SOCKET"] == sock_path
 
 
 def test_build_session_settings_file_merges_user_hooks(tmp_path):
@@ -63,7 +63,7 @@ def test_build_session_settings_file_merges_user_hooks(tmp_path):
     # user hook first, vantage hook appended
     assert len(hooks) == 2
     assert hooks[0]["matcher"] == "Bash(git*)"
-    assert hooks[1]["hooks"][0]["env"]["VANTAGE_SOCKET"] == sock_path
+    assert hooks[1]["hooks"][0]["env"]["COHRINT_SOCKET"] == sock_path
 
 
 def test_permission_server_allow_response(tmp_path):

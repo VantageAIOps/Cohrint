@@ -21,7 +21,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "vantage-proxy": "./dist/cli.js"
+    "cohrint-proxy": "./dist/cli.js"
   },
   "exports": {
     ".": {

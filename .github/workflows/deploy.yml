@@ -9,7 +9,7 @@ on:
       - main          # → production
       - preview       # → preview environment
     paths:
-      - 'vantage-final-v4/**'
+      - 'cohrint-frontend/**'
       - 'wrangler.toml'
       - '.github/workflows/deploy.yml'
   workflow_dispatch:  # manual trigger from GitHub UI
@@ -38,7 +38,7 @@ jobs:
           for f in index.html app.html auth.html signup.html docs.html \
                    calculator.html superadmin.html sw.js manifest.json \
                    _headers _redirects; do
-            [ -f "vantage-final-v4/$f" ] || { echo "❌ Missing: vantage-final-v4/$f"; exit 1; }
+            [ -f "cohrint-frontend/$f" ] || { echo "❌ Missing: cohrint-frontend/$f"; exit 1; }
           done
           echo "✅ All required files present"
 
@@ -55,7 +55,7 @@ jobs:
           DELAY=30
           for attempt in $(seq 1 $MAX_ATTEMPTS); do
             echo "▶ Deploy attempt $attempt / $MAX_ATTEMPTS"
-            if npx wrangler pages deploy ./vantage-final-v4 \
+            if npx wrangler pages deploy ./cohrint-frontend \
                 --project-name=cohrint \
                 --branch=${{ steps.branch.outputs.branch }}; then
               echo "✅ Deploy succeeded on attempt $attempt"

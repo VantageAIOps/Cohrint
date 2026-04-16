@@ -19,7 +19,7 @@ TESTS_DIR  = tests
 ## Install all development dependencies
 install:
 	npm ci
-	cd vantage-worker && npm ci
+	cd cohrint-worker && npm ci
 	$(PIP) install requests structlog
 	@echo "Optional: pip install playwright && python -m playwright install chromium"
 
@@ -48,12 +48,12 @@ test-smoke:
 
 ## Deploy frontend to Cloudflare Pages
 deploy:
-	npx wrangler pages deploy ./vantage-final-v4 --project-name=cohrint --branch=main
+	npx wrangler pages deploy ./cohrint-frontend --project-name=cohrint --branch=main
 
 ## Deploy API Worker to Cloudflare Workers
 deploy-worker:
-	cd vantage-worker && npm run deploy
+	cd cohrint-worker && npm run deploy
 
 ## TypeScript type check
 lint:
-	cd vantage-worker && npm run typecheck
+	cd cohrint-worker && npm run typecheck

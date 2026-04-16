@@ -31,7 +31,7 @@
     "node_modules",
     "dist",
     "*.lock",
-    "vantage-agent/cohrint_agent.egg-info",
-    "vantage-agent/vantage_agent.egg-info"
+    "cohrint-agent/cohrint_agent.egg-info",
+    "cohrint-agent/vantage_agent.egg-info"
   ]
 }

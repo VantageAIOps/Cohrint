@@ -29,7 +29,7 @@ def _make_exporter(**env_overrides):
     """Return an OTelExporter with env controlled by kwargs."""
     import os
     env = {
-        "VANTAGE_OTEL_ENABLED": "false",
+        "COHRINT_OTEL_ENABLED": "false",
         "OTEL_EXPORTER_OTLP_ENDPOINT": "https://api.cohrint.com",
         "COHRINT_API_KEY": "",
         "VANTAGE_ORG_ID": "",
@@ -47,7 +47,7 @@ def _make_exporter(**env_overrides):
 def test_disabled_by_default_no_http_call():
     import os
     # Ensure env var is NOT set to true
-    env = {"VANTAGE_OTEL_ENABLED": "false"}
+    env = {"COHRINT_OTEL_ENABLED": "false"}
     with patch.dict(os.environ, env, clear=False):
         from vantage_agent.telemetry import OTelExporter
         exporter = OTelExporter()
@@ -57,12 +57,12 @@ def test_disabled_by_default_no_http_call():
 
 
 # ---------------------------------------------------------------------------
-# Test 2 — VANTAGE_OTEL_ENABLED=true activates exporter
+# Test 2 — COHRINT_OTEL_ENABLED=true activates exporter
 # ---------------------------------------------------------------------------
 
 def test_enabled_makes_http_calls():
     import os
-    env = {"VANTAGE_OTEL_ENABLED": "true", "COHRINT_API_KEY": "vnt_test"}
+    env = {"COHRINT_OTEL_ENABLED": "true", "COHRINT_API_KEY": "vnt_test"}
     with patch.dict(os.environ, env, clear=False):
         from importlib import reload
         import vantage_agent.telemetry as tel_mod
@@ -80,7 +80,7 @@ def test_enabled_makes_http_calls():
 
 def test_metrics_payload_structure():
     import os
-    env = {"VANTAGE_OTEL_ENABLED": "true", "COHRINT_API_KEY": "vnt_test"}
+    env = {"COHRINT_OTEL_ENABLED": "true", "COHRINT_API_KEY": "vnt_test"}
     with patch.dict(os.environ, env, clear=False):
         from importlib import reload
         import vantage_agent.telemetry as tel_mod
@@ -119,7 +119,7 @@ def test_metrics_payload_structure():
 
 def test_logs_payload_structure():
     import os
-    env = {"VANTAGE_OTEL_ENABLED": "true"}
+    env = {"COHRINT_OTEL_ENABLED": "true"}
     with patch.dict(os.environ, env, clear=False):
         from importlib import reload
         import vantage_agent.telemetry as tel_mod
@@ -130,7 +130,7 @@ def test_logs_payload_structure():
     assert "resourceLogs" in payload
     rl = payload["resourceLogs"][0]
     service_attr = next(a for a in rl["resource"]["attributes"] if a["key"] == "service.name")
-    assert service_attr["value"]["stringValue"] == "vantageai-agent"
+    assert service_attr["value"]["stringValue"] == "cohrint-agent"
 
     log_record = rl["scopeLogs"][0]["logRecords"][0]
     body = json.loads(log_record["body"]["stringValue"])
@@ -149,7 +149,7 @@ def test_logs_payload_structure():
 
 def test_silently_ignores_network_errors():
     import os
-    env = {"VANTAGE_OTEL_ENABLED": "true", "COHRINT_API_KEY": "vnt_test"}
+    env = {"COHRINT_OTEL_ENABLED": "true", "COHRINT_API_KEY": "vnt_test"}
     with patch.dict(os.environ, env, clear=False):
         from importlib import reload
         import vantage_agent.telemetry as tel_mod
@@ -166,7 +166,7 @@ def test_silently_ignores_network_errors():
 
 def test_export_async_returns_immediately():
     import os
-    env = {"VANTAGE_OTEL_ENABLED": "true", "COHRINT_API_KEY": "vnt_test"}
+    env = {"COHRINT_OTEL_ENABLED": "true", "COHRINT_API_KEY": "vnt_test"}
     with patch.dict(os.environ, env, clear=False):
         from importlib import reload
         import vantage_agent.telemetry as tel_mod
@@ -194,7 +194,7 @@ def test_custom_endpoint_is_respected():
     import os
     custom = "https://my-collector.example.com"
     env = {
-        "VANTAGE_OTEL_ENABLED": "true",
+        "COHRINT_OTEL_ENABLED": "true",
         "OTEL_EXPORTER_OTLP_ENDPOINT": custom,
         "COHRINT_API_KEY": "vnt_test",
     }
@@ -222,11 +222,11 @@ def test_custom_endpoint_is_respected():
 def test_missing_env_vars_use_defaults():
     import os
     # Remove the vars entirely if present
-    keys_to_remove = ["VANTAGE_OTEL_ENABLED", "OTEL_EXPORTER_OTLP_ENDPOINT",
+    keys_to_remove = ["COHRINT_OTEL_ENABLED", "OTEL_EXPORTER_OTLP_ENDPOINT",
                       "COHRINT_API_KEY", "VANTAGE_ORG_ID"]
     clean_env = {k: "" for k in keys_to_remove}
     # We can't truly "unset" with patch.dict easily, so set to empty/false
-    with patch.dict(os.environ, {"VANTAGE_OTEL_ENABLED": "false",
+    with patch.dict(os.environ, {"COHRINT_OTEL_ENABLED": "false",
                                   "OTEL_EXPORTER_OTLP_ENDPOINT": "",
                                   "COHRINT_API_KEY": "",
                                   "VANTAGE_ORG_ID": ""},

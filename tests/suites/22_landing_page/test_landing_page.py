@@ -11,7 +11,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from helpers.output import section, chk, ok, fail, get_results, reset_results
 
-INDEX_HTML = Path(__file__).parent.parent.parent.parent / "vantage-final-v4" / "index.html"
+INDEX_HTML = Path(__file__).parent.parent.parent.parent / "cohrint-frontend" / "index.html"
 
 
 def get_html():

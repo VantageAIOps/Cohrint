@@ -279,10 +279,21 @@ class TestAdminActionEvents:
     def test_al20_member_added_event(self, headers):
         """POST /v1/auth/members must create admin_action.member_added."""
         import random
+        # Create a team first (org accounts require team_id when inviting members)
+        team_r = requests.post(
+            f"{API_URL}/v1/teams",
+            json={"name": f"audit-team-{random.randint(1000, 9999)}"},
+            headers=headers,
+            timeout=15,
+        )
+        team_id = team_r.json().get("team_id") if team_r.status_code == 201 else None
         new_email = f"audit-test-{random.randint(10000, 99999)}@example.com"
+        payload = {"email": new_email, "name": "Audit Test", "role": "member"}
+        if team_id:
+            payload["team_id"] = team_id
         r = requests.post(
             f"{API_URL}/v1/auth/members",
-            json={"email": new_email, "name": "Audit Test", "role": "member"},
+            json=payload,
             headers=headers,
             timeout=15,
         )
@@ -581,10 +592,18 @@ def member_key(account):
     import random
     api_key, _, _ = account
     email = f"member-fixture-{random.randint(10000, 99999)}@example.com"
+    hdrs = get_headers(api_key)
+    # Create a team first (org accounts require team_id)
+    team_r = requests.post(f"{API_URL}/v1/teams",
+                           json={"name": "fixture-team"}, headers=hdrs, timeout=15)
+    team_id = team_r.json().get("team_id") if team_r.status_code == 201 else None
+    payload = {"email": email, "name": "Member Fixture", "role": "member"}
+    if team_id:
+        payload["team_id"] = team_id
     r = requests.post(
         f"{API_URL}/v1/auth/members",
-        json={"email": email, "name": "Member Fixture", "role": "member"},
-        headers=get_headers(api_key),
+        json=payload,
+        headers=hdrs,
         timeout=15,
     )
     if r.status_code != 201:
