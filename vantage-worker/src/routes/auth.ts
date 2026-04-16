@@ -360,7 +360,7 @@ auth.post('/members', authMiddleware, adminOnly, async (c) => {
 auth.get('/members', authMiddleware, adminOnly, async (c) => {
   const orgId = c.get('orgId');
   const { results } = await c.env.DB.prepare(`
-    SELECT id, email, name, role, api_key_hint, scope_team,
+    SELECT id, email, name, role, api_key_hint, scope_team, team_id,
            datetime(created_at, 'unixepoch') AS created_at
     FROM org_members WHERE org_id = ? ORDER BY created_at ASC
   `).bind(orgId).all();
@@ -618,8 +618,8 @@ auth.get('/session', authMiddleware, async (c) => {
   const memberId = c.get('memberId');
 
   const org = await c.env.DB.prepare(
-    'SELECT name, email, plan, budget_usd, api_key_hint, created_at FROM orgs WHERE id = ?'
-  ).bind(orgId).first<{ name: string; email: string; plan: string; budget_usd: number; api_key_hint: string; created_at: number }>();
+    'SELECT name, email, plan, budget_usd, api_key_hint, created_at, account_type FROM orgs WHERE id = ?'
+  ).bind(orgId).first<{ name: string; email: string; plan: string; budget_usd: number; api_key_hint: string; created_at: number; account_type: string }>();
 
   let memberInfo: { name: string | null; email: string | null } | null = null;
   if (memberId) {
@@ -645,8 +645,9 @@ auth.get('/session', authMiddleware, async (c) => {
 
   return c.json({
     authenticated: true,
-    org_id:   orgId,
+    org_id:       orgId,
     role,
+    account_type: org?.account_type ?? 'organization',
     member_id: memberId,
     // Top-level convenience fields (tests expect these)
     email:        memberId ? (memberInfo?.email ?? org?.email) : org?.email,
@@ -657,6 +658,7 @@ auth.get('/session', authMiddleware, async (c) => {
       plan:         org?.plan ?? 'free',
       budget_usd:   org?.budget_usd ?? 0,
       api_key_hint: org?.api_key_hint ?? null,
+      account_type: org?.account_type ?? 'organization',
       created_at:   org?.created_at ? new Date(org.created_at * 1000).toISOString() : null,
     },
     member: memberInfo,

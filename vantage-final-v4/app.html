@@ -1682,6 +1682,12 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
         <option value="superadmin" class="invite-elevated-role">Superadmin</option>
       </select>
     </div>
+    <div class="form-group" id="inviteTeamIdGroup" style="display:none;">
+      <label>Assign to Team <span style="color:var(--danger,#e74c3c)">*</span></label>
+      <select id="inviteTeamId">
+        <option value="">— select a team —</option>
+      </select>
+    </div>
     <div class="form-group">
       <label>Scope Team (optional)</label>
       <input type="text" id="inviteTeam" placeholder="e.g. backend">
@@ -3135,7 +3141,7 @@ function loadMembers() {
         tr.appendChild(td3);
 
         var td4 = document.createElement('td');
-        td4.textContent = m.scope_team || m.team || '-';
+        td4.textContent = m.team_id || m.scope_team || m.team || '-';
         tr.appendChild(td4);
 
         // Spend MTD cell
@@ -3302,6 +3308,28 @@ function showInviteModal() {
   elevatedOpts.forEach(function(el) {
     el.style.display = hasRole(currentRole, 'superadmin') ? '' : 'none';
   });
+  // For org accounts, load teams and show team_id selector
+  var accountType = (_session && (_session.account_type || (_session.org && _session.org.account_type))) || 'organization';
+  var teamIdGroup = document.getElementById('inviteTeamIdGroup');
+  if (accountType === 'organization') {
+    teamIdGroup.style.display = '';
+    apiFetch('/v1/teams').then(function(data) {
+      var sel = document.getElementById('inviteTeamId');
+      while (sel.options.length > 0) sel.remove(0);
+      var placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = '\u2014 select a team \u2014';
+      sel.appendChild(placeholder);
+      (data.teams || []).forEach(function(t) {
+        var opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = t.name + ' (' + t.id + ')';
+        sel.appendChild(opt);
+      });
+    }).catch(function() {});
+  } else {
+    teamIdGroup.style.display = 'none';
+  }
 }
 
 function closeModal(id) {
@@ -3319,12 +3347,17 @@ function inviteMember() {
   var name = document.getElementById('inviteName').value.trim();
   var role = document.getElementById('inviteRole').value;
   var team = document.getElementById('inviteTeam').value.trim();
+  var teamId = document.getElementById('inviteTeamId').value.trim();
 
   if (!email) { alert('Email is required'); return; }
 
+  var payload = { email: email, name: name, role: role };
+  if (team) payload.scope_team = team;
+  if (teamId) payload.team_id = teamId;
+
   apiFetch('/v1/auth/members', {
     method: 'POST',
-    body: JSON.stringify({ email: email, name: name, role: role, scope_team: team || undefined }),
+    body: JSON.stringify(payload),
   }).then(function() {
     closeModal('inviteModal');
     loadMembers();
