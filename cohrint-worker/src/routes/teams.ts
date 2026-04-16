@@ -150,11 +150,18 @@ teams.post('/:id/members', adminOnly, async (c) => {
   const email = (body.email ?? '').trim().toLowerCase();
   if (!email) return c.json({ error: 'email is required' }, 400);
 
-  const VALID_ROLES = ['superadmin', 'member', 'viewer'] as const;
+  const VALID_ROLES = ['superadmin', 'admin', 'ceo', 'member', 'viewer'] as const;
   type ValidRole = typeof VALID_ROLES[number];
   const role = (body.role ?? 'member') as ValidRole;
   if (!VALID_ROLES.includes(role)) {
     return c.json({ error: `role must be one of: ${VALID_ROLES.join(', ')}` }, 400);
+  }
+
+  // Prevent privilege escalation: inviter cannot grant a role higher than their own
+  const ROLE_RANK: Record<string, number> = { viewer: 0, member: 1, admin: 2, ceo: 3, superadmin: 4, owner: 5 };
+  const inviterRole = c.get('role') as string;
+  if ((ROLE_RANK[role] ?? -1) > (ROLE_RANK[inviterRole] ?? -1)) {
+    return c.json({ error: 'Cannot invite member with a role higher than your own' }, 403);
   }
 
   const existing = await c.env.DB.prepare(
@@ -166,7 +173,7 @@ teams.post('/:id/members', adminOnly, async (c) => {
   const rawKey    = `crt_${orgId}_${randomHex(24)}`;
   const keyHash   = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(rawKey))
     .then(b => Array.from(new Uint8Array(b)).map(x => x.toString(16).padStart(2, '0')).join(''));
-  const keyHint   = rawKey.slice(-4);
+  const keyHint   = rawKey.slice(0, 12) + '...';
   const memberName = (body.name ?? '').trim() || email.split('@')[0];
 
   await c.env.DB.prepare(`
