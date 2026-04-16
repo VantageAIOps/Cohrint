@@ -6,6 +6,8 @@ export type Bindings = {
   // Cloudflare bindings
   DB:  D1Database;
   KV:  KVNamespace;
+  AI:  Ai;
+  VECTORIZE: VectorizeIndex;
   // Env vars
   ENVIRONMENT:         string;
   ALLOWED_ORIGINS:     string;

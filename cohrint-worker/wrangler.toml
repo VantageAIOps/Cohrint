@@ -24,6 +24,16 @@ binding = "KV"
 id      = "65b5609ad5b747c9b416632a19529f24"
 preview_id = "65b5609ad5b747c9b416632a19529f24"
 
+# ── Workers AI (BGE embeddings for semantic cache) ────────────────────────────
+[ai]
+binding = "AI"
+
+# ── Vectorize (semantic cache vector store) ───────────────────────────────────
+# Run once to create: wrangler vectorize create cohrint-semantic-cache --dimensions=384 --metric=cosine
+[[vectorize]]
+binding     = "VECTORIZE"
+index_name  = "cohrint-semantic-cache"
+
 # ── Environment variables (non-secret) ───────────────────────────────────────
 [vars]
 ENVIRONMENT        = "production"
