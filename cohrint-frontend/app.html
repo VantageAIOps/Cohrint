@@ -2233,6 +2233,11 @@ function nav(view, btn) {
     view = 'overview';
     btn = document.querySelector('[onclick*="nav(\'overview\'"]') || null;
   }
+  // Guard: block non-admin from accessing integrations view
+  if (view === 'integrations' && !hasRole(_navRole, 'admin')) {
+    view = 'overview';
+    btn = document.querySelector('[onclick*="nav(\'overview\'"]') || null;
+  }
   // Tear down SSE when leaving overview to avoid idle connections
   if (activeView === 'overview' && view !== 'overview') {
     if (_sseSource) { _sseSource.close(); _sseSource = null; }
