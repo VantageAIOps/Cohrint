@@ -748,10 +748,10 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
       <button class="sb-item" id="sb-security" onclick="nav('security', this)" style="display:none">
         <span class="icon">&#128274;</span> Security
       </button>
-      <button class="sb-item" onclick="nav('integrations', this)">
+      <button class="sb-item" id="sb-integrations" onclick="nav('integrations', this)">
         <span class="icon">&#128279;</span> Integrations
       </button>
-      <button class="sb-item" onclick="nav('account', this)">
+      <button class="sb-item" id="sb-account" onclick="nav('account', this)">
         <span class="icon">&#9683;</span> Account
       </button>
     </div>
@@ -2188,6 +2188,10 @@ function applyRoleUI(role) {
   var bcPanel = document.getElementById('budget-control-panel');
   if (bcPanel) bcPanel.style.display = hasRole(role, 'superadmin') ? '' : 'none';
 
+  // Integrations tab: admin+ only
+  var intBtn = document.getElementById('sb-integrations');
+  if (intBtn) intBtn.style.display = isAdmin ? '' : 'none';
+
   // Benchmark contribute button: admin+ only
   var benchBtn = document.getElementById('benchmarkContributeBtn');
   if (benchBtn) benchBtn.style.display = isAdmin ? '' : 'none';
@@ -2201,6 +2205,8 @@ function applyRoleUI(role) {
     if (_urlView === 'budgets' && !isAdmin) _urlView = 'overview';
     // Guard: redirect non-admin away from cross-platform
     if (_urlView === 'cross-platform' && !isAdmin) _urlView = 'overview';
+    // Guard: redirect non-admin away from integrations
+    if (_urlView === 'integrations' && !isAdmin) _urlView = 'overview';
     var _navBtn = document.querySelector('[onclick*="nav(\'' + _urlView + '\'"]') || null;
     nav(_urlView, _navBtn);
   }

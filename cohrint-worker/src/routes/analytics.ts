@@ -468,21 +468,20 @@ analytics.get('/today', async (c) => {
   const teamArgs   = scopeTeam ? [scopeTeam] : [];
   const devClause  = isPrivileged ? '' : ' AND developer_email = ?';
   const devArgs    = isPrivileged ? [] : [memberEmail];
+  // events.created_at is TEXT 'YYYY-MM-DD HH:MM:SS' — use ISO text for both tables
   const todayStr   = new Date().toISOString().split('T')[0] + ' 00:00:00';
-  // events table uses unix timestamps
-  const todayUnix  = Math.floor(Date.now() / 86_400_000) * 86_400;
 
   const [evRows, cpuRows] = await Promise.all([
     c.env.DB.prepare(`
       SELECT
-        CAST(strftime('%H', datetime(created_at, 'unixepoch')) AS INTEGER) AS hour,
+        CAST(strftime('%H', created_at) AS INTEGER) AS hour,
         SUM(cost_usd)                        AS cost_usd,
         SUM(prompt_tokens + completion_tokens) AS tokens,
         COUNT(*)                             AS requests
       FROM events
       WHERE org_id = ? AND created_at >= ?${teamClause}${devClause}
       GROUP BY hour
-    `).bind(orgId, todayUnix, ...teamArgs, ...devArgs).all<{ hour: number; cost_usd: number; tokens: number; requests: number }>(),
+    `).bind(orgId, todayStr, ...teamArgs, ...devArgs).all<{ hour: number; cost_usd: number; tokens: number; requests: number }>(),
     c.env.DB.prepare(`
       SELECT
         CAST(strftime('%H', created_at) AS INTEGER) AS hour,

@@ -11,7 +11,11 @@ admin.use('*', authMiddleware, adminOnly);
 admin.get('/overview', async (c) => {
   const orgId  = c.get('orgId');
   const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
-  const since  = Math.floor(Date.now() / 1000) - period * 86_400;
+  // events.created_at is TEXT 'YYYY-MM-DD HH:MM:SS' — use ISO text, not unix seconds
+  const d = new Date(Date.now() - (period - 1) * 86_400_000);
+  d.setUTCHours(0, 0, 0, 0);
+  const since = d.toISOString().replace('T', ' ').slice(0, 19);
+  const monthStart = new Date().toISOString().slice(0, 7) + '-01 00:00:00';
 
   // Org-level totals
   const orgRow = await c.env.DB.prepare(`
@@ -27,8 +31,8 @@ admin.get('/overview', async (c) => {
     SELECT
       COALESCE(SUM(cost_usd), 0) AS mtd_cost_usd,
       COUNT(*) AS mtd_event_count
-    FROM events WHERE org_id = ? AND created_at >= strftime('%s', 'now', 'start of month')
-  `).bind(orgId).first<{ mtd_cost_usd: number; mtd_event_count: number }>();
+    FROM events WHERE org_id = ? AND created_at >= ?
+  `).bind(orgId, monthStart).first<{ mtd_cost_usd: number; mtd_event_count: number }>();
 
   const org = await c.env.DB.prepare(
     'SELECT budget_usd, plan, name, email FROM orgs WHERE id = ?'

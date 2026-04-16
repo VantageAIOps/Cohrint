@@ -76,11 +76,11 @@ crossplatform.get('/trend', async (c) => {
   const since = sqliteDateSince(days);
 
   const rows = await c.env.DB.prepare(`
-    SELECT DATE(period_start) AS day,
+    SELECT DATE(created_at) AS day,
            provider,
            COALESCE(SUM(cost_usd), 0) AS cost
     FROM cross_platform_usage
-    WHERE org_id = ? AND period_start >= ?${devClause}
+    WHERE org_id = ? AND created_at >= ?${devClause}
     GROUP BY DATE(period_start), provider
     ORDER BY day ASC
   `).bind(orgId, since, ...devArgs).all<{ day: string; provider: string; cost: number }>();
