@@ -9,7 +9,7 @@ name: PR Gate
 #   2. CLI Build                 — install + verify cohrint-agent Python package (~2 min)
 #   3. Environment & Health Tests — verify API + frontend reachable (~2 min)
 #   4. Connector Tests           — skipped unless connector files changed (~1 min)
-#   5. Secret Scan               — grep vantage-worker/src/ for credential patterns (~1 min)
+#   5. Secret Scan               — grep cohrint-worker/src/ for credential patterns (~1 min)
 #   6. Preview Deploy            — deploy preview, post URL as PR comment (~5 min)
 #   7. PR Gate Summary           — fail if any critical job failed
 
@@ -39,14 +39,14 @@ jobs:
         with:
           node-version: '24'
           cache: 'npm'
-          cache-dependency-path: vantage-worker/package-lock.json
+          cache-dependency-path: cohrint-worker/package-lock.json
 
       - name: Install dependencies
-        working-directory: vantage-worker
+        working-directory: cohrint-worker
         run: npm ci
 
       - name: Run TypeScript check
-        working-directory: vantage-worker
+        working-directory: cohrint-worker
         run: npx tsc --noEmit
 
   # ── 1b. Python Agent build check ────────────────────────────────────────────────
@@ -62,7 +62,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install cohrint-agent
-        working-directory: vantage-agent
+        working-directory: cohrint-agent
         run: pip install -e ".[dev]"
 
       - name: Verify CLI entry point
@@ -121,12 +121,12 @@ jobs:
         with:
           node-version: '24'
           cache: 'npm'
-          cache-dependency-path: vantage-worker/package-lock.json
+          cache-dependency-path: cohrint-worker/package-lock.json
 
       - name: Check if connector code changed
         id: changes
         run: |
-          CHANGED=$(git diff --name-only origin/main...HEAD -- 'vantage-worker/src/connectors/' 2>/dev/null || echo "")
+          CHANGED=$(git diff --name-only origin/main...HEAD -- 'cohrint-worker/src/connectors/' 2>/dev/null || echo "")
           if [ -n "$CHANGED" ]; then
             echo "has_changes=true" >> $GITHUB_OUTPUT
             echo "Connector files changed:"
@@ -138,12 +138,12 @@ jobs:
 
       - name: Install dependencies
         if: steps.changes.outputs.has_changes == 'true'
-        working-directory: vantage-worker
+        working-directory: cohrint-worker
         run: npm ci
 
       - name: Run connector tests
         if: steps.changes.outputs.has_changes == 'true'
-        working-directory: vantage-worker
+        working-directory: cohrint-worker
         run: |
           if [ -f "vitest.config.ts" ] || [ -f "vitest.config.js" ]; then
             npx vitest run --reporter=verbose src/connectors/ 2>&1 | tee /tmp/connector-tests.txt
@@ -158,7 +158,7 @@ jobs:
         run: |
           FOUND=$(grep -rn --include='*.ts' --include='*.js' \
             -E 'sk-ant-admin-|sk-proj-|ghp_[a-zA-Z0-9]{36}|gho_[a-zA-Z0-9]{36}' \
-            vantage-worker/src/connectors/ 2>/dev/null | \
+            cohrint-worker/src/connectors/ 2>/dev/null | \
             grep -v 'test\|mock\|fake\|example\|placeholder' || true)
           if [ -n "$FOUND" ]; then
             echo "🚨 Potential secrets in connector code:"
@@ -188,11 +188,11 @@ jobs:
           cache: 'pip'
 
       - name: Install dependencies
-        working-directory: vantage-agent
+        working-directory: cohrint-agent
         run: pip install -e ".[dev]"
 
       - name: Run Python agent unit tests
-        working-directory: vantage-agent
+        working-directory: cohrint-agent
         run: python -m pytest tests/ -q --tb=short -x --ignore=tests/test_integration.py
 
   # ── 4. Preview Deploy (frontend PRs only) ───────────────────────────────────
@@ -200,7 +200,7 @@ jobs:
     name: Preview Deploy
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Only deploy preview when vantage-final-v4/** files actually changed
+    # Only deploy preview when cohrint-frontend/** files actually changed
     # Avoids burning 5-10 CI min on backend/test-only PRs
     if: |
       contains(github.event.pull_request.title, 'frontend') ||
@@ -214,7 +214,7 @@ jobs:
       - name: Check for frontend file changes
         id: frontend-check
         run: |
-          CHANGED=$(git diff --name-only origin/main...HEAD -- 'vantage-final-v4/' 2>/dev/null | wc -l)
+          CHANGED=$(git diff --name-only origin/main...HEAD -- 'cohrint-frontend/' 2>/dev/null | wc -l)
           echo "frontend_changed=${CHANGED}" >> $GITHUB_OUTPUT
           echo "Frontend files changed: $CHANGED"
 
@@ -231,7 +231,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           BRANCH: ${{ github.head_ref }}
         run: |
-          npx wrangler@latest pages deploy ./vantage-final-v4 \
+          npx wrangler@latest pages deploy ./cohrint-frontend \
             --project-name=cohrint \
             --branch="$BRANCH" \
             --config=wrangler.toml \
@@ -290,14 +290,14 @@ jobs:
         run: |
           FOUND=$(grep -rn --include='*.ts' --include='*.js' \
             -E 'sk-ant-admin-|sk-ant-api[0-9]+-|sk-proj-|ghp_[a-zA-Z0-9]{36}|gho_[a-zA-Z0-9]{36}|AKIA[0-9A-Z]{16}' \
-            vantage-worker/src/ 2>/dev/null | \
+            cohrint-worker/src/ 2>/dev/null | \
             grep -v -E 'test|mock|fake|example|placeholder' || true)
           if [ -n "$FOUND" ]; then
             echo "Potential secrets detected in worker source:"
             echo "$FOUND"
             exit 1
           fi
-          echo "No secrets detected in vantage-worker/src/"
+          echo "No secrets detected in cohrint-worker/src/"
 
   # ── 6. PR Gate Summary (required check — blocks merge on failure) ───────────
   pr-summary:

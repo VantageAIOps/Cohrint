@@ -7,10 +7,10 @@ on:
   push:
     branches: [main]
     paths:
-      - 'vantage-mcp/**'
-      - 'vantage-js-sdk/**'
-      - 'vantage-local-proxy/**'
-      - 'vantage-agent/**'
+      - 'cohrint-mcp/**'
+      - 'cohrint-js-sdk/**'
+      - 'cohrint-local-proxy/**'
+      - 'cohrint-agent/**'
       - 'claude-intelligence/**'
   workflow_dispatch: # Manual trigger for force-publish
 
@@ -82,7 +82,7 @@ jobs:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
       - name: Install, build, publish
-        working-directory: vantage-mcp
+        working-directory: cohrint-mcp
         run: |
           npm ci
           npm run build
@@ -102,7 +102,7 @@ jobs:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
       - name: Install, build, publish
-        working-directory: vantage-js-sdk
+        working-directory: cohrint-js-sdk
         run: |
           npm ci
           npm run build
@@ -122,7 +122,7 @@ jobs:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
       - name: Install, build, publish
-        working-directory: vantage-local-proxy
+        working-directory: cohrint-local-proxy
         run: |
           npm ci
           npm run build
@@ -161,7 +161,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Build and publish to PyPI
-        working-directory: vantage-agent
+        working-directory: cohrint-agent
         run: |
           pip install build twine
           python -m build
