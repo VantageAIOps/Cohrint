@@ -268,10 +268,10 @@ auth.post('/members', authMiddleware, adminOnly, async (c) => {
   const email     = (body.email ?? '').trim().toLowerCase();
   const name      = (body.name  ?? '').trim();
   // team accounts: only member/viewer (owner is implicit admin)
-  // organization accounts: superadmin/member/viewer
+  // organization accounts: all roles up to owner
   const VALID_ROLES = accountType === 'team'
     ? ['member', 'viewer']
-    : ['viewer', 'member', 'superadmin', 'admin'];
+    : ['viewer', 'member', 'admin', 'ceo', 'superadmin'];
   const inviterRole = c.get('role') as string;
   const { hasRole: hr } = await import('../middleware/auth');
   const requestedRole = body.role ?? 'member';
