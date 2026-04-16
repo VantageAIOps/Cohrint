@@ -100,6 +100,116 @@ prompts.post('/', adminOnly, async (c) => {
   return c.json({ id: promptId, name: body.name.trim(), first_version: firstVersion }, 201);
 });
 
+// ── POST /v1/prompts/usage ────────────────────────────────────────────────────
+// Called by SDK to attribute an LLM event to a specific prompt version
+// MUST be registered before /:id to avoid Hono route shadowing
+
+prompts.post('/usage', async (c) => {
+  const orgId = c.get('orgId');
+  const body = await c.req.json<{
+    version_id: string;
+    event_id: string;
+    cost_usd?: number;
+    prompt_tokens?: number;
+    completion_tokens?: number;
+  }>().catch(() => null);
+
+  if (!body?.version_id || !body?.event_id) {
+    return c.json({ error: 'version_id and event_id are required' }, 400);
+  }
+
+  // Verify version belongs to an org prompt
+  const version = await c.env.DB
+    .prepare(`SELECT pv.id, pv.prompt_id, pv.total_calls, pv.total_cost_usd,
+                pv.avg_prompt_tokens, pv.avg_completion_tokens
+              FROM prompt_versions pv
+              JOIN prompts p ON p.id = pv.prompt_id
+              WHERE pv.id = ? AND p.org_id = ? AND p.deleted_at IS NULL`)
+    .bind(body.version_id, orgId)
+    .first<{
+      id: string; prompt_id: string; total_calls: number; total_cost_usd: number;
+      avg_prompt_tokens: number; avg_completion_tokens: number;
+    }>();
+
+  if (!version) return c.json({ error: 'version not found' }, 404);
+
+  const costUsd = body.cost_usd ?? 0;
+  const promptTokens = body.prompt_tokens ?? 0;
+  const completionTokens = body.completion_tokens ?? 0;
+
+  const usageId = generateId();
+  const newCalls = version.total_calls + 1;
+  const newTotalCost = version.total_cost_usd + costUsd;
+  const newAvgCost = newTotalCost / newCalls;
+  const newAvgPrompt = Math.round(
+    (version.avg_prompt_tokens * version.total_calls + promptTokens) / newCalls
+  );
+  const newAvgCompletion = Math.round(
+    (version.avg_completion_tokens * version.total_calls + completionTokens) / newCalls
+  );
+
+  await c.env.DB.batch([
+    c.env.DB
+      .prepare(`INSERT OR IGNORE INTO prompt_usage (id, version_id, event_id, org_id, cost_usd, prompt_tokens, completion_tokens)
+                VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .bind(usageId, body.version_id, body.event_id, orgId, costUsd, promptTokens, completionTokens),
+    c.env.DB
+      .prepare(`UPDATE prompt_versions SET
+                  total_calls = ?, total_cost_usd = ?, avg_cost_usd = ?,
+                  avg_prompt_tokens = ?, avg_completion_tokens = ?
+                WHERE id = ?`)
+      .bind(newCalls, newTotalCost, newAvgCost, newAvgPrompt, newAvgCompletion, version.id),
+  ]);
+
+  return c.json({ recorded: true }, 201);
+});
+
+// ── GET /v1/prompts/analytics/comparison ─────────────────────────────────────
+// MUST be registered before /:id to avoid Hono route shadowing
+
+prompts.get('/analytics/comparison', async (c) => {
+  const orgId = c.get('orgId');
+  const promptId = c.req.query('prompt_id');
+
+  if (!promptId) return c.json({ error: 'prompt_id query param required' }, 400);
+
+  // Verify prompt ownership
+  const prompt = await c.env.DB
+    .prepare('SELECT id, name FROM prompts WHERE id = ? AND org_id = ? AND deleted_at IS NULL')
+    .bind(promptId, orgId)
+    .first<{ id: string; name: string }>();
+  if (!prompt) return c.json({ error: 'not found' }, 404);
+
+  const versions = await c.env.DB
+    .prepare(`SELECT
+                pv.id, pv.version_num, pv.model, pv.notes, pv.created_at,
+                pv.total_calls, pv.total_cost_usd, pv.avg_cost_usd,
+                pv.avg_prompt_tokens, pv.avg_completion_tokens,
+                substr(pv.content, 1, 100) AS content_preview
+              FROM prompt_versions pv
+              WHERE pv.prompt_id = ?
+              ORDER BY pv.version_num ASC`)
+    .bind(promptId)
+    .all<{
+      id: string; version_num: number; model: string | null; notes: string | null;
+      created_at: string; total_calls: number; total_cost_usd: number;
+      avg_cost_usd: number; avg_prompt_tokens: number; avg_completion_tokens: number;
+      content_preview: string;
+    }>();
+
+  // Cost delta between consecutive versions
+  const vList = versions.results;
+  const withDelta = vList.map((v, i) => {
+    const prev = i > 0 ? vList[i - 1] : null;
+    const costDelta = prev && prev.avg_cost_usd > 0
+      ? ((v.avg_cost_usd - prev.avg_cost_usd) / prev.avg_cost_usd) * 100
+      : null;
+    return { ...v, cost_delta_pct: costDelta !== null ? Math.round(costDelta * 10) / 10 : null };
+  });
+
+  return c.json({ prompt, versions: withDelta });
+});
+
 // ── GET /v1/prompts/:id ───────────────────────────────────────────────────────
 
 prompts.get('/:id', async (c) => {
@@ -249,110 +359,3 @@ prompts.get('/:id/versions/:versionId', async (c) => {
   return c.json(version);
 });
 
-// ── POST /v1/prompts/usage ────────────────────────────────────────────────────
-// Called by SDK to attribute an LLM event to a specific prompt version
-
-prompts.post('/usage', async (c) => {
-  const orgId = c.get('orgId');
-  const body = await c.req.json<{
-    version_id: string;
-    event_id: string;
-    cost_usd?: number;
-    prompt_tokens?: number;
-    completion_tokens?: number;
-  }>().catch(() => null);
-
-  if (!body?.version_id || !body?.event_id) {
-    return c.json({ error: 'version_id and event_id are required' }, 400);
-  }
-
-  // Verify version belongs to an org prompt
-  const version = await c.env.DB
-    .prepare(`SELECT pv.id, pv.prompt_id, pv.total_calls, pv.total_cost_usd,
-                pv.avg_prompt_tokens, pv.avg_completion_tokens
-              FROM prompt_versions pv
-              JOIN prompts p ON p.id = pv.prompt_id
-              WHERE pv.id = ? AND p.org_id = ? AND p.deleted_at IS NULL`)
-    .bind(body.version_id, orgId)
-    .first<{
-      id: string; prompt_id: string; total_calls: number; total_cost_usd: number;
-      avg_prompt_tokens: number; avg_completion_tokens: number;
-    }>();
-
-  if (!version) return c.json({ error: 'version not found' }, 404);
-
-  const costUsd = body.cost_usd ?? 0;
-  const promptTokens = body.prompt_tokens ?? 0;
-  const completionTokens = body.completion_tokens ?? 0;
-
-  const usageId = generateId();
-  const newCalls = version.total_calls + 1;
-  const newTotalCost = version.total_cost_usd + costUsd;
-  const newAvgCost = newTotalCost / newCalls;
-  const newAvgPrompt = Math.round(
-    (version.avg_prompt_tokens * version.total_calls + promptTokens) / newCalls
-  );
-  const newAvgCompletion = Math.round(
-    (version.avg_completion_tokens * version.total_calls + completionTokens) / newCalls
-  );
-
-  await c.env.DB.batch([
-    c.env.DB
-      .prepare(`INSERT OR IGNORE INTO prompt_usage (id, version_id, event_id, org_id, cost_usd, prompt_tokens, completion_tokens)
-                VALUES (?, ?, ?, ?, ?, ?, ?)`)
-      .bind(usageId, body.version_id, body.event_id, orgId, costUsd, promptTokens, completionTokens),
-    c.env.DB
-      .prepare(`UPDATE prompt_versions SET
-                  total_calls = ?, total_cost_usd = ?, avg_cost_usd = ?,
-                  avg_prompt_tokens = ?, avg_completion_tokens = ?
-                WHERE id = ?`)
-      .bind(newAvgCost, newCalls, newTotalCost, newAvgPrompt, newAvgCompletion, version.id),
-  ]);
-
-  return c.json({ recorded: true }, 201);
-});
-
-// ── GET /v1/prompts/analytics/comparison ─────────────────────────────────────
-
-prompts.get('/analytics/comparison', async (c) => {
-  const orgId = c.get('orgId');
-  const promptId = c.req.query('prompt_id');
-
-  if (!promptId) return c.json({ error: 'prompt_id query param required' }, 400);
-
-  // Verify prompt ownership
-  const prompt = await c.env.DB
-    .prepare('SELECT id, name FROM prompts WHERE id = ? AND org_id = ? AND deleted_at IS NULL')
-    .bind(promptId, orgId)
-    .first<{ id: string; name: string }>();
-  if (!prompt) return c.json({ error: 'not found' }, 404);
-
-  const versions = await c.env.DB
-    .prepare(`SELECT
-                pv.id, pv.version_num, pv.model, pv.notes, pv.created_at,
-                pv.total_calls, pv.total_cost_usd, pv.avg_cost_usd,
-                pv.avg_prompt_tokens, pv.avg_completion_tokens,
-                substr(pv.content, 1, 100) AS content_preview
-              FROM prompt_versions pv
-              WHERE pv.prompt_id = ?
-              ORDER BY pv.version_num ASC`)
-    .bind(promptId)
-    .all<{
-      id: string; version_num: number; model: string | null; notes: string | null;
-      created_at: string; total_calls: number; total_cost_usd: number;
-      avg_cost_usd: number; avg_prompt_tokens: number; avg_completion_tokens: number;
-      content_preview: string;
-    }>();
-
-  // Cost delta between consecutive versions
-  const vList = versions.results;
-  const withDelta = vList.map((v, i) => {
-    const prev = i > 0 ? vList[i - 1] : null;
-    const costDelta = prev && prev.avg_cost_usd > 0
-      ? ((v.avg_cost_usd - prev.avg_cost_usd) / prev.avg_cost_usd) * 100
-      : null;
-    return { ...v, cost_delta_pct: costDelta !== null ? Math.round(costDelta * 10) / 10 : null };
-  });
-
-  return c.json({ prompt, versions: withDelta });
-});

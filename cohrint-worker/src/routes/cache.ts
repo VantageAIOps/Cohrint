@@ -254,10 +254,10 @@ cache.patch('/config', adminOnly, async (c) => {
                 updated_at = datetime('now')`)
     .bind(
       orgId,
-      body.enabled !== undefined ? (body.enabled ? 1 : 0) : 1,
-      body.similarity_threshold ?? 0.92,
-      body.min_prompt_length ?? 10,
-      body.max_cache_age_days ?? 30,
+      body.enabled !== undefined ? (body.enabled ? 1 : 0) : null,
+      body.similarity_threshold ?? null,
+      body.min_prompt_length ?? null,
+      body.max_cache_age_days ?? null,
     )
     .run();
 
