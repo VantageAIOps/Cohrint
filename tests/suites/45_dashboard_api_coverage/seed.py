@@ -53,7 +53,7 @@ def _headers(api_key: str) -> dict:
 def _signup(email: str, name: str, org: str) -> dict:
     hdrs = {"Content-Type": "application/json"}
     if CI_SECRET:
-        hdrs["X-Vantage-CI"] = CI_SECRET
+        hdrs["X-Cohrint-CI"] = CI_SECRET
     for attempt in range(4):
         r = requests.post(f"{API_URL}/v1/auth/signup",
                           json={"email": email, "name": name, "org": org},

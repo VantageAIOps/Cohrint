@@ -74,7 +74,17 @@ async function loadState() {
     const raw = await readFile(STATE_FILE, 'utf-8');
     return JSON.parse(raw);
   } catch (err) {
-    if (err.code !== 'ENOENT') process.stderr.write(`[cohrint-track] WARN: state read error: ${err}\n`);
+    if (err.code === 'ENOENT') {
+      // One-time migration from old vantage-state.json
+      const oldFile = join(homedir(), '.claude', 'vantage-state.json');
+      try {
+        const old = JSON.parse(await readFile(oldFile, 'utf-8'));
+        await writeFile(STATE_FILE, JSON.stringify(old, null, 2));
+        return old;
+      } catch { /* no old state either — start fresh */ }
+      return { uploadedIds: [] };
+    }
+    process.stderr.write(`[cohrint-track] WARN: state read error: ${err}\n`);
     return { uploadedIds: [] };
   }
 }
