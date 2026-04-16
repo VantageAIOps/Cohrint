@@ -409,6 +409,42 @@ analytics.get('/traces', async (c) => {
   return c.json({ traces: results });
 });
 
+// ── GET /v1/analytics/traces/:traceId — full span tree for one trace ──────────
+analytics.get('/traces/:traceId', async (c) => {
+  const orgId       = c.get('orgId');
+  const traceId     = c.req.param('traceId');
+  const role        = c.get('role');
+  const memberEmail = c.get('memberEmail');
+  const scopeTeam   = c.get('scopeTeam');
+  const { clause, args } = teamScope(scopeTeam);
+  const isPrivileged = hasRole(role, 'admin');
+  const devClause = isPrivileged ? '' : ' AND developer_email = ?';
+  const devArgs   = isPrivileged ? [] : [memberEmail];
+
+  const { results } = await c.env.DB.prepare(`
+    SELECT
+      event_id          AS id,
+      parent_event_id   AS parent_id,
+      agent_name,
+      model,
+      provider,
+      feature,
+      span_depth,
+      prompt_tokens,
+      completion_tokens,
+      cache_tokens,
+      cost_usd,
+      latency_ms,
+      created_at
+    FROM events
+    WHERE org_id = ? AND trace_id = ?${clause}${devClause}
+    ORDER BY created_at ASC
+  `).bind(orgId, traceId, ...args, ...devArgs).all();
+
+  if (!results.length) return c.json({ error: 'trace not found' }, 404);
+  return c.json({ trace_id: traceId, spans: results });
+});
+
 // ── GET /v1/analytics/today — hourly spend for the current UTC day ───────────
 analytics.get('/today', async (c) => {
   const orgId     = c.get('orgId');

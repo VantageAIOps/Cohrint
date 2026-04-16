@@ -801,7 +801,7 @@ All P2 tasks shipped in PR #55 (merged 2026-04-14):
 
 ### P3 — Month 2 (build + GTM sprint)
 
-- [ ] **Build semantic cache layer** — Cloudflare Workers + Vectorize. BGE embedding, configurable similarity threshold (default 0.92), $ saved on dashboard. Ship before Helicone moves to semantic matching. Use Prompt #03. **2 weeks.**
+- [x] **Build semantic cache layer** — Cloudflare Workers + Vectorize. BGE embedding, configurable similarity threshold (default 0.92), $ saved on dashboard. Ship before Helicone moves to semantic matching. Use Prompt #03. **2 weeks.** ✅ PR #65
 - [ ] **Get 3 design partner CTOs onboarded** — Cross-platform console + Copilot adapter is the hook. These are your first paying customers and your benchmark data seed. **ongoing.**
 - [ ] **Deploy n8n on Railway** — Onboarding drip + trial conversion workflows (Workflow 1 + 7). **6h.**
 - [ ] **Start SOC2 prep with Vanta** — Timeline: begin Month 3, target Type I at Month 7–8. **ongoing.**
@@ -814,7 +814,7 @@ All P2 tasks shipped in PR #55 (merged 2026-04-14):
 
 - [ ] **Launch public benchmark dashboard** — email-gated, shows industry median cost/dev/month by tool and company size band. SEO + lead gen. **1 week.**
 - [ ] **Publish first full benchmark report** — "State of AI Coding Spend Q2 2026" with real anonymized data from design partners. Use Prompt #04. PR strategy. **1 week.**
-- [ ] **Prompt Registry MVP** — version prompts, cost-per-version comparison. Closes gap vs Helicone + LangSmith. **6 weeks.**
+- [x] **Prompt Registry MVP** — version prompts, cost-per-version comparison. Closes gap vs Helicone + LangSmith. **6 weeks.** ✅ PR #65
 - [ ] **Agent trace DAG visualization** — Basic graph view of multi-step agent sessions from existing OTel trace data. Closes most visible gap vs Langfuse Agent Graph. **2 weeks.**
 - [ ] **Finance tool BD outreach** — Ramp, Brex, Zip integration conversations. **M4.**
 

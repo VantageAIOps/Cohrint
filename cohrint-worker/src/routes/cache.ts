@@ -44,7 +44,8 @@ function generateId(): string {
 // ── POST /v1/cache/lookup ─────────────────────────────────────────────────────
 
 cache.post('/lookup', async (c) => {
-  const orgId = c.get('orgId');
+  const orgId    = c.get('orgId');
+  const scopeTeam = c.get('scopeTeam') as string | null;
   const body = await c.req.json<{ prompt: string; model: string }>().catch(() => null);
 
   if (!body?.prompt || !body?.model) {
@@ -60,10 +61,12 @@ cache.post('/lookup', async (c) => {
   // Generate embedding for the incoming prompt
   const embedding = await embedText(c.env.AI, body.prompt);
 
-  // Query Vectorize for nearest neighbor within this org+model namespace
+  // Query Vectorize for nearest neighbor within this org+model+team namespace
+  const vectorizeFilter: Record<string, string> = { org_id: orgId, model: body.model };
+  if (scopeTeam) vectorizeFilter['team_id'] = scopeTeam;
   const matches = await c.env.VECTORIZE.query(embedding, {
     topK: 1,
-    filter: { org_id: orgId, model: body.model },
+    filter: vectorizeFilter,
     returnMetadata: 'indexed',
   });
 
@@ -72,10 +75,11 @@ cache.post('/lookup', async (c) => {
     return c.json({ hit: false, score: top?.score ?? 0 });
   }
 
-  // Fetch full entry from D1
+  // Fetch full entry from D1 — re-enforce team isolation at DB level
+  const teamClause = scopeTeam ? ' AND (team_id = ? OR team_id IS NULL)' : '';
   const entry = await c.env.DB
-    .prepare('SELECT * FROM semantic_cache_entries WHERE id = ? AND org_id = ?')
-    .bind(top.id, orgId)
+    .prepare(`SELECT * FROM semantic_cache_entries WHERE id = ? AND org_id = ?${teamClause}`)
+    .bind(...([top.id, orgId, ...(scopeTeam ? [scopeTeam] : [])] as [string, string, ...string[]]))
     .first<{
       id: string; response_text: string; cost_usd: number;
       prompt_tokens: number; completion_tokens: number;
@@ -126,7 +130,8 @@ cache.post('/lookup', async (c) => {
 // ── POST /v1/cache/store ──────────────────────────────────────────────────────
 
 cache.post('/store', async (c) => {
-  const orgId = c.get('orgId');
+  const orgId     = c.get('orgId');
+  const scopeTeam = c.get('scopeTeam') as string | null;
   const body = await c.req.json<{
     prompt: string;
     model: string;
@@ -159,22 +164,24 @@ cache.post('/store', async (c) => {
   const id = generateId();
   const embedding = await embedText(c.env.AI, body.prompt);
 
-  // Insert into Vectorize with org/model metadata for filtered search
+  // Insert into Vectorize with org/model/team metadata for filtered search
+  const vectorizeMeta: Record<string, string> = { org_id: orgId, model: body.model };
+  if (scopeTeam) vectorizeMeta['team_id'] = scopeTeam;
   await c.env.VECTORIZE.upsert([{
     id,
     values: embedding,
-    metadata: { org_id: orgId, model: body.model },
+    metadata: vectorizeMeta,
   }]);
 
   // Persist to D1
   const promptHash = body.prompt_hash ?? body.prompt.slice(0, 16);
   await c.env.DB
     .prepare(`INSERT INTO semantic_cache_entries
-              (id, org_id, prompt_hash, prompt_text, model, response_text,
+              (id, org_id, team_id, prompt_hash, prompt_text, model, response_text,
                prompt_tokens, completion_tokens, cost_usd, vectorize_id, created_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`)
     .bind(
-      id, orgId, promptHash, body.prompt, body.model, body.response,
+      id, orgId, scopeTeam ?? null, promptHash, body.prompt, body.model, body.response,
       body.prompt_tokens ?? 0, body.completion_tokens ?? 0,
       body.cost_usd ?? 0, id,
     )
