@@ -2172,6 +2172,10 @@ function applyRoleUI(role) {
   var settingsBtn = document.getElementById('sb-settings');
   if (settingsBtn) settingsBtn.style.display = isAdmin ? '' : 'none';
 
+  // Budgets & Alerts tab: admin+ only (members have no budget management permissions)
+  var budgetsBtn = document.getElementById('sb-budgets');
+  if (budgetsBtn) budgetsBtn.style.display = isAdmin ? '' : 'none';
+
   // Budget Control Center: superadmin/owner only
   var bcPanel = document.getElementById('budget-control-panel');
   if (bcPanel) bcPanel.style.display = hasRole(role, 'superadmin') ? '' : 'none';
@@ -2185,6 +2189,8 @@ function applyRoleUI(role) {
   if (_urlView) {
     // Guard: redirect non-ceo away from executive
     if (_urlView === 'executive' && !isExec) _urlView = 'overview';
+    // Guard: redirect non-admin away from budgets
+    if (_urlView === 'budgets' && !isAdmin) _urlView = 'overview';
     var _navBtn = document.querySelector('[onclick*="nav(\'' + _urlView + '\'"]') || null;
     nav(_urlView, _navBtn);
   }
@@ -2198,6 +2204,11 @@ function nav(view, btn) {
   // Guard: block non-ceo from accessing executive view
   var _navRole = (_session && (_session.role || (_session.user && _session.user.role))) || 'member';
   if (view === 'executive' && !hasRole(_navRole, 'ceo')) {
+    view = 'overview';
+    btn = document.querySelector('[onclick*="nav(\'overview\'"]') || null;
+  }
+  // Guard: block non-admin from accessing budgets view
+  if (view === 'budgets' && !hasRole(_navRole, 'admin')) {
     view = 'overview';
     btn = document.querySelector('[onclick*="nav(\'overview\'"]') || null;
   }
