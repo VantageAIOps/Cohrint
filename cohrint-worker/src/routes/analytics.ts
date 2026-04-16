@@ -16,6 +16,19 @@ function teamScope(scopeTeam: string | null): { clause: string; args: unknown[] 
     : { clause: '',                args: [] };
 }
 
+// ── Date helper — returns YYYY-MM-DD HH:MM:SS for use in events.created_at ────
+// events.created_at is stored as text, not unix. Always use this for comparisons.
+function sinceText(periodDays: number): string {
+  const d = new Date(Date.now() - (periodDays - 1) * 86_400_000);
+  d.setUTCHours(0, 0, 0, 0);
+  return d.toISOString().replace('T', ' ').slice(0, 19);
+}
+function todayText(): string {
+  const d = new Date();
+  d.setUTCHours(0, 0, 0, 0);
+  return d.toISOString().replace('T', ' ').slice(0, 19);
+}
+
 // ── GET /v1/analytics/summary ─────────────────────────────────────────────────
 analytics.get('/summary', async (c) => {
   const orgId       = c.get('orgId');
@@ -42,11 +55,10 @@ analytics.get('/summary', async (c) => {
     } catch { /* KV unavailable — continue to DB */ }
   }
 
-  const now        = Math.floor(Date.now() / 1000);
-  // Align to UTC midnight so "today" is a calendar day, not a rolling 24-hour window
-  const today      = Math.floor(Date.now() / 86_400_000) * 86_400;
-  const month      = now - 30 * 86_400;
-  const thirty     = now - 30 * 60;
+  // Use text dates — events.created_at is stored as YYYY-MM-DD HH:MM:SS text
+  const today      = todayText();
+  const month      = sinceText(30);
+  const thirty     = new Date(Date.now() - 30 * 60_000).toISOString().replace('T', ' ').slice(0, 19);
 
   const [totals, session] = await c.env.DB.batch([
     c.env.DB.prepare(`
@@ -127,8 +139,7 @@ analytics.get('/kpis', async (c) => {
   const devClause = isPrivileged ? '' : ' AND developer_email = ?';
   const devArgs   = isPrivileged ? [] : [memberEmail];
   const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
-  // Align to UTC midnight: show today + previous (period-1) days = exactly `period` calendar days
-  const since  = Math.floor(Date.now() / 86_400_000) * 86_400 - (period - 1) * 86_400;
+  const since  = sinceText(period);
 
   const kpisCacheKey = `analytics:kpis:${orgId}:${period}:${scopeTeam ?? 'all'}:${isPrivileged ? 'all' : (memberEmail ?? 'anon')}`;
   try {
@@ -284,7 +295,7 @@ analytics.get('/teams', async (c) => {
   const scopeTeam = c.get('scopeTeam');
   const { clause, args } = teamScope(scopeTeam);
   const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
-  const since  = Math.floor(Date.now() / 86_400_000) * 86_400 - (period - 1) * 86_400;
+  const since  = sinceText(period);
 
   const { results } = await c.env.DB.prepare(`
     SELECT
@@ -313,8 +324,7 @@ analytics.get('/teams', async (c) => {
 analytics.get('/business-units', async (c) => {
   const orgId  = c.get('orgId');
   const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
-  const sinceIso  = new Date(Date.now() - period * 86_400_000).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
-  const sinceUnix = Math.floor(Date.now() / 1000) - period * 86_400;
+  const sinceIso  = sinceText(period);  // used for both tables (both store text dates)
 
   // UNION events + cross_platform_usage for complete picture
   const { results } = await c.env.DB.prepare(`
@@ -356,7 +366,7 @@ analytics.get('/business-units', async (c) => {
     GROUP BY business_unit
     ORDER BY cost_usd DESC
     LIMIT 50
-  `).bind(orgId, sinceIso, orgId, sinceUnix).all();
+  `).bind(orgId, sinceIso, orgId, sinceIso).all();
 
   // Per-business-unit team breakdown
   const { results: byTeam } = await c.env.DB.prepare(`
@@ -377,7 +387,7 @@ analytics.get('/business-units', async (c) => {
     GROUP BY business_unit, team, provider
     ORDER BY cost_usd DESC
     LIMIT 200
-  `).bind(orgId, sinceIso, orgId, sinceUnix).all();
+  `).bind(orgId, sinceIso, orgId, sinceIso).all();
 
   return c.json({ business_units: results, by_team_provider: byTeam, period_days: period });
 });
@@ -508,8 +518,8 @@ analytics.get('/cost', async (c) => {
   const scopeTeam = c.get('scopeTeam');
   const { clause, args } = teamScope(scopeTeam);
   const period = Math.min(parseInt(c.req.query('period') ?? '7', 10) || 7, 30);
-  const since  = Math.floor(Date.now() / 86_400_000) * 86_400 - (period - 1) * 86_400;
-  const today  = Math.floor(Date.now() / 86_400_000) * 86_400;
+  const since  = sinceText(period);
+  const today  = todayText();
 
   const [total, todayRow] = await c.env.DB.batch([
     c.env.DB.prepare(
