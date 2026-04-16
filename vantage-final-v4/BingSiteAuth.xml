@@ -1,16 +1,4 @@
 <?xml version="1.0"?>
-<!-- PLACEHOLDER: Replace this file with the BingSiteAuth.xml downloaded from Bing Webmaster Tools -->
-<!-- Steps:
-  1. Go to bing.com/webmasters
-  2. Add Site → https://cohrint.com
-  3. Choose "XML file" verification method
-  4. Download the BingSiteAuth.xml Bing provides
-  5. Replace this file with the downloaded file
-  6. Update <meta name="msvalidate.01"> in index.html with your code
-  7. Deploy, then click Verify in Bing Webmaster Tools
-  8. After verification: Sitemaps → Submit https://cohrint.com/sitemap.xml
-  NOTE: Bing covers DuckDuckGo, Yahoo, Edge, and Safari Spotlight search
--->
 <users>
-  <user>BING_VERIFICATION_CODE_HERE</user>
+	<user>1AC2E296969FEE3BFEF49A58F8735A74</user>
 </users>
