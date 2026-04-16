@@ -166,7 +166,7 @@ const AGENT_TIPS = [
     savingsEstimate: "~30-50% with better caching",
     condition: (m) => m.totalInputTokens > 10000 && m.totalCachedTokens < m.totalInputTokens * 0.15
       // Suppress when an agent-specific cache tip already covers this (avoids duplicate advice)
-      && !["claude", "gemini", "codex", "copilot", "aider"].includes(m.agent) },
+      && !["claude", "gemini", "codex", "copilot", "aider", "chatgpt"].includes(m.agent) },
   // ── Quality / Hallucination alerts ──
   { id: "all-high-hallucination", priority: "critical", agent: "all", category: "quality",
     title: "High hallucination rate detected",

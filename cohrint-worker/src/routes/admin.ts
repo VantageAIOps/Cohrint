@@ -608,37 +608,57 @@ admin.get('/budget-alerts', async (c) => {
     WHERE org_id = ?
   `).bind(orgId).all<{ id: string; scope: string; scope_target: string | null; monthly_limit_usd: number; enforcement: string }>();
 
+  // Batch MTD spend in 2 queries (cross_platform_usage + events) instead of N+1 per policy.
+  // Aggregate spend grouped by scope dimension, then join in JS.
+  const [cpuRows, evRows] = await Promise.all([
+    c.env.DB.prepare(`
+      SELECT
+        COALESCE(SUM(cost_usd), 0)                                       AS org_cost,
+        COALESCE(SUM(CASE WHEN team              IS NOT NULL THEN cost_usd ELSE 0 END), 0) AS _unused,
+        team, developer_email, provider
+      FROM cross_platform_usage
+      WHERE org_id = ? AND created_at >= ?
+      GROUP BY team, developer_email, provider
+    `).bind(orgId, monthStartIso).all<{ org_cost: number; team: string | null; developer_email: string | null; provider: string | null }>(),
+    c.env.DB.prepare(`
+      SELECT COALESCE(SUM(cost_usd), 0) AS org_cost, developer_email
+      FROM events
+      WHERE org_id = ? AND created_at >= ?
+      GROUP BY developer_email
+    `).bind(orgId, monthStartUnix).all<{ org_cost: number; developer_email: string | null }>(),
+  ]);
+
+  // Pre-aggregate totals by dimension for O(1) lookup per policy
+  let cpuOrgTotal = 0, evOrgTotal = 0;
+  const cpuByTeam    = new Map<string, number>();
+  const cpuByDev     = new Map<string, number>();
+  const cpuByProv    = new Map<string, number>();
+  const evByDev      = new Map<string, number>();
+
+  for (const r of cpuRows.results ?? []) {
+    const c2 = r.org_cost;
+    cpuOrgTotal += c2;
+    if (r.team)            cpuByTeam.set(r.team, (cpuByTeam.get(r.team) ?? 0) + c2);
+    if (r.developer_email) cpuByDev.set(r.developer_email, (cpuByDev.get(r.developer_email) ?? 0) + c2);
+    if (r.provider)        cpuByProv.set(r.provider, (cpuByProv.get(r.provider) ?? 0) + c2);
+  }
+  for (const r of evRows.results ?? []) {
+    evOrgTotal += r.org_cost;
+    if (r.developer_email) evByDev.set(r.developer_email, (evByDev.get(r.developer_email) ?? 0) + r.org_cost);
+  }
+
   const alerts: unknown[] = [];
 
   for (const p of policies) {
     let mtdCost = 0;
-
     if (p.scope === 'org') {
-      const row = await c.env.DB.prepare(`
-        SELECT COALESCE(SUM(cost_usd),0) AS t FROM cross_platform_usage WHERE org_id = ? AND created_at >= ?
-      `).bind(orgId, monthStartIso).first<{ t: number }>();
-      const row2 = await c.env.DB.prepare(`
-        SELECT COALESCE(SUM(cost_usd),0) AS t FROM events WHERE org_id = ? AND created_at >= ?
-      `).bind(orgId, monthStartUnix).first<{ t: number }>();
-      mtdCost = (row?.t ?? 0) + (row2?.t ?? 0);
+      mtdCost = cpuOrgTotal + evOrgTotal;
     } else if (p.scope === 'team' && p.scope_target) {
-      const row = await c.env.DB.prepare(`
-        SELECT COALESCE(SUM(cost_usd),0) AS t FROM cross_platform_usage WHERE org_id = ? AND team = ? AND created_at >= ?
-      `).bind(orgId, p.scope_target, monthStartIso).first<{ t: number }>();
-      mtdCost = row?.t ?? 0;
+      mtdCost = cpuByTeam.get(p.scope_target) ?? 0;
     } else if (p.scope === 'developer' && p.scope_target) {
-      const row = await c.env.DB.prepare(`
-        SELECT COALESCE(SUM(cost_usd),0) AS t FROM cross_platform_usage WHERE org_id = ? AND developer_email = ? AND created_at >= ?
-      `).bind(orgId, p.scope_target, monthStartIso).first<{ t: number }>();
-      const row2 = await c.env.DB.prepare(`
-        SELECT COALESCE(SUM(cost_usd),0) AS t FROM events WHERE org_id = ? AND developer_email = ? AND created_at >= ?
-      `).bind(orgId, p.scope_target, monthStartUnix).first<{ t: number }>();
-      mtdCost = (row?.t ?? 0) + (row2?.t ?? 0);
+      mtdCost = (cpuByDev.get(p.scope_target) ?? 0) + (evByDev.get(p.scope_target) ?? 0);
     } else if (p.scope === 'provider' && p.scope_target) {
-      const row = await c.env.DB.prepare(`
-        SELECT COALESCE(SUM(cost_usd),0) AS t FROM cross_platform_usage WHERE org_id = ? AND provider = ? AND created_at >= ?
-      `).bind(orgId, p.scope_target, monthStartIso).first<{ t: number }>();
-      mtdCost = row?.t ?? 0;
+      mtdCost = cpuByProv.get(p.scope_target) ?? 0;
     }
 
     const pct = p.monthly_limit_usd > 0 ? Math.round((mtdCost / p.monthly_limit_usd) * 100) : 0;
