@@ -3326,11 +3326,13 @@ function loadMembers() {
     apiFetch('/v1/auth/members').catch(function() { return null; }),
     apiFetch('/v1/cross-platform/developers').catch(function() { return null; }),
     apiFetch('/v1/admin/developers/recommendations').catch(function() { return null; }),
+    apiFetch('/v1/admin/developers/quality').catch(function() { return null; }),
   ]).then(function(results) {
-    var overview = results[0];
-    var members  = results[1];
-    var devsData = results[2];
-    var recsData = results[3];
+    var overview     = results[0];
+    var members      = results[1];
+    var devsData     = results[2];
+    var recsData     = results[3];
+    var qualityData  = results[4];
 
     var memberList = (members && members.members) || (members && members.data) || [];
     document.getElementById('memberCount').textContent = fmtNum(memberList.length);
@@ -3349,6 +3351,10 @@ function loadMembers() {
     var recsByEmail = {};
     ((recsData && recsData.recommendations) || []).forEach(function(r) {
       recsByEmail[r.developer_email] = r;
+    });
+    var qualityByEmail = {};
+    ((qualityData && qualityData.quality) || []).forEach(function(q) {
+      qualityByEmail[q.developer_email] = q;
     });
     // Show empty_reason hint when cross-platform data is missing
     var recsEmptyHint = document.getElementById('recsEmptyHint');
@@ -3432,21 +3438,21 @@ function loadMembers() {
         }
         tr.appendChild(tdLines);
 
-        // Hallucination score cell — from quality scores API (admin/superadmin only see this)
-        // Members see their own score; admins see everyone's. Populated via /v1/analytics/kpis quality field.
+        // Hallucination score cell — from /v1/admin/developers/quality (events table, not cross_platform_usage)
         var tdHallu = document.createElement('td');
         tdHallu.style.fontFamily = 'var(--font-mono)';
         tdHallu.style.fontSize = '11px';
-        var halluScore = devEntry && devEntry.avg_hallucination_score != null ? devEntry.avg_hallucination_score : null;
+        var qualityEntry = qualityByEmail[m.email];
+        var halluScore = qualityEntry && qualityEntry.avg_hallucination_score != null ? qualityEntry.avg_hallucination_score : null;
         if (halluScore != null) {
           var halluPct = Math.round(halluScore * 100);
           tdHallu.textContent = halluPct + '%';
-          tdHallu.title = 'Avg hallucination rate: ' + halluPct + '% (lower is better)';
-          tdHallu.style.color = halluScore > 0.2 ? 'var(--accent-red,#f87171)' : halluScore > 0.1 ? 'var(--accent-amber)' : '#4ade80';
+          tdHallu.title = 'Avg hallucination rate: ' + halluPct + '% (lower is better) · ' + qualityEntry.scored_events + ' scored events';
+          tdHallu.style.color = halluScore > 0.2 ? 'var(--accent-red,#f87171)' : halluScore > 0.1 ? 'var(--accent-amber,#fbbf24)' : '#4ade80';
         } else {
-          tdHallu.textContent = '—';
+          tdHallu.textContent = '\u2014';
           tdHallu.style.opacity = '0.3';
-          tdHallu.title = 'No quality scores submitted yet. Use PATCH /v1/events/:id/scores to add scores.';
+          tdHallu.title = 'No quality scores submitted yet. Use PATCH /v1/events/:id to add hallucination_score.';
         }
         tr.appendChild(tdHallu);
 

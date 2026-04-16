@@ -591,6 +591,48 @@ admin.get('/developers/recommendations', async (c) => {
   return c.json({ period_days: days, recommendations: recs, empty_reason });
 });
 
+// ── GET /v1/admin/developers/quality — per-developer avg quality scores ────────
+admin.get('/developers/quality', async (c) => {
+  const orgId = c.get('orgId');
+  const days  = Math.min(parseInt(c.req.query('days') ?? '30', 10) || 30, 90);
+  const since = (() => {
+    const d = new Date(Date.now() - (days - 1) * 86400000);
+    return Math.floor(d.getTime() / 1000);
+  })();
+
+  const { results } = await c.env.DB.prepare(`
+    SELECT
+      developer_email,
+      AVG(hallucination_score)   AS avg_hallucination_score,
+      AVG(faithfulness_score)    AS avg_faithfulness_score,
+      AVG(relevancy_score)       AS avg_relevancy_score,
+      COUNT(CASE WHEN hallucination_score IS NOT NULL THEN 1 END) AS scored_events,
+      COUNT(*)                   AS total_events
+    FROM events
+    WHERE org_id = ? AND created_at >= ? AND developer_email IS NOT NULL
+    GROUP BY developer_email
+    ORDER BY avg_hallucination_score DESC NULLS LAST
+  `).bind(orgId, since).all<{
+    developer_email: string;
+    avg_hallucination_score: number | null;
+    avg_faithfulness_score: number | null;
+    avg_relevancy_score: number | null;
+    scored_events: number;
+    total_events: number;
+  }>();
+
+  const quality = (results ?? []).map((r) => ({
+    developer_email: r.developer_email,
+    avg_hallucination_score: r.avg_hallucination_score != null ? Math.round(r.avg_hallucination_score * 1000) / 1000 : null,
+    avg_faithfulness_score:  r.avg_faithfulness_score  != null ? Math.round(r.avg_faithfulness_score  * 1000) / 1000 : null,
+    avg_relevancy_score:     r.avg_relevancy_score     != null ? Math.round(r.avg_relevancy_score     * 1000) / 1000 : null,
+    scored_events: r.scored_events,
+    total_events:  r.total_events,
+  }));
+
+  return c.json({ period_days: days, quality });
+});
+
 // ── GET /v1/admin/budget-alerts — individuals/teams that hit thresholds ────────
 admin.get('/budget-alerts', async (c) => {
   const orgId    = c.get('orgId');
