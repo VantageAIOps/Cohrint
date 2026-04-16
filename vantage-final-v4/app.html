@@ -2052,6 +2052,10 @@ function applyRoleUI(role) {
   var roleBadge = document.getElementById('exec-role-badge');
   if (roleBadge) roleBadge.textContent = role.toUpperCase();
 
+  // Settings tab: admin+ only
+  var settingsBtn = document.getElementById('sb-settings');
+  if (settingsBtn) settingsBtn.style.display = isAdmin ? '' : 'none';
+
   // Budget Control Center: superadmin/owner only
   var bcPanel = document.getElementById('budget-control-panel');
   if (bcPanel) bcPanel.style.display = hasRole(role, 'superadmin') ? '' : 'none';
@@ -3655,9 +3659,10 @@ function loadSettings() {
 
 function loadTeamMgmt() {
   var accountType = (_session && (_session.account_type || (_session.org && _session.org.account_type))) || 'organization';
+  var role        = (_session && (_session.role || (_session.user && _session.user.role))) || 'member';
   var card = document.getElementById('teamMgmtCard');
   if (!card) return;
-  if (accountType !== 'organization') { card.style.display = 'none'; return; }
+  if (accountType !== 'organization' || !hasRole(role, 'admin')) { card.style.display = 'none'; return; }
   card.style.display = '';
   refreshTeamsList();
 }
