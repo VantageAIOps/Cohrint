@@ -1071,12 +1071,13 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
             <div class="card-title">Team Members</div>
             <button class="btn btn-primary btn-sm" onclick="showInviteModal()">+ Invite</button>
           </div>
+          <div id="recsEmptyHint" style="display:none;font-size:11px;color:var(--accent-amber);margin-bottom:8px;padding:6px 8px;background:rgba(251,191,36,.08);border-radius:4px;"></div>
           <table class="members-table">
             <thead>
-              <tr><th>Email</th><th>Name</th><th>Role</th><th>Team</th><th>Spend MTD</th><th>$/PR</th><th>Lines/$</th><th>Rec</th><th>API Key</th><th>Actions</th></tr>
+              <tr><th>Email</th><th>Name</th><th>Role</th><th>Team</th><th>Spend MTD</th><th>$/PR</th><th>Lines/$</th><th title="Avg hallucination score (0=good, 1=bad). Only shown when quality scores have been submitted.">Hallucination</th><th>Rec</th><th>API Key</th><th>Actions</th></tr>
             </thead>
             <tbody id="membersTableBody">
-              <tr><td colspan="6" class="empty-state">Loading...</td></tr>
+              <tr><td colspan="11" class="empty-state">Loading...</td></tr>
             </tbody>
           </table>
         </div>
@@ -3302,6 +3303,12 @@ function loadMembers() {
     ((recsData && recsData.recommendations) || []).forEach(function(r) {
       recsByEmail[r.developer_email] = r;
     });
+    // Show empty_reason hint when cross-platform data is missing
+    var recsEmptyHint = document.getElementById('recsEmptyHint');
+    if (recsEmptyHint) {
+      recsEmptyHint.style.display = (recsData && recsData.empty_reason) ? '' : 'none';
+      if (recsData && recsData.empty_reason) recsEmptyHint.textContent = '⚠ ' + recsData.empty_reason;
+    }
 
     // Members table — DOM safe
     var tbody = document.getElementById('membersTableBody');
@@ -3378,11 +3385,32 @@ function loadMembers() {
         }
         tr.appendChild(tdLines);
 
+        // Hallucination score cell — from quality scores API (admin/superadmin only see this)
+        // Members see their own score; admins see everyone's. Populated via /v1/analytics/kpis quality field.
+        var tdHallu = document.createElement('td');
+        tdHallu.style.fontFamily = 'var(--font-mono)';
+        tdHallu.style.fontSize = '11px';
+        var halluScore = devEntry && devEntry.avg_hallucination_score != null ? devEntry.avg_hallucination_score : null;
+        if (halluScore != null) {
+          var halluPct = Math.round(halluScore * 100);
+          tdHallu.textContent = halluPct + '%';
+          tdHallu.title = 'Avg hallucination rate: ' + halluPct + '% (lower is better)';
+          tdHallu.style.color = halluScore > 0.2 ? 'var(--accent-red,#f87171)' : halluScore > 0.1 ? 'var(--accent-amber)' : '#4ade80';
+        } else {
+          tdHallu.textContent = '—';
+          tdHallu.style.opacity = '0.3';
+          tdHallu.title = 'No quality scores submitted yet. Use PATCH /v1/events/:id/scores to add scores.';
+        }
+        tr.appendChild(tdHallu);
+
         // Recommendations badge cell
         var tdRec = document.createElement('td');
         if (recEntry && recEntry.savings_opportunity_usd > 0) {
           var recBadge = document.createElement('span');
-          recBadge.title = 'Est. savings: $' + Number(recEntry.savings_opportunity_usd).toFixed(2) + '/mo';
+          var reasonLabels = { low_cache_rate: 'low cache', no_pr_attribution: 'no PRs', low_code_output: 'low output' };
+          var reasons = (recEntry.savings_reasons || []).map(function(r) { return reasonLabels[r] || r; }).join(', ');
+          recBadge.title = 'Est. savings: $' + Number(recEntry.savings_opportunity_usd).toFixed(2) + '/mo'
+            + (reasons ? ' · ' + reasons : '');
           recBadge.style.cssText = 'background:rgba(74,222,128,.15);color:#4ade80;border-radius:4px;padding:2px 5px;font-size:10px;cursor:default;white-space:nowrap';
           recBadge.textContent = '\uD83D\uDCA1 $' + Number(recEntry.savings_opportunity_usd).toFixed(0);
           tdRec.appendChild(recBadge);

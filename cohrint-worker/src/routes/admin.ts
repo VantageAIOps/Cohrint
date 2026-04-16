@@ -527,15 +527,38 @@ admin.get('/developers/recommendations', async (c) => {
   `).bind(orgId, since).all<{ developer_email: string; team: string; total_cost: number; commits: number; pull_requests: number; lines_added: number; lines_removed: number; cached_tokens: number; total_tokens: number }>();
 
   const recs = (results ?? []).map((d) => {
-    const costPerPR     = d.pull_requests > 0 ? +(d.total_cost / d.pull_requests).toFixed(4) : null;
-    const costPerCommit = d.commits > 0       ? +(d.total_cost / d.commits).toFixed(4) : null;
-    const cacheRate     = d.total_tokens > 0  ? +(d.cached_tokens / d.total_tokens * 100).toFixed(1) : null;
-    const linesPerDollar = d.total_cost > 0   ? Math.round((d.lines_added + d.lines_removed) / d.total_cost) : null;
+    const costPerPR      = d.pull_requests > 0 ? +(d.total_cost / d.pull_requests).toFixed(4) : null;
+    const costPerCommit  = d.commits > 0       ? +(d.total_cost / d.commits).toFixed(4) : null;
+    const cacheRate      = d.total_tokens > 0  ? +(d.cached_tokens / d.total_tokens * 100).toFixed(1) : null;
+    const linesPerDollar = d.total_cost > 0    ? Math.round((d.lines_added + d.lines_removed) / d.total_cost) : null;
 
-    // Savings opportunity: if cache rate < 20%, rough estimate of potential savings at 40% cache rate
-    const savingsOpportunity = (cacheRate !== null && cacheRate < 20 && d.total_cost > 1)
-      ? +(d.total_cost * 0.15).toFixed(4)  // rough 15% savings with better caching
-      : 0;
+    // Multi-signal savings estimate:
+    //   Signal 1 — low cache rate (<20%): potential ~30% savings proportional to how far below 20%
+    //   Signal 2 — no PRs (cost exists but no productivity signal): flag as unattributed spend
+    //   Signal 3 — zero lines/$ when cost > $5 (pure chat, no code output): flag as workflow issue
+    let savingsOpportunity = 0;
+    if (d.total_cost > 1) {
+      // Cache signal: scale savings linearly — 0% cache → 30% savings, 20% cache → 0% savings
+      if (cacheRate !== null && cacheRate < 20) {
+        const cacheSavingsPct = (20 - Number(cacheRate)) / 20 * 0.30;
+        savingsOpportunity += d.total_cost * cacheSavingsPct;
+      }
+      // No-PR signal: cost with no attributed PRs suggests unbounded exploration
+      if (d.pull_requests === 0 && d.total_cost > 5) {
+        savingsOpportunity += d.total_cost * 0.10;
+      }
+      // Low output signal: no code lines produced despite spend
+      if (linesPerDollar !== null && linesPerDollar < 10 && d.total_cost > 5) {
+        savingsOpportunity += d.total_cost * 0.10;
+      }
+    }
+    savingsOpportunity = +savingsOpportunity.toFixed(4);
+
+    // Identify the primary savings reason for the dashboard tooltip
+    const savingsReasons: string[] = [];
+    if (cacheRate !== null && cacheRate < 20 && d.total_cost > 1) savingsReasons.push('low_cache_rate');
+    if (d.pull_requests === 0 && d.total_cost > 5) savingsReasons.push('no_pr_attribution');
+    if (linesPerDollar !== null && linesPerDollar < 10 && d.total_cost > 5) savingsReasons.push('low_code_output');
 
     return {
       developer_email: d.developer_email,
@@ -546,13 +569,19 @@ admin.get('/developers/recommendations', async (c) => {
       cache_hit_rate_pct: cacheRate,
       lines_per_dollar: linesPerDollar,
       savings_opportunity_usd: savingsOpportunity,
+      savings_reasons: savingsReasons,
     };
   });
 
   // Sort by savings_opportunity desc
   recs.sort((a, b) => b.savings_opportunity_usd - a.savings_opportunity_usd);
 
-  return c.json({ period_days: days, recommendations: recs });
+  // Explain when empty — helps the dashboard show a meaningful message
+  const empty_reason = recs.length === 0
+    ? 'No cross-platform usage data. Connect GitHub via the Integrations tab to populate developer efficiency metrics.'
+    : null;
+
+  return c.json({ period_days: days, recommendations: recs, empty_reason });
 });
 
 // ── GET /v1/admin/budget-alerts — individuals/teams that hit thresholds ────────

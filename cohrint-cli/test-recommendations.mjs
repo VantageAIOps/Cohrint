@@ -12,12 +12,19 @@ const AGENT_TIPS = [
     title: "Switch to Sonnet for this session",
     action: "Run: /model sonnet — Opus costs 5x more. Use Opus only for complex multi-file architecture.",
     savingsEstimate: "~60% cost reduction",
-    condition: (m) => m.agent === "claude" && (m.model ?? "").includes("opus") && (m.avgCostPerPrompt ?? 0) < 0.1 },
+    // Only fire when hallucination_score is not high — cheaper model with bad quality = worse outcome
+    condition: (m) => m.agent === "claude" && (m.model ?? "").includes("opus")
+      && (m.avgCostPerPrompt ?? 0) < 0.1
+      && (m.avgHallucinationScore == null || m.avgHallucinationScore < 0.2) },
   { id: "claude-use-haiku", priority: "medium", agent: "claude", category: "model",
     title: "Use Haiku for simple edits",
     action: "Run: /model haiku — Best for formatting, linting, docstrings, and simple fixes.",
     savingsEstimate: "~80% cost reduction vs Sonnet",
-    condition: (m) => m.agent === "claude" && (m.lastPromptTokens ?? 0) < 500 && m.promptCount > 3 },
+    // Require actual low token usage AND low cost signal — not just "more than 3 prompts"
+    // Do not fire when quality scores indicate accuracy issues (hallucination > 0.15)
+    condition: (m) => m.agent === "claude" && (m.lastPromptTokens ?? 0) < 500
+      && m.promptCount > 3 && (m.avgCostPerPrompt ?? 0) < 0.05
+      && (m.avgHallucinationScore == null || m.avgHallucinationScore < 0.15) },
   { id: "claude-compact", priority: "high", agent: "claude", category: "cache",
     title: "Run /compact to reduce context",
     action: "Run: /compact — Your session has grown large. Compact before next edit to save tokens.",
@@ -32,7 +39,9 @@ const AGENT_TIPS = [
     title: "Use ! prefix for shell commands",
     action: "Type: ! ls, ! git status — Direct execution skips Claude's reasoning about what command to run.",
     savingsEstimate: "~30-50% on command-heavy tasks",
-    condition: (m) => m.agent === "claude" && m.promptCount > 3 },
+    // Only meaningful when prompts are frequent AND average cost suggests shell-heavy workflow
+    condition: (m) => m.agent === "claude" && m.promptCount > 10
+      && (m.avgCostPerPrompt ?? 0) > 0.01 && (m.avgCostPerPrompt ?? 0) < 0.05 },
   { id: "claude-prompt-caching", priority: "high", agent: "claude", category: "cache",
     title: "Enable prompt caching for large context",
     action: "Prompt caching gives 90% savings on repeated context. Structure system prompts for cache reuse.",
@@ -44,11 +53,13 @@ const AGENT_TIPS = [
     action: "Gemini Flash beats Pro on coding benchmarks (78% vs 76.2%) at 10x lower cost. Default to Flash.",
     savingsEstimate: "~90% cost reduction",
     condition: (m) => m.agent === "gemini" && (m.model ?? "").includes("pro") },
-  { id: "gemini-free-tier", priority: "critical", agent: "gemini", category: "budget",
-    title: "You may be on the free tier",
+  { id: "gemini-free-tier", priority: "medium", agent: "gemini", category: "budget",
+    // Downgraded from critical — this is informational, not an active problem
+    title: "You may qualify for Gemini free tier",
     action: "Gemini CLI gets 60 RPM / 1,000 requests/day FREE. Verify your billing — you might not need to pay at all.",
     savingsEstimate: "~100% for light usage",
-    condition: (m) => m.agent === "gemini" && m.totalCostUsd < 1 && m.promptCount < 50 },
+    // Tighten condition: only fire after enough usage to know it's real spend, not trial
+    condition: (m) => m.agent === "gemini" && m.totalCostUsd > 0.10 && m.totalCostUsd < 1 && m.promptCount >= 10 && m.promptCount < 50 },
   { id: "gemini-context-cache", priority: "medium", agent: "gemini", category: "cache",
     title: "Enable context caching",
     action: "Run: /compress or configure context caching in ~/.gemini/settings.json.",
@@ -85,7 +96,10 @@ const AGENT_TIPS = [
     title: "Try DeepSeek for budget tasks",
     action: "DeepSeek V3 achieves 55% benchmark accuracy vs Sonnet's 60%. Great for routine edits.",
     savingsEstimate: "~75% cost reduction vs Sonnet",
-    condition: (m) => m.agent === "aider" && (m.model ?? "").includes("claude") && (m.avgCostPerPrompt ?? 0) > 0.02 },
+    // Don't recommend cheaper model when hallucination is already high
+    condition: (m) => m.agent === "aider" && (m.model ?? "").includes("claude")
+      && (m.avgCostPerPrompt ?? 0) > 0.02
+      && (m.avgHallucinationScore == null || m.avgHallucinationScore < 0.2) },
   { id: "aider-selective-add", priority: "medium", agent: "aider", category: "workflow",
     title: "Only /add files you need edited",
     action: "Run: /add specific_file.py — Don't add entire directories.",
@@ -112,6 +126,22 @@ const AGENT_TIPS = [
     action: "Type @filename to reference code.",
     savingsEstimate: "~30-50% token reduction",
     condition: (m) => m.agent === "chatgpt" && (m.lastPromptTokens ?? 0) > 3000 },
+  // ── GitHub Copilot ──
+  { id: "copilot-use-inline", priority: "high", agent: "copilot", category: "workflow",
+    title: "Prefer inline completions over Chat",
+    action: "Inline completions use far fewer tokens than Copilot Chat. Reserve Chat for complex multi-file tasks.",
+    savingsEstimate: "~60-80% per interaction",
+    condition: (m) => m.agent === "copilot" && (m.avgCostPerPrompt ?? 0) > 0.03 },
+  { id: "copilot-clear-signatures", priority: "medium", agent: "copilot", category: "prompt",
+    title: "Write explicit function signatures",
+    action: "Clear parameter names and return types give Copilot full context without needing large prompts.",
+    savingsEstimate: "~30-40% token reduction",
+    condition: (m) => m.agent === "copilot" && (m.lastPromptTokens ?? 0) > 2000 },
+  { id: "copilot-scope-comments", priority: "medium", agent: "copilot", category: "prompt",
+    title: "Use single-line scope comments",
+    action: "A one-line // comment above the function is sufficient context. Multi-paragraph descriptions waste tokens.",
+    savingsEstimate: "~20-30% on prompt tokens",
+    condition: (m) => m.agent === "copilot" && m.promptCount > 5 && (m.avgCostPerPrompt ?? 0) > 0.01 },
   // ── Universal Tips ──
   { id: "all-high-cost-alert", priority: "critical", agent: "all", category: "budget",
     title: "Session cost is high",
@@ -128,11 +158,31 @@ const AGENT_TIPS = [
     action: "Your last prompt used ${tokens} tokens. Break large requests into smaller, focused prompts.",
     savingsEstimate: "~20-40% by reducing context",
     condition: (m) => (m.lastPromptTokens ?? 0) > 10000 },
+  // Merged cache tip: only the agent-specific cache tip fires when applicable;
+  // all-low-cache fires ONLY for agents without a dedicated cache tip (prevents double-tip)
   { id: "all-low-cache", priority: "medium", agent: "all", category: "cache",
     title: "Cache utilization is low",
     action: "Only ${pct}% of tokens are cached. Standardize system prompts for better cache hits.",
     savingsEstimate: "~30-50% with better caching",
-    condition: (m) => m.totalInputTokens > 10000 && m.totalCachedTokens < m.totalInputTokens * 0.15 },
+    condition: (m) => m.totalInputTokens > 10000 && m.totalCachedTokens < m.totalInputTokens * 0.15
+      // Suppress when an agent-specific cache tip already covers this (avoids duplicate advice)
+      && !["claude", "gemini", "codex"].includes(m.agent) },
+  // ── Quality / Hallucination alerts ──
+  { id: "all-high-hallucination", priority: "critical", agent: "all", category: "quality",
+    title: "High hallucination rate detected",
+    action: "Your avg hallucination score is ${hallucination}. Add explicit grounding instructions and verify outputs before use. Avoid switching to a cheaper model until this is resolved.",
+    savingsEstimate: "Prevents downstream errors",
+    condition: (m) => (m.avgHallucinationScore ?? 0) > 0.2 },
+  { id: "all-low-faithfulness", priority: "high", agent: "all", category: "quality",
+    title: "Low faithfulness to source material",
+    action: "Avg faithfulness score is ${faithfulness}. Add 'Answer only from the provided context.' to your system prompt.",
+    savingsEstimate: "Reduces hallucinated references",
+    condition: (m) => m.avgFaithfulnessScore != null && m.avgFaithfulnessScore < 0.7 },
+  { id: "all-high-toxicity", priority: "critical", agent: "all", category: "quality",
+    title: "Elevated toxicity detected",
+    action: "Avg toxicity score is ${toxicity}. Review outputs and tighten system prompt safety constraints.",
+    savingsEstimate: "Compliance risk reduction",
+    condition: (m) => (m.avgToxicityScore ?? 0) > 0.15 },
 ];
 
 function normalizeAgentName(agent) {
@@ -143,6 +193,7 @@ function normalizeAgentName(agent) {
   if (lower.includes("codex") || lower.includes("openai")) return "codex";
   if (lower.includes("aider")) return "aider";
   if (lower.includes("cursor") || lower.includes("chatgpt") || lower.includes("gpt")) return "chatgpt";
+  if (lower.includes("copilot")) return "copilot";
   return lower;
 }
 
@@ -153,7 +204,12 @@ function getRecommendations(metrics, maxTips = 3) {
   const filled = { ...metrics, agent: agentName, model: metrics.model ?? "unknown",
     avgCostPerPrompt: avgCost, avgLatencyMs: metrics.avgLatencyMs ?? 0,
     lastPromptCostUsd: metrics.lastPromptCostUsd ?? avgCost,
-    lastPromptTokens: metrics.lastPromptTokens ?? 0, sessionDurationMin: durationMin };
+    lastPromptTokens: metrics.lastPromptTokens ?? 0, sessionDurationMin: durationMin,
+    // Quality score fields — null when not yet scored
+    avgHallucinationScore: metrics.avgHallucinationScore ?? null,
+    avgFaithfulnessScore:  metrics.avgFaithfulnessScore  ?? null,
+    avgToxicityScore:      metrics.avgToxicityScore       ?? null,
+  };
   const applicable = AGENT_TIPS.filter((tip) => {
     if (tip.agent !== "all" && tip.agent !== agentName) return false;
     try { return tip.condition(filled); } catch { return false; }
@@ -167,6 +223,9 @@ function getRecommendations(metrics, maxTips = 3) {
       .replace("${avg}", `$${(filled.avgCostPerPrompt ?? 0).toFixed(3)}`)
       .replace("${tokens}", (filled.lastPromptTokens ?? 0).toLocaleString())
       .replace("${pct}", Math.round(filled.totalCachedTokens / Math.max(filled.totalInputTokens, 1) * 100).toString())
+      .replace("${hallucination}", (filled.avgHallucinationScore ?? 0).toFixed(2))
+      .replace("${faithfulness}", (filled.avgFaithfulnessScore ?? 0).toFixed(2))
+      .replace("${toxicity}", (filled.avgToxicityScore ?? 0).toFixed(2))
   }));
 }
 

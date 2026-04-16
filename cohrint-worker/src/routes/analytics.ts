@@ -142,7 +142,12 @@ analytics.get('/kpis', async (c) => {
       COALESCE(SUM(total_tokens), 0)               AS total_tokens,
       COALESCE(COUNT(*), 0)                        AS total_requests,
       COALESCE(AVG(latency_ms), 0)                 AS avg_latency_ms,
-      COALESCE(AVG(efficiency_score), 74)          AS efficiency_score,
+      AVG(efficiency_score)                        AS efficiency_score,
+      AVG(hallucination_score)                     AS avg_hallucination_score,
+      AVG(faithfulness_score)                      AS avg_faithfulness_score,
+      AVG(relevancy_score)                         AS avg_relevancy_score,
+      AVG(toxicity_score)                          AS avg_toxicity_score,
+      COUNT(CASE WHEN hallucination_score IS NOT NULL THEN 1 END) AS scored_events,
       COALESCE(SUM(CASE WHEN is_streaming=1 THEN 1 ELSE 0 END), 0) AS streaming_requests,
       COALESCE(SUM(prompt_tokens), 0)              AS total_prompt_tokens,
       COALESCE(SUM(cache_tokens), 0)               AS cache_tokens_total,
@@ -165,17 +170,29 @@ analytics.get('/kpis', async (c) => {
   const cacheHitRatePct   = totalPromptTokens > 0 ? Math.round((totalCacheTokens / totalPromptTokens) * 1000) / 10 : 0;
 
   const kpisResult = {
-    total_cost_usd:      (row?.total_cost_usd ?? 0) as number,
-    total_tokens:        (row?.total_tokens ?? 0) as number,
-    total_requests:      (row?.total_requests ?? 0) as number,
-    avg_latency_ms:      (row?.avg_latency_ms ?? 0) as number,
-    efficiency_score:    (row?.efficiency_score ?? 0) as number,
-    streaming_requests:  (row?.streaming_requests ?? 0) as number,
-    cache_tokens_total:  totalCacheTokens,
-    duplicate_calls:     (row?.duplicate_calls ?? 0) as number,
-    wasted_cost_usd:     Math.round(((row?.wasted_cost_usd ?? 0) as number) * 1e6) / 1e6,
-    cache_savings_usd:   Math.round(cacheSavingsUsd * 1e6) / 1e6,
-    cache_hit_rate_pct:  cacheHitRatePct,
+    total_cost_usd:           (row?.total_cost_usd ?? 0) as number,
+    total_tokens:             (row?.total_tokens ?? 0) as number,
+    total_requests:           (row?.total_requests ?? 0) as number,
+    avg_latency_ms:           (row?.avg_latency_ms ?? 0) as number,
+    // null when no events have been scored — never substitute a fake default
+    efficiency_score:         row?.efficiency_score != null ? (row.efficiency_score as number) : null,
+    streaming_requests:       (row?.streaming_requests ?? 0) as number,
+    cache_tokens_total:       totalCacheTokens,
+    duplicate_calls:          (row?.duplicate_calls ?? 0) as number,
+    wasted_cost_usd:          Math.round(((row?.wasted_cost_usd ?? 0) as number) * 1e6) / 1e6,
+    cache_savings_usd:        Math.round(cacheSavingsUsd * 1e6) / 1e6,
+    cache_hit_rate_pct:       cacheHitRatePct,
+    // Quality score aggregates — null when no events have been scored yet
+    quality: {
+      avg_hallucination_score: row?.avg_hallucination_score != null ? Math.round((row.avg_hallucination_score as number) * 1000) / 1000 : null,
+      avg_faithfulness_score:  row?.avg_faithfulness_score  != null ? Math.round((row.avg_faithfulness_score  as number) * 1000) / 1000 : null,
+      avg_relevancy_score:     row?.avg_relevancy_score     != null ? Math.round((row.avg_relevancy_score     as number) * 1000) / 1000 : null,
+      avg_toxicity_score:      row?.avg_toxicity_score      != null ? Math.round((row.avg_toxicity_score      as number) * 1000) / 1000 : null,
+      scored_events:           (row?.scored_events ?? 0) as number,
+      coverage_pct:            (row?.total_requests ?? 0) > 0
+        ? Math.round(((row?.scored_events ?? 0) as number) / ((row?.total_requests as number)) * 1000) / 10
+        : 0,
+    },
   };
   try { await c.env.KV.put(kpisCacheKey, JSON.stringify(kpisResult), { expirationTtl: 300 }); } catch { /* best-effort */ }
   logAudit(c, { event_type: 'data_access', event_name: 'data_access.analytics', resource_type: 'analytics', metadata: { endpoint: '/v1/analytics/kpis' } });

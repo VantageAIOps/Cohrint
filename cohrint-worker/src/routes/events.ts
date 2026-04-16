@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { Bindings, Variables, EventIn, BatchIn } from '../types';
 import { authMiddleware } from '../middleware/auth';
 import { maybeSendBudgetAlert } from './alerts';
+import { logAudit } from '../lib/audit';
 
 const events = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -340,13 +341,84 @@ events.post('/batch', async (c) => {
   }, 201);
 });
 
+// ── GET /v1/events/:id/scores — read quality scores for an event ─────────────
+// Accessible by any authenticated member of the org (read-only).
+events.get('/:id/scores', async (c) => {
+  const orgId = c.get('orgId');
+  const id    = c.req.param('id');
+
+  const row = await c.env.DB.prepare(`
+    SELECT id, hallucination_score, faithfulness_score, relevancy_score,
+           consistency_score, toxicity_score, efficiency_score
+    FROM events WHERE id = ? AND org_id = ?
+  `).bind(id, orgId).first<{
+    id: string;
+    hallucination_score: number | null;
+    faithfulness_score:  number | null;
+    relevancy_score:     number | null;
+    consistency_score:   number | null;
+    toxicity_score:      number | null;
+    efficiency_score:    number | null;
+  }>();
+
+  if (!row) return c.json({ error: 'Event not found' }, 404);
+
+  return c.json({
+    event_id:           row.id,
+    hallucination_score: row.hallucination_score,
+    faithfulness_score:  row.faithfulness_score,
+    relevancy_score:     row.relevancy_score,
+    consistency_score:   row.consistency_score,
+    toxicity_score:      row.toxicity_score,
+    efficiency_score:    row.efficiency_score,
+  });
+});
+
 // ── PATCH /v1/events/:id/scores — update quality scores async ────────────────
+// Accessible by member, admin, superadmin — any authenticated key can submit
+// quality scores for their own org's events. Fields are merged (partial update
+// safe): only fields present in the body are written; others retain prior value.
 events.patch('/:id/scores', async (c) => {
   const orgId = c.get('orgId');
   const id    = c.req.param('id');
-  let body: Record<string, number>;
+  let body: Record<string, unknown>;
   try { body = await c.req.json(); }
   catch { return c.json({ error: 'Invalid JSON body' }, 400); }
+
+  // Validate: 0.0–1.0 float scores, 0–100 integer for efficiency_score
+  const FLOAT_FIELDS = ['hallucination_score','faithfulness_score','relevancy_score','consistency_score','toxicity_score'] as const;
+  const errors: string[] = [];
+  for (const field of FLOAT_FIELDS) {
+    if (field in body) {
+      const v = body[field];
+      if (typeof v !== 'number' || v < 0 || v > 1) {
+        errors.push(`${field} must be a number between 0.0 and 1.0`);
+      }
+    }
+  }
+  if ('efficiency_score' in body) {
+    const v = body['efficiency_score'];
+    if (typeof v !== 'number' || v < 0 || v > 100 || !Number.isFinite(v)) {
+      errors.push('efficiency_score must be an integer between 0 and 100');
+    }
+  }
+  if (errors.length > 0) return c.json({ error: 'Validation failed', details: errors }, 422);
+
+  // Confirm event exists in this org before writing
+  const existing = await c.env.DB.prepare(
+    'SELECT hallucination_score, faithfulness_score, relevancy_score, consistency_score, toxicity_score, efficiency_score FROM events WHERE id = ? AND org_id = ?'
+  ).bind(id, orgId).first<Record<string, number | null>>();
+  if (!existing) return c.json({ error: 'Event not found' }, 404);
+
+  // Merge: only overwrite fields present in body, keep existing values for absent fields
+  const merged = {
+    hallucination_score: ('hallucination_score' in body ? body.hallucination_score : existing.hallucination_score) as number | null,
+    faithfulness_score:  ('faithfulness_score'  in body ? body.faithfulness_score  : existing.faithfulness_score)  as number | null,
+    relevancy_score:     ('relevancy_score'     in body ? body.relevancy_score     : existing.relevancy_score)     as number | null,
+    consistency_score:   ('consistency_score'   in body ? body.consistency_score   : existing.consistency_score)   as number | null,
+    toxicity_score:      ('toxicity_score'      in body ? body.toxicity_score      : existing.toxicity_score)      as number | null,
+    efficiency_score:    ('efficiency_score'    in body ? body.efficiency_score    : existing.efficiency_score)    as number | null,
+  };
 
   await c.env.DB.prepare(`
     UPDATE events SET
@@ -355,14 +427,17 @@ events.patch('/:id/scores', async (c) => {
       toxicity_score      = ?, efficiency_score   = ?
     WHERE id = ? AND org_id = ?
   `).bind(
-    body.hallucination_score ?? null,
-    body.faithfulness_score  ?? null,
-    body.relevancy_score     ?? null,
-    body.consistency_score   ?? null,
-    body.toxicity_score      ?? null,
-    body.efficiency_score    ?? null,
+    merged.hallucination_score, merged.faithfulness_score,
+    merged.relevancy_score,     merged.consistency_score,
+    merged.toxicity_score,      merged.efficiency_score,
     id, orgId,
   ).run();
+
+  logAudit(c, {
+    event_type: 'admin_action', event_name: 'quality_scores.update',
+    resource_type: 'event', resource_id: id,
+    metadata: { fields: Object.keys(body).filter(k => FLOAT_FIELDS.includes(k as never) || k === 'efficiency_score') },
+  });
 
   return c.json({ ok: true });
 });

@@ -499,3 +499,208 @@ class TestRoleVisibility:
         d = r.json()
         chk("ROLE.08 period_days=90 for superadmin", d.get("period_days") == 90)
         chk("ROLE.08 recommendations array present", isinstance(d.get("recommendations"), list))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SECTION E — Bug fixes validation
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestBugFixes:
+    """Directly validate each fix from the audit."""
+
+    # Fix 1: Input validation on scores
+    def test_fix01_score_above_1_rejected(self):
+        section("E — Bug fixes validation")
+        event_id = _ingest_event()
+        if not event_id:
+            pytest.skip("Could not ingest event")
+        r = _api("patch", f"/v1/events/{event_id}/scores", json={"hallucination_score": 1.5})
+        chk("FIX.01 hallucination_score >1 → 422", r.status_code == 422, f"got {r.status_code}: {r.text[:120]}")
+
+    def test_fix02_negative_score_rejected(self):
+        event_id = _ingest_event()
+        if not event_id:
+            pytest.skip("Could not ingest event")
+        r = _api("patch", f"/v1/events/{event_id}/scores", json={"toxicity_score": -0.1})
+        chk("FIX.02 negative score → 422", r.status_code == 422, f"got {r.status_code}: {r.text[:120]}")
+
+    def test_fix03_efficiency_score_out_of_range_rejected(self):
+        event_id = _ingest_event()
+        if not event_id:
+            pytest.skip("Could not ingest event")
+        r = _api("patch", f"/v1/events/{event_id}/scores", json={"efficiency_score": 150})
+        chk("FIX.03 efficiency_score >100 → 422", r.status_code == 422, f"got {r.status_code}: {r.text[:120]}")
+
+    def test_fix04_nonexistent_event_returns_404(self):
+        """PATCH on non-existent event_id must return 404, not silently succeed."""
+        r = _api("patch", "/v1/events/totally-fake-event-xyz/scores", json={"hallucination_score": 0.1})
+        chk("FIX.04 non-existent event → 404", r.status_code == 404, f"got {r.status_code}: {r.text[:120]}")
+
+    def test_fix05_get_scores_returns_event(self):
+        """GET /v1/events/:id/scores must return the stored scores."""
+        event_id = _ingest_event()
+        if not event_id:
+            pytest.skip("Could not ingest event")
+        # Write scores
+        _api("patch", f"/v1/events/{event_id}/scores", json={
+            "hallucination_score": 0.12, "faithfulness_score": 0.88,
+        })
+        # Read them back
+        r = _api("get", f"/v1/events/{event_id}/scores")
+        chk("FIX.05 GET scores returns 200", r.status_code == 200, f"got {r.status_code}: {r.text[:120]}")
+        d = r.json()
+        chk("FIX.05 event_id in response", "event_id" in d, f"keys: {list(d.keys())}")
+        chk("FIX.05 hallucination_score readable", d.get("hallucination_score") == 0.12,
+            f"got {d.get('hallucination_score')}")
+        chk("FIX.05 faithfulness_score readable", d.get("faithfulness_score") == 0.88,
+            f"got {d.get('faithfulness_score')}")
+
+    def test_fix06_get_scores_nonexistent_returns_404(self):
+        r = _api("get", "/v1/events/does-not-exist/scores")
+        chk("FIX.06 GET scores nonexistent → 404", r.status_code == 404, f"got {r.status_code}")
+
+    def test_fix07_partial_patch_preserves_existing_scores(self):
+        """PATCH with one field must not null out the other five."""
+        event_id = _ingest_event()
+        if not event_id:
+            pytest.skip("Could not ingest event")
+        # Write all 6 scores
+        _api("patch", f"/v1/events/{event_id}/scores", json={
+            "hallucination_score": 0.10, "faithfulness_score": 0.90,
+            "relevancy_score": 0.85, "consistency_score": 0.80,
+            "toxicity_score": 0.02, "efficiency_score": 75,
+        })
+        # Partial update — only hallucination
+        _api("patch", f"/v1/events/{event_id}/scores", json={"hallucination_score": 0.20})
+        r = _api("get", f"/v1/events/{event_id}/scores")
+        d = r.json()
+        chk("FIX.07 partial PATCH preserves faithfulness_score", d.get("faithfulness_score") == 0.90,
+            f"was nulled: {d.get('faithfulness_score')}")
+        chk("FIX.07 partial PATCH preserves efficiency_score", d.get("efficiency_score") == 75,
+            f"was nulled: {d.get('efficiency_score')}")
+        chk("FIX.07 partial PATCH updates hallucination_score", d.get("hallucination_score") == 0.20,
+            f"not updated: {d.get('hallucination_score')}")
+
+    def test_fix08_kpis_efficiency_score_null_when_unscored(self):
+        """KPIs must return null efficiency_score (not 74) when no events scored."""
+        r = _api("get", "/v1/analytics/kpis", key=MEMBER_KEY)
+        chk("FIX.08 kpis returns 200", r.status_code == 200, f"got {r.status_code}")
+        d = r.json()
+        # efficiency_score should be null or a real number — never the fake default 74
+        eff = d.get("efficiency_score")
+        chk("FIX.08 efficiency_score is null or real number (never fake 74)",
+            eff != 74 or eff is None,  # 74 is acceptable only if real events averaged to it
+            f"suspicious default: {eff}")
+
+    def test_fix09_kpis_includes_quality_object(self):
+        """KPIs response must include quality score aggregates."""
+        r = _api("get", "/v1/analytics/kpis", key=ADMIN_KEY)
+        chk("FIX.09 kpis returns 200", r.status_code == 200, f"got {r.status_code}")
+        d = r.json()
+        chk("FIX.09 'quality' key in kpis response", "quality" in d, f"keys: {list(d.keys())}")
+        q = d.get("quality", {})
+        for field in ["avg_hallucination_score", "avg_faithfulness_score",
+                      "avg_relevancy_score", "avg_toxicity_score",
+                      "scored_events", "coverage_pct"]:
+            chk(f"FIX.09 quality.{field} present", field in q, f"missing from quality: {list(q.keys())}")
+
+    def test_fix10_recommendations_includes_empty_reason(self):
+        """When recommendations is empty, response must include empty_reason string."""
+        r = _api("get", "/v1/admin/developers/recommendations", key=ADMIN_KEY)
+        d = r.json()
+        recs = d.get("recommendations", [])
+        if len(recs) == 0:
+            chk("FIX.10 empty recommendations includes empty_reason",
+                "empty_reason" in d and isinstance(d["empty_reason"], str),
+                f"keys: {list(d.keys())}, empty_reason: {d.get('empty_reason')}")
+
+    def test_fix11_recommendations_includes_savings_reasons(self):
+        """Each recommendation entry must include savings_reasons array."""
+        r = _api("get", "/v1/admin/developers/recommendations", key=ADMIN_KEY)
+        recs = r.json().get("recommendations", [])
+        for rec in recs:
+            chk("FIX.11 savings_reasons is list", isinstance(rec.get("savings_reasons"), list),
+                f"missing or wrong type: {rec.get('savings_reasons')}")
+
+    # Fix 8: claude-use-bang no longer fires for low-activity sessions
+    def test_fix12_claude_use_bang_does_not_fire_on_low_activity(self):
+        """claude-use-bang must not fire for sessions with only 4 prompts and zero cost."""
+        metrics = _claude(promptCount=4, totalCostUsd=0, avgCostPerPrompt=0)
+        r = _cli("recommendations", metrics)
+        chk("FIX.12 claude-use-bang does not fire on minimal sessions",
+            "claude-use-bang" not in r.get("ids", []), f"tips: {r.get('ids')}")
+
+    # Fix 9: no duplicate cache tips for claude agent
+    def test_fix13_no_duplicate_cache_tips_for_claude(self):
+        """claude-prompt-caching and all-low-cache must not both appear for Claude."""
+        metrics = _claude(totalInputTokens=25000, totalCachedTokens=300, promptCount=6)
+        r = _cli("recommendations", metrics, {"maxTips": 5})
+        ids = r.get("ids", [])
+        both = "claude-prompt-caching" in ids and "all-low-cache" in ids
+        chk("FIX.13 no duplicate cache tips for Claude agent", not both,
+            f"both fired: {ids}")
+
+    # Fix 10: gemini-free-tier downgraded from critical
+    def test_fix14_gemini_free_tier_not_critical(self):
+        """gemini-free-tier must be medium priority, not critical."""
+        metrics = _gemini(totalCostUsd=0.5, promptCount=20)
+        r = _cli("recommendations", metrics)
+        for tip in r.get("tips", []):
+            if tip["id"] == "gemini-free-tier":
+                chk("FIX.14 gemini-free-tier is medium priority",
+                    tip["priority"] == "medium", f"got: {tip['priority']}")
+
+    # Fix 13: Copilot tips exist
+    def test_fix15_copilot_agent_gets_tips(self):
+        """GitHub Copilot agent must receive relevant tips."""
+        metrics = {**ZERO_METRICS, "agent": "copilot", "model": "copilot",
+                   "promptCount": 6, "avgCostPerPrompt": 0.04, "lastPromptTokens": 2500}
+        r = _cli("recommendations", metrics)
+        ids = r.get("ids", [])
+        copilot_tips = [i for i in ids if i.startswith("copilot-")]
+        chk("FIX.15 copilot agent gets copilot-specific tips", len(copilot_tips) > 0, f"tips: {ids}")
+
+    # Fix 14: model-switch tips suppressed when hallucination is high
+    def test_fix16_model_switch_suppressed_when_hallucination_high(self):
+        """claude-use-sonnet must not fire when avgHallucinationScore >= 0.2."""
+        metrics = _claude(
+            model="claude-opus-4-6", avgCostPerPrompt=0.05, promptCount=5,
+            avgHallucinationScore=0.25,  # quality concern — don't recommend cheaper model
+        )
+        r = _cli("recommendations", metrics)
+        chk("FIX.16 claude-use-sonnet suppressed on high hallucination",
+            "claude-use-sonnet" not in r.get("ids", []), f"tips: {r.get('ids')}")
+
+    def test_fix17_model_switch_fires_when_hallucination_low(self):
+        """claude-use-sonnet must still fire when hallucination is under threshold."""
+        metrics = _claude(
+            model="claude-opus-4-6", avgCostPerPrompt=0.05, promptCount=5,
+            avgHallucinationScore=0.10,  # acceptable quality
+        )
+        r = _cli("recommendations", metrics)
+        chk("FIX.17 claude-use-sonnet fires when hallucination is low",
+            "claude-use-sonnet" in r.get("ids", []), f"tips: {r.get('ids')}")
+
+    # Fix: quality alert tips fire correctly
+    def test_fix18_high_hallucination_tip_fires(self):
+        """all-high-hallucination must fire when avgHallucinationScore > 0.2."""
+        metrics = _claude(avgHallucinationScore=0.30, promptCount=5)
+        r = _cli("recommendations", metrics)
+        chk("FIX.18 all-high-hallucination fires for score >0.2",
+            "all-high-hallucination" in r.get("ids", []), f"tips: {r.get('ids')}")
+
+    def test_fix19_high_toxicity_tip_fires(self):
+        metrics = _claude(avgToxicityScore=0.20, promptCount=5)
+        r = _cli("recommendations", metrics, {"maxTips": 5})
+        chk("FIX.19 all-high-toxicity fires for score >0.15",
+            "all-high-toxicity" in r.get("ids", []), f"tips: {r.get('ids')}")
+
+    def test_fix20_quality_placeholder_substituted(self):
+        """${hallucination} and ${toxicity} placeholders must be replaced in action text."""
+        metrics = _claude(avgHallucinationScore=0.30, promptCount=5)
+        r = _cli("recommendations", metrics)
+        for action in r.get("actions", []):
+            chk("FIX.20 ${hallucination} placeholder replaced", "${hallucination}" not in action,
+                f"unsubstituted: {action}")
+            chk("FIX.20 ${toxicity} placeholder replaced", "${toxicity}" not in action,
+                f"unsubstituted: {action}")
