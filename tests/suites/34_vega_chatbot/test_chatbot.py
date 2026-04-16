@@ -23,7 +23,7 @@ def test_health():
 # ── Task 2: Static knowledge ──────────────────────────────────────────────────
 
 def test_static_knowledge_loads():
-    path = ROOT / "vantage-chatbot/knowledge/static.json"
+    path = ROOT / "cohrint-chatbot/knowledge/static.json"
     data = json.loads(path.read_text())
     assert len(data) >= 10
     for entry in data:
@@ -85,7 +85,7 @@ def test_build_chunks_produces_valid_json():
     result = subprocess.run(
         ["node", "knowledge/build-chunks.js"],
         capture_output=True, text=True,
-        cwd=str(ROOT / "vantage-chatbot"),
+        cwd=str(ROOT / "cohrint-chatbot"),
     )
     assert result.returncode == 0
     data = json.loads(result.stdout)
@@ -96,18 +96,18 @@ def test_build_chunks_produces_valid_json():
 # ── Task 7: Frontend widget ───────────────────────────────────────────────────
 
 def test_widget_files_exist():
-    base = ROOT / "vantage-final-v4/widget"
+    base = ROOT / "cohrint-frontend/widget"
     assert (base / "chatbot.css").exists()
     assert (base / "chatbot.js").exists()
 
 
 def test_widget_js_uses_safe_dom_only():
-    js = (ROOT / "vantage-final-v4/widget/chatbot.js").read_text()
+    js = (ROOT / "cohrint-frontend/widget/chatbot.js").read_text()
     assert ".innerHTML" not in js
 
 
 def test_widget_css_has_required_selectors():
-    css = (ROOT / "vantage-final-v4/widget/chatbot.css").read_text()
+    css = (ROOT / "cohrint-frontend/widget/chatbot.css").read_text()
     assert "#vega-launcher" in css
     assert "#vega-panel" in css
     assert ".vega-msg" in css
@@ -213,18 +213,18 @@ def test_chat_reply_non_empty():
 
 
 def test_knowledge_basics_no_plan_gate():
-    data = json.loads((ROOT / "vantage-chatbot/knowledge/static.json").read_text())
+    data = json.loads((ROOT / "cohrint-chatbot/knowledge/static.json").read_text())
     basics = [e for e in data if "overview" in e.get("tags", []) or "product" in e.get("tags", [])]
     assert all("plan_gate" not in e for e in basics)
 
 
 def test_knowledge_pro_entries_gated():
-    data = json.loads((ROOT / "vantage-chatbot/knowledge/static.json").read_text())
+    data = json.loads((ROOT / "cohrint-chatbot/knowledge/static.json").read_text())
     pro = [e for e in data if "pro" in e.get("tags", [])]
     assert all(e.get("plan_gate") in ("pro", "enterprise") for e in pro)
 
 
 def test_app_html_injects_widget():
-    html = (ROOT / "vantage-final-v4/app.html").read_text()
+    html = (ROOT / "cohrint-frontend/app.html").read_text()
     assert 'href="/widget/chatbot.css"' in html
     assert 'src="/widget/chatbot.js"' in html

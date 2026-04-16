@@ -413,7 +413,7 @@ class TestNoFakeData:
     @staticmethod
     def _fetch_html():
         """Read app.html from the local repo (not deployed site) to test current code."""
-        local_path = Path(__file__).parent.parent.parent.parent / "vantage-final-v4" / "app.html"
+        local_path = Path(__file__).parent.parent.parent.parent / "cohrint-frontend" / "app.html"
         if local_path.exists():
             return local_path.read_text()
         # Fallback to deployed site

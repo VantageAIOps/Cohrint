@@ -1,7 +1,7 @@
 {
-  "name": "vantage-worker",
+  "name": "cohrint-worker",
   "version": "1.0.0",
-  "description": "VantageAI ingest + analytics API — Cloudflare Worker",
+  "description": "Cohrint ingest + analytics API — Cloudflare Worker",
   "private": true,
   "scripts": {
     "gen-version": "node --input-type=commonjs -e \"const fs=require('fs');const v=require('./package.json').version;fs.writeFileSync('src/_version.ts','// AUTO-GENERATED — do not edit manually. Run: npm run gen-version\\nexport const VERSION = '+JSON.stringify(v)+';\\n');\"",

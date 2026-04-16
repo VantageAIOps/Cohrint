@@ -53,13 +53,13 @@ jobs:
           }
 
           echo "Checking package versions..."
-          check_version "vantage-mcp" "cohrint-mcp" "mcp"
-          check_version "vantage-js-sdk" "cohrint" "sdk"
-          check_version "vantage-local-proxy" "cohrint-local-proxy" "proxy"
+          check_version "cohrint-mcp" "cohrint-mcp" "mcp"
+          check_version "cohrint-js-sdk" "cohrint" "sdk"
+          check_version "cohrint-local-proxy" "cohrint-local-proxy" "proxy"
           check_version "claude-intelligence" "@cohrint/claude-code" "claude_code"
 
           # Check Python package version against PyPI JSON API
-          local_py_ver=$(python3 -c "import tomllib; d=tomllib.load(open('vantage-agent/pyproject.toml','rb')); print(d['project']['version'])" 2>/dev/null || echo "0.0.0")
+          local_py_ver=$(python3 -c "import tomllib; d=tomllib.load(open('cohrint-agent/pyproject.toml','rb')); print(d['project']['version'])" 2>/dev/null || echo "0.0.0")
           registry_py_ver=$(curl -s https://pypi.org/pypi/cohrint-agent/json 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['info']['version'])" 2>/dev/null || echo "0.0.0")
           echo "  cohrint-agent: local=${local_py_ver} registry=${registry_py_ver}"
           if [ "$local_py_ver" != "$registry_py_ver" ]; then

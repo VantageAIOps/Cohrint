@@ -11,7 +11,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from helpers.output import section, chk, get_results, reset_results
 
-AGENT_DIR = Path(__file__).parent.parent.parent.parent / "vantage-agent"
+AGENT_DIR = Path(__file__).parent.parent.parent.parent / "cohrint-agent"
 PKG_DIR   = AGENT_DIR / "vantage_agent"
 BACKENDS  = PKG_DIR / "backends"
 
