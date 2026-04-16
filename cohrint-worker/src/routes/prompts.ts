@@ -333,7 +333,7 @@ prompts.post('/:id/versions', adminOnly, async (c) => {
 
 // ── GET /v1/prompts/:id/versions/:versionId ───────────────────────────────────
 
-prompts.get('/:id/versions/:versionId', async (c) => {
+prompts.get('/:id/versions/:versionId', adminOnly, async (c) => {
   const orgId = c.get('orgId');
   const promptId = c.req.param('id');
   const versionId = c.req.param('versionId');
