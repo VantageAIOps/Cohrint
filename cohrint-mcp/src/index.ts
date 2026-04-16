@@ -1080,7 +1080,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (!existsSync(hooksDir)) mkdirSync(hooksDir, { recursive: true });
 
         const __dirnameHook = dirname(fileURLToPath(import.meta.url));
-        const srcHook = join(__dirnameHook, 'vantage-track.js');
+        const srcHook = join(__dirnameHook, 'cohrint-track.js');
         const destHook = join(hooksDir, 'cohrint-track.js');
 
         if (!existsSync(srcHook)) {
@@ -1218,11 +1218,11 @@ async function runSetup(): Promise<void> {
 
   // 3. Copy hook script (bundled in dist/ alongside this file)
   const __dirname = dirname(fileURLToPath(import.meta.url));
-  const srcHook = join(__dirname, 'vantage-track.js');
+  const srcHook = join(__dirname, 'cohrint-track.js');
   const destHook = join(hooksDir, 'cohrint-track.js');
 
   if (!existsSync(srcHook)) {
-    process.stderr.write(`✗ vantage-track.js not found at ${srcHook}\n`);
+    process.stderr.write(`✗ cohrint-track.js not found at ${srcHook}\n`);
     process.exit(1);
   }
   copyFileSync(srcHook, destHook);

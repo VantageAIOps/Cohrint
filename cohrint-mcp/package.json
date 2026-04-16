@@ -11,7 +11,7 @@
   "scripts": {
     "gen-version": "node --input-type=commonjs -e \"const fs=require('fs');const v=require('./package.json').version;fs.writeFileSync('src/_version.ts','// AUTO-GENERATED — do not edit manually. Run: npm run gen-version\\nexport const VERSION = '+JSON.stringify(v)+';\\n');\"",
     "prebuild": "npm run gen-version",
-    "build": "tsc && cp ../claude-intelligence/hooks/vantage-track.js dist/vantage-track.js",
+    "build": "tsc && cp ../claude-intelligence/hooks/cohrint-track.js dist/cohrint-track.js",
     "predev": "npm run gen-version",
     "dev": "tsc --watch",
     "start": "node dist/index.js",

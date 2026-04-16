@@ -19,7 +19,7 @@
     "Stop": [
       {
         "matcher": "",
-        "hooks": [{ "type": "command", "command": "node .claude/hooks/vantage-track.js" }]
+        "hooks": [{ "type": "command", "command": "node .claude/hooks/cohrint-track.js" }]
       }
     ]
   },
