@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Coding Spend Benchmarks — Cohrint</title>
+<meta name="description" content="Industry benchmarks for AI coding tool spend. See median cost per developer per month, by company size and model. Powered by anonymized data from Cohrint.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://cohrint.com/benchmarks">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#00d4a1">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f0f17; --bg-card: #16161f; --bg-hover: #1e1e2e;
+    --border: #2a2a3a; --accent: #00d4a1;
+    --text: #e0e0e0; --text-muted: #888; --text-dim: #555;
+    --red: #e05c5c; --yellow: #f0c040; --blue: #7eb8f7;
+  }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* Header */
+  .header { display: flex; align-items: center; justify-content: space-between; padding: 16px 32px; border-bottom: 1px solid var(--border); background: var(--bg-card); }
+  .header-logo { font-weight: 700; font-size: 18px; color: var(--accent); }
+  .header-links { display: flex; gap: 20px; font-size: 14px; color: var(--text-muted); }
+  .header-links a { color: var(--text-muted); }
+  .header-links a:hover { color: var(--text); text-decoration: none; }
+
+  /* Layout */
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+  .hero { padding: 48px 0 32px; text-align: center; }
+  .hero h1 { font-size: 32px; font-weight: 700; margin-bottom: 12px; }
+  .hero p { color: var(--text-muted); font-size: 16px; max-width: 560px; margin: 0 auto 24px; line-height: 1.6; }
+  .badge { display: inline-block; background: rgba(0,212,161,.12); color: var(--accent); border: 1px solid rgba(0,212,161,.3); border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 600; letter-spacing: .5px; margin-bottom: 16px; }
+
+  /* Email gate */
+  #emailGate { max-width: 440px; margin: 0 auto; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 32px; text-align: center; }
+  #emailGate h2 { font-size: 20px; margin-bottom: 8px; }
+  #emailGate p { color: var(--text-muted); font-size: 14px; margin-bottom: 20px; line-height: 1.5; }
+  .gate-form { display: flex; gap: 8px; }
+  .gate-form input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 10px 14px; color: var(--text); font-size: 14px; outline: none; }
+  .gate-form input:focus { border-color: var(--accent); }
+  .gate-form button { background: var(--accent); color: #000; border: none; border-radius: 7px; padding: 10px 18px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .gate-form button:hover { opacity: .9; }
+  .gate-note { font-size: 11px; color: var(--text-dim); margin-top: 12px; }
+  #gateError { color: var(--red); font-size: 13px; margin-top: 8px; display: none; }
+
+  /* Dashboard */
+  #dashboard { display: none; }
+  .section { padding: 32px 0; }
+  .section-title { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+  .section-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
+
+  /* Filters */
+  .filters { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
+  .filter-group { display: flex; flex-direction: column; gap: 4px; }
+  .filter-group label { font-size: 11px; color: var(--text-muted); font-weight: 600; letter-spacing: .5px; text-transform: uppercase; }
+  .filter-group select { background: var(--bg-card); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 7px; font-size: 13px; cursor: pointer; outline: none; }
+  .filter-group select:focus { border-color: var(--accent); }
+
+  /* KPI cards */
+  .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px; }
+  .kpi-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .kpi-label { font-size: 11px; color: var(--text-muted); font-weight: 600; letter-spacing: .5px; text-transform: uppercase; margin-bottom: 8px; }
+  .kpi-value { font-size: 28px; font-weight: 700; color: var(--accent); }
+  .kpi-sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+  /* Chart cards */
+  .chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 20px; margin-bottom: 32px; }
+  .chart-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .chart-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .chart-card .chart-sub { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; }
+  .chart-wrap { position: relative; height: 240px; }
+
+  /* Percentile table */
+  .pct-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .pct-table th { padding: 8px 12px; text-align: left; font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid var(--border); }
+  .pct-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .pct-table tr:last-child td { border-bottom: none; }
+  .pct-table tr:hover td { background: var(--bg-hover); }
+  .pct-bar-wrap { width: 120px; background: var(--bg-hover); border-radius: 4px; height: 6px; display: inline-block; vertical-align: middle; margin-left: 8px; }
+  .pct-bar { height: 6px; background: var(--accent); border-radius: 4px; }
+
+  /* No data */
+  .no-data { padding: 48px; text-align: center; color: var(--text-muted); font-size: 14px; }
+  .no-data strong { display: block; font-size: 16px; color: var(--text); margin-bottom: 8px; }
+
+  /* Footer */
+  .footer { border-top: 1px solid var(--border); padding: 24px 32px; text-align: center; font-size: 13px; color: var(--text-muted); margin-top: 48px; }
+  .footer a { color: var(--text-muted); }
+
+  @media (max-width: 640px) {
+    .header { padding: 12px 16px; }
+    .hero { padding: 32px 0 20px; }
+    .hero h1 { font-size: 24px; }
+    .chart-grid { grid-template-columns: 1fr; }
+    .gate-form { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <a href="/" class="header-logo">Cohrint</a>
+  <nav class="header-links">
+    <a href="/app.html">Dashboard</a>
+    <a href="/docs.html">Docs</a>
+    <a href="/report.html">Report</a>
+  </nav>
+</header>
+
+<div class="container">
+  <div class="hero">
+    <div class="badge">LIVE BENCHMARKS</div>
+    <h1>AI Coding Spend Benchmarks</h1>
+    <p>Industry percentiles for LLM cost per developer per month, cache efficiency, and token spend &mdash; updated quarterly from anonymized org data.</p>
+  </div>
+
+  <!-- Email gate -->
+  <div id="emailGate">
+    <h2>Access the Benchmarks</h2>
+    <p>Enter your work email to see industry spend data. We&rsquo;ll send you a quarterly update when new data is available.</p>
+    <form class="gate-form" id="gateForm" onsubmit="submitGate(event)">
+      <input type="email" id="gateEmail" placeholder="you@company.com" required autocomplete="email">
+      <button type="submit">View Data</button>
+    </form>
+    <div id="gateError"></div>
+    <p class="gate-note">No spam. Unsubscribe anytime. Data is anonymized &mdash; no org is ever identified.</p>
+  </div>
+
+  <!-- Dashboard (shown after email gate) -->
+  <div id="dashboard">
+    <!-- Filters -->
+    <div class="section">
+      <div class="section-title">Industry Benchmarks</div>
+      <div class="section-sub" id="dataFreshness">Loading data&hellip;</div>
+      <div class="filters">
+        <div class="filter-group">
+          <label>Metric</label>
+          <select id="metricSel" onchange="refreshData()">
+            <option value="cost_per_dev_month">Cost / Dev / Month</option>
+            <option value="cost_per_token">Cost per Token</option>
+            <option value="cache_hit_rate">Cache Hit Rate</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Model</label>
+          <select id="modelSel" onchange="refreshData()">
+            <option value="">All Models</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- KPI summary -->
+      <div class="kpi-row" id="kpiRow">
+        <div class="kpi-card"><div class="kpi-label">Median (P50)</div><div class="kpi-value" id="kpiP50">&mdash;</div><div class="kpi-sub">industry median</div></div>
+        <div class="kpi-card"><div class="kpi-label">75th Percentile</div><div class="kpi-value" id="kpiP75">&mdash;</div><div class="kpi-sub">top quartile threshold</div></div>
+        <div class="kpi-card"><div class="kpi-label">25th Percentile</div><div class="kpi-value" id="kpiP25">&mdash;</div><div class="kpi-sub">bottom quartile</div></div>
+        <div class="kpi-card"><div class="kpi-label">Sample Size</div><div class="kpi-value" id="kpiN">&mdash;</div><div class="kpi-sub">contributing orgs</div></div>
+      </div>
+
+      <!-- Charts -->
+      <div class="chart-grid">
+        <div class="chart-card">
+          <h3>Percentile Distribution</h3>
+          <div class="chart-sub">P25 / P50 / P75 / P90 across all participating orgs</div>
+          <div class="chart-wrap"><canvas id="pctChart"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Available Metrics</h3>
+          <div class="chart-sub">Metrics with sufficient anonymized data (k &ge; 5 orgs)</div>
+          <div id="metricsTable"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- How it works -->
+    <div class="section" style="border-top:1px solid var(--border);padding-top:32px;">
+      <div class="section-title">How This Data Works</div>
+      <div class="section-sub">Privacy-first benchmark methodology</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px;">
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:20px;">
+          <div style="font-weight:600;margin-bottom:8px;">&#128272; K-Anonymity</div>
+          <div style="font-size:13px;color:var(--text-muted);line-height:1.6;">Cohorts with fewer than 5 contributing organizations return no data. Your org is never identifiable in the aggregate.</div>
+        </div>
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:20px;">
+          <div style="font-weight:600;margin-bottom:8px;">&#128200; Quarterly Snapshots</div>
+          <div style="font-size:13px;color:var(--text-muted);line-height:1.6;">Data is aggregated quarterly. Percentiles are computed from all opted-in orgs in each size band and recalculated each Sunday.</div>
+        </div>
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:20px;">
+          <div style="font-weight:600;margin-bottom:8px;">&#9989; Opt-in Only</div>
+          <div style="font-size:13px;color:var(--text-muted);line-height:1.6;">Only organizations that explicitly enable benchmark sharing contribute data. Participation is always voluntary and can be revoked.</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="text-align:center;padding:32px 0 16px;">
+      <a href="/app.html" style="background:var(--accent);color:#000;padding:12px 28px;border-radius:8px;font-weight:600;font-size:14px;">Connect Your Data &rarr;</a>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:8px;">Contribute your org&rsquo;s anonymized data in Settings &rsquo; Integrations &rsquo; Benchmarks</div>
+    </div>
+  </div><!-- /#dashboard -->
+</div><!-- /.container -->
+
+<footer class="footer">
+  <div>&copy; 2026 Cohrint &mdash; <a href="/privacy.html">Privacy</a> &middot; <a href="/trust.html">Trust &amp; Security</a> &middot; <a href="/docs.html">API Docs</a></div>
+</footer>
+
+<script>
+(function() {
+  'use strict';
+
+  var API = 'https://api.cohrint.com';
+  var GATE_KEY = 'cohrint_benchmark_email';
+  var _pctChart = null;
+  var _summary = [];
+
+  // ── Email gate ─────────────────────────────────────────────────────────────
+
+  function isGated() {
+    try { return !localStorage.getItem(GATE_KEY); } catch(e) { return true; }
+  }
+
+  function unlockDashboard() {
+    document.getElementById('emailGate').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    loadSummary();
+  }
+
+  window.submitGate = function(e) {
+    e.preventDefault();
+    var emailEl = document.getElementById('gateEmail');
+    var errEl = document.getElementById('gateError');
+    var email = (emailEl.value || '').trim();
+    if (!email || !email.includes('@')) {
+      errEl.textContent = 'Please enter a valid email address.';
+      errEl.style.display = 'block';
+      return;
+    }
+    errEl.style.display = 'none';
+    try { localStorage.setItem(GATE_KEY, email); } catch(e) {}
+    unlockDashboard();
+  };
+
+  // ── Data loading ───────────────────────────────────────────────────────────
+
+  function loadSummary() {
+    fetch(API + '/v1/benchmark/summary')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        _summary = (data && data.available) || [];
+        populateModelFilter();
+        renderMetricsTable();
+        refreshData();
+        var fresh = document.getElementById('dataFreshness');
+        if (_summary.length) {
+          var latest = _summary.map(function(s) { return s.quarter; }).sort().pop() || '';
+          fresh.textContent = 'Latest data: ' + latest + ' \u00b7 ' + _summary.length + ' metric/model combinations available';
+        } else {
+          fresh.textContent = 'No benchmark data available yet. Be the first to contribute!';
+        }
+      })
+      .catch(function() {
+        document.getElementById('dataFreshness').textContent = 'Could not load benchmark data.';
+      });
+  }
+
+  function populateModelFilter() {
+    var sel = document.getElementById('modelSel');
+    // Clear existing options except "All Models"
+    while (sel.options.length > 1) sel.remove(1);
+    var models = {};
+    _summary.forEach(function(s) { if (s.model) models[s.model] = true; });
+    Object.keys(models).sort().forEach(function(m) {
+      var opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = m;
+      sel.appendChild(opt);
+    });
+  }
+
+  window.refreshData = function() {
+    var metric = document.getElementById('metricSel').value;
+    var model = document.getElementById('modelSel').value || null;
+    var url = API + '/v1/benchmark/percentiles?metric=' + encodeURIComponent(metric);
+    if (model) url += '&model=' + encodeURIComponent(model);
+
+    fetch(url)
+      .then(function(r) {
+        if (r.status === 404) return null;
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function(data) {
+        if (!data) { renderEmpty(); return; }
+        renderKPIs(data, metric);
+        renderPctChart(data, metric);
+      })
+      .catch(function() { renderEmpty(); });
+  };
+
+  // ── Renderers ──────────────────────────────────────────────────────────────
+
+  function formatValue(v, metric) {
+    if (v == null) return '\u2014';
+    if (metric === 'cache_hit_rate') return (Number(v) * 100).toFixed(1) + '%';
+    if (metric === 'cost_per_token') return '$' + Number(v).toFixed(8);
+    return '$' + Number(v).toFixed(2);
+  }
+
+  function renderKPIs(data, metric) {
+    document.getElementById('kpiP50').textContent = formatValue(data.p50, metric);
+    document.getElementById('kpiP75').textContent = formatValue(data.p75, metric);
+    document.getElementById('kpiP25').textContent = formatValue(data.p25, metric);
+    document.getElementById('kpiN').textContent = String(data.sample_size || 0);
+  }
+
+  function renderEmpty() {
+    document.getElementById('kpiP50').textContent = '\u2014';
+    document.getElementById('kpiP75').textContent = '\u2014';
+    document.getElementById('kpiP25').textContent = '\u2014';
+    document.getElementById('kpiN').textContent = '\u2014';
+    if (_pctChart) { _pctChart.destroy(); _pctChart = null; }
+    var ctx = document.getElementById('pctChart').getContext('2d');
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  }
+
+  function renderPctChart(data, metric) {
+    var labels = ['P25', 'P50', 'P75', 'P90'];
+    var values = [data.p25, data.p50, data.p75, data.p90].map(function(v) {
+      return metric === 'cache_hit_rate' ? Number(v) * 100 : Number(v);
+    });
+    if (_pctChart) { _pctChart.destroy(); }
+    var ctx = document.getElementById('pctChart').getContext('2d');
+    _pctChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: metric === 'cache_hit_rate' ? 'Cache Hit Rate (%)' : 'USD',
+          data: values,
+          backgroundColor: ['#2a5a4a', '#00d4a1', '#2a5a4a', '#1a3a2a'],
+          borderColor: ['#00d4a1', '#00d4a1', '#00d4a1', '#00d4a1'],
+          borderWidth: 1,
+          borderRadius: 5,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#888' }, grid: { color: '#222' } },
+          y: { ticks: { color: '#888' }, grid: { color: '#222' }, beginAtZero: true }
+        }
+      }
+    });
+  }
+
+  function renderMetricsTable() {
+    var el = document.getElementById('metricsTable');
+    while (el.firstChild) el.removeChild(el.firstChild);
+    if (!_summary.length) {
+      var msg = document.createElement('div');
+      msg.className = 'no-data';
+      var strong = document.createElement('strong');
+      strong.textContent = 'No data yet';
+      msg.appendChild(strong);
+      msg.appendChild(document.createTextNode('Benchmark data appears after 5+ orgs contribute.'));
+      el.appendChild(msg);
+      return;
+    }
+    var table = document.createElement('table');
+    table.className = 'pct-table';
+    var thead = document.createElement('thead');
+    var hr = document.createElement('tr');
+    ['Metric', 'Model', 'Quarter', 'Orgs'].forEach(function(h) {
+      var th = document.createElement('th');
+      th.textContent = h;
+      hr.appendChild(th);
+    });
+    thead.appendChild(hr);
+    table.appendChild(thead);
+    var tbody = document.createElement('tbody');
+    _summary.slice(0, 20).forEach(function(s) {
+      var tr = document.createElement('tr');
+      [s.metric, s.model || 'all', s.quarter, String(s.sample_size)].forEach(function(v) {
+        var td = document.createElement('td');
+        td.textContent = v;
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    el.appendChild(table);
+  }
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+
+  if (!isGated()) {
+    unlockDashboard();
+  }
+
+})();
+</script>
+</body>
+</html>

@@ -27,6 +27,7 @@
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
 <script src="/vantage-models.js"></script>
+<script src="/traces.js" defer></script>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════════
    Cohrint — Dark Industrial Command Center
@@ -717,6 +718,9 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
       <button class="sb-item" onclick="nav('models', this)">
         <span class="icon">&#11041;</span> Model Pricing
       </button>
+      <button class="sb-item" onclick="nav('traces', this)">
+        <span class="icon">&#9900;</span> Agent Traces
+      </button>
     </div>
 
     <div class="sidebar-section" id="sb-section-executive" style="display:none">
@@ -1045,6 +1049,48 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
           </div>
           <div style="position:relative; height:240px;">
             <canvas id="providerBreakdownChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── Agent Traces ─── -->
+      <div id="view-traces" class="view">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <h2 style="margin:0;font-size:18px;">Agent Traces</h2>
+          <select id="tracesPeriodSel" onchange="loadTraces()" style="background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);padding:6px 10px;border-radius:6px;cursor:pointer;">
+            <option value="1">Today</option>
+            <option value="7" selected>Last 7 days</option>
+            <option value="30">Last 30 days</option>
+          </select>
+        </div>
+        <div id="tracesTable" style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+          <table class="tool-table" style="width:100%;border-collapse:collapse;">
+            <thead><tr style="background:var(--bg-hover);">
+              <th style="padding:10px 14px;text-align:left;font-size:12px;color:var(--text-muted);font-weight:600;">TRACE ID</th>
+              <th style="padding:10px 14px;text-align:left;font-size:12px;color:var(--text-muted);font-weight:600;">AGENT</th>
+              <th style="padding:10px 14px;text-align:right;font-size:12px;color:var(--text-muted);font-weight:600;">SPANS</th>
+              <th style="padding:10px 14px;text-align:right;font-size:12px;color:var(--text-muted);font-weight:600;">COST</th>
+              <th style="padding:10px 14px;text-align:right;font-size:12px;color:var(--text-muted);font-weight:600;">LATENCY</th>
+              <th style="padding:10px 14px;text-align:left;font-size:12px;color:var(--text-muted);font-weight:600;">STARTED</th>
+              <th style="padding:10px 14px;"></th>
+            </tr></thead>
+            <tbody id="tracesBody"><tr><td colspan="7" style="padding:32px;text-align:center;color:var(--text-muted);">Loading…</td></tr></tbody>
+          </table>
+        </div>
+        <!-- DAG modal -->
+        <div id="dagModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;align-items:center;justify-content:center;">
+          <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;width:min(900px,95vw);max-height:90vh;display:flex;flex-direction:column;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);">
+              <div>
+                <div style="font-weight:600;font-size:15px;" id="dagTitle">Trace</div>
+                <div style="font-size:12px;color:var(--text-muted);margin-top:2px;" id="dagSubtitle"></div>
+              </div>
+              <button onclick="closeDag()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;padding:4px 8px;">&#10005;</button>
+            </div>
+            <div style="padding:20px;overflow:auto;flex:1;" id="dagContainer">
+              <svg id="dagSvg" width="100%" style="min-height:300px;"></svg>
+            </div>
+            <div id="dagSpanDetail" style="padding:14px 20px;border-top:1px solid var(--border);font-size:13px;color:var(--text-muted);display:none;"></div>
           </div>
         </div>
       </div>
@@ -2203,6 +2249,7 @@ function loadViewData(view) {
     case 'integrations':  loadIntegrations(); break;
     case 'account': loadAccount(); break;
     case 'executive': loadExecutive(); break;
+    case 'traces': loadTraces(); break;
   }
 }
 
