@@ -53,15 +53,15 @@ jobs:
           }
 
           echo "Checking package versions..."
-          check_version "vantage-mcp" "vantageaiops-mcp" "mcp"
-          check_version "vantage-js-sdk" "vantageaiops" "sdk"
-          check_version "vantage-local-proxy" "vantageai-local-proxy" "proxy"
-          check_version "claude-intelligence" "@vantageaiops/claude-code" "claude_code"
+          check_version "vantage-mcp" "cohrint-mcp" "mcp"
+          check_version "vantage-js-sdk" "cohrint" "sdk"
+          check_version "vantage-local-proxy" "cohrint-local-proxy" "proxy"
+          check_version "claude-intelligence" "@cohrint/claude-code" "claude_code"
 
           # Check Python package version against PyPI JSON API
           local_py_ver=$(python3 -c "import tomllib; d=tomllib.load(open('vantage-agent/pyproject.toml','rb')); print(d['project']['version'])" 2>/dev/null || echo "0.0.0")
-          registry_py_ver=$(curl -s https://pypi.org/pypi/vantageai-agent/json 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['info']['version'])" 2>/dev/null || echo "0.0.0")
-          echo "  vantage-agent: local=${local_py_ver} registry=${registry_py_ver}"
+          registry_py_ver=$(curl -s https://pypi.org/pypi/cohrint-agent/json 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['info']['version'])" 2>/dev/null || echo "0.0.0")
+          echo "  cohrint-agent: local=${local_py_ver} registry=${registry_py_ver}"
           if [ "$local_py_ver" != "$registry_py_ver" ]; then
             echo "agent=true" >> $GITHUB_OUTPUT
             echo "  → WILL PUBLISH"
@@ -71,7 +71,7 @@ jobs:
           fi
 
   publish-mcp:
-    name: Publish vantageaiops-mcp
+    name: Publish cohrint-mcp
     needs: detect-changes
     if: needs.detect-changes.outputs.mcp == 'true'
     runs-on: ubuntu-latest
@@ -91,7 +91,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   publish-sdk:
-    name: Publish vantageaiops
+    name: Publish cohrint
     needs: detect-changes
     if: needs.detect-changes.outputs.sdk == 'true'
     runs-on: ubuntu-latest
@@ -111,7 +111,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   publish-proxy:
-    name: Publish vantageai-local-proxy
+    name: Publish cohrint-local-proxy
     needs: detect-changes
     if: needs.detect-changes.outputs.proxy == 'true'
     runs-on: ubuntu-latest
@@ -128,13 +128,13 @@ jobs:
           npm run build
           npm publish --access public
           NEW_VER=$(node -e "console.log(require('./package.json').version)")
-          npm deprecate "vantageai-local-proxy@<${NEW_VER}" "Upgrade to ${NEW_VER}: run npm install -g vantageai-local-proxy"
+          npm deprecate "cohrint-local-proxy@<${NEW_VER}" "Upgrade to ${NEW_VER}: run npm install -g cohrint-local-proxy"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           # NEW_VER is derived from package.json — not user input, no injection risk
 
   publish-claude-code:
-    name: Publish @vantageaiops/claude-code
+    name: Publish @cohrint/claude-code
     needs: detect-changes
     if: needs.detect-changes.outputs.claude_code == 'true'
     runs-on: ubuntu-latest
@@ -151,7 +151,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   publish-agent:
-    name: Publish vantage-agent (PyPI)
+    name: Publish cohrint-agent (PyPI)
     needs: detect-changes
     if: needs.detect-changes.outputs.agent == 'true'
     runs-on: ubuntu-latest
@@ -182,8 +182,8 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Package | Changed | Result |" >> $GITHUB_STEP_SUMMARY
           echo "|---------|---------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| vantageaiops-mcp | ${{ needs.detect-changes.outputs.mcp }} | ${{ needs.publish-mcp.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| vantageaiops | ${{ needs.detect-changes.outputs.sdk }} | ${{ needs.publish-sdk.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| vantageai-local-proxy | ${{ needs.detect-changes.outputs.proxy }} | ${{ needs.publish-proxy.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| vantage-agent (PyPI) | ${{ needs.detect-changes.outputs.agent }} | ${{ needs.publish-agent.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| @vantageaiops/claude-code | ${{ needs.detect-changes.outputs.claude_code }} | ${{ needs.publish-claude-code.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| cohrint-mcp | ${{ needs.detect-changes.outputs.mcp }} | ${{ needs.publish-mcp.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| cohrint | ${{ needs.detect-changes.outputs.sdk }} | ${{ needs.publish-sdk.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| cohrint-local-proxy | ${{ needs.detect-changes.outputs.proxy }} | ${{ needs.publish-proxy.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| cohrint-agent (PyPI) | ${{ needs.detect-changes.outputs.agent }} | ${{ needs.publish-agent.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| @cohrint/claude-code | ${{ needs.detect-changes.outputs.claude_code }} | ${{ needs.publish-claude-code.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY

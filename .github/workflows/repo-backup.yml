@@ -1,6 +1,6 @@
 name: Full Repository Backup
 
-# Mirrors the entire VantageAI repo (all branches, tags, history)
+# Mirrors the entire Cohrint repo (all branches, tags, history)
 # to the backup repo: Amanjain98/Vantage-AI
 #
 # Runs:
@@ -143,13 +143,13 @@ jobs:
       - name: Create dated archive
         run: |
           DATE=$(date -u '+%Y%m%d-%H%M')
-          git archive --format=zip --output="vantageai-backup-${DATE}.zip" HEAD
-          echo "Archive size: $(du -sh vantageai-backup-${DATE}.zip | cut -f1)"
+          git archive --format=zip --output="cohrint-backup-${DATE}.zip" HEAD
+          echo "Archive size: $(du -sh cohrint-backup-${DATE}.zip | cut -f1)"
           echo "DATE=${DATE}" >> $GITHUB_ENV
 
       - name: Upload archive artifact
         uses: actions/upload-artifact@v4
         with:
-          name: vantageai-backup-${{ env.DATE }}
-          path: vantageai-backup-*.zip
+          name: cohrint-backup-${{ env.DATE }}
+          path: cohrint-backup-*.zip
           retention-days: 30    # keep 30 days of ZIP backups
