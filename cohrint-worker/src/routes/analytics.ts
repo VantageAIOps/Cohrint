@@ -447,23 +447,55 @@ analytics.get('/traces/:traceId', async (c) => {
 
 // ── GET /v1/analytics/today — hourly spend for the current UTC day ───────────
 analytics.get('/today', async (c) => {
-  const orgId     = c.get('orgId');
-  const scopeTeam = c.get('scopeTeam');
+  const orgId      = c.get('orgId');
+  const scopeTeam  = c.get('scopeTeam');
+  const role       = c.get('role') as string;
+  const memberEmail = c.get('memberEmail') as string | undefined;
+  const isPrivileged = hasRole(role, 'admin');
   const teamClause = scopeTeam ? ' AND team = ?' : '';
   const teamArgs   = scopeTeam ? [scopeTeam] : [];
-  const todayStr = new Date().toISOString().split('T')[0] + ' 00:00:00';
+  const devClause  = isPrivileged ? '' : ' AND developer_email = ?';
+  const devArgs    = isPrivileged ? [] : [memberEmail];
+  const todayStr   = new Date().toISOString().split('T')[0] + ' 00:00:00';
+  // events table uses unix timestamps
+  const todayUnix  = Math.floor(Date.now() / 86_400_000) * 86_400;
 
-  const { results } = await c.env.DB.prepare(`
-    SELECT
-      CAST(strftime('%H', created_at) AS INTEGER) AS hour,
-      SUM(cost_usd)                               AS cost_usd,
-      SUM(input_tokens + output_tokens)           AS tokens,
-      COUNT(*)                                    AS requests
-    FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ?${teamClause}
-    GROUP BY hour
-    ORDER BY hour ASC
-  `).bind(orgId, todayStr, ...teamArgs).all();
+  const [evRows, cpuRows] = await Promise.all([
+    c.env.DB.prepare(`
+      SELECT
+        CAST(strftime('%H', datetime(created_at, 'unixepoch')) AS INTEGER) AS hour,
+        SUM(cost_usd)                        AS cost_usd,
+        SUM(prompt_tokens + completion_tokens) AS tokens,
+        COUNT(*)                             AS requests
+      FROM events
+      WHERE org_id = ? AND created_at >= ?${teamClause}${devClause}
+      GROUP BY hour
+    `).bind(orgId, todayUnix, ...teamArgs, ...devArgs).all<{ hour: number; cost_usd: number; tokens: number; requests: number }>(),
+    c.env.DB.prepare(`
+      SELECT
+        CAST(strftime('%H', created_at) AS INTEGER) AS hour,
+        SUM(cost_usd)                               AS cost_usd,
+        SUM(input_tokens + output_tokens)           AS tokens,
+        COUNT(*)                                    AS requests
+      FROM cross_platform_usage
+      WHERE org_id = ? AND created_at >= ?${teamClause}
+      GROUP BY hour
+    `).bind(orgId, todayStr, ...teamArgs).all<{ hour: number; cost_usd: number; tokens: number; requests: number }>(),
+  ]);
+
+  // Merge both sources by hour
+  const merged = new Map<number, { hour: number; cost_usd: number; tokens: number; requests: number }>();
+  for (const row of [...(evRows.results ?? []), ...(cpuRows.results ?? [])]) {
+    const existing = merged.get(row.hour);
+    if (existing) {
+      existing.cost_usd += row.cost_usd;
+      existing.tokens   += row.tokens;
+      existing.requests += row.requests;
+    } else {
+      merged.set(row.hour, { ...row });
+    }
+  }
+  const results = Array.from(merged.values()).sort((a, b) => a.hour - b.hour);
 
   return c.json({ date: todayStr.slice(0, 10), hours: results });
 });
