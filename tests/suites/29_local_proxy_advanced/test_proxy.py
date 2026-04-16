@@ -25,7 +25,7 @@ from helpers.api import fresh_account, get_headers, signup_api
 from helpers.data import rand_email, rand_tag
 from helpers.output import section, chk, ok, fail, info, get_results, reset_results
 
-PROXY_DIR = Path(__file__).parent.parent.parent.parent / "vantage-local-proxy"
+PROXY_DIR = Path(__file__).parent.parent.parent.parent / "cohrint-local-proxy"
 
 
 # ── Payload Builders ─────────────────────────────────────────────────────────

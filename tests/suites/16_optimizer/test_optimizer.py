@@ -218,9 +218,9 @@ def test_api_estimate_endpoint():
     )
     assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
     data = resp.json()
-    assert "comparisons" in data
-    assert len(data["comparisons"]) > 0
-    print(f"  PASS: API estimated costs for {len(data['comparisons'])} models")
+    assert "models" in data, f"Expected 'models' in response, got: {list(data.keys())}"
+    assert len(data["models"]) > 0
+    print(f"  PASS: API estimated costs for {len(data['models'])} models")
 
 
 # ── Runner ────────────────────────────────────────────────────────────────

@@ -25,7 +25,7 @@ from helpers.api import fresh_account, get_headers, signup_api
 from helpers.data import make_event, rand_email
 from helpers.output import section, chk, ok, fail, info, get_results, reset_results
 
-MCP_DIR = Path(__file__).parent.parent.parent.parent / "vantage-mcp"
+MCP_DIR = Path(__file__).parent.parent.parent.parent / "cohrint-mcp"
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────

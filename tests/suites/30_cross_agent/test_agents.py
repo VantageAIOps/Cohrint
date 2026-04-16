@@ -22,7 +22,7 @@ from helpers.api import fresh_account, get_headers
 from helpers.data import make_event, rand_tag
 from helpers.output import section, chk, ok, fail, info, get_results, reset_results
 
-AGENT_DIR = Path(__file__).parent.parent.parent.parent / "vantage-agent"
+AGENT_DIR = Path(__file__).parent.parent.parent.parent / "cohrint-agent"
 PKG_DIR   = AGENT_DIR / "vantage_agent"
 BACKENDS  = PKG_DIR / "backends"
 
