@@ -411,8 +411,15 @@ analytics.get('/traces', async (c) => {
 
 // ── GET /v1/analytics/traces/:traceId — full span tree for one trace ──────────
 analytics.get('/traces/:traceId', async (c) => {
-  const orgId   = c.get('orgId');
-  const traceId = c.req.param('traceId');
+  const orgId       = c.get('orgId');
+  const traceId     = c.req.param('traceId');
+  const role        = c.get('role');
+  const memberEmail = c.get('memberEmail');
+  const scopeTeam   = c.get('scopeTeam');
+  const { clause, args } = teamScope(scopeTeam);
+  const isPrivileged = hasRole(role, 'admin');
+  const devClause = isPrivileged ? '' : ' AND developer_email = ?';
+  const devArgs   = isPrivileged ? [] : [memberEmail];
 
   const { results } = await c.env.DB.prepare(`
     SELECT
@@ -430,9 +437,9 @@ analytics.get('/traces/:traceId', async (c) => {
       latency_ms,
       created_at
     FROM events
-    WHERE org_id = ? AND trace_id = ?
+    WHERE org_id = ? AND trace_id = ?${clause}${devClause}
     ORDER BY created_at ASC
-  `).bind(orgId, traceId).all();
+  `).bind(orgId, traceId, ...args, ...devArgs).all();
 
   if (!results.length) return c.json({ error: 'trace not found' }, 404);
   return c.json({ trace_id: traceId, spans: results });
