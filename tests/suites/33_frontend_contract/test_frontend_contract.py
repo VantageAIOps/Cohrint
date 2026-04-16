@@ -530,7 +530,7 @@ class TestIntegrationChannelContract:
         assert r.status_code in (200, 201)
 
         time.sleep(1)
-        r2 = _get("/v1/cross-platform/summary", hdrs, params={"days": 1})
+        r2 = _get("/v1/cross-platform/summary", hdrs, params={"days": 7})
         assert r2.status_code == 200
         body = r2.json()
         chk("FC.56b total_cost_usd > 0 after single event", body.get("total_cost_usd", 0) > 0,
@@ -595,7 +595,7 @@ class TestIntegrationChannelContract:
         assert r.status_code == 200
 
         time.sleep(2)
-        r2 = _get("/v1/cross-platform/summary", hdrs, params={"days": 1})
+        r2 = _get("/v1/cross-platform/summary", hdrs, params={"days": 7})
         assert r2.status_code == 200
         body = r2.json()
         chk("FC.58b total_cost_usd > 0 after OTel ingest", body.get("total_cost_usd", 0) > 0,

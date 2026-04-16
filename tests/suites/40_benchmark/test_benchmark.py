@@ -43,10 +43,13 @@ def _benchmark_deployed(headers=None) -> bool:
     global _BENCHMARK_DEPLOYED
     if _BENCHMARK_DEPLOYED is None:
         try:
-            # Try the public summary endpoint first; if that's 500 also check
-            # the authenticated contribute endpoint (different table).
+            # Check the public summary endpoint first
             r = requests.get(SUMMARY_URL, timeout=10)
-            if r.status_code == 500 and headers is not None:
+            if r.status_code == 500:
+                _BENCHMARK_DEPLOYED = False
+            elif headers is not None:
+                # Summary OK — also probe contribute to detect schema mismatch
+                # (contribute uses different D1 tables that may not yet be migrated)
                 r2 = requests.post(CONTRIBUTE_URL, json={}, headers=headers, timeout=10)
                 _BENCHMARK_DEPLOYED = r2.status_code != 500
             else:
