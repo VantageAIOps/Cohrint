@@ -829,6 +829,16 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
             <div class="kpi-value" id="kpiCacheSavings" style="color:var(--accent-green);">&mdash;</div>
             <div class="kpi-sub neutral" id="kpiCacheSavingsSub">&nbsp;</div>
           </div>
+          <div class="kpi-card animate-in delay-7" data-insight="Cost wasted on tokens that were not cached but could have been. Reducing prompt variability can recapture this spend.">
+            <div class="kpi-label">Wasted Spend</div>
+            <div class="kpi-value" id="kpiWastedCost" style="color:var(--accent-amber);">&mdash;</div>
+            <div class="kpi-sub neutral" id="kpiWastedCostSub">&nbsp;</div>
+          </div>
+          <div class="kpi-card animate-in delay-8" data-insight="Number of streaming API requests in this period. Streaming calls typically have higher output token counts.">
+            <div class="kpi-label">Streaming Reqs</div>
+            <div class="kpi-value" id="kpiStreamingReqs">&mdash;</div>
+            <div class="kpi-sub neutral" id="kpiStreamingReqsSub">&nbsp;</div>
+          </div>
         </div>
 
         <div class="chart-row animate-in delay-5">
@@ -948,6 +958,22 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
             </div>
           </div>
         </div>
+
+        <!-- Business Units — admin+ only -->
+        <div id="busUnitsCard" class="card" style="display:none" data-insight="Spend rolled up by business unit. Derived from team-to-BU mapping. Use for executive chargeback.">
+          <div class="card-header">
+            <div class="card-title">Cost by Business Unit</div>
+            <div class="card-badge" style="background:rgba(251,191,36,.15);color:var(--accent-amber);">ADMIN</div>
+          </div>
+          <table class="tool-table">
+            <thead>
+              <tr><th>Business Unit</th><th>Cost</th><th>Teams</th><th>% of Total</th></tr>
+            </thead>
+            <tbody id="busUnitsBody">
+              <tr><td colspan="4" class="empty-state">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <!-- ─── Model Pricing ─── -->
@@ -1047,7 +1073,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
           </div>
           <table class="members-table">
             <thead>
-              <tr><th>Email</th><th>Name</th><th>Role</th><th>Team</th><th>Spend MTD</th><th>Rec</th><th>API Key</th><th>Actions</th></tr>
+              <tr><th>Email</th><th>Name</th><th>Role</th><th>Team</th><th>Spend MTD</th><th>$/PR</th><th>Lines/$</th><th>Rec</th><th>API Key</th><th>Actions</th></tr>
             </thead>
             <tbody id="membersTableBody">
               <tr><td colspan="6" class="empty-state">Loading...</td></tr>
@@ -1330,6 +1356,10 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
               <span style="font-size:13px; font-weight:500;">Opt in to anonymized industry benchmarks</span>
             </label>
             <div id="benchmarkOptInStatus" style="margin-top:8px; font-size:11px; font-family:var(--font-mono); color:var(--text-muted);"></div>
+            <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <button class="btn btn-sm" onclick="contributeBenchmarkData()" id="benchmarkContributeBtn">Contribute Data Now</button>
+              <span id="benchmarkContributeStatus" style="font-size:11px;font-family:var(--font-mono);color:var(--text-muted);"></span>
+            </div>
           </div>
 
           <!-- ── GitHub Copilot Integration ── -->
@@ -1621,6 +1651,36 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
           </div>
         </div>
 
+        <!-- Optimizer Stats -->
+        <div class="card" style="margin-top:16px" data-insight="Prompt compression stats from the Cohrint optimizer. Shows tokens saved and estimated cost reduction from compression.">
+          <div class="card-header">
+            <div class="card-title">Prompt Optimizer Stats</div>
+            <div class="card-badge" style="background:rgba(96,165,250,.15);color:var(--accent-blue);">OPTIMIZER</div>
+          </div>
+          <div id="optimizerStatsGrid" class="kpi-grid" style="grid-template-columns:repeat(4,1fr);gap:10px">
+            <div class="kpi-card" style="padding:12px 14px">
+              <div class="kpi-label">Compressions</div>
+              <div class="kpi-value" id="optCompressions" style="font-size:22px">&mdash;</div>
+              <div class="kpi-sub neutral" id="optCompressionsSub">&nbsp;</div>
+            </div>
+            <div class="kpi-card" style="padding:12px 14px">
+              <div class="kpi-label">Tokens Saved</div>
+              <div class="kpi-value" id="optTokensSaved" style="font-size:22px;color:var(--accent-green)">&mdash;</div>
+              <div class="kpi-sub neutral" id="optTokensSavedSub">&nbsp;</div>
+            </div>
+            <div class="kpi-card" style="padding:12px 14px">
+              <div class="kpi-label">Cost Saved</div>
+              <div class="kpi-value" id="optCostSaved" style="font-size:22px;color:var(--accent-green)">&mdash;</div>
+              <div class="kpi-sub neutral">&nbsp;</div>
+            </div>
+            <div class="kpi-card" style="padding:12px 14px">
+              <div class="kpi-label">Avg Ratio</div>
+              <div class="kpi-value" id="optAvgRatio" style="font-size:22px">&mdash;</div>
+              <div class="kpi-sub neutral">compressed/original</div>
+            </div>
+          </div>
+        </div>
+
       </div>
 
     </div>
@@ -1687,6 +1747,15 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
     <button class="modal-close" onclick="closeModal('devDetailModal')" aria-label="Close">&times;</button>
     <h3 id="devDetailTitle" style="margin-bottom:16px"></h3>
     <div id="devDetailBody"></div>
+  </div>
+</div>
+
+<!-- ── Member usage detail modal (admin+) ──────────────────────────────── -->
+<div id="memberUsageModal" class="modal-overlay" role="dialog" aria-modal="true">
+  <div class="modal" style="max-width:580px;width:100%">
+    <button class="modal-close" onclick="closeModal('memberUsageModal')" aria-label="Close">&times;</button>
+    <h3 id="memberUsageTitle" style="margin-bottom:16px"></h3>
+    <div id="memberUsageBody"></div>
   </div>
 </div>
 
@@ -2060,6 +2129,10 @@ function applyRoleUI(role) {
   var bcPanel = document.getElementById('budget-control-panel');
   if (bcPanel) bcPanel.style.display = hasRole(role, 'superadmin') ? '' : 'none';
 
+  // Benchmark contribute button: admin+ only
+  var benchBtn = document.getElementById('benchmarkContributeBtn');
+  if (benchBtn) benchBtn.style.display = isAdmin ? '' : 'none';
+
   // Handle ?view= URL param now that role is known
   var _urlView = new URLSearchParams(window.location.search).get('view');
   if (_urlView) {
@@ -2119,6 +2192,7 @@ function loadViewData(view) {
       if (window.cpConsoleLoadPeriod) window.cpConsoleLoadPeriod(period);
       else if (window.cpConsoleInit) window.cpConsoleInit();
       loadActiveDevelopers();
+      loadOptimizerStats();
       break;
     case 'models': updateModelCalc(); break;
     case 'members': loadMembers(); break;
@@ -2249,6 +2323,37 @@ function loadOverview() {
     } else {
       document.getElementById('kpiCacheSavings').textContent = '$0.00';
       document.getElementById('kpiCacheSavingsSub').textContent = 'No cache hits yet';
+    }
+
+    // Wasted spend — tokens that re-ran without cache benefit
+    var wastedCost = (kpis && kpis.wasted_cost_usd) || 0;
+    var wastedEl = document.getElementById('kpiWastedCost');
+    var wastedSubEl = document.getElementById('kpiWastedCostSub');
+    if (wastedEl) {
+      wastedEl.textContent = fmt(wastedCost);
+      if (wastedSubEl) {
+        if (wastedCost > 0 && cacheSavingsUsd > 0) {
+          var recoverPct = ((wastedCost / (wastedCost + cacheSavingsUsd)) * 100).toFixed(0);
+          wastedSubEl.textContent = recoverPct + '% could be cached';
+        } else if (wastedCost > 0) {
+          wastedSubEl.textContent = 'optimize prompts to reduce';
+        } else {
+          wastedSubEl.textContent = 'no waste detected';
+          wastedSubEl.className = 'kpi-sub down';
+        }
+      }
+    }
+
+    // Streaming requests
+    var streamingReqs = (kpis && kpis.streaming_requests) || 0;
+    var totalKpiReqs = (kpis && kpis.total_requests) || totalReqs || 0;
+    var streamEl = document.getElementById('kpiStreamingReqs');
+    var streamSubEl = document.getElementById('kpiStreamingReqsSub');
+    if (streamEl) {
+      streamEl.textContent = fmtNum(streamingReqs);
+      if (streamSubEl && totalKpiReqs > 0) {
+        streamSubEl.textContent = Math.round((streamingReqs / totalKpiReqs) * 100) + '% of all requests';
+      }
     }
 
     renderDailyChart(summary, timeseries);
@@ -2677,12 +2782,17 @@ var _todayChart  = null;
 function loadSpend() {
   var gen = ++_renderGen;
   _skelOn();
+  var _spendRole = (_session && (_session.role || (_session.user && _session.user.role))) || 'member';
+  var fetchBusUnits = hasRole(_spendRole, 'admin')
+    ? apiFetch('/v1/analytics/business-units').catch(function() { return null; })
+    : Promise.resolve(null);
   Promise.all([
     apiFetch('/v1/analytics/timeseries?period=' + period).catch(function() { return null; }),
     apiFetch('/v1/analytics/models?period=' + period).catch(function() { return null; }),
     apiFetch('/v1/analytics/teams?period=' + period).catch(function() { return null; }),
     apiFetch('/v1/cross-platform/summary?days=' + period).catch(function() { return null; }),
     apiFetch('/v1/analytics/today').catch(function() { return null; }),
+    fetchBusUnits,
   ]).then(function(results) {
     if (gen !== _renderGen) return; // stale render — a newer one is in flight
     _skelOff();
@@ -2691,6 +2801,7 @@ function loadSpend() {
     var teams = results[2];
     var summary = results[3];
     var todayData = results[4];
+    var busUnits = results[5];
 
     if (summary) buildToolTabs(summary);
 
@@ -2725,6 +2836,7 @@ function loadSpend() {
     renderTodayHourly(todayData);
     renderSpendModels(modelList);
     renderTeamPie(teams);
+    renderBusUnits(busUnits, totalCost);
 
   }).catch(function(e) {
     _skelOff();
@@ -3102,6 +3214,60 @@ function renderProviderBreakdown(costs) {
 }
 
 
+function renderBusUnits(busUnits, grandTotal) {
+  var card = document.getElementById('busUnitsCard');
+  var tbody = document.getElementById('busUnitsBody');
+  if (!card || !tbody) return;
+
+  var units = (busUnits && (busUnits.business_units || busUnits.data)) || [];
+  if (!units.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  tbody.textContent = '';
+
+  var total = (grandTotal > 0) ? grandTotal
+            : units.reduce(function(s, u) { return s + (u.cost_usd || u.cost || u.total_cost || 0); }, 0);
+  if (total <= 0) { card.style.display = 'none'; return; }
+  units.slice().sort(function(a, b) { return (b.cost_usd || b.cost || b.total_cost || 0) - (a.cost_usd || a.cost || a.total_cost || 0); }).forEach(function(u) {
+    var cost = u.cost_usd || u.cost || u.total_cost || 0;
+    var pct = ((cost / total) * 100).toFixed(1);
+    var teamList = (u.by_team || u.teams || []).map(function(t) { return t.team || t; }).join(', ') || '—';
+    var tr = document.createElement('tr');
+
+    var tdName = document.createElement('td');
+    tdName.style.fontWeight = '500';
+    tdName.textContent = u.business_unit || u.name || '—';
+    tr.appendChild(tdName);
+
+    var tdCost = document.createElement('td');
+    tdCost.className = 'cost-highlight';
+    tdCost.textContent = '$' + fmtCost(cost);
+    tr.appendChild(tdCost);
+
+    var tdTeams = document.createElement('td');
+    tdTeams.style.cssText = 'color:var(--text-secondary);font-size:11px';
+    tdTeams.textContent = teamList;
+    tr.appendChild(tdTeams);
+
+    var tdPct = document.createElement('td');
+    var bar = document.createElement('div');
+    bar.style.cssText = 'display:flex;align-items:center;gap:6px';
+    var track = document.createElement('div');
+    track.style.cssText = 'flex:1;height:4px;background:var(--bg-deep);border-radius:2px';
+    var fill = document.createElement('div');
+    fill.style.cssText = 'width:' + pct + '%;height:4px;background:var(--accent-blue);border-radius:2px';
+    track.appendChild(fill);
+    var label = document.createElement('span');
+    label.style.cssText = 'font-size:10px;color:var(--text-muted);min-width:32px';
+    label.textContent = pct + '%';
+    bar.appendChild(track);
+    bar.appendChild(label);
+    tdPct.appendChild(bar);
+    tr.appendChild(tdPct);
+
+    tbody.appendChild(tr);
+  });
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    Members
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -3185,9 +3351,35 @@ function loadMembers() {
         tdSpend.style.cssText = 'color:#4ade80;font-size:11px';
         tr.appendChild(tdSpend);
 
+        // $/PR cell (from recommendations)
+        var tdCostPr = document.createElement('td');
+        var recEntry = recsByEmail[m.email];
+        tdCostPr.style.fontFamily = 'var(--font-mono)';
+        tdCostPr.style.fontSize = '11px';
+        if (recEntry && recEntry.cost_per_pr != null && recEntry.cost_per_pr > 0) {
+          tdCostPr.textContent = '$' + Number(recEntry.cost_per_pr).toFixed(2);
+          tdCostPr.title = 'AI cost per pull request merged';
+        } else {
+          tdCostPr.textContent = '\u2014';
+          tdCostPr.style.opacity = '0.3';
+        }
+        tr.appendChild(tdCostPr);
+
+        // Lines/$ cell (from recommendations)
+        var tdLines = document.createElement('td');
+        tdLines.style.fontFamily = 'var(--font-mono)';
+        tdLines.style.fontSize = '11px';
+        if (recEntry && recEntry.lines_per_dollar != null && recEntry.lines_per_dollar > 0) {
+          tdLines.textContent = fmtNum(Math.round(recEntry.lines_per_dollar));
+          tdLines.title = 'Lines of code changed per dollar of AI spend';
+        } else {
+          tdLines.textContent = '\u2014';
+          tdLines.style.opacity = '0.3';
+        }
+        tr.appendChild(tdLines);
+
         // Recommendations badge cell
         var tdRec = document.createElement('td');
-        var recEntry = recsByEmail[m.email];
         if (recEntry && recEntry.savings_opportunity_usd > 0) {
           var recBadge = document.createElement('span');
           recBadge.title = 'Est. savings: $' + Number(recEntry.savings_opportunity_usd).toFixed(2) + '/mo';
@@ -3207,10 +3399,21 @@ function loadMembers() {
         tr.appendChild(td5);
 
         var td6 = document.createElement('td');
+        td6.style.whiteSpace = 'nowrap';
+
+        var usageBtn = document.createElement('button');
+        usageBtn.className = 'btn btn-sm';
+        usageBtn.textContent = 'Usage';
+        usageBtn.title = 'View usage history for this member';
+        usageBtn.onclick = (function(mid, memail) { return function(e) { e.stopPropagation(); showMemberUsage(mid, memail); }; })(m.id, m.email);
+        td6.appendChild(usageBtn);
+
+        td6.appendChild(document.createTextNode(' '));
+
         var rotateBtn = document.createElement('button');
         rotateBtn.className = 'btn btn-sm';
         rotateBtn.textContent = 'Rotate';
-        rotateBtn.onclick = function() { rotateMemberKey(m.id, m.email); };
+        rotateBtn.onclick = (function(mid, memail) { return function(e) { e.stopPropagation(); rotateMemberKey(mid, memail); }; })(m.id, m.email);
         td6.appendChild(rotateBtn);
 
         td6.appendChild(document.createTextNode(' '));
@@ -3218,7 +3421,7 @@ function loadMembers() {
         var revokeBtn = document.createElement('button');
         revokeBtn.className = 'btn btn-danger btn-sm';
         revokeBtn.textContent = 'Revoke';
-        revokeBtn.onclick = function() { revokeMember(m.id, m.email); };
+        revokeBtn.onclick = (function(mid, memail) { return function(e) { e.stopPropagation(); revokeMember(mid, memail); }; })(m.id, m.email);
         td6.appendChild(revokeBtn);
         tr.appendChild(td6);
 
@@ -3397,6 +3600,113 @@ function inviteMember() {
   }).catch(function(e) {
     alert('Failed to invite: ' + e.message);
   });
+}
+
+function showMemberUsage(memberId, email) {
+  var title = document.getElementById('memberUsageTitle');
+  var body = document.getElementById('memberUsageBody');
+  if (!title || !body) return;
+  title.textContent = email || memberId;
+  body.textContent = '';
+  var loading = document.createElement('div');
+  loading.style.cssText = 'opacity:.6;padding:24px 0;text-align:center';
+  loading.textContent = 'Loading usage...';
+  body.appendChild(loading);
+  document.getElementById('memberUsageModal').classList.add('active');
+
+  var days = period || 30;
+  apiFetch('/v1/admin/members/' + encodeURIComponent(memberId) + '/usage?period=' + days)
+    .catch(function() { return null; })
+    .then(function(d) {
+      body.textContent = '';
+      if (!d) {
+        var errEl = document.createElement('div');
+        errEl.style.cssText = 'opacity:.5;padding:16px;text-align:center';
+        errEl.textContent = 'Failed to load usage data.';
+        body.appendChild(errEl);
+        return;
+      }
+
+      // KPI row
+      var kpiGrid = document.createElement('div');
+      kpiGrid.className = 'kpi-grid';
+      kpiGrid.style.cssText = 'grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px';
+      var kpis = [
+        ['Total Cost', '$' + fmtCost(d.total_cost_usd || d.cost || 0), ''],
+        ['Requests', fmtNum(d.total_requests || d.request_count || 0), ''],
+        ['Tokens', fmtTok((d.total_input_tokens || 0) + (d.total_output_tokens || 0)), ''],
+      ];
+      kpis.forEach(function(k) {
+        var card = document.createElement('div');
+        card.className = 'kpi-card';
+        card.style.padding = '10px 12px';
+        var lbl = document.createElement('div');
+        lbl.className = 'kpi-label';
+        lbl.textContent = k[0];
+        var val = document.createElement('div');
+        val.className = 'kpi-value';
+        val.style.fontSize = '20px';
+        val.textContent = k[1];
+        card.appendChild(lbl);
+        card.appendChild(val);
+        kpiGrid.appendChild(card);
+      });
+      body.appendChild(kpiGrid);
+
+      // Model breakdown
+      var byModel = d.by_model || d.models || [];
+      if (byModel.length) {
+        var hdr = document.createElement('div');
+        hdr.style.cssText = 'font-size:11px;opacity:.5;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px';
+        hdr.textContent = 'Top Models';
+        body.appendChild(hdr);
+        byModel.slice(0, 8).forEach(function(m) {
+          var row = document.createElement('div');
+          row.style.cssText = 'display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)';
+          var modelName = document.createElement('span');
+          modelName.style.fontSize = '12px';
+          modelName.textContent = m.model || m.name || '—';
+          var modelCost = document.createElement('span');
+          modelCost.style.cssText = 'font-weight:600;font-size:12px';
+          modelCost.textContent = '$' + fmtCost(m.cost || m.total_cost || 0);
+          row.appendChild(modelName);
+          row.appendChild(modelCost);
+          body.appendChild(row);
+        });
+      }
+
+      // Daily trend (if available)
+      var daily = d.daily || d.timeseries || [];
+      if (daily.length) {
+        var sep = document.createElement('div');
+        sep.style.cssText = 'font-size:11px;opacity:.5;margin:12px 0 6px;text-transform:uppercase;letter-spacing:.5px';
+        sep.textContent = 'Daily Spend (' + days + ' days)';
+        body.appendChild(sep);
+        var maxCost = Math.max.apply(null, daily.map(function(r) { return r.cost_usd || r.cost || 0; })) || 1;
+        daily.slice(-14).forEach(function(r) {
+          var cost = r.cost_usd || r.cost || 0;
+          var pct = Math.round((cost / maxCost) * 100);
+          var rowEl = document.createElement('div');
+          rowEl.style.cssText = 'display:flex;align-items:center;gap:8px;padding:2px 0';
+          var dateEl = document.createElement('span');
+          dateEl.style.cssText = 'font-family:var(--font-mono);font-size:10px;color:var(--text-muted);min-width:36px';
+          var dt = new Date((r.date || r.day || '') + 'T00:00:00Z');
+          dateEl.textContent = (dt.getUTCMonth() + 1) + '/' + dt.getUTCDate();
+          var barWrap = document.createElement('div');
+          barWrap.style.cssText = 'flex:1;height:4px;background:var(--bg-deep);border-radius:2px';
+          var barFill = document.createElement('div');
+          barFill.style.cssText = 'width:' + pct + '%;height:4px;background:var(--accent-green);border-radius:2px';
+          barWrap.appendChild(barFill);
+          var costEl = document.createElement('span');
+          costEl.style.cssText = 'font-family:var(--font-mono);font-size:10px;min-width:44px;text-align:right';
+          costEl.textContent = '$' + fmtCost(cost);
+          rowEl.appendChild(dateEl);
+          rowEl.appendChild(barWrap);
+          rowEl.appendChild(costEl);
+          body.appendChild(rowEl);
+        });
+      }
+    });
 }
 
 function rotateMemberKey(memberId, email) {
@@ -3976,6 +4286,49 @@ function loadBenchmarkOptIn() {
     var cb = document.getElementById('benchmarkOptIn');
     if (cb) cb.checked = !!(data && data.org && data.org.benchmark_opt_in);
   }).catch(function() {});
+}
+
+function loadOptimizerStats() {
+  apiFetch('/v1/optimizer/stats').catch(function() { return null; }).then(function(d) {
+    if (!d) return;
+    var compressions = d.total_compressions || d.compressions || d.total_events || 0;
+    var tokensSaved  = d.total_tokens_saved || d.tokens_saved || 0;
+    var costSaved    = d.total_cost_saved_usd || d.cost_saved_usd || 0;
+    var avgRatio     = d.avg_compression_ratio || d.avg_ratio || 0;
+
+    var setOpt = function(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; };
+    setOpt('optCompressions', fmtNum(compressions));
+    setOpt('optTokensSaved', fmtTok(tokensSaved));
+    setOpt('optCostSaved', fmt(costSaved));
+    setOpt('optAvgRatio', avgRatio > 0 ? avgRatio.toFixed(2) : '—');
+
+    var sub = document.getElementById('optCompressionsSub');
+    if (sub && d.period_days) sub.textContent = 'last ' + d.period_days + 'd';
+    var subSaved = document.getElementById('optTokensSavedSub');
+    if (subSaved && tokensSaved > 0 && compressions > 0) {
+      subSaved.textContent = fmtNum(Math.round(tokensSaved / compressions)) + ' avg/req';
+    }
+  });
+}
+
+function contributeBenchmarkData() {
+  var btn = document.getElementById('benchmarkContributeBtn');
+  var status = document.getElementById('benchmarkContributeStatus');
+  if (!btn) return;
+  btn.disabled = true;
+  if (status) status.textContent = 'Submitting...';
+  apiFetch('/v1/benchmark/contribute', { method: 'POST', body: JSON.stringify({}) })
+    .then(function(data) {
+      if (status) status.textContent = (data && data.ok)
+        ? 'Contributed! Data submitted successfully.'
+        : 'Not submitted — opt in to benchmarking first.';
+      if (btn) btn.disabled = false;
+      setTimeout(function() { if (status) status.textContent = ''; }, 4000);
+    })
+    .catch(function(e) {
+      if (status) status.textContent = 'Failed: ' + (e.message || 'unknown error');
+      if (btn) btn.disabled = false;
+    });
 }
 
 function saveBenchmarkOptIn() {

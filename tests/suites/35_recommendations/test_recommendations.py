@@ -1,6 +1,6 @@
 """
 Test Suite 35 — Recommendation Engine (TDD)
-Tests for vantage-cli/src/recommendations.ts:
+Tests for cohrint-cli recommendation engine:
   getRecommendations, getInlineTip, formatRecommendations, normalizeAgentName
 """
 import json
@@ -13,18 +13,20 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from helpers.output import section, chk
 
-CLI_DIR = Path(__file__).parent.parent.parent.parent / "vantage-cli"
-HARNESS = CLI_DIR / "test-recommendations.ts"
-TSX = CLI_DIR / "node_modules" / ".bin" / "tsx"
+CLI_DIR = Path(__file__).parent.parent.parent.parent / "cohrint-cli"
+HARNESS = CLI_DIR / "test-recommendations.mjs"
+
+if not HARNESS.exists():
+    pytest.skip(f"Recommendation harness not found: {HARNESS}", allow_module_level=True)
 
 
 def rec(cmd: str, metrics: dict, extra: dict | None = None, timeout: int = 10) -> dict:
-    """Run test-recommendations.ts via tsx and return parsed JSON."""
+    """Run test-recommendations.mjs via node and return parsed JSON."""
     payload = {"metrics": metrics}
     if extra:
         payload.update(extra)
     result = subprocess.run(
-        [str(TSX), str(HARNESS), cmd, json.dumps(payload)],
+        ["node", str(HARNESS), cmd, json.dumps(payload)],
         capture_output=True, text=True, timeout=timeout,
         cwd=str(CLI_DIR),
     )

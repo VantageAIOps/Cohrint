@@ -502,6 +502,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       },
     },
     {
+      name: 'setup_claude_hook',
+      description: 'Install the Cohrint Stop hook into Claude Code (~/.claude/settings.json). Run this once after adding the MCP to automatically track costs at the end of every Claude Code session. Idempotent — safe to run multiple times.',
+      inputSchema: { type: 'object', properties: {} },
+    },
+    {
       name: 'get_recommendations',
       description: 'Get agent-specific cost optimization recommendations based on your current usage patterns. Provides actionable tips for Claude Code, Gemini CLI, Codex, Cursor, Aider, and Copilot. Works offline — no API key needed.',
       inputSchema: {
@@ -1060,6 +1065,64 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         );
 
         return { content: [{ type: 'text', text: lines.join('\n') }] };
+      }
+
+      case 'setup_claude_hook': {
+        const home = homedir();
+        const claudeDir = join(home, '.claude');
+        const hooksDir = join(claudeDir, 'hooks');
+        const settingsPath = join(claudeDir, 'settings.json');
+
+        if (!existsSync(claudeDir)) {
+          return { content: [{ type: 'text', text: '❌ ~/.claude/ not found. Install Claude Code first: https://claude.ai/code' }], isError: true };
+        }
+
+        if (!existsSync(hooksDir)) mkdirSync(hooksDir, { recursive: true });
+
+        const __dirnameHook = dirname(fileURLToPath(import.meta.url));
+        const srcHook = join(__dirnameHook, 'vantage-track.js');
+        const destHook = join(hooksDir, 'cohrint-track.js');
+
+        if (!existsSync(srcHook)) {
+          return { content: [{ type: 'text', text: `❌ Hook script not found at ${srcHook}. Try reinstalling cohrint-mcp.` }], isError: true };
+        }
+
+        copyFileSync(srcHook, destHook);
+
+        type SettingsJson = Record<string, unknown>;
+        let settings: SettingsJson = {};
+        if (existsSync(settingsPath)) {
+          try { settings = JSON.parse(readFileSync(settingsPath, 'utf-8')) as SettingsJson; } catch { /* start fresh */ }
+        }
+
+        const hookEntry = { matcher: '*', hooks: [{ type: 'command', command: `node ${destHook}` }] };
+        if (!Array.isArray(settings.hooks)) settings.hooks = [];
+        const hooksArr = settings.hooks as unknown[];
+        const alreadyInstalled = hooksArr.some(
+          (h) => typeof h === 'object' && h !== null &&
+            JSON.stringify((h as Record<string, unknown>).hooks).includes('cohrint-track.js')
+        );
+
+        if (!alreadyInstalled) {
+          hooksArr.push(hookEntry);
+          writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+        }
+
+        const status = alreadyInstalled ? 'already installed — no changes made' : 'installed successfully';
+        return {
+          content: [{ type: 'text', text: [
+            `✅ Cohrint Stop hook ${status}`,
+            ``,
+            `Hook location: ${destHook}`,
+            `Settings: ${settingsPath}`,
+            ``,
+            `Every Claude Code session will now post token usage to Cohrint automatically.`,
+            `Make sure COHRINT_API_KEY is set in your shell profile:`,
+            `  export COHRINT_API_KEY=crt_...`,
+            ``,
+            `Get your free key: https://cohrint.com/signup.html`,
+          ].join('\n') }],
+        };
       }
 
       default:
