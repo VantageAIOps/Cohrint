@@ -57,6 +57,20 @@
  *   POST /v1/copilot/connect             (admin — store GitHub org + PAT encrypted in KV)
  *   DELETE /v1/copilot/connect           (admin — remove Copilot connection)
  *   GET  /v1/copilot/status              (list Copilot connections + last sync time)
+ *   POST /v1/cache/lookup               (auth — find semantically similar cached response)
+ *   POST /v1/cache/store                (auth — store prompt+response embedding)
+ *   GET  /v1/cache/stats                (auth — hit rate, savings, recent entries)
+ *   PATCH /v1/cache/config              (admin — update org cache config)
+ *   DELETE /v1/cache/entries/:id        (admin — remove cache entry)
+ *   GET  /v1/prompts                    (auth — list versioned prompt templates)
+ *   POST /v1/prompts                    (admin — create prompt)
+ *   GET  /v1/prompts/:id                (auth — prompt + all versions)
+ *   PATCH /v1/prompts/:id               (admin — update prompt metadata)
+ *   DELETE /v1/prompts/:id              (admin — soft delete)
+ *   POST /v1/prompts/:id/versions       (admin — add version)
+ *   GET  /v1/prompts/:id/versions/:vid  (auth — full version content)
+ *   POST /v1/prompts/usage              (auth — attribute event to version)
+ *   GET  /v1/prompts/analytics/comparison (auth — cost delta across versions)
  *
  * Cron Triggers:
  *   Every 10 min  — anomaly detection (Z-score cost spike alerts)
@@ -85,6 +99,8 @@ import { datadog, syncDatadogMetrics } from './routes/datadog';
 import { benchmark, syncBenchmarkContributions } from './routes/benchmark';
 import { executive } from './routes/executive';
 import { teams }     from './routes/teams';
+import { cache }     from './routes/cache';
+import { prompts }   from './routes/prompts';
 import { runAnomalyDetection } from './lib/anomaly';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -122,6 +138,8 @@ app.route('/v1/datadog',        datadog);   // Datadog metrics exporter
 app.route('/v1/benchmark',      benchmark); // Anonymized cross-company benchmarks
 app.route('/v1/analytics/executive', executive); // CEO/superadmin unified dashboard
 app.route('/v1/teams',              teams);      // Team CRUD (org accounts only)
+app.route('/v1/cache',              cache);      // Semantic cache (Vectorize + Workers AI)
+app.route('/v1/prompts',            prompts);    // Prompt registry + version cost tracking
 
 // ── 404 fallback ──────────────────────────────────────────────────────────────
 app.notFound((c) => c.json({
