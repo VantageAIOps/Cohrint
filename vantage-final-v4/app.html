@@ -1428,6 +1428,35 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
               </div>
             </div>
           </div>
+          <!-- ── Team Management (org accounts only) ── -->
+          <div class="card" id="teamMgmtCard" style="display:none;">
+            <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+              <div class="card-title" style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:18px;">👥</span> Teams
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="showCreateTeamForm()">+ New Team</button>
+            </div>
+            <p style="font-size:12px;color:var(--text-secondary);margin-bottom:14px;">
+              Manage teams within your organization. Invite members directly to a team.
+            </p>
+
+            <!-- Create team form (hidden by default) -->
+            <div id="createTeamForm" style="display:none;margin-bottom:16px;padding:12px;background:var(--bg-secondary);border-radius:6px;border:1px solid var(--border);">
+              <div class="form-group" style="margin-bottom:10px;">
+                <label>Team Name</label>
+                <input type="text" id="newTeamName" placeholder="e.g. Backend, ML, Platform" autocomplete="off">
+              </div>
+              <div style="display:flex;gap:8px;">
+                <button class="btn btn-primary btn-sm" onclick="createTeam()">Create</button>
+                <button class="btn btn-sm" onclick="hideCreateTeamForm()">Cancel</button>
+              </div>
+              <div id="createTeamStatus" style="margin-top:8px;font-size:11px;font-family:var(--font-mono);color:var(--text-muted);"></div>
+            </div>
+
+            <!-- Teams list -->
+            <div id="teamsList" style="display:flex;flex-direction:column;gap:8px;"></div>
+            <div id="teamsEmpty" style="display:none;font-size:12px;color:var(--text-muted);font-style:italic;">No teams yet. Create one above.</div>
+          </div>
         </div>
       </div>
 
@@ -3619,6 +3648,87 @@ function loadSettings() {
   loadBenchmarkOptIn();
   loadCopilotStatus();
   loadClaudeCodeStatus();
+  loadTeamMgmt();
+}
+
+/* ── Team Management ── */
+
+function loadTeamMgmt() {
+  var accountType = (_session && (_session.account_type || (_session.org && _session.org.account_type))) || 'organization';
+  var card = document.getElementById('teamMgmtCard');
+  if (!card) return;
+  if (accountType !== 'organization') { card.style.display = 'none'; return; }
+  card.style.display = '';
+  refreshTeamsList();
+}
+
+function refreshTeamsList() {
+  apiFetch('/v1/teams').then(function(data) {
+    var teams = data.teams || [];
+    var list  = document.getElementById('teamsList');
+    var empty = document.getElementById('teamsEmpty');
+    while (list.firstChild) list.removeChild(list.firstChild);
+    if (teams.length === 0) { empty.style.display = ''; return; }
+    empty.style.display = 'none';
+    teams.forEach(function(t) {
+      var row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--bg-secondary);border-radius:6px;border:1px solid var(--border);';
+
+      var info = document.createElement('div');
+      var nameSpan = document.createElement('span');
+      nameSpan.style.cssText = 'font-size:13px;font-weight:600;color:var(--text-primary);';
+      nameSpan.textContent = t.name;
+      var idSpan = document.createElement('span');
+      idSpan.style.cssText = 'font-size:10px;font-family:var(--font-mono);color:var(--text-muted);margin-left:8px;';
+      idSpan.textContent = t.id;
+      info.appendChild(nameSpan);
+      info.appendChild(idSpan);
+
+      var btn = document.createElement('button');
+      btn.className = 'btn btn-danger btn-sm';
+      btn.textContent = 'Delete';
+      btn.onclick = (function(tid) { return function() { deleteTeam(tid); }; })(t.id);
+
+      row.appendChild(info);
+      row.appendChild(btn);
+      list.appendChild(row);
+    });
+  }).catch(function() {});
+}
+
+function showCreateTeamForm() {
+  document.getElementById('createTeamForm').style.display = '';
+  document.getElementById('newTeamName').focus();
+}
+
+function hideCreateTeamForm() {
+  document.getElementById('createTeamForm').style.display = 'none';
+  document.getElementById('newTeamName').value = '';
+  document.getElementById('createTeamStatus').textContent = '';
+}
+
+function createTeam() {
+  var name = document.getElementById('newTeamName').value.trim();
+  var status = document.getElementById('createTeamStatus');
+  if (!name) { status.textContent = 'Team name is required.'; return; }
+  status.textContent = 'Creating\u2026';
+  apiFetch('/v1/teams', { method: 'POST', body: JSON.stringify({ name: name }) }).then(function(d) {
+    status.textContent = '\u2713 Team created.';
+    document.getElementById('newTeamName').value = '';
+    refreshTeamsList();
+    setTimeout(hideCreateTeamForm, 1200);
+  }).catch(function(e) {
+    status.textContent = '\u2717 ' + (e.message || 'Failed to create team.');
+  });
+}
+
+function deleteTeam(teamId) {
+  if (!confirm('Delete team "' + teamId + '"? Members will be unassigned but not removed.')) return;
+  apiFetch('/v1/teams/' + encodeURIComponent(teamId), { method: 'DELETE' }).then(function() {
+    refreshTeamsList();
+  }).catch(function(e) {
+    alert('Failed to delete team: ' + (e.message || 'unknown error'));
+  });
 }
 
 /* ── GitHub Copilot ── */

@@ -128,4 +128,61 @@ teams.get('/:id/members', adminOnly, async (c) => {
   return c.json({ team_id: teamId, members: results });
 });
 
+// ── POST /v1/teams/:id/members — invite member directly to a team ─────────────
+teams.post('/:id/members', adminOnly, async (c) => {
+  const orgId       = c.get('orgId');
+  const accountType = c.get('accountType');
+  const teamId      = c.req.param('id');
+
+  if (accountType !== 'organization') {
+    return c.json({ error: 'Team member invite only available on organization accounts.' }, 403);
+  }
+
+  const team = await c.env.DB.prepare(
+    'SELECT id, name FROM teams WHERE org_id = ? AND id = ? AND deleted_at IS NULL'
+  ).bind(orgId, teamId).first<{ id: string; name: string }>();
+  if (!team) return c.json({ error: 'Team not found' }, 404);
+
+  let body: { email?: string; name?: string; role?: string };
+  try { body = await c.req.json(); }
+  catch { return c.json({ error: 'Invalid JSON body' }, 400); }
+
+  const email = (body.email ?? '').trim().toLowerCase();
+  if (!email) return c.json({ error: 'email is required' }, 400);
+
+  const VALID_ROLES = ['superadmin', 'member', 'viewer'] as const;
+  type ValidRole = typeof VALID_ROLES[number];
+  const role = (body.role ?? 'member') as ValidRole;
+  if (!VALID_ROLES.includes(role)) {
+    return c.json({ error: `role must be one of: ${VALID_ROLES.join(', ')}` }, 400);
+  }
+
+  const existing = await c.env.DB.prepare(
+    'SELECT id FROM org_members WHERE org_id = ? AND email = ?'
+  ).bind(orgId, email).first();
+  if (existing) return c.json({ error: 'Member with this email already exists' }, 409);
+
+  const memberId  = `mem_${randomHex(12)}`;
+  const rawKey    = `crt_${orgId}_${randomHex(24)}`;
+  const keyHash   = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(rawKey))
+    .then(b => Array.from(new Uint8Array(b)).map(x => x.toString(16).padStart(2, '0')).join(''));
+  const keyHint   = rawKey.slice(-4);
+  const memberName = (body.name ?? '').trim() || email.split('@')[0];
+
+  await c.env.DB.prepare(`
+    INSERT INTO org_members (id, org_id, email, name, role, api_key_hash, api_key_hint, team_id, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, unixepoch())
+  `).bind(memberId, orgId, email, memberName, role, keyHash, keyHint, teamId).run();
+
+  logAudit(c, {
+    event_type:    'admin_action',
+    event_name:    'admin_action.member_invited',
+    resource_type: 'member',
+    resource_id:   memberId,
+    metadata:      { email, role, team_id: teamId },
+  });
+
+  return c.json({ ok: true, member_id: memberId, email, role, team_id: teamId, api_key: rawKey }, 201);
+});
+
 export { teams };

@@ -427,3 +427,96 @@ class TestCookieSecurity:
         r3 = requests.get(f"{BASE}/v1/auth/session",
                           cookies=cookies, timeout=TIMEOUT)
         assert r3.status_code in (401, 403)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# AH-H: POST /v1/teams/:id/members — invite member directly to a team
+# ══════════════════════════════════════════════════════════════════════════════
+
+def invite_to_team(org_key: str, team_id: str, role: str = "member",
+                   email: str = None) -> requests.Response:
+    payload = {
+        "email": email or rand_email("ah-tinv"),
+        "name":  rand_name(),
+        "role":  role,
+    }
+    return requests.post(f"{BASE}/v1/teams/{team_id}/members",
+                         headers=_h(org_key), json=payload, timeout=TIMEOUT)
+
+
+class TestTeamMemberInvite:
+
+    @pytest.fixture(scope="class")
+    def org(self):
+        return signup("organization", prefix="ah-tinv")
+
+    @pytest.fixture(scope="class")
+    def org_key(self, org):
+        return org["api_key"]
+
+    @pytest.fixture(scope="class")
+    def team_id(self, org_key):
+        r = create_team(org_key, "Infra")
+        assert r.status_code == 201, f"team creation failed: {r.text}"
+        return r.json()["team_id"]
+
+    def test_invite_member_to_team_returns_201(self, org_key, team_id):
+        """AH.H.1 — POST /v1/teams/:id/members returns 201 with api_key."""
+        r = invite_to_team(org_key, team_id, role="member")
+        assert r.status_code == 201, f"expected 201, got {r.status_code}: {r.text}"
+        d = r.json()
+        assert d.get("ok") is True
+        assert d.get("team_id") == team_id
+        assert d.get("role") == "member"
+        assert d.get("api_key", "").startswith("crt_")
+
+    def test_invite_superadmin_to_team(self, org_key, team_id):
+        """AH.H.2 — superadmin role is accepted via team invite endpoint."""
+        r = invite_to_team(org_key, team_id, role="superadmin")
+        assert r.status_code == 201, f"expected 201, got {r.status_code}: {r.text}"
+        assert r.json().get("role") == "superadmin"
+
+    def test_invite_viewer_to_team(self, org_key, team_id):
+        """AH.H.3 — viewer role is accepted via team invite endpoint."""
+        r = invite_to_team(org_key, team_id, role="viewer")
+        assert r.status_code == 201, f"expected 201, got {r.status_code}: {r.text}"
+        assert r.json().get("role") == "viewer"
+
+    def test_invite_invalid_role_returns_400(self, org_key, team_id):
+        """AH.H.4 — invalid role returns 400."""
+        r = invite_to_team(org_key, team_id, role="owner")
+        assert r.status_code == 400, f"expected 400, got {r.status_code}: {r.text}"
+
+    def test_invite_to_nonexistent_team_returns_404(self, org_key):
+        """AH.H.5 — invite to unknown team_id returns 404."""
+        r = invite_to_team(org_key, "no-such-team")
+        assert r.status_code == 404, f"expected 404, got {r.status_code}: {r.text}"
+
+    def test_duplicate_email_returns_409(self, org_key, team_id):
+        """AH.H.6 — inviting same email twice returns 409."""
+        email = rand_email("ah-dup")
+        r1 = invite_to_team(org_key, team_id, email=email)
+        assert r1.status_code == 201
+        r2 = invite_to_team(org_key, team_id, email=email)
+        assert r2.status_code == 409, f"expected 409, got {r2.status_code}: {r2.text}"
+
+    def test_invited_member_appears_in_team_list(self, org_key, team_id):
+        """AH.H.7 — member invited via team endpoint appears in GET /v1/teams/:id/members."""
+        email = rand_email("ah-list")
+        r = invite_to_team(org_key, team_id, email=email)
+        assert r.status_code == 201
+        r2 = requests.get(f"{BASE}/v1/teams/{team_id}/members",
+                          headers=_h(org_key), timeout=TIMEOUT)
+        assert r2.status_code == 200
+        emails = [m["email"] for m in r2.json().get("members", [])]
+        assert email in emails, f"{email} not found in team members: {emails}"
+
+    def test_team_invite_on_non_org_account_returns_403(self):
+        """AH.H.8 — POST /v1/teams/:id/members on a team account returns 403."""
+        key = signup("team", prefix="ah-tinv-team")["api_key"]
+        # First create a team attempt should fail too — but use a fake team_id
+        r = requests.post(f"{BASE}/v1/teams/any-team/members",
+                          headers=_h(key),
+                          json={"email": rand_email("ah-t"), "role": "member"},
+                          timeout=TIMEOUT)
+        assert r.status_code == 403, f"expected 403, got {r.status_code}: {r.text}"
