@@ -388,7 +388,9 @@ analytics.get('/traces', async (c) => {
   const scopeTeam = c.get('scopeTeam');
   const { clause, args } = teamScope(scopeTeam);
   const period = Math.min(parseInt(c.req.query('period') ?? '1', 10) || 1, 30);
-  const since  = Math.floor(Date.now() / 86_400_000) * 86_400 - (period - 1) * 86_400;
+  const sinceDate = new Date(Date.now() - (period - 1) * 86_400_000);
+  sinceDate.setUTCHours(0, 0, 0, 0);
+  const since = sinceDate.toISOString().replace('T', ' ').slice(0, 19);
 
   const { results } = await c.env.DB.prepare(`
     SELECT
