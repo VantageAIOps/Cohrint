@@ -1216,17 +1216,17 @@ async function runSetup(): Promise<void> {
     process.stdout.write('✓ ~/.claude/hooks/ exists\n');
   }
 
-  // 3. Copy vantage-track.js (bundled in dist/ alongside this file)
+  // 3. Copy hook script (bundled in dist/ alongside this file)
   const __dirname = dirname(fileURLToPath(import.meta.url));
   const srcHook = join(__dirname, 'vantage-track.js');
-  const destHook = join(hooksDir, 'vantage-track.js');
+  const destHook = join(hooksDir, 'cohrint-track.js');
 
   if (!existsSync(srcHook)) {
     process.stderr.write(`✗ vantage-track.js not found at ${srcHook}\n`);
     process.exit(1);
   }
   copyFileSync(srcHook, destHook);
-  process.stdout.write(`✓ Installed vantage-track.js → ${destHook}\n`);
+  process.stdout.write(`✓ Installed cohrint-track.js → ${destHook}\n`);
 
   // 4. Patch ~/.claude/settings.json — merge Stop hook, never overwrite existing hooks
   type SettingsJson = Record<string, unknown>;
@@ -1252,7 +1252,7 @@ async function runSetup(): Promise<void> {
     (h) =>
       typeof h === 'object' &&
       h !== null &&
-      JSON.stringify((h as Record<string, unknown>).hooks).includes('vantage-track.js')
+      JSON.stringify((h as Record<string, unknown>).hooks).includes('cohrint-track.js')
   );
 
   if (!alreadyInstalled) {
