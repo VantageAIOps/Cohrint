@@ -4289,7 +4289,7 @@ function loadBenchmarkOptIn() {
 function loadOptimizerStats() {
   apiFetch('/v1/optimizer/stats').catch(function() { return null; }).then(function(d) {
     if (!d) return;
-    var compressions = d.total_compressions || d.compressions || 0;
+    var compressions = d.total_compressions || d.compressions || d.total_events || 0;
     var tokensSaved  = d.total_tokens_saved || d.tokens_saved || 0;
     var costSaved    = d.total_cost_saved_usd || d.cost_saved_usd || 0;
     var avgRatio     = d.avg_compression_ratio || d.avg_ratio || 0;
