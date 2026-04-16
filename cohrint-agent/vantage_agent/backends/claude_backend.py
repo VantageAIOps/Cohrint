@@ -46,7 +46,7 @@ class ClaudeCliBackend(Backend):
     ) -> None:
         self._model = model
         self._config_dir = config_dir or Path(
-            os.environ.get("VANTAGE_CONFIG_DIR", Path.home() / ".vantage-agent")
+            os.environ.get("COHRINT_CONFIG_DIR", Path.home() / ".cohrint-agent")
         )
         self._permission_server = permission_server
         self._claude_session_id: str | None = None
