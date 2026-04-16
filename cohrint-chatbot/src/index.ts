@@ -6,7 +6,7 @@ import { handleTicket } from "./ticket";
 
 const app = new Hono<{ Bindings: Env }>();
 
-app.use("*", cors({ origin: ["https://vantageaiops.com", "http://localhost:*"] }));
+app.use("*", cors({ origin: ["https://cohrint.com", "http://localhost:*"] }));
 
 app.get("/health", (c) => c.json({ status: "ok", name: "vega" }));
 app.post("/chat", handleChat);

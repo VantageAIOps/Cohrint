@@ -11,7 +11,6 @@ on:
       - 'cohrint-js-sdk/**'
       - 'cohrint-local-proxy/**'
       - 'cohrint-agent/**'
-      - 'claude-intelligence/**'
   workflow_dispatch: # Manual trigger for force-publish
 
 env:
@@ -26,7 +25,6 @@ jobs:
       sdk: ${{ steps.check.outputs.sdk }}
       proxy: ${{ steps.check.outputs.proxy }}
       agent: ${{ steps.check.outputs.agent }}
-      claude_code: ${{ steps.check.outputs.claude_code }}
     steps:
       - uses: actions/checkout@v4
 
@@ -56,7 +54,6 @@ jobs:
           check_version "cohrint-mcp" "cohrint-mcp" "mcp"
           check_version "cohrint-js-sdk" "cohrint" "sdk"
           check_version "cohrint-local-proxy" "cohrint-local-proxy" "proxy"
-          check_version "claude-intelligence" "@cohrint/claude-code" "claude_code"
 
           # Check Python package version against PyPI JSON API
           local_py_ver=$(python3 -c "import tomllib; d=tomllib.load(open('cohrint-agent/pyproject.toml','rb')); print(d['project']['version'])" 2>/dev/null || echo "0.0.0")
@@ -133,23 +130,6 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           # NEW_VER is derived from package.json — not user input, no injection risk
 
-  publish-claude-code:
-    name: Publish @cohrint/claude-code
-    needs: detect-changes
-    if: needs.detect-changes.outputs.claude_code == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
-      - name: Publish
-        working-directory: claude-intelligence
-        run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
   publish-agent:
     name: Publish cohrint-agent (PyPI)
     needs: detect-changes
@@ -172,7 +152,7 @@ jobs:
 
   summary:
     name: Publish Summary
-    needs: [detect-changes, publish-mcp, publish-sdk, publish-proxy, publish-agent, publish-claude-code]
+    needs: [detect-changes, publish-mcp, publish-sdk, publish-proxy, publish-agent]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -186,4 +166,3 @@ jobs:
           echo "| cohrint | ${{ needs.detect-changes.outputs.sdk }} | ${{ needs.publish-sdk.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| cohrint-local-proxy | ${{ needs.detect-changes.outputs.proxy }} | ${{ needs.publish-proxy.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| cohrint-agent (PyPI) | ${{ needs.detect-changes.outputs.agent }} | ${{ needs.publish-agent.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| @cohrint/claude-code | ${{ needs.detect-changes.outputs.claude_code }} | ${{ needs.publish-claude-code.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY

@@ -1,25 +1,24 @@
 #!/usr/bin/env node
 'use strict';
 /**
- * vantage-track.js — Claude Code cost tracker
+ * cohrint-track.js — Claude Code cost tracker
  *
  * Reads Claude Code session files from ~/.claude/projects/ and posts token
- * usage + estimated cost to VantageAI for cross-project cost visibility.
+ * usage + estimated cost to Cohrint for cross-project cost visibility.
  *
- * Setup (one-time):
- *   npx vantageaiops-mcp setup
+ * Setup (one-time): run the setup_claude_hook tool in the Cohrint MCP server.
  *
  * Or manually:
- *   1. Get a free API key at https://vantageaiops.com
- *   2. Set VANTAGE_API_KEY in your shell profile
+ *   1. Get a free API key at https://cohrint.com
+ *   2. Set COHRINT_API_KEY in your shell profile
  *   3. Add this script as a Stop hook in ~/.claude/settings.json
  *
  * Environment variables:
- *   VANTAGE_API_KEY   — required; your VantageAI API key
- *   VANTAGE_API_BASE  — optional; default https://api.vantageaiops.com
- *   VANTAGE_TEAM      — optional; tag events with a team name
- *   VANTAGE_PROJECT   — optional; tag events with a project name
- *   VANTAGE_FEATURE   — optional; tag events with a feature name
+ *   COHRINT_API_KEY   — required; your Cohrint API key (VANTAGE_API_KEY accepted for backwards compat)
+ *   COHRINT_API_BASE  — optional; default https://api.cohrint.com
+ *   COHRINT_TEAM      — optional; tag events with a team name
+ *   COHRINT_PROJECT   — optional; tag events with a project name
+ *   COHRINT_FEATURE   — optional; tag events with a feature name
  *
  * This script is silent on errors — it will never break Claude Code.
  */
@@ -28,13 +27,13 @@ const { readdir, readFile, writeFile } = require('node:fs/promises');
 const { join } = require('node:path');
 const { homedir } = require('node:os');
 
-const API_KEY    = process.env.VANTAGE_API_KEY   ?? '';
-const API_BASE   = process.env.VANTAGE_API_BASE  ?? 'https://api.vantageaiops.com';
-const TEAM       = process.env.VANTAGE_TEAM      ?? null;
-const PROJECT    = process.env.VANTAGE_PROJECT   ?? null;
-const FEATURE    = process.env.VANTAGE_FEATURE   ?? null;
+const API_KEY    = process.env.COHRINT_API_KEY   ?? process.env.VANTAGE_API_KEY   ?? '';
+const API_BASE   = process.env.COHRINT_API_BASE  ?? process.env.VANTAGE_API_BASE  ?? 'https://api.cohrint.com';
+const TEAM       = process.env.COHRINT_TEAM      ?? process.env.VANTAGE_TEAM      ?? null;
+const PROJECT    = process.env.COHRINT_PROJECT   ?? process.env.VANTAGE_PROJECT   ?? null;
+const FEATURE    = process.env.COHRINT_FEATURE   ?? process.env.VANTAGE_FEATURE   ?? null;
 
-const STATE_FILE = join(homedir(), '.claude', 'vantage-state.json');
+const STATE_FILE = join(homedir(), '.claude', 'cohrint-state.json');
 
 // Token prices per million (USD) — mirrors vantage-worker/src/lib/pricing.ts
 // input/output/cache = read rate, cacheWrite = creation rate
@@ -75,7 +74,7 @@ async function loadState() {
     const raw = await readFile(STATE_FILE, 'utf-8');
     return JSON.parse(raw);
   } catch (err) {
-    if (err.code !== 'ENOENT') process.stderr.write(`[vantage-track] WARN: state read error: ${err}\n`);
+    if (err.code !== 'ENOENT') process.stderr.write(`[cohrint-track] WARN: state read error: ${err}\n`);
     return { uploadedIds: [] };
   }
 }
@@ -87,7 +86,7 @@ async function saveState(state) {
     }
     await writeFile(STATE_FILE, JSON.stringify(state, null, 2));
   } catch (err) {
-    process.stderr.write(`[vantage-track] WARN: state write failed: ${err}\n`);
+    process.stderr.write(`[cohrint-track] WARN: state write failed: ${err}\n`);
   }
 }
 
@@ -262,7 +261,7 @@ async function main() {
       // 3. Provide feedback on successful upload
       const totalCost = allNew.reduce((s, e) => s + (e.payload.total_cost_usd ?? 0), 0);
       process.stderr.write(
-        `[vantage-track] Tracked ${allNew.length} event(s) — $${totalCost.toFixed(4)} — https://vantageaiops.com\n`
+        `[cohrint-track] Tracked ${allNew.length} event(s) — $${totalCost.toFixed(4)} — https://cohrint.com\n`
       );
     }
   } catch {
