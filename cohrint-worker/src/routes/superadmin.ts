@@ -22,15 +22,23 @@ import { logAuditRaw } from '../lib/audit';
 const superadmin = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 // ── Auth guard middleware ─────────────────────────────────────────────────────
+// Always return 403 on any auth failure — including the case where
+// SUPERADMIN_SECRET is not configured on this deployment. Returning a distinct
+// 503 in that case would leak deployment configuration state to anonymous
+// callers (lets an attacker distinguish "misconfigured" from "bad token" and
+// walk through deployments looking for one without the guard set).
 superadmin.use('*', async (c, next) => {
   const secret = c.env.SUPERADMIN_SECRET;
+  const auth   = c.req.header('Authorization') ?? '';
+  const token  = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+
+  // If no secret is configured, no token can ever match — short-circuit with 403.
   if (!secret) {
-    return c.json({ error: 'Superadmin not configured on this deployment' }, 503);
+    return c.json({ error: 'Forbidden' }, 403);
   }
-  const auth = c.req.header('Authorization') ?? '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
-  // Constant-time comparison to prevent timing attacks
-  // Hash both values to ensure equal length, then compare hashes
+
+  // Constant-time comparison to prevent timing attacks.
+  // Hash both values to ensure equal length, then compare hashes.
   const enc = new TextEncoder();
   const [hashA, hashB] = await Promise.all([
     crypto.subtle.digest('SHA-256', enc.encode(token)),

@@ -121,15 +121,22 @@ async function checkBudgetPolicy(
 const FREE_TIER_LIMIT = 50_000;
 
 async function checkFreeTierLimit(db: D1Database, orgId: string, adding = 1): Promise<{ blocked: boolean; used: number }> {
+  // Compute month-start in UTC explicitly. Relying on strftime('%s', 'now',
+  // 'start of month') returns a TEXT and depends on SQLite numeric-affinity
+  // coercion; computing the unix int in JS makes the bind type unambiguous
+  // against events.created_at (INTEGER unixepoch).
+  const monthStartUnix = Math.floor(
+    new Date(new Date().toISOString().slice(0, 7) + '-01T00:00:00Z').getTime() / 1000,
+  );
   const row = await db.prepare(`
     SELECT o.plan,
            COALESCE((
              SELECT COUNT(*) FROM events
              WHERE org_id = o.id
-               AND created_at >= strftime('%s', 'now', 'start of month')
+               AND created_at >= ?
            ), 0) AS mtd_count
     FROM orgs o WHERE o.id = ?
-  `).bind(orgId).first<{ plan: string; mtd_count: number }>();
+  `).bind(monthStartUnix, orgId).first<{ plan: string; mtd_count: number }>();
 
   if (!row || row.plan !== 'free') return { blocked: false, used: row?.mtd_count ?? 0 };
   const used = Number(row.mtd_count);

@@ -31,12 +31,20 @@ executive.get('/', async (c) => {
   const orgId = c.get('orgId');
   const days  = Math.min(parseInt(c.req.query('days') ?? '30', 10) || 30, 90);
 
-  // Both tables use TEXT 'YYYY-MM-DD HH:MM:SS' for created_at
+  // created_at column types diverge by table — do NOT unify these binds:
+  //   events / orgs / org_members / platform_*       → INTEGER unixepoch (use *Unix)
+  //   cross_platform_usage / otel_events / audit_*   → TEXT 'YYYY-MM-DD HH:MM:SS'
+  // Binding a TEXT date against an INTEGER column coerces to 0 and silently
+  // returns ALL rows instead of the filtered window.
   const d = new Date(Date.now() - (days - 1) * 86_400_000);
   d.setUTCHours(0, 0, 0, 0);
   const sinceIso  = d.toISOString().replace('T', ' ').slice(0, 19);
+  const sinceUnix = Math.floor(d.getTime() / 1000);
 
-  const monthStart = sqliteMonthStart();
+  const monthStart     = sqliteMonthStart();
+  const monthStartUnix = Math.floor(
+    new Date(new Date().toISOString().slice(0, 7) + '-01T00:00:00Z').getTime() / 1000,
+  );
 
   // ── 1. Org summary ─────────────────────────────────────────────────────────
   const org = await c.env.DB.prepare(
@@ -57,7 +65,7 @@ executive.get('/', async (c) => {
       COALESCE(SUM(tokens), 0)     AS total_tokens,
       COALESCE(COUNT(*), 0)        AS total_records
     FROM all_usage
-  `).bind(orgId, sinceIso, orgId, sinceIso).first<{ total_cost: number; total_tokens: number; total_records: number }>();
+  `).bind(orgId, sinceIso, orgId, sinceUnix).first<{ total_cost: number; total_tokens: number; total_records: number }>();
 
   // MTD spend from both tables
   const monthSpendCpu = await c.env.DB.prepare(`
@@ -67,7 +75,7 @@ executive.get('/', async (c) => {
   const monthSpendEvt = await c.env.DB.prepare(`
     SELECT COALESCE(SUM(cost_usd), 0) AS mtd_cost
     FROM events WHERE org_id = ? AND created_at >= ? AND cost_usd > 0
-  `).bind(orgId, monthStart).first<{ mtd_cost: number }>();
+  `).bind(orgId, monthStartUnix).first<{ mtd_cost: number }>();
 
   const budgetLimit = org?.budget_usd ?? 0;
   const mtdCost = (monthSpendCpu?.mtd_cost ?? 0) + (monthSpendEvt?.mtd_cost ?? 0);
@@ -95,7 +103,7 @@ executive.get('/', async (c) => {
       COUNT(*)                             AS records
     FROM all_usage
     GROUP BY team ORDER BY cost DESC
-  `).bind(orgId, sinceIso, orgId, sinceIso).all<{ team: string; cost: number; tokens: number; developer_count: number; records: number }>();
+  `).bind(orgId, sinceIso, orgId, sinceUnix).all<{ team: string; cost: number; tokens: number; developer_count: number; records: number }>();
 
   // Step B: per-team per-provider breakdown (UNION both tables)
   const { results: teamProviderRows } = await c.env.DB.prepare(`
@@ -109,7 +117,7 @@ executive.get('/', async (c) => {
     SELECT team, provider, COALESCE(SUM(cost_usd), 0) AS cost
     FROM all_usage
     GROUP BY team, provider ORDER BY team, cost DESC
-  `).bind(orgId, sinceIso, orgId, sinceIso).all<{ team: string; provider: string; cost: number }>();
+  `).bind(orgId, sinceIso, orgId, sinceUnix).all<{ team: string; provider: string; cost: number }>();
 
   // Step C: team budgets
   const { results: teamBudgets } = await c.env.DB.prepare(`
@@ -149,7 +157,7 @@ executive.get('/', async (c) => {
       COUNT(*)                            AS records
     FROM all_usage
     GROUP BY provider ORDER BY cost DESC
-  `).bind(orgId, sinceIso, orgId, sinceIso).all<{ provider: string; cost: number; developer_count: number; records: number }>();
+  `).bind(orgId, sinceIso, orgId, sinceUnix).all<{ provider: string; cost: number; developer_count: number; records: number }>();
 
   // ── 4. Top 15 individual spenders across org (UNION both tables) ──────────
   const { results: topDevs } = await c.env.DB.prepare(`
@@ -175,7 +183,7 @@ executive.get('/', async (c) => {
     FROM all_usage
     GROUP BY developer_email, team
     ORDER BY cost DESC LIMIT 15
-  `).bind(orgId, sinceIso, orgId, sinceIso).all<{ developer_email: string; team: string; cost: number; pull_requests: number; commits: number; lines_added: number; providers: string | null }>();
+  `).bind(orgId, sinceIso, orgId, sinceUnix).all<{ developer_email: string; team: string; cost: number; pull_requests: number; commits: number; lines_added: number; providers: string | null }>();
 
   // ── 5. Budget policies overview ────────────────────────────────────────────
   interface PolicyRow {
@@ -210,7 +218,7 @@ executive.get('/', async (c) => {
       const row2 = await c.env.DB.prepare(`
         SELECT COALESCE(SUM(cost_usd), 0) AS s
         FROM events WHERE org_id = ? AND developer_email = ? AND created_at >= ?
-      `).bind(orgId, p.scope_target, monthStart).first<{ s: number }>();
+      `).bind(orgId, p.scope_target, monthStartUnix).first<{ s: number }>();
       spend = (row?.s ?? 0) + (row2?.s ?? 0);
     } else if (p.scope === 'provider' && p.scope_target) {
       const row = await c.env.DB.prepare(`
@@ -252,7 +260,7 @@ executive.get('/', async (c) => {
       COALESCE(SUM(cost_usd), 0)       AS cost
     FROM all_usage
     GROUP BY developer_email
-  `).bind(orgId, sinceIso, orgId, sinceIso).all<{ developer_email: string; cached: number; total_tokens: number; cost: number }>();
+  `).bind(orgId, sinceIso, orgId, sinceUnix).all<{ developer_email: string; cached: number; total_tokens: number; cost: number }>();
 
   let totalSavingsOpportunity = 0;
   for (const d of (cacheStats ?? [])) {

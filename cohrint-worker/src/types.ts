@@ -21,6 +21,9 @@ export type Bindings = {
   VANTAGE_CI_SECRET?:  string;
   // AES-256-GCM key material for Copilot PAT encryption — set via: wrangler secret put TOKEN_ENCRYPTION_SECRET
   TOKEN_ENCRYPTION_SECRET?: string;
+  // Demo viewer key used by the Live Demo button — set via: wrangler secret put DEMO_API_KEY
+  // Never exposed to the client; /v1/auth/demo reads this server-side.
+  DEMO_API_KEY?:       string;
 };
 
 export type AccountType = 'individual' | 'team' | 'organization';

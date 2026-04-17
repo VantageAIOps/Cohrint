@@ -514,6 +514,89 @@ auth.post('/members/:id/rotate', authMiddleware, adminOnly, async (c) => {
   });
 });
 
+// ── POST /v1/auth/demo — issue a short-lived demo session ────────────────────
+// Public — no body required. Reads DEMO_API_KEY server-side (never exposed to
+// client), validates it against orgs/org_members, and issues a 1-hour session
+// cookie. Returns 503 when the secret is unset so the frontend can fall back
+// to the signup CTA.
+auth.post('/demo', async (c) => {
+  const demoKey = (c.env.DEMO_API_KEY ?? '').trim();
+  if (!demoKey) {
+    return c.json({ error: 'Demo unavailable' }, 503);
+  }
+
+  // Light brute-force guard (per-IP) so this endpoint can't be abused to
+  // fabricate many session rows.
+  try {
+    const ip    = c.req.header('CF-Connecting-IP') ?? 'unknown';
+    const rlKey = `rl:demo:${ip}`;
+    const count = parseInt(await c.env.KV.get(rlKey) ?? '0', 10);
+    if (count >= 30) {
+      return c.json({ error: 'Too many demo sessions. Try again later.' }, 429, { 'Retry-After': '300' });
+    }
+    await c.env.KV.put(rlKey, String(count + 1), { expirationTtl: 300 });
+  } catch { /* KV unavailable — allow request */ }
+
+  const hash = await sha256hex(demoKey);
+
+  let orgId: string;
+  let role: string;
+  let memberId: string | null = null;
+
+  const org = await c.env.DB.prepare(
+    'SELECT id FROM orgs WHERE api_key_hash = ?'
+  ).bind(hash).first<{ id: string }>();
+  if (org) {
+    orgId = org.id;
+    role  = 'viewer'; // Force-downgrade demo sessions to viewer regardless of the underlying key's role
+  } else {
+    const member = await c.env.DB.prepare(
+      'SELECT id, org_id FROM org_members WHERE api_key_hash = ?'
+    ).bind(hash).first<{ id: string; org_id: string }>();
+    if (!member) {
+      console.error('[auth/demo] DEMO_API_KEY set but does not resolve to any org/member');
+      return c.json({ error: 'Demo unavailable' }, 503);
+    }
+    orgId    = member.org_id;
+    role     = 'viewer';
+    memberId = member.id;
+  }
+
+  const tokenBytes = new Uint8Array(32);
+  crypto.getRandomValues(tokenBytes);
+  const token = Array.from(tokenBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+
+  const DEMO_TTL_SEC = 3600; // 1 hour
+  const expiresAt    = Math.floor(Date.now() / 1000) + DEMO_TTL_SEC;
+
+  await c.env.DB.prepare(`
+    INSERT INTO sessions (token, org_id, role, member_id, expires_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).bind(token, orgId, role, memberId, expiresAt).run();
+
+  const isProd = (c.env.ENVIRONMENT ?? 'production') === 'production';
+  const cookieParts = isProd
+    ? [
+        `__Host-cohrint_session=${token}`,
+        `Path=/`,
+        `HttpOnly`,
+        `SameSite=None`,
+        `Max-Age=${DEMO_TTL_SEC}`,
+        `Secure`,
+      ]
+    : [
+        `cohrint_session=${token}`,
+        `Path=/`,
+        `HttpOnly`,
+        `Max-Age=${DEMO_TTL_SEC}`,
+        `SameSite=Lax`,
+      ];
+
+  const res = c.json({ ok: true, role, expires_at: expiresAt });
+  (await res).headers.set('Set-Cookie', cookieParts.join('; '));
+  return res;
+});
+
 // ── POST /v1/auth/session — exchange API key for a session cookie ─────────────
 // Public — no authMiddleware. Caller sends { api_key }; we validate, create
 // a 30-day session row in D1, and set an HTTP-only cookie.

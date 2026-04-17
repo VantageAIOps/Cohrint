@@ -153,7 +153,11 @@ ALLOWED_ORIGINS = "https://cohrint.com,https://www.cohrint.com,https://cohrint.p
 RATE_LIMIT_RPM = "1000"
 
 # Secrets (set via: wrangler secret put)
-RESEND_API_KEY   — email sending
+RESEND_API_KEY           — email sending
+SUPERADMIN_SECRET        — /v1/superadmin/* gate
+VANTAGE_CI_SECRET        — bypass signup rate limiting in CI
+TOKEN_ENCRYPTION_SECRET  — AES-256-GCM key material for Copilot PAT encryption
+DEMO_API_KEY             — viewer-scoped key used by POST /v1/auth/demo (never exposed to the client)
 ```
 
 > **Note:** `database_id` and KV `id` are in `wrangler.toml` which is gitignored. Retrieve them from the Cloudflare dashboard or via `wrangler d1 list` / `wrangler kv namespace list`.
@@ -1888,18 +1892,25 @@ All applied migrations in order:
 | `0013_schema_fixes.sql` | Additional indexes and schema fixes |
 | `0014_drop_copilot_kv_key.sql` | Removes `kv_key` column from `copilot_connections` (token moved to KV-only) |
 
-### 19.6 SQLite Date Format (Critical)
+### 19.6 SQLite Date Format (Critical — diverges by table)
 
-All date comparisons in cross-platform queries use SQLite-native format: `YYYY-MM-DD HH:MM:SS` (space separator, no T, no Z). This is because `datetime('now')` in SQLite produces this format.
+**`created_at` column type is NOT consistent across the schema.** Bind the wrong type and SQLite silently coerces the mismatched side to `0` in numeric contexts — filters then return every row in the table. There is no runtime error.
 
-**Common mistake:** Using ISO 8601 (`2026-03-24T00:00:00Z`) in WHERE clauses — this breaks string-based comparisons because `T` sorts differently than space.
+| Column type | Tables | Bind as |
+|---|---|---|
+| `INTEGER` (unix epoch seconds, default `unixepoch()`) | `events`, `orgs`, `org_members`, `alert_configs`, `team_budgets`, `sessions`, `alert_log`, `platform_*`, `audit_events` | `Math.floor(Date.now() / 1000)` / `unixepoch()` |
+| `TEXT` (`YYYY-MM-DD HH:MM:SS`, default `datetime('now')`) | `cross_platform_usage`, `otel_events`, `benchmark_snapshots`, `copilot_connections`, `datadog_connections`, `prompts`, `prompt_versions`, `prompt_usage`, `semantic_cache_entries`, `org_cache_config` | `sqliteDateSince()` / `sqliteMonthStart()` / `datetime('now')` |
 
-**Helper functions** in `crossplatform.ts`:
-- `sqliteDateSince(days)` — returns `YYYY-MM-DD HH:MM:SS` for N days ago
-- `sqliteTodayStart()` — returns `YYYY-MM-DD 00:00:00` for today
-- `sqliteMonthStart()` — returns `YYYY-MM-01 00:00:00` for current month
+**Why this matters:** earlier commit `b1fcc6f` globally rewrote unix binds to ISO text on the mistaken assumption that *all* tables stored TEXT. That quietly broke every events-backed analytics endpoint because `events.created_at` is INTEGER — the TEXT bind was coerced to 0, matching every row. The partial revert in this branch uses the matrix above.
 
-**When writing new queries:** Always use these helpers or `datetime('now')` — never construct ISO dates manually.
+**Common mistake:** Using ISO 8601 with `T`/`Z` (`2026-03-24T00:00:00Z`) in TEXT WHERE clauses — `T` sorts differently than space.
+
+**Helper functions** in `crossplatform.ts` (TEXT columns) and `analytics.ts` (INTEGER columns):
+- `sqliteDateSince(days)` / `sqliteTodayStart()` / `sqliteMonthStart()` — TEXT `YYYY-MM-DD HH:MM:SS`
+- `sinceUnix(days)` / `todayUnix()` — INTEGER unix seconds
+- For INTEGER hour extraction from `created_at`, use `strftime('%H', created_at, 'unixepoch')`
+
+**When writing new queries:** look up the column type in `schema.sql` before binding. Never assume — the cost of a wrong bind is silent, complete data corruption on the read path.
 
 ---
 

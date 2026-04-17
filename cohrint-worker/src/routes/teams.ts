@@ -19,6 +19,17 @@ function toSlug(input: string): string {
     .slice(0, 32) || 'team';
 }
 
+// If the caller is a team-scoped admin (scope_team is set), they may only
+// operate on their own team. Returns a 403 response if the caller attempts
+// to read/write a different team. Returns null if the caller is unscoped
+// (org-wide admin/owner/ceo) or the team matches.
+function scopeTeamMismatch(
+  callerScopeTeam: string | null,
+  pathTeamId: string | undefined,
+): boolean {
+  return !!callerScopeTeam && callerScopeTeam !== pathTeamId;
+}
+
 // All team routes require auth
 teams.use('*', authMiddleware);
 
@@ -86,6 +97,10 @@ teams.delete('/:id', adminOnly, async (c) => {
   const orgId  = c.get('orgId');
   const teamId = c.req.param('id');
 
+  if (scopeTeamMismatch(c.get('scopeTeam') as string | null, teamId)) {
+    return c.json({ error: 'You do not have access to this team.' }, 403);
+  }
+
   const team = await c.env.DB.prepare(
     'SELECT id, name FROM teams WHERE org_id = ? AND id = ? AND deleted_at IS NULL'
   ).bind(orgId, teamId).first<{ id: string; name: string }>();
@@ -112,6 +127,10 @@ teams.get('/:id/members', adminOnly, async (c) => {
   const orgId  = c.get('orgId');
   const teamId = c.req.param('id');
 
+  if (scopeTeamMismatch(c.get('scopeTeam') as string | null, teamId)) {
+    return c.json({ error: 'You do not have access to this team.' }, 403);
+  }
+
   const team = await c.env.DB.prepare(
     'SELECT id FROM teams WHERE org_id = ? AND id = ? AND deleted_at IS NULL'
   ).bind(orgId, teamId).first();
@@ -133,6 +152,10 @@ teams.post('/:id/members', adminOnly, async (c) => {
   const orgId       = c.get('orgId');
   const accountType = c.get('accountType');
   const teamId      = c.req.param('id');
+
+  if (scopeTeamMismatch(c.get('scopeTeam') as string | null, teamId)) {
+    return c.json({ error: 'You do not have access to this team.' }, 403);
+  }
 
   if (accountType !== 'organization') {
     return c.json({ error: 'Team member invite only available on organization accounts.' }, 403);

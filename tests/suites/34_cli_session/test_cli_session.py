@@ -356,42 +356,12 @@ class TestFailureStateIsolation:
         assert not r2
 
 
-# ---------------------------------------------------------------------------
-# Section C: ClaudeStreamRenderer — skipped (Python renderer uses rich console,
-# no structured-JSON stream-processing protocol equivalent to test-renderer.ts)
-# ---------------------------------------------------------------------------
-
-# These renderer tests verified ClaudeStreamRenderer's JSON stream parsing,
-# which was a TypeScript-specific implementation in vantage-cli/test-renderer.ts.
-# The Python renderer.py uses rich console for live output and does not expose
-# the same JSON-in / JSON-out harness interface.
-# UUID validation regression tests are covered in TestFailureStateIsolation above.
-
-@pytest.mark.skip(reason="Python renderer uses rich console output; no JSON harness equivalent")
-class TestClaudeStreamRenderer:
-    def test_cs15_text_block_produces_display(self): pass
-    def test_cs16_tool_use_produces_bullet(self): pass
-    def test_cs17_tool_result_produces_result_prefix(self): pass
-    def test_cs18_result_event_captures_session_id(self): pass
-    def test_cs19_system_event_captures_session_id(self): pass
-    def test_cs20_invalid_session_id_not_captured(self): pass
-    def test_cs21_non_json_line_passthrough(self): pass
-    def test_cs22_empty_line_returns_nothing(self): pass
-    def test_cs23_tool_result_truncates_long_output(self): pass
-    def test_cs24_text_not_inflated_by_tool_display(self): pass
-
-
-# ---------------------------------------------------------------------------
-# Section D: formatToolInput previews — skipped (TS renderer harness only)
-# ---------------------------------------------------------------------------
-
-@pytest.mark.skip(reason="Python renderer uses rich console output; no JSON harness equivalent")
-class TestFormatToolInput:
-    def test_cs25_bash_shows_command(self): pass
-    def test_cs26_read_shows_file_path(self): pass
-    def test_cs27_grep_shows_pattern(self): pass
-    def test_cs28_long_preview_truncated_at_70_chars(self): pass
-    def test_cs29_unknown_tool_shows_first_arg(self): pass
+# Sections C and D (TestClaudeStreamRenderer / TestFormatToolInput) were
+# TypeScript-era harness tests for vantage-cli/test-renderer.ts. The Python
+# renderer.py uses rich console for live output and has no JSON-in / JSON-out
+# interface, so those 15 cases had no body and were permanently skipped.
+# They have been removed — UUID validation regressions remain covered by
+# TestFailureStateIsolation above.
 
 
 # ---------------------------------------------------------------------------
