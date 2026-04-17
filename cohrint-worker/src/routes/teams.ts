@@ -70,16 +70,28 @@ teams.post('/', adminOnly, async (c) => {
 
   let teamId = body.id ? toSlug(body.id) : toSlug(name);
 
-  // Ensure uniqueness within org
+  // Ensure uniqueness within org — check first, then catch concurrent insert race
   const existing = await c.env.DB.prepare(
     'SELECT id FROM teams WHERE org_id = ? AND id = ? AND deleted_at IS NULL'
   ).bind(orgId, teamId).first();
   if (existing) teamId = `${teamId}-${randomHex(3)}`;
 
-  await c.env.DB.prepare(`
-    INSERT INTO teams (id, org_id, name, created_at)
-    VALUES (?, ?, ?, unixepoch())
-  `).bind(teamId, orgId, name).run();
+  try {
+    await c.env.DB.prepare(`
+      INSERT INTO teams (id, org_id, name, created_at)
+      VALUES (?, ?, ?, unixepoch())
+    `).bind(teamId, orgId, name).run();
+  } catch (e: unknown) {
+    if ((e as Error).message?.includes('UNIQUE constraint')) {
+      teamId = `${teamId}-${randomHex(3)}`;
+      await c.env.DB.prepare(`
+        INSERT INTO teams (id, org_id, name, created_at)
+        VALUES (?, ?, ?, unixepoch())
+      `).bind(teamId, orgId, name).run();
+    } else {
+      throw e;
+    }
+  }
 
   logAudit(c, {
     event_type:    'admin_action',

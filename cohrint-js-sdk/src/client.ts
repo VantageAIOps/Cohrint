@@ -32,11 +32,17 @@ export class VantageClient {
   private readonly debug: boolean;
 
   constructor(opts: VantageClientOptions) {
-    const _keyParts = opts.apiKey.split("_");
-    if (!opts.org && _keyParts.length < 2) {
+    // Key format: crt_<orgId>_<hex> — orgId may contain underscores, so extract
+    // between the first and last underscore rather than splitting naively.
+    const _firstUs = opts.apiKey.indexOf("_");
+    const _lastUs  = opts.apiKey.lastIndexOf("_");
+    const _orgFromKey = _firstUs >= 0 && _lastUs > _firstUs
+      ? opts.apiKey.slice(_firstUs + 1, _lastUs)
+      : "";
+    if (!opts.org && !_orgFromKey) {
       throw new Error("Invalid API key format: expected 'crt_<orgId>_...' (or legacy 'vnt_<orgId>_...') or provide opts.org explicitly.");
     }
-    this.orgId = opts.org ?? _keyParts[1] ?? "";
+    this.orgId = opts.org ?? _orgFromKey;
     this.environment = opts.environment ?? "production";
     this.team = opts.team ?? "";
     this.project = opts.project ?? "";

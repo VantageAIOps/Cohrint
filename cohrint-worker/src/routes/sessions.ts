@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
-import { authMiddleware } from '../middleware/auth';
+import { authMiddleware, hasRole } from '../middleware/auth';
 
 const sessions = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -8,18 +8,32 @@ sessions.use('*', authMiddleware);
 
 // ── GET /v1/sessions ──────────────────────────────────────────────────────────
 sessions.get('/', async (c) => {
-  const orgId: string = c.get('orgId');
+  const orgId: string  = c.get('orgId');
+  const role           = c.get('role') as string;
+  const memberEmail    = c.get('memberEmail') as string | undefined;
+  const isPrivileged   = hasRole(role, 'admin');
 
-  const limit         = Math.min(parseInt(c.req.query('limit')          ?? '20', 10), 100);
+  const limit         = Math.min(parseInt(c.req.query('limit') ?? '20', 10), 100);
   const provider      = c.req.query('provider');
   const developerEmail = c.req.query('developer_email');
-  const from          = c.req.query('from'); // ISO date string filter on last_seen_at
+  const from          = c.req.query('from');
+
+  // Validate from param: must be YYYY-MM-DD or YYYY-MM-DD HH:MM:SS (TEXT column)
+  if (from && !/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?$/.test(from)) {
+    return c.json({ error: 'from must be YYYY-MM-DD or YYYY-MM-DD HH:MM:SS' }, 400);
+  }
 
   const conditions: string[] = ['org_id = ?'];
   const params: (string | number)[] = [orgId];
 
   if (provider)        { conditions.push('provider = ?');        params.push(provider); }
-  if (developerEmail)  { conditions.push('developer_email = ?'); params.push(developerEmail); }
+  // Non-admins are scoped to their own sessions only
+  if (isPrivileged) {
+    if (developerEmail) { conditions.push('developer_email = ?'); params.push(developerEmail); }
+  } else {
+    conditions.push('developer_email = ?');
+    params.push(memberEmail ?? '');
+  }
   if (from)            { conditions.push('last_seen_at >= ?');   params.push(from); }
 
   const where = conditions.join(' AND ');
