@@ -102,9 +102,9 @@ def signup_api(email=None, name=None, org=None, timeout=15) -> dict:
         "org":   org   or rand_org(),
     }
     hdrs = {"Content-Type": "application/json"}
-    _ci_secret = os.environ.get("VANTAGE_CI_SECRET", "")
+    _ci_secret = os.environ.get("COHRINT_CI_SECRET", "") or os.environ.get("VANTAGE_CI_SECRET", "")
     if _ci_secret:
-        hdrs["X-Vantage-CI"] = _ci_secret
+        hdrs["X-Cohrint-CI"] = _ci_secret
     last_err = None
     for attempt in range(4):
         r = requests.post(f"{API_URL}/v1/auth/signup", json=payload, headers=hdrs, timeout=timeout)

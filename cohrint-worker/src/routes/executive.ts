@@ -210,7 +210,11 @@ executive.get('/', async (c) => {
           SELECT COALESCE(SUM(cost_usd), 0) AS s
           FROM cross_platform_usage WHERE org_id = ? AND team = ? AND created_at >= ?
         `).bind(orgId, p.scope_target, monthStart).first<{ s: number }>();
-        spend = row?.s ?? 0;
+        const row2 = await c.env.DB.prepare(`
+          SELECT COALESCE(SUM(cost_usd), 0) AS s
+          FROM events WHERE org_id = ? AND team = ? AND created_at >= ?
+        `).bind(orgId, p.scope_target, monthStartUnix).first<{ s: number }>();
+        spend = (row?.s ?? 0) + (row2?.s ?? 0);
       } else if (p.scope === 'developer' && p.scope_target) {
         const row = await c.env.DB.prepare(`
           SELECT COALESCE(SUM(cost_usd), 0) AS s
@@ -222,6 +226,7 @@ executive.get('/', async (c) => {
         `).bind(orgId, p.scope_target, monthStartUnix).first<{ s: number }>();
         spend = (row?.s ?? 0) + (row2?.s ?? 0);
       } else if (p.scope === 'provider' && p.scope_target) {
+        // Only cross_platform_usage has a provider column; events uses model names
         const row = await c.env.DB.prepare(`
           SELECT COALESCE(SUM(cost_usd), 0) AS s
           FROM cross_platform_usage WHERE org_id = ? AND provider = ? AND created_at >= ?

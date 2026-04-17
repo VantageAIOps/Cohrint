@@ -97,8 +97,8 @@ TIP: Use "cohrint-proxy scan" to scan local AI tool sessions (no API key needed)
 
   startProxyServer({
     port: parseInt(args["port"] ?? process.env.COHRINT_PROXY_PORT ?? process.env.VANTAGE_PROXY_PORT ?? "4891", 10),
-    vantageApiKey: apiKey,
-    vantageApiBase: args["api-base"] ?? process.env.COHRINT_API_BASE ?? process.env.VANTAGE_API_BASE ?? "https://api.cohrint.com",
+    apiKey: apiKey,
+    apiBase: args["api-base"] ?? process.env.COHRINT_API_BASE ?? process.env.VANTAGE_API_BASE ?? "https://api.cohrint.com",
     privacy: {
       level: privacyLevel,
       redactModelNames: args["redact-models"] === "true",

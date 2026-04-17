@@ -2287,7 +2287,7 @@ function _requireAdmin() {
 
 function applyRoleUI(role) {
   var isAdmin = hasRole(role, 'admin');
-  var isExec  = (role === 'ceo');
+  var isExec  = hasRole(role, 'ceo');
 
   // Team section (Members + Budgets): admin+ only
   var teamSection = document.getElementById('sb-section-team');
@@ -2395,7 +2395,7 @@ function nav(view, btn) {
   var el = document.getElementById('view-' + view);
   if (el) el.classList.add('active');
   var tabs = document.getElementById('toolTabs');
-  tabs.style.display = (view === 'overview' || view === 'spend') ? 'flex' : 'none';
+  if (tabs) tabs.style.display = (view === 'overview' || view === 'spend') ? 'flex' : 'none';
   if (view === 'cross-platform') {
     if (window.cpConsoleInit) window.cpConsoleInit();
   } else {

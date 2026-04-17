@@ -381,6 +381,13 @@ function update() {
     monthly:  calcCost(m, prompt, completion) * requests,
   })).sort((a,b)=>a.monthly-b.monthly);
 
+  if (!results.length) {
+    const sc = document.getElementById('summary-cards');
+    const rt = document.getElementById('results-table');
+    if (sc) sc.textContent = 'No models match the current filters.';
+    if (rt) rt.textContent = '';
+    return;
+  }
   const cheapest = results[0].monthly;
   const mostExpensive = results[results.length-1].monthly;
 

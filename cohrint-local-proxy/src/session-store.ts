@@ -2,7 +2,7 @@ import { promises as fs, readFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 
-export const DEFAULT_SESSIONS_DIR = join(homedir(), ".vantage", "sessions");
+export const DEFAULT_SESSIONS_DIR = join(homedir(), ".cohrint", "sessions");
 
 export interface PersistedEvent {
   event_id: string;

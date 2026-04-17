@@ -228,7 +228,7 @@ auth.post('/recover/redeem', async (c) => {
   // Tokens with ip='unknown' (no CF-Connecting-IP at issue time) are only accepted
   // when the redeeming request also has no CF-Connecting-IP, preventing cross-IP transfer.
   const redeemIp = c.req.header('CF-Connecting-IP') ?? 'unknown';
-  if (payload.ip && payload.ip !== redeemIp) {
+  if (!payload.ip || payload.ip !== redeemIp) {
     // Consume token on IP mismatch to prevent brute-force probing
     await c.env.KV.delete(`recover:${token}`);
     return c.json({ error: 'expired' }, 410);
