@@ -785,10 +785,31 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
           <div class="live-dot"></div>
           LIVE
         </div>
-        <a href="/docs.html" target="_blank" rel="noopener" style="font-size:12px;color:var(--text-muted);text-decoration:none;padding:6px 12px;border:1px solid var(--border);border-radius:6px;transition:color .2s,border-color .2s" onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border)'">Docs ↗</a>
-        <span class="topbar-user" id="topbarUser"></span>
-        <button onclick="signOut()" style="font-size:11px;color:var(--text-muted);background:none;border:1px solid var(--border);border-radius:6px;padding:5px 10px;cursor:pointer;font-family:var(--font-mono)" onmouseover="this.style.borderColor='var(--accent-red)';this.style.color='var(--accent-red)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">Sign out</button>
-        <button id="theme-toggle" data-theme-toggle onclick="cohrintTheme.toggle()">&#9789;</button>
+        <!-- Account menu -->
+        <div id="acct-menu-wrap" style="position:relative">
+          <button id="acct-menu-btn" onclick="toggleAcctMenu()" style="display:flex;align-items:center;gap:8px;background:none;border:1px solid var(--border);border-radius:8px;padding:5px 10px;cursor:pointer;color:var(--text-secondary);font-size:12px;font-family:var(--font-mono);transition:border-color .15s" onmouseover="this.style.borderColor='var(--border-active)'" onmouseout="this.style.borderColor='var(--border)'">
+            <div id="acct-avatar" style="width:22px;height:22px;border-radius:50%;background:var(--accent-green);color:#fff;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0">?</div>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="opacity:.5"><path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div id="acct-menu-dropdown" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--bg-panel);border:1px solid var(--border);border-radius:10px;min-width:220px;box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:1000;overflow:hidden">
+            <div style="padding:12px 16px;border-bottom:1px solid var(--border)">
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Signed in as</div>
+              <div id="acct-menu-email" style="font-size:12px;color:var(--text-primary);font-family:var(--font-mono);word-break:break-all"></div>
+            </div>
+            <div style="padding:6px">
+              <a href="/docs.html" target="_blank" rel="noopener" onclick="closeAcctMenu()" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;text-decoration:none;color:var(--text-secondary);font-size:13px;transition:background .15s" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">
+                <span style="font-size:15px">📖</span> Docs
+              </a>
+              <button onclick="toggleThemeFromMenu()" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;width:100%;text-align:left;background:none;border:none;color:var(--text-secondary);font-size:13px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''" id="acct-theme-item">
+                <span style="font-size:15px" id="acct-theme-icon">🌙</span> <span id="acct-theme-label">Switch to Light</span>
+              </button>
+              <div style="height:1px;background:var(--border);margin:4px 0"></div>
+              <button onclick="signOut()" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;width:100%;text-align:left;background:none;border:none;color:var(--accent-red);font-size:13px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='rgba(220,38,38,.08)'" onmouseout="this.style.background=''">
+                <span style="font-size:15px">🚪</span> Sign out
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -2183,6 +2204,10 @@ function populateUserFromSession(s) {
   var user = s.user || s;
   var name = user.name || user.email || '';
   document.getElementById('topbarUser').textContent = name;
+  var emailEl = document.getElementById('acct-menu-email');
+  if (emailEl) emailEl.textContent = user.email || name;
+  var avatarEl = document.getElementById('acct-avatar');
+  if (avatarEl) avatarEl.textContent = (user.email || name || '?').charAt(0).toUpperCase();
   document.getElementById('accountName').textContent = name;
   document.getElementById('accountEmail').textContent = user.email || '';
   document.getElementById('accountOrg').textContent = (user.org && user.org.name) || user.org_name || user.org_id || '';
@@ -5235,6 +5260,35 @@ function loadConnectedTools() {
   });
 }
 
+
+/* ── Account menu ────────────────────────────────────────────────────────── */
+function toggleAcctMenu() {
+  var dd = document.getElementById('acct-menu-dropdown');
+  if (!dd) return;
+  var open = dd.style.display !== 'none';
+  dd.style.display = open ? 'none' : 'block';
+  if (!open) updateAcctThemeLabel();
+}
+function closeAcctMenu() {
+  var dd = document.getElementById('acct-menu-dropdown');
+  if (dd) dd.style.display = 'none';
+}
+function updateAcctThemeLabel() {
+  var isDark = (typeof cohrintTheme !== 'undefined') ? cohrintTheme.get() === 'dark' : true;
+  var icon = document.getElementById('acct-theme-icon');
+  var label = document.getElementById('acct-theme-label');
+  if (icon) icon.textContent = isDark ? '☀️' : '🌙';
+  if (label) label.textContent = isDark ? 'Switch to Light' : 'Switch to Dark';
+}
+function toggleThemeFromMenu() {
+  if (typeof cohrintTheme !== 'undefined') cohrintTheme.toggle();
+  updateAcctThemeLabel();
+}
+// Close menu on outside click
+document.addEventListener('click', function(e) {
+  var wrap = document.getElementById('acct-menu-wrap');
+  if (wrap && !wrap.contains(e.target)) closeAcctMenu();
+});
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Init
