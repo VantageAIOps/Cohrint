@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
-import { authMiddleware } from '../middleware/auth';
+import { authMiddleware, hasRole } from '../middleware/auth';
 
 const optimizer = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -166,15 +166,22 @@ optimizer.post('/estimate', async (c) => {
 
 // ── GET /v1/optimizer/stats ──────────────────────────────────────────────────
 optimizer.get('/stats', async (c) => {
-  const orgId     = c.get('orgId');
-  const scopeTeam = c.get('scopeTeam');
+  const orgId      = c.get('orgId');
+  const scopeTeam  = c.get('scopeTeam');
+  const role       = c.get('role') as string;
+  const memberEmail = c.get('memberEmail') as string | undefined;
+  const isPrivileged = hasRole(role, 'admin');
 
   let clause = '';
   const args: unknown[] = [orgId];
 
   if (scopeTeam) {
-    clause = ' AND team = ?';
+    clause += ' AND team = ?';
     args.push(scopeTeam);
+  }
+  if (!isPrivileged) {
+    clause += ' AND developer_email = ?';
+    args.push(memberEmail);
   }
 
   // Sum tokens_saved stored inside the tags JSON column
@@ -201,8 +208,10 @@ optimizer.get('/stats', async (c) => {
 
 // ── GET /v1/optimizer/impact ─────────────────────────────────────────────────
 optimizer.get('/impact', async (c) => {
-  const orgId     = c.get('orgId');
-  const scopeTeam = c.get('scopeTeam');
+  const orgId      = c.get('orgId');
+  const scopeTeam  = c.get('scopeTeam');
+  const role       = c.get('role') as string;
+  const isPrivileged = hasRole(role, 'admin');
   const db = c.env.DB;
 
   const teamClause = scopeTeam ? ' AND team = ?' : '';
@@ -328,7 +337,7 @@ optimizer.get('/impact', async (c) => {
       },
       model_switch: { avg_factor: 1.0, event_count: 0, cost_saved_usd: 0 },
     },
-    per_developer: perDeveloper,
+    per_developer: isPrivileged ? perDeveloper : [],
     monthly_trend: (trendAgg.results ?? []).map(r => ({
       month: r.month,
       avg_factor: r.avg_factor != null ? Math.round(r.avg_factor * 10) / 10 : 1.0,

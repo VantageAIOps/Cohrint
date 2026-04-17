@@ -221,6 +221,7 @@ crossplatform.get('/summary', async (c) => {
 crossplatform.get('/developers', async (c) => {
   const orgId = c.get('orgId');
   const role   = c.get('role');
+  if (!hasRole(role, 'admin')) return c.json({ developers: [], period_days: 0 });
   let days: number;
   try {
     days = validateDays(c.req.query('days'));
@@ -418,6 +419,7 @@ function redactEmail(email: string | null): string | null {
 crossplatform.get('/active-developers', async (c) => {
   const orgId = c.get('orgId');
   const role  = c.get('role');
+  if (!hasRole(role, 'admin')) return c.json({ active_count: 0, window_sec: 60, developers: [], generated_at: new Date().toISOString() });
   const isPrivileged = hasRole(role, 'admin');
 
   const windowSec = Math.max(30, Math.min(300, parseInt(c.req.query('window_sec') ?? '60', 10)));
@@ -534,6 +536,11 @@ crossplatform.get('/live', async (c) => {
 
 crossplatform.get('/models', async (c) => {
   const orgId = c.get('orgId');
+  const role  = c.get('role');
+  const memberEmail = c.get('memberEmail') as string | undefined;
+  const isPrivileged = hasRole(role, 'admin');
+  const devClause = isPrivileged ? '' : ' AND developer_email = ?';
+  const devArgs   = isPrivileged ? [] : [memberEmail];
   let days: number;
   try {
     days = validateDays(c.req.query('days'));
@@ -549,9 +556,9 @@ crossplatform.get('/models', async (c) => {
       COALESCE(SUM(output_tokens), 0) as output_tokens,
       COUNT(*) as requests
     FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ? AND model IS NOT NULL
+    WHERE org_id = ? AND created_at >= ? AND model IS NOT NULL${devClause}
     GROUP BY model, provider ORDER BY cost DESC LIMIT 20
-  `).bind(orgId, since).all();
+  `).bind(orgId, since, ...devArgs).all();
 
   return c.json({ period_days: days, models: models.results });
 });
@@ -627,6 +634,8 @@ crossplatform.get('/connections', async (c) => {
 
 crossplatform.get('/budget', async (c) => {
   const orgId = c.get('orgId');
+  const role  = c.get('role');
+  const isPrivileged = hasRole(role, 'admin');
   const monthStart = sqliteMonthStart();
 
   const policies = await c.env.DB.prepare(`
@@ -661,7 +670,7 @@ crossplatform.get('/budget', async (c) => {
     current_spend: {
       org: orgSpend?.spend ?? 0,
       by_team: teamSpend.results,
-      by_developer: devSpend.results,
+      by_developer: isPrivileged ? devSpend.results : [],
     },
   });
 });

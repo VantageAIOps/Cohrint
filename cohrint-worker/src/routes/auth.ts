@@ -708,8 +708,8 @@ auth.get('/session', authMiddleware, async (c) => {
   let memberInfo: { name: string | null; email: string | null } | null = null;
   if (memberId) {
     memberInfo = await c.env.DB.prepare(
-      'SELECT name, email FROM org_members WHERE id = ?'
-    ).bind(memberId).first<{ name: string | null; email: string | null }>() ?? null;
+      'SELECT name, email FROM org_members WHERE id = ? AND org_id = ?'
+    ).bind(memberId, orgId).first<{ name: string | null; email: string | null }>() ?? null;
   }
 
   // Generate a short-lived SSE token (32 hex chars = 16 random bytes)

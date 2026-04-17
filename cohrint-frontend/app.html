@@ -1906,7 +1906,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
 
     <!-- Panel 1: Hero metric card -->
     <div class="card" style="padding:24px;margin-bottom:16px">
-      <div id="opt-hero-loading" class="skel" style="height:120px;border-radius:8px"></div>
+      <div id="opt-hero-loading" class="skel" style="height:120px;border-radius:8px;background:var(--bg-hover)"></div>
       <div id="opt-hero-content" style="display:none">
         <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:16px">
           Cohrint Optimization Impact &middot; <span id="opt-period"></span>
@@ -1935,14 +1935,15 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
     <!-- Panel 2: Monthly trend chart -->
     <div class="card" style="padding:24px;margin-bottom:16px">
       <div class="card-title">Cost Reduction Trend</div>
-      <div id="opt-trend-loading" class="skel" style="height:200px;border-radius:8px"></div>
+      <div id="opt-trend-loading" class="skel" style="height:200px;border-radius:8px;background:var(--bg-hover)"></div>
       <canvas id="opt-trend-chart" style="display:none;max-height:200px"></canvas>
+      <div id="opt-trend-empty" style="display:none;color:var(--text-secondary);font-size:14px;padding:32px 0;text-align:center">No trend data yet.</div>
     </div>
 
     <!-- Panel 3: Developer leaderboard -->
     <div class="card" style="padding:24px">
       <div class="card-title">Developer Leaderboard</div>
-      <div id="opt-leaderboard-loading" class="skel" style="height:160px;border-radius:8px"></div>
+      <div id="opt-leaderboard-loading" class="skel" style="height:160px;border-radius:8px;background:var(--bg-hover)"></div>
       <div id="opt-leaderboard" style="display:none"></div>
       <div id="opt-leaderboard-empty" style="display:none;color:var(--text-secondary);font-size:14px">No developer data available.</div>
     </div>
@@ -2143,8 +2144,10 @@ function apiFetch(path, opts) {
   return fetch(API_BASE + path, Object.assign({}, opts, { headers: headers, credentials: 'include' }))
     .then(function(res) {
       if (res.status === 401) {
-        window.location.replace('/auth.html?next=' + encodeURIComponent(window.location.pathname));
-        return;
+        // Only redirect to auth if the session check itself confirms we're logged out.
+        // Redirecting here causes infinite loops when a single endpoint returns 401
+        // (e.g. permission denied) while the session is otherwise valid.
+        throw new Error('401');
       }
       if (res.status === 429) {
         var retryAfter = parseInt(res.headers.get('Retry-After') || '60', 10);
@@ -2184,16 +2187,25 @@ function initKeyAuth() {
     .catch(function() { console.warn('[cohrint] offline'); return null; })
     .then(function(res) {
       if (!res || !res.ok) {
-        window.location.replace('/auth.html?next=' + encodeURIComponent(window.location.pathname));
+        // Session is genuinely invalid — redirect to sign-in.
+        // Guard against double-redirect in case this is called more than once.
+        if (!window._cohrintRedirecting) {
+          window._cohrintRedirecting = true;
+          window.location.replace('/auth.html?next=' + encodeURIComponent(window.location.pathname));
+        }
         return false;
       }
       return res.json().then(function(data) {
         _session = data;
+        try { sessionStorage.removeItem('_authBounce'); } catch (_) {}
         populateUserFromSession(_session);
         return true;
       }).catch(function(e) {
         console.error('[cohrint] bad session JSON', e);
-        window.location.href = '/auth.html';
+        if (!window._cohrintRedirecting) {
+          window._cohrintRedirecting = true;
+          window.location.href = '/auth.html';
+        }
         return false;
       });
     });
@@ -2663,6 +2675,7 @@ function buildToolTabs(summary) {
 function renderDailyChart(summary, timeseries) {
   var canvas = document.getElementById('dailySpendChart');
   if (!canvas) return;
+  if (!summary) { canvas.style.display = 'none'; return; }
 
   var byProvider = summary.by_provider || [];
   var daily = summary.daily || (timeseries && (timeseries.series || timeseries.data)) || [];
@@ -3716,7 +3729,7 @@ function loadMembers() {
 }
 
 function loadActiveDevelopers() {
-  apiFetch('/v1/cross-platform/active-developers?window_sec=60').then(function(data) {
+  apiFetch('/v1/cross-platform/active-developers?window_sec=60').catch(function() { return null; }).then(function(data) {
     if (!data) return;
     var list  = document.getElementById('active-now-list');
     var count = document.getElementById('active-now-count');
@@ -3828,14 +3841,14 @@ function showInviteModal() {
   var teamIdGroup = document.getElementById('inviteTeamIdGroup');
   if (accountType === 'organization') {
     teamIdGroup.style.display = '';
-    apiFetch('/v1/teams').then(function(data) {
+    apiFetch('/v1/teams').catch(function() { return null; }).then(function(data) {
       var sel = document.getElementById('inviteTeamId');
       while (sel.options.length > 0) sel.remove(0);
       var placeholder = document.createElement('option');
       placeholder.value = '';
       placeholder.textContent = '\u2014 select a team \u2014';
       sel.appendChild(placeholder);
-      (data.teams || []).forEach(function(t) {
+      ((data && data.teams) || []).forEach(function(t) {
         var opt = document.createElement('option');
         opt.value = t.id;
         opt.textContent = t.name + ' (' + t.id + ')';
@@ -4260,8 +4273,8 @@ function loadTeamMgmt() {
 }
 
 function refreshTeamsList() {
-  apiFetch('/v1/teams').then(function(data) {
-    var teams = data.teams || [];
+  apiFetch('/v1/teams').catch(function() { return null; }).then(function(data) {
+    var teams = (data && data.teams) || [];
     var list  = document.getElementById('teamsList');
     var empty = document.getElementById('teamsEmpty');
     while (list.firstChild) list.removeChild(list.firstChild);
@@ -5455,11 +5468,11 @@ function loadOptimization() {
 
     // Panel 2: Trend chart
     document.getElementById('opt-trend-loading').style.display = 'none';
-    var canvas = document.getElementById('opt-trend-chart');
-    canvas.style.display = 'block';
     var trend = data.monthly_trend || [];
     if (_optTrendChart) { _optTrendChart.destroy(); _optTrendChart = null; }
     if (trend.length > 0 && typeof Chart !== 'undefined') {
+      var canvas = document.getElementById('opt-trend-chart');
+      canvas.style.display = 'block';
       _optTrendChart = new Chart(canvas, {
         type: 'bar',
         data: {
@@ -5477,6 +5490,8 @@ function loadOptimization() {
           scales: { y: { beginAtZero: true, ticks: { callback: function(v) { return v + 'x'; } } } },
         },
       });
+    } else {
+      document.getElementById('opt-trend-empty').style.display = 'block';
     }
 
     // Panel 3: Leaderboard — DOM methods to avoid XSS (email is user data)
@@ -5528,6 +5543,7 @@ function loadOptimization() {
     document.getElementById('opt-hero-loading').style.display = 'none';
     document.getElementById('opt-hero-empty').style.display = 'block';
     document.getElementById('opt-trend-loading').style.display = 'none';
+    document.getElementById('opt-trend-empty').style.display = 'block';
     document.getElementById('opt-leaderboard-loading').style.display = 'none';
     document.getElementById('opt-leaderboard-empty').style.display = 'block';
   });
