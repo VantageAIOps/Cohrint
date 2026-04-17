@@ -2211,34 +2211,43 @@ function initKeyAuth() {
     });
 }
 
+function _setText(id, val) {
+  var el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
 function populateUserFromSession(s) {
   if (!s) return;
   var user = s.user || s;
   var name = user.name || user.email || '';
-  document.getElementById('topbarUser').textContent = name;
+  _setText('topbarUser', name);
   var emailEl = document.getElementById('acct-menu-email');
   if (emailEl) emailEl.textContent = user.email || name;
   var avatarEl = document.getElementById('acct-avatar');
   if (avatarEl) avatarEl.textContent = (user.email || name || '?').charAt(0).toUpperCase();
-  document.getElementById('accountName').textContent = name;
-  document.getElementById('accountEmail').textContent = user.email || '';
-  document.getElementById('accountOrg').textContent = (user.org && user.org.name) || user.org_name || user.org_id || '';
-  document.getElementById('accountAvatar').textContent = name ? name.charAt(0).toUpperCase() : '?';
+  _setText('accountName', name);
+  _setText('accountEmail', user.email || '');
+  _setText('accountOrg', (user.org && user.org.name) || user.org_name || user.org_id || '');
+  _setText('accountAvatar', name ? name.charAt(0).toUpperCase() : '?');
   var apiKeyHint = user.api_key_hint || user.api_key;
   if (apiKeyHint) {
     var k = apiKeyHint;
     var el = document.getElementById('accountApiKey');
-    el.textContent = k.length > 11 ? k.substring(0, 7) + '****...' + k.substring(k.length - 4) : k;
-    el.dataset.full = k;
+    if (el) {
+      el.textContent = k.length > 11 ? k.substring(0, 7) + '****...' + k.substring(k.length - 4) : k;
+      el.dataset.full = k;
+    }
   }
   if (user.org_id) {
-    document.getElementById('accountOrgId').textContent = user.org_id;
+    _setText('accountOrgId', user.org_id);
   }
   var plan = (user.org && user.org.plan) || user.plan || 'free';
-  document.getElementById('accountPlan').textContent = plan.charAt(0).toUpperCase() + plan.slice(1);
+  _setText('accountPlan', plan.charAt(0).toUpperCase() + plan.slice(1));
   var badge = document.getElementById('accountPlanBadge');
-  badge.textContent = plan.toUpperCase();
-  badge.className = 'role-badge ' + (plan === 'free' ? 'role-member' : 'role-admin');
+  if (badge) {
+    badge.textContent = plan.toUpperCase();
+    badge.className = 'role-badge ' + (plan === 'free' ? 'role-member' : 'role-admin');
+  }
 
   // Show demo banner for demo org
   if (user.org_id === 'demo') {
