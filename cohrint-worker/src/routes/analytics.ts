@@ -114,21 +114,39 @@ analytics.get('/summary', async (c) => {
     ? Math.round(((mtd?.mtd_cost_usd ?? 0) / budgetUsd) * 100)
     : null; // null = no budget set; 0 = budget set but 0% used
 
+  // Cost forecasting — project MTD spend to month end
+  const now = new Date();
+  const daysElapsed = Math.max(now.getUTCDate(), 1);
+  const daysInMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
+  const mtdCost = mtd?.mtd_cost_usd ?? 0;
+  const dailyAvgCostUsd = Math.round((mtdCost / daysElapsed) * 1_000_000) / 1_000_000;
+  const projectedMonthEndUsd = Math.round(dailyAvgCostUsd * daysInMonth * 1_000_000) / 1_000_000;
+  // Days until budget exhausted: (budget - mtd) / daily_avg; null if no budget or no spend rate
+  let daysUntilBudgetExhausted: number | null = null;
+  if (budgetUsd > 0 && dailyAvgCostUsd > 0) {
+    const remaining = budgetUsd - mtdCost;
+    daysUntilBudgetExhausted = remaining <= 0 ? 0 : Math.ceil(remaining / dailyAvgCostUsd);
+  }
+
   const result = {
-    today_cost_usd:   t?.today_cost_usd   ?? 0,
-    today_tokens:     t?.today_tokens     ?? 0,
-    today_requests:   t?.today_requests   ?? 0,
-    last_event_at:    t?.last_event_at    ?? null,
+    today_cost_usd:              t?.today_cost_usd   ?? 0,
+    today_tokens:                t?.today_tokens     ?? 0,
+    today_requests:              t?.today_requests   ?? 0,
+    last_event_at:               t?.last_event_at    ?? null,
     // Aliases used by SDK privacy tests and cross-platform clients
-    total_cost_usd:   t?.today_cost_usd   ?? 0,
-    total_tokens:     t?.today_tokens     ?? 0,
-    total_events:     t?.today_requests   ?? 0,
-    mtd_cost_usd:     mtd?.mtd_cost_usd   ?? 0,
-    session_cost_usd: s?.session_cost_usd ?? 0,
-    budget_pct:       budgetPct,
-    budget_usd:       budgetUsd,
-    plan:             orgPlan,
-    scope_team:       scopeTeam ?? null,
+    total_cost_usd:              t?.today_cost_usd   ?? 0,
+    total_tokens:                t?.today_tokens     ?? 0,
+    total_events:                t?.today_requests   ?? 0,
+    mtd_cost_usd:                mtd?.mtd_cost_usd   ?? 0,
+    session_cost_usd:            s?.session_cost_usd ?? 0,
+    budget_pct:                  budgetPct,
+    budget_usd:                  budgetUsd,
+    plan:                        orgPlan,
+    scope_team:                  scopeTeam ?? null,
+    // Forecast fields
+    daily_avg_cost_usd:          dailyAvgCostUsd,
+    projected_month_end_usd:     projectedMonthEndUsd,
+    days_until_budget_exhausted: daysUntilBudgetExhausted,
   };
   if (!agentFilter) {
     try { await c.env.KV.put(cacheKey, JSON.stringify(result), { expirationTtl: 300 }); } catch { /* best-effort */ }
