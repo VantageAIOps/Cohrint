@@ -754,9 +754,6 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
       <button class="sb-item" id="sb-integrations" onclick="nav('integrations', this)">
         <span class="icon">&#128279;</span> Integrations
       </button>
-      <button class="sb-item" id="sb-account" onclick="nav('account', this)">
-        <span class="icon">&#9683;</span> Account
-      </button>
     </div>
 
     <div class="sidebar-connections" id="connectedTools">
@@ -802,6 +799,9 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
               </a>
               <button onclick="toggleThemeFromMenu()" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;width:100%;text-align:left;background:none;border:none;color:var(--text-secondary);font-size:13px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''" id="acct-theme-item">
                 <span style="font-size:15px" id="acct-theme-icon">🌙</span> <span id="acct-theme-label">Switch to Light</span>
+              </button>
+              <button onclick="closeAcctMenu(); nav('account', null)" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;width:100%;text-align:left;background:none;border:none;color:var(--text-secondary);font-size:13px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">
+                <span style="font-size:15px">&#9683;</span> Account
               </button>
               <div style="height:1px;background:var(--border);margin:4px 0"></div>
               <button onclick="signOut()" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;width:100%;text-align:left;background:none;border:none;color:var(--accent-red);font-size:13px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='rgba(220,38,38,.08)'" onmouseout="this.style.background=''">
@@ -2287,7 +2287,7 @@ function _requireAdmin() {
 
 function applyRoleUI(role) {
   var isAdmin = hasRole(role, 'admin');
-  var isExec  = hasRole(role, 'ceo');
+  var isExec  = (role === 'ceo');
 
   // Team section (Members + Budgets): admin+ only
   var teamSection = document.getElementById('sb-section-team');
@@ -2487,29 +2487,28 @@ function loadOverview() {
     var totalDevs = (devs && devs.developers ? devs.developers.length : 0) || summary.total_developers || 0;
 
     // KPIs
-    document.getElementById('kpiTotalSpend').textContent = fmt(totalCost);
+    _setText('kpiTotalSpend', fmt(totalCost));
     var prevCost = summary.previous_period_cost || 0;
     if (prevCost > 0) {
       var pctChange = ((totalCost - prevCost) / prevCost * 100).toFixed(1);
       var sub = document.getElementById('kpiTotalSpendSub');
-      sub.textContent = (pctChange >= 0 ? '\u2191 ' : '\u2193 ') + Math.abs(pctChange) + '% vs prev period';
-      sub.className = 'kpi-sub ' + (pctChange >= 0 ? 'up' : 'down');
+      if (sub) { sub.textContent = (pctChange >= 0 ? '\u2191 ' : '\u2193 ') + Math.abs(pctChange) + '% vs prev period'; sub.className = 'kpi-sub ' + (pctChange >= 0 ? 'up' : 'down'); }
     }
 
     // Costliest tool
     if (filtered.length > 0) {
       var costliest = filtered.slice().sort(function(a, b) { return (b.total_cost || b.cost || 0) - (a.total_cost || a.cost || 0); })[0];
-      document.getElementById('kpiCostliestTool').textContent = toolName(costliest.provider);
-      document.getElementById('kpiCostliestTool').style.color = toolColor(costliest.provider);
+      var ctEl = document.getElementById('kpiCostliestTool');
+      if (ctEl) { ctEl.textContent = toolName(costliest.provider); ctEl.style.color = toolColor(costliest.provider); }
       var costliestCost = costliest.total_cost || costliest.cost || 0;
       var pct = totalCost > 0 ? ((costliestCost / totalCost) * 100).toFixed(0) : 0;
-      document.getElementById('kpiCostliestToolSub').textContent = fmt(costliestCost) + ' \u00b7 ' + pct + '% of total';
+      _setText('kpiCostliestToolSub', fmt(costliestCost) + ' \u00b7 ' + pct + '% of total');
     }
 
     // Active developers
-    document.getElementById('kpiActiveDev').textContent = fmtNum(totalDevs);
+    _setText('kpiActiveDev', fmtNum(totalDevs));
     if (totalDevs > 0) {
-      document.getElementById('kpiActiveDevSub').textContent = 'avg ' + fmt(totalCost / totalDevs) + '/dev/' + (period <= 7 ? 'week' : period + 'd');
+      _setText('kpiActiveDevSub', 'avg ' + fmt(totalCost / totalDevs) + '/dev/' + (period <= 7 ? 'week' : period + 'd'));
     }
 
     // Budget status — summary.budget uses monthly_limit_usd / month_spend_usd
@@ -2518,21 +2517,24 @@ function loadOverview() {
     var budgetSpend = budget && (budget.month_spend_usd || budget.used) || totalCost;
     if (budgetLimit > 0) {
       var budgetPct = Math.min(100, (budgetSpend / budgetLimit * 100)).toFixed(0);
-      document.getElementById('kpiBudgetPct').textContent = budgetPct + '%';
-      document.getElementById('kpiBudgetFill').style.width = budgetPct + '%';
+      _setText('kpiBudgetPct', budgetPct + '%');
+      var budgetFill = document.getElementById('kpiBudgetFill');
+      if (budgetFill) budgetFill.style.width = budgetPct + '%';
       var remaining = budgetLimit - budgetSpend;
       var budgetSubEl = document.getElementById('kpiBudgetSub');
-      if (remaining < 0) {
-        budgetSubEl.textContent = 'Exceeded by ' + fmt(Math.abs(remaining));
-        budgetSubEl.style.color = 'var(--accent-red, #f87171)';
-      } else {
-        budgetSubEl.textContent = fmt(remaining) + ' remaining';
-        budgetSubEl.style.color = '';
+      if (budgetSubEl) {
+        if (remaining < 0) {
+          budgetSubEl.textContent = 'Exceeded by ' + fmt(Math.abs(remaining));
+          budgetSubEl.style.color = 'var(--accent-red, #f87171)';
+        } else {
+          budgetSubEl.textContent = fmt(remaining) + ' remaining';
+          budgetSubEl.style.color = '';
+        }
       }
       checkBudgetAlertBanner(parseFloat(budgetPct));
     } else {
-      document.getElementById('kpiBudgetPct').textContent = 'N/A';
-      document.getElementById('kpiBudgetSub').textContent = 'No budget set';
+      _setText('kpiBudgetPct', 'N/A');
+      _setText('kpiBudgetSub', 'No budget set');
       checkBudgetAlertBanner(0);
     }
 
@@ -2541,9 +2543,8 @@ function loadOverview() {
     var outputTok = summary.total_output_tokens || 0;
     var totalTok = inputTok + outputTok;
     if (totalTok > 0) {
-      document.getElementById('kpiTokenUsage').textContent = fmtTok(totalTok);
-      document.getElementById('kpiTokenUsageSub').textContent =
-        fmtTok(inputTok) + ' in \u00b7 ' + fmtTok(outputTok) + ' out';
+      _setText('kpiTokenUsage', fmtTok(totalTok));
+      _setText('kpiTokenUsageSub', fmtTok(inputTok) + ' in \u00b7 ' + fmtTok(outputTok) + ' out');
     }
 
     // Cache savings — sourced from /v1/analytics/kpis (computed per-model server-side)
@@ -2551,12 +2552,11 @@ function loadOverview() {
     var cacheTokensTotal = (kpis && kpis.cache_tokens_total) || 0;
     var cacheHitRatePct = (kpis && kpis.cache_hit_rate_pct) || 0;
     if (cacheSavingsUsd > 0 || cacheTokensTotal > 0) {
-      document.getElementById('kpiCacheSavings').textContent = fmt(cacheSavingsUsd);
-      document.getElementById('kpiCacheSavingsSub').textContent =
-        fmtTok(cacheTokensTotal) + ' cached \u00b7 ' + cacheHitRatePct.toFixed(1) + '% hit rate';
+      _setText('kpiCacheSavings', fmt(cacheSavingsUsd));
+      _setText('kpiCacheSavingsSub', fmtTok(cacheTokensTotal) + ' cached \u00b7 ' + cacheHitRatePct.toFixed(1) + '% hit rate');
     } else {
-      document.getElementById('kpiCacheSavings').textContent = '$0.00';
-      document.getElementById('kpiCacheSavingsSub').textContent = 'No cache hits yet';
+      _setText('kpiCacheSavings', '$0.00');
+      _setText('kpiCacheSavingsSub', 'No cache hits yet');
     }
 
     // Wasted spend — tokens that re-ran without cache benefit
@@ -4895,7 +4895,8 @@ function showDeveloperDetail(devId, devEmail) {
   var body  = document.getElementById('devDetailBody');
   if (title) title.textContent = devEmail || devId;
   if (body)  body.innerHTML = '<div style="opacity:.6;padding:24px 0;text-align:center">Loading...</div>';
-  document.getElementById('devDetailModal').classList.add('active');
+  var modal = document.getElementById('devDetailModal');
+  if (modal) modal.classList.add('active');
 
   var days = period || 30;
   apiFetch('/v1/cross-platform/developer/' + devId + '?days=' + days)
@@ -5646,7 +5647,7 @@ function loadOptimization() {
 })();
 </script>
   <link rel="stylesheet" href="/widget/chatbot.css">
-  <script>window.VEGA_CHATBOT_URL = "https://vantage-chatbot.aman-lpucse.workers.dev";</script>
+  <script>window.COHRINT_CHATBOT_URL = "https://vantage-chatbot.aman-lpucse.workers.dev"; window.VEGA_CHATBOT_URL = window.COHRINT_CHATBOT_URL;</script>
   <script src="/widget/chatbot.js"></script>
   <script src="/cp-console.js" defer></script>
 </body>
