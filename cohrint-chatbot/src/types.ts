@@ -4,7 +4,7 @@ export interface Env {
   RESEND_API_KEY: string;
   RESEND_FROM: string;
   SUPPORT_EMAIL: string;
-  VANTAGE_API_URL: string;
+  COHRINT_API_URL: string;
 }
 
 export interface ChatRequest {
