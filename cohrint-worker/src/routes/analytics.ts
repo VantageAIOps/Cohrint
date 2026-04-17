@@ -518,9 +518,9 @@ analytics.get('/today', async (c) => {
         SUM(input_tokens + output_tokens)           AS tokens,
         COUNT(*)                                    AS requests
       FROM cross_platform_usage
-      WHERE org_id = ? AND created_at >= ?${teamClause}
+      WHERE org_id = ? AND created_at >= ?${teamClause}${devClause}
       GROUP BY hour
-    `).bind(orgId, todayStr, ...teamArgs).all<{ hour: number; cost_usd: number; tokens: number; requests: number }>(),
+    `).bind(orgId, todayStr, ...teamArgs, ...devArgs).all<{ hour: number; cost_usd: number; tokens: number; requests: number }>(),
   ]);
 
   // Merge both sources by hour

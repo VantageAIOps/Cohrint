@@ -64,6 +64,7 @@ export async function authMiddleware(
   // Legacy names kept for backward compat during transition.
   const sessionToken = parseCookie(cookieHeader, '__Host-cohrint_session')
     ?? parseCookie(cookieHeader, 'cohrint_session')
+    ?? parseCookie(cookieHeader, '__Host-vantage_session')
     ?? parseCookie(cookieHeader, 'vantage_session');
 
   if (sessionToken) {

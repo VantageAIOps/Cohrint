@@ -153,7 +153,19 @@ function _checkExistingSession() {
       if (res.ok) {
         const raw  = new URLSearchParams(window.location.search).get('next') || '';
         const dest = (raw.startsWith('/') && !raw.startsWith('//') && !raw.startsWith('/auth')) ? raw : '';
-        if (dest) { window.location.replace(dest); return; }
+        if (dest) {
+          // Loop guard: if we've bounced here more than twice, the session is
+          // valid on the API side but something on the app side keeps rejecting it.
+          // Break the loop by clearing state and showing the sign-in form.
+          const bounces = parseInt(sessionStorage.getItem('_authBounce') || '0', 10);
+          if (bounces >= 2) {
+            sessionStorage.removeItem('_authBounce');
+            return; // show sign-in form
+          }
+          sessionStorage.setItem('_authBounce', String(bounces + 1));
+          window.location.replace(dest);
+          return;
+        }
         res.json().then(function(data) {
           var role = (data && data.role) || 'member';
           var defaultView = role === 'ceo' ? 'executive' : (role === 'superadmin' || role === 'owner') ? 'admin' : 'overview';

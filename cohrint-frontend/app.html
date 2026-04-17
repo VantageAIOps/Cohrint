@@ -2197,6 +2197,7 @@ function initKeyAuth() {
       }
       return res.json().then(function(data) {
         _session = data;
+        try { sessionStorage.removeItem('_authBounce'); } catch (_) {}
         populateUserFromSession(_session);
         return true;
       }).catch(function(e) {
