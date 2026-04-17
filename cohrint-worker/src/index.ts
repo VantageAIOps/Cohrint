@@ -47,6 +47,7 @@
  *   POST /v1/optimizer/analyze           (token count + cost estimate)
  *   POST /v1/optimizer/estimate          (cross-model cost comparison)
  *   GET  /v1/optimizer/stats             (optimizer usage stats)
+ *   GET  /v1/optimizer/impact            (aggregate optimization impact with multipliers)
  *   POST /v1/otel/v1/metrics             (OTLP metrics — Claude Code, Copilot, Gemini CLI)
  *   POST /v1/otel/v1/logs                (OTLP events — api_request, tool_result, etc.)
  *   POST /v1/otel/v1/traces              (OTLP traces — future)
