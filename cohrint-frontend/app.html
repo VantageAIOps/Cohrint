@@ -2675,6 +2675,7 @@ function buildToolTabs(summary) {
 function renderDailyChart(summary, timeseries) {
   var canvas = document.getElementById('dailySpendChart');
   if (!canvas) return;
+  if (!summary) { canvas.style.display = 'none'; return; }
 
   var byProvider = summary.by_provider || [];
   var daily = summary.daily || (timeseries && (timeseries.series || timeseries.data)) || [];
@@ -3728,7 +3729,7 @@ function loadMembers() {
 }
 
 function loadActiveDevelopers() {
-  apiFetch('/v1/cross-platform/active-developers?window_sec=60').then(function(data) {
+  apiFetch('/v1/cross-platform/active-developers?window_sec=60').catch(function() { return null; }).then(function(data) {
     if (!data) return;
     var list  = document.getElementById('active-now-list');
     var count = document.getElementById('active-now-count');
@@ -3840,14 +3841,14 @@ function showInviteModal() {
   var teamIdGroup = document.getElementById('inviteTeamIdGroup');
   if (accountType === 'organization') {
     teamIdGroup.style.display = '';
-    apiFetch('/v1/teams').then(function(data) {
+    apiFetch('/v1/teams').catch(function() { return null; }).then(function(data) {
       var sel = document.getElementById('inviteTeamId');
       while (sel.options.length > 0) sel.remove(0);
       var placeholder = document.createElement('option');
       placeholder.value = '';
       placeholder.textContent = '\u2014 select a team \u2014';
       sel.appendChild(placeholder);
-      (data.teams || []).forEach(function(t) {
+      ((data && data.teams) || []).forEach(function(t) {
         var opt = document.createElement('option');
         opt.value = t.id;
         opt.textContent = t.name + ' (' + t.id + ')';
@@ -4272,8 +4273,8 @@ function loadTeamMgmt() {
 }
 
 function refreshTeamsList() {
-  apiFetch('/v1/teams').then(function(data) {
-    var teams = data.teams || [];
+  apiFetch('/v1/teams').catch(function() { return null; }).then(function(data) {
+    var teams = (data && data.teams) || [];
     var list  = document.getElementById('teamsList');
     var empty = document.getElementById('teamsEmpty');
     while (list.firstChild) list.removeChild(list.firstChild);
