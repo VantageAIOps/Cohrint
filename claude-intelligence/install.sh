@@ -91,20 +91,20 @@ for hook in "$SCRIPT_DIR/hooks/"*; do
   fi
 done
 
-# --- Step 8: Optional Vantage API key ---
+# --- Step 8: Optional Cohrint API key ---
 echo ""
-read -r -p "Enter your Vantage API key (optional, press Enter to skip): " VANTAGE_KEY
-if [ -n "$VANTAGE_KEY" ]; then
-  TRACK_FILE="$TARGET_DIR/.claude/hooks/vantage-track.js"
+read -r -p "Enter your Cohrint API key (optional, press Enter to skip): " COHRINT_KEY
+if [ -n "$COHRINT_KEY" ]; then
+  TRACK_FILE="$TARGET_DIR/.claude/hooks/cohrint-track.js"
   if [ -f "$TRACK_FILE" ]; then
     # Insert the key as a fallback in the script (env var still takes precedence)
-    sed -i.bak "s|const API_KEY   = process.env.VANTAGE_API_KEY ?? '';|const API_KEY   = process.env.VANTAGE_API_KEY ?? '$VANTAGE_KEY';|" "$TRACK_FILE"
+    sed -i.bak "s|const API_KEY    = process.env.COHRINT_API_KEY   ?? process.env.VANTAGE_API_KEY   ?? '';|const API_KEY    = process.env.COHRINT_API_KEY   ?? process.env.VANTAGE_API_KEY   ?? '$COHRINT_KEY';|" "$TRACK_FILE"
     rm -f "${TRACK_FILE}.bak"
-    success "Vantage API key saved to vantage-track.js"
-    info "  Tip: set VANTAGE_API_KEY in your shell profile to override"
+    success "Cohrint API key saved to cohrint-track.js"
+    info "  Tip: set COHRINT_API_KEY in your shell profile to override"
   fi
 else
-  info "Skipped Vantage API key. Set VANTAGE_API_KEY env var to enable cost tracking."
+  info "Skipped Cohrint API key. Set COHRINT_API_KEY env var to enable cost tracking."
 fi
 
 # --- Done ---
