@@ -1906,7 +1906,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
 
     <!-- Panel 1: Hero metric card -->
     <div class="card" style="padding:24px;margin-bottom:16px">
-      <div id="opt-hero-loading" class="skel" style="height:120px;border-radius:8px"></div>
+      <div id="opt-hero-loading" class="skel" style="height:120px;border-radius:8px;background:var(--bg-hover)"></div>
       <div id="opt-hero-content" style="display:none">
         <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:16px">
           Cohrint Optimization Impact &middot; <span id="opt-period"></span>
@@ -1935,14 +1935,15 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
     <!-- Panel 2: Monthly trend chart -->
     <div class="card" style="padding:24px;margin-bottom:16px">
       <div class="card-title">Cost Reduction Trend</div>
-      <div id="opt-trend-loading" class="skel" style="height:200px;border-radius:8px"></div>
+      <div id="opt-trend-loading" class="skel" style="height:200px;border-radius:8px;background:var(--bg-hover)"></div>
       <canvas id="opt-trend-chart" style="display:none;max-height:200px"></canvas>
+      <div id="opt-trend-empty" style="display:none;color:var(--text-secondary);font-size:14px;padding:32px 0;text-align:center">No trend data yet.</div>
     </div>
 
     <!-- Panel 3: Developer leaderboard -->
     <div class="card" style="padding:24px">
       <div class="card-title">Developer Leaderboard</div>
-      <div id="opt-leaderboard-loading" class="skel" style="height:160px;border-radius:8px"></div>
+      <div id="opt-leaderboard-loading" class="skel" style="height:160px;border-radius:8px;background:var(--bg-hover)"></div>
       <div id="opt-leaderboard" style="display:none"></div>
       <div id="opt-leaderboard-empty" style="display:none;color:var(--text-secondary);font-size:14px">No developer data available.</div>
     </div>
@@ -5465,11 +5466,11 @@ function loadOptimization() {
 
     // Panel 2: Trend chart
     document.getElementById('opt-trend-loading').style.display = 'none';
-    var canvas = document.getElementById('opt-trend-chart');
-    canvas.style.display = 'block';
     var trend = data.monthly_trend || [];
     if (_optTrendChart) { _optTrendChart.destroy(); _optTrendChart = null; }
     if (trend.length > 0 && typeof Chart !== 'undefined') {
+      var canvas = document.getElementById('opt-trend-chart');
+      canvas.style.display = 'block';
       _optTrendChart = new Chart(canvas, {
         type: 'bar',
         data: {
@@ -5487,6 +5488,8 @@ function loadOptimization() {
           scales: { y: { beginAtZero: true, ticks: { callback: function(v) { return v + 'x'; } } } },
         },
       });
+    } else {
+      document.getElementById('opt-trend-empty').style.display = 'block';
     }
 
     // Panel 3: Leaderboard — DOM methods to avoid XSS (email is user data)
@@ -5538,6 +5541,7 @@ function loadOptimization() {
     document.getElementById('opt-hero-loading').style.display = 'none';
     document.getElementById('opt-hero-empty').style.display = 'block';
     document.getElementById('opt-trend-loading').style.display = 'none';
+    document.getElementById('opt-trend-empty').style.display = 'block';
     document.getElementById('opt-leaderboard-loading').style.display = 'none';
     document.getElementById('opt-leaderboard-empty').style.display = 'block';
   });
