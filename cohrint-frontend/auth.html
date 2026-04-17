@@ -168,9 +168,9 @@ function _checkExistingSession() {
         }
         res.json().then(function(data) {
           var role = (data && data.role) || 'member';
-          var defaultView = role === 'ceo' ? 'executive' : (role === 'superadmin' || role === 'owner') ? 'admin' : 'overview';
-          window.location.replace('/app.html?view=' + defaultView);
-        }).catch(function() { window.location.replace('/app.html'); });
+          var defaultView = role === 'ceo' || role === 'superadmin' || role === 'owner' ? 'overview' : 'overview';
+          window.location.replace('/app?view=' + defaultView);
+        }).catch(function() { window.location.replace('/app'); });
       }
     })
     .catch(() => { /* not signed in, show form */ });
@@ -231,8 +231,8 @@ async function doSignIn() {
     if (next) { window.location.replace(next); return; }
     const sessionData = await res.json().catch(() => ({}));
     var role = sessionData.role || 'member';
-    var defaultView = role === 'ceo' ? 'executive' : (role === 'superadmin' || role === 'owner') ? 'admin' : 'overview';
-    window.location.replace('/app.html?view=' + defaultView);
+    var defaultView = 'overview';
+    window.location.replace('/app?view=' + defaultView);
   } catch(e) {
     btn.disabled = false;
     btn.textContent = 'Sign in →';

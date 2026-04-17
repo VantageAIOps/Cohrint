@@ -2191,7 +2191,7 @@ function initKeyAuth() {
         // Guard against double-redirect in case this is called more than once.
         if (!window._cohrintRedirecting) {
           window._cohrintRedirecting = true;
-          window.location.replace('/auth.html?next=' + encodeURIComponent(window.location.pathname));
+          window.location.replace('/auth?next=' + encodeURIComponent(window.location.pathname));
         }
         return false;
       }
@@ -2204,7 +2204,7 @@ function initKeyAuth() {
         console.error('[cohrint] bad session JSON', e);
         if (!window._cohrintRedirecting) {
           window._cohrintRedirecting = true;
-          window.location.href = '/auth.html';
+          window.location.href = '/auth';
         }
         return false;
       });
@@ -5169,7 +5169,7 @@ function signOut() {
   if (_sseSource) { _sseSource.close(); _sseSource = null; }
   _session = null;
   fetch(API_BASE + '/v1/auth/session', { method: 'DELETE', credentials: 'include' }).catch(function() {}).then(function() {
-    window.location.replace('/auth.html');
+    window.location.replace('/auth');
   });
 }
 
