@@ -23,7 +23,7 @@ export async function corsMiddleware(c: Context<{ Bindings: Bindings }>, next: N
       headers: {
         'Access-Control-Allow-Origin':      corsOrigin,
         'Access-Control-Allow-Methods':     'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers':     'Authorization, Content-Type, X-Vantage-Org, X-Cohrint-Privacy',
+        'Access-Control-Allow-Headers':     'Authorization, Content-Type, X-Cohrint-Org, X-Vantage-Org, X-Cohrint-Privacy',
         ...(canCredential ? { 'Access-Control-Allow-Credentials': 'true' } : {}),
         'Access-Control-Max-Age':           '86400',
         'Vary':                             'Origin',
@@ -33,7 +33,7 @@ export async function corsMiddleware(c: Context<{ Bindings: Bindings }>, next: N
 
   await next();
   c.res.headers.set('Access-Control-Allow-Origin',      corsOrigin);
-  c.res.headers.set('Access-Control-Allow-Headers',     'Authorization, Content-Type, X-Vantage-Org, X-Cohrint-Privacy');
+  c.res.headers.set('Access-Control-Allow-Headers',     'Authorization, Content-Type, X-Cohrint-Org, X-Vantage-Org, X-Cohrint-Privacy');
   if (canCredential) c.res.headers.set('Access-Control-Allow-Credentials', 'true');
   c.res.headers.set('Vary', 'Origin');
 }

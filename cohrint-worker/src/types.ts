@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Shared types for the Vantage Worker
+// Shared types for the Cohrint Worker
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type Bindings = {

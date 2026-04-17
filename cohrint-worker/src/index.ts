@@ -112,7 +112,7 @@ app.use('*', corsMiddleware);
 // ── Health check (no auth) ────────────────────────────────────────────────────
 const healthResponse = (c: any) => c.json({
   status:  'ok',
-  service: 'vantage-api',
+  service: 'cohrint-api',
   version: VERSION,
   region:  (c.req.raw as Request & { cf?: { colo?: string } }).cf?.colo ?? 'unknown',
   ts:      new Date().toISOString(),
@@ -150,7 +150,7 @@ app.notFound((c) => c.json({
 
 // ── Global error handler ──────────────────────────────────────────────────────
 app.onError((err, c) => {
-  console.error('[vantageai]', err);
+  console.error('[cohrint]', err);
   const origin  = c.req.header('Origin') ?? '';
   const allowed = (c.env.ALLOWED_ORIGINS ?? '').split(',').map(s => s.trim()).filter(Boolean);
   const isAllowed = allowed.includes(origin) ||
