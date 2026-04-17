@@ -28,7 +28,7 @@
 
 import { Hono } from 'hono';
 import type { Bindings, Variables } from '../types';
-import { authMiddleware } from '../middleware/auth';
+import { authMiddleware, hasRole } from '../middleware/auth';
 
 const datadog = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -330,7 +330,7 @@ datadog.post('/connect', async (c) => {
   const orgId = c.get('orgId');
   const role  = c.get('role');
 
-  if (role !== 'owner' && role !== 'admin') {
+  if (!hasRole(role, 'admin')) {
     return c.json({ error: 'Forbidden — admin or owner required' }, 403);
   }
 
@@ -386,7 +386,7 @@ datadog.delete('/connect', async (c) => {
   const orgId = c.get('orgId');
   const role  = c.get('role');
 
-  if (role !== 'owner' && role !== 'admin') {
+  if (!hasRole(role, 'admin')) {
     return c.json({ error: 'Forbidden — admin or owner required' }, 403);
   }
 
@@ -406,7 +406,7 @@ datadog.delete('/connect', async (c) => {
 datadog.get('/status', async (c) => {
   const orgId   = c.get('orgId');
   const role    = c.get('role');
-  const isAdmin = role === 'owner' || role === 'admin';
+  const isAdmin = hasRole(role, 'admin');
 
   if (!isAdmin) {
     return c.json({ error: 'Forbidden — admin or owner required' }, 403);

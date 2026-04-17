@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { Bindings, Variables } from '../types';
-import { authMiddleware } from '../middleware/auth';
+import { authMiddleware, hasRole } from '../middleware/auth';
 import { logAudit } from '../lib/audit';
 
 const auditlog = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -38,7 +38,7 @@ function parseIsoDate(s: string | undefined, endOfDay = false): number | null {
 
 auditlog.get('/', async (c) => {
   const role = c.get('role');
-  if (role !== 'owner' && role !== 'admin') {
+  if (!hasRole(role, 'admin')) {
     return c.json({ error: 'Owner or admin key required to access audit log' }, 403);
   }
 

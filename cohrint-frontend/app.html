@@ -2301,13 +2301,12 @@ function applyRoleUI(role) {
   var execSection = document.getElementById('sb-section-executive');
   if (execSection) execSection.style.display = isExec ? '' : 'none';
 
-  // Remove executive nav from DOM entirely for non-ceo roles
-  if (!isExec) {
-    var execNavBtn = document.getElementById('sb-executive');
-    if (execNavBtn) {
-      var execLi = execNavBtn.closest('li, .nav-item') || execNavBtn.parentElement;
-      if (execLi) execLi.remove(); else execNavBtn.remove();
-    }
+  // Hide/show executive nav button — use display, not remove(), so role changes don't break the DOM
+  var execNavBtn = document.getElementById('sb-executive');
+  if (execNavBtn) {
+    var execLi = execNavBtn.closest('li, .nav-item') || execNavBtn.parentElement;
+    var execNavEl = execLi || execNavBtn;
+    execNavEl.style.display = isExec ? '' : 'none';
   }
 
   // Role badge on executive view

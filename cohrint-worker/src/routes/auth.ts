@@ -224,14 +224,13 @@ auth.post('/recover/redeem', async (c) => {
     return c.json({ error: 'invalid' }, 400);
   }
 
-  // Validate IP binding — token is only redeemable from the IP that requested it.
-  // Tokens with ip='unknown' (no CF-Connecting-IP at issue time) are only accepted
-  // when the redeeming request also has no CF-Connecting-IP, preventing cross-IP transfer.
+  // Soft IP check — log mismatches but don't burn the token.
+  // NAT/proxy rotation legitimately changes the egress IP between issue and redeem,
+  // so consuming the token on mismatch would permanently lock out valid users with
+  // no recovery path. Token is already single-use, short-lived, and 48 random hex chars.
   const redeemIp = c.req.header('CF-Connecting-IP') ?? 'unknown';
-  if (!payload.ip || payload.ip !== redeemIp) {
-    // Consume token on IP mismatch to prevent brute-force probing
-    await c.env.KV.delete(`recover:${token}`);
-    return c.json({ error: 'expired' }, 410);
+  if (payload.ip && payload.ip !== 'unknown' && payload.ip !== redeemIp) {
+    console.warn('[cohrint] recover/redeem IP mismatch — issued from', payload.ip, 'redeemed from', redeemIp);
   }
 
   // Consume the token immediately (single-use)
@@ -386,9 +385,10 @@ auth.patch('/members/:id', authMiddleware, adminOnly, async (c) => {
     const updaterRole = c.get('role') as string;
     const { hasRole: hr } = await import('../middleware/auth');
     // Can only assign roles up to your own level
-    if (VALID_ROLES.includes(body.role) && hr(updaterRole, body.role as import('../types').OrgRole)) {
-      updates.push('role = ?'); params.push(body.role);
+    if (!VALID_ROLES.includes(body.role) || !hr(updaterRole, body.role as import('../types').OrgRole)) {
+      return c.json({ error: 'Insufficient privilege to assign that role.' }, 403);
     }
+    updates.push('role = ?'); params.push(body.role);
   }
   if ('scope_team' in body) {
     const st = body.scope_team ?? null;
