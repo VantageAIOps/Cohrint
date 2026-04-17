@@ -14,19 +14,14 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - 'cohrint-frontend/**'
-      - 'tests/suites/15_cross_browser/**'
-      - 'tests/helpers/browser.py'
-      - '.github/workflows/ci-cross-browser.yml'
-
-  # push to main/v* removed — too expensive on free tier; weekly schedule covers regression detection
-
-  schedule:
-    # Weekly on Sunday 02:00 UTC — was nightly; saves ~2,100 CI min/month
-    - cron: '0 2 * * 0'
+  # Auto-triggers disabled — cross-browser matrix (Chrome + Firefox + WebKit +
+  # mobile viewports) is the single most expensive workflow in this repo and
+  # was burning through the free-tier minute budget. Now manual-only.
+  #
+  # Removed:
+  #   - pull_request paths-filter (fired on every frontend PR push)
+  #   - schedule cron "0 2 * * 0" (weekly regression)
+  # Re-enable by restoring the triggers below if off free tier.
 
   workflow_dispatch:
     inputs:

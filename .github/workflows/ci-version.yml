@@ -32,6 +32,13 @@ on:
         type: boolean
         default: true
 
+# Cancel superseded version-branch runs. Rapid pushes to a version branch
+# would otherwise queue the full API + UI + env matrix for every commit,
+# which is the second most expensive workflow in this repo.
+concurrency:
+  group: ci-version-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # ── 1. TypeScript check ───────────────────────────────────────────────────
   typecheck:

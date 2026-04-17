@@ -16,16 +16,15 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
-  # PR gate — smoke + API tests only (browser/stress/security run weekly or on dispatch)
-  pull_request:
-    branches: [main]
-
-  # workflow_run removed — was firing after every deploy, burning ~118 min each time
-  # Use post-deploy-verify.yml (manual dispatch) for deployment-dependent tests instead
-
-  # Weekly full regression on main (Sunday 02:00 UTC)
-  schedule:
-    - cron: "0 2 * * 0"
+  # Auto-triggers disabled to stop GitHub Actions billing on a private repo.
+  # ci-pr-gate.yml already runs fast checks (typecheck, CLI build, env smoke)
+  # on every PR — this heavier suite is now manual-only or post-deploy.
+  #
+  # Removed:
+  #   - pull_request (was running the full API suite on every PR push)
+  #   - schedule cron "0 2 * * 0" (nightly regression — burned minutes even
+  #     when the repo had no changes)
+  # Re-enable by restoring the triggers below when off free tier.
 
   # Manual: pick category, enable security/integrations/browser
   workflow_dispatch:

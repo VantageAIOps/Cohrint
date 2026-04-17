@@ -20,6 +20,20 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
+    # Skip for docs-only PRs — no backend/frontend code changed, no gate needed.
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'ADMIN_GUIDE.md'
+      - 'PRODUCT_STRATEGY.md'
+      - 'GIT_MEMORY.md'
+      - 'CLAUDE.md'
+
+# Cancel any in-flight runs for this PR when a newer commit is pushed.
+# Without this every force-push to a PR doubles (or triples) billable minutes.
+concurrency:
+  group: pr-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

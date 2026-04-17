@@ -14,6 +14,12 @@ on:
       - '.github/workflows/deploy.yml'
   workflow_dispatch:  # manual trigger from GitHub UI
 
+# Only one Pages deploy per branch at a time. Rapid merges would otherwise queue
+# multiple deploys that all run to completion, doubling billed minutes.
+concurrency:
+  group: deploy-pages-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest

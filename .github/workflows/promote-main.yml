@@ -29,6 +29,12 @@ on:
         type: boolean
         default: false
 
+# One promotion at a time. Prevents double-tag / double-backup runs when
+# a version PR is merged while another workflow_dispatch is in flight.
+concurrency:
+  group: promote-main
+  cancel-in-progress: false
+
 jobs:
   tag-release:
     name: Tag Release & Verify Backup

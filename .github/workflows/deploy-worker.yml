@@ -12,6 +12,12 @@ on:
       - '.github/workflows/deploy-worker.yml'
   workflow_dispatch:  # manual trigger from GitHub Actions UI
 
+# Only one worker deploy at a time. Rapid merges would otherwise queue two
+# deploys that both run to completion, doubling billed minutes.
+concurrency:
+  group: deploy-worker
+  cancel-in-progress: true
+
 jobs:
   typecheck:
     name: TypeScript type check
