@@ -120,16 +120,12 @@ prompts.post('/usage', async (c) => {
 
   // Verify version belongs to an org prompt
   const version = await c.env.DB
-    .prepare(`SELECT pv.id, pv.prompt_id, pv.total_calls, pv.total_cost_usd,
-                pv.avg_prompt_tokens, pv.avg_completion_tokens
+    .prepare(`SELECT pv.id, pv.prompt_id
               FROM prompt_versions pv
               JOIN prompts p ON p.id = pv.prompt_id
               WHERE pv.id = ? AND p.org_id = ? AND p.deleted_at IS NULL`)
     .bind(body.version_id, orgId)
-    .first<{
-      id: string; prompt_id: string; total_calls: number; total_cost_usd: number;
-      avg_prompt_tokens: number; avg_completion_tokens: number;
-    }>();
+    .first<{ id: string; prompt_id: string }>();
 
   if (!version) return c.json({ error: 'version not found' }, 404);
 
@@ -138,15 +134,6 @@ prompts.post('/usage', async (c) => {
   const completionTokens = body.completion_tokens ?? 0;
 
   const usageId = generateId();
-  const newCalls = version.total_calls + 1;
-  const newTotalCost = version.total_cost_usd + costUsd;
-  const newAvgCost = newTotalCost / newCalls;
-  const newAvgPrompt = Math.round(
-    (version.avg_prompt_tokens * version.total_calls + promptTokens) / newCalls
-  );
-  const newAvgCompletion = Math.round(
-    (version.avg_completion_tokens * version.total_calls + completionTokens) / newCalls
-  );
 
   await c.env.DB.batch([
     c.env.DB
@@ -155,10 +142,15 @@ prompts.post('/usage', async (c) => {
       .bind(usageId, body.version_id, body.event_id, orgId, costUsd, promptTokens, completionTokens),
     c.env.DB
       .prepare(`UPDATE prompt_versions SET
-                  total_calls = ?, total_cost_usd = ?, avg_cost_usd = ?,
-                  avg_prompt_tokens = ?, avg_completion_tokens = ?
+                  total_calls = total_calls + 1,
+                  total_cost_usd = total_cost_usd + ?,
+                  total_prompt_tokens = total_prompt_tokens + ?,
+                  total_completion_tokens = total_completion_tokens + ?,
+                  avg_cost_usd = (total_cost_usd + ?) / (total_calls + 1),
+                  avg_prompt_tokens = ROUND((total_prompt_tokens + ?) * 1.0 / (total_calls + 1)),
+                  avg_completion_tokens = ROUND((total_completion_tokens + ?) * 1.0 / (total_calls + 1))
                 WHERE id = ?`)
-      .bind(newCalls, newTotalCost, newAvgCost, newAvgPrompt, newAvgCompletion, version.id),
+      .bind(costUsd, promptTokens, completionTokens, costUsd, promptTokens, completionTokens, version.id),
   ]);
 
   return c.json({ recorded: true }, 201);

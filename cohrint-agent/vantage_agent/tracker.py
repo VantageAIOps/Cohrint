@@ -8,10 +8,13 @@ Cost tracking module for cohrint-agent.
 from __future__ import annotations
 
 import hashlib
+import json
+import os
 import threading
 import time
 import uuid
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -19,6 +22,57 @@ import httpx
 from . import __version__
 from .cost_tracker import SessionCost
 from .telemetry import OTelExporter
+
+# ── Spool helpers ─────────────────────────────────────────────────────────────
+
+_SPOOL_DIR = Path.home() / ".cohrint"
+_SPOOL_FILE = _SPOOL_DIR / "spool.jsonl"
+_MAX_SPOOL = 1000
+_spool_lock = threading.Lock()
+
+
+def _spool_write(events: list[dict[str, Any]]) -> None:
+    """Append events to ~/.cohrint/spool.jsonl (best-effort, never raises)."""
+    try:
+        _SPOOL_DIR.mkdir(parents=True, exist_ok=True)
+        with _spool_lock:
+            # Read existing lines to enforce max size
+            existing: list[str] = []
+            if _SPOOL_FILE.exists():
+                existing = _SPOOL_FILE.read_text(encoding="utf-8").splitlines()
+            new_lines = [json.dumps(e) for e in events]
+            combined = existing + new_lines
+            # Drop oldest if over limit
+            if len(combined) > _MAX_SPOOL:
+                combined = combined[len(combined) - _MAX_SPOOL:]
+            _SPOOL_FILE.write_text("\n".join(combined) + "\n", encoding="utf-8")
+    except Exception as exc:  # noqa: BLE001
+        try:
+            print(f"  [tracker] WARN: could not write to spool: {exc}")
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def _spool_drain() -> list[dict[str, Any]]:
+    """Read and delete the spool file. Returns list of event dicts."""
+    try:
+        with _spool_lock:
+            if not _SPOOL_FILE.exists():
+                return []
+            lines = _SPOOL_FILE.read_text(encoding="utf-8").splitlines()
+            _SPOOL_FILE.unlink(missing_ok=True)
+        events: list[dict[str, Any]] = []
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                events.append(json.loads(line))
+            except json.JSONDecodeError:
+                pass  # corrupt line — skip
+        return events
+    except Exception:  # noqa: BLE001
+        return []
 
 
 @dataclass
@@ -152,11 +206,16 @@ class Tracker:
                 data.pop("agent_name", None)
             events.append(data)
 
+        # Drain any previously spooled events and prepend to this batch.
+        # Drained before the request so a successful send clears the spool.
+        spooled = _spool_drain()
+        all_events = spooled + events
+
         try:
             url = f"{self.config.api_base}/v1/events/batch"
             resp = httpx.post(
                 url,
-                json={"events": events},
+                json={"events": all_events},
                 headers={
                     "Authorization": f"Bearer {self.config.api_key}",
                     "Content-Type": "application/json",
@@ -164,11 +223,13 @@ class Tracker:
                 },
                 timeout=10,
             )
-            if resp.status_code < 400:
-                # Only clear on success (2xx/3xx)
+            # 201 (sync created) and 202 (async queued via INGEST_QUEUE) are both success
+            if resp.status_code in (201, 202) or resp.status_code < 400:
+                # Only clear on success
                 self._queue = [e for e in self._queue if e not in batch]
                 if self.config.debug:
-                    print(f"  [tracker] flushed {len(events)} events")
+                    extra = f" (+{len(spooled)} spooled)" if spooled else ""
+                    print(f"  [tracker] flushed {len(events)}{extra} events → {resp.status_code}")
                 # Fire-and-forget OTel export for each event in the batch
                 _otel = OTelExporter()
                 for e in batch:
@@ -181,12 +242,32 @@ class Tracker:
                         "latency_ms": e.latency_ms,
                         "session_id": e.session_id,
                     })
+            elif resp.status_code == 503:
+                # Service unavailable — spool current batch for later retry
+                if self.config.debug:
+                    print(f"  [tracker] 503 received — spooling {len(events)} events (+{len(spooled)} re-spooled)")
+                _spool_write(all_events)
+                # Clear from in-memory queue (spool takes over)
+                self._queue = [e for e in self._queue if e not in batch]
             else:
                 if self.config.debug:
                     print(f"  [tracker] flush failed: HTTP {resp.status_code} — events retained")
+                # Re-spool the drained events so they aren't lost
+                if spooled:
+                    _spool_write(spooled)
+        except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError, OSError) as exc:
+            # Connection/network error — spool for later retry
+            if self.config.debug:
+                print(f"  [tracker] connection error — spooling {len(events)} events: {exc}")
+            _spool_write(all_events)
+            # Clear from in-memory queue (spool takes over)
+            self._queue = [e for e in self._queue if e not in batch]
         except Exception as exc:
             if self.config.debug:
                 print(f"  [tracker] flush error: {exc} — events retained")
+            # Re-spool drained events so they aren't lost; keep in-memory queue
+            if spooled:
+                _spool_write(spooled)
             # Do NOT clear queue — events will retry on next flush
 
     def _schedule_flush(self) -> None:

@@ -18,32 +18,13 @@
 import { Hono } from 'hono';
 import type { Bindings, Variables } from '../types';
 import { authMiddleware, hasRole } from '../middleware/auth';
+import { sinceUnix, monthStartUnix } from '../lib/db-dates';
 
 const crossplatform = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 // Use the shared auth middleware — supports both session cookies (dashboard)
 // and Bearer tokens (API/SDK/tests)
 crossplatform.use('*', authMiddleware);
-
-// SQLite datetime('now') produces 'YYYY-MM-DD HH:MM:SS' (no T, no Z).
-// All date comparisons must use the same format to avoid string comparison bugs.
-// Align to UTC midnight so the window covers exactly `days` calendar days
-// (today + previous days-1), not a rolling window from the current timestamp.
-function sqliteDateSince(days: number): string {
-  const todayMidnightMs = Math.floor(Date.now() / 86400000) * 86400000;
-  const d = new Date(todayMidnightMs - (days - 1) * 86400000);
-  return d.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
-}
-
-function sqliteTodayStart(): string {
-  const d = new Date();
-  return d.toISOString().split('T')[0] + ' 00:00:00';
-}
-
-function sqliteMonthStart(): string {
-  const d = new Date();
-  return d.toISOString().slice(0, 7) + '-01 00:00:00';
-}
 
 const ALLOWED_DAYS = new Set([7, 30, 90]);
 
@@ -73,14 +54,14 @@ crossplatform.get('/trend', async (c) => {
   } catch {
     return c.json({ error: 'days must be 7, 30, or 90' }, 400);
   }
-  const since = sqliteDateSince(days);
+  const since = sinceUnix(days);
 
   const rows = await c.env.DB.prepare(`
     SELECT DATE(created_at) AS day,
            provider,
            COALESCE(SUM(cost_usd), 0) AS cost
     FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ?${devClause}
+    WHERE org_id = ? AND created_at_unix >= ?${devClause}
     GROUP BY DATE(created_at), provider
     ORDER BY day ASC
   `).bind(orgId, since, ...devArgs).all<{ day: string; provider: string; cost: number }>();
@@ -124,7 +105,7 @@ crossplatform.get('/summary', async (c) => {
   } catch {
     return c.json({ error: 'days must be 7, 30, or 90' }, 400);
   }
-  const since = sqliteDateSince(days);
+  const since = sinceUnix(days);
 
   // Total spend
   const total = await c.env.DB.prepare(`
@@ -135,7 +116,7 @@ crossplatform.get('/summary', async (c) => {
       COALESCE(SUM(cached_tokens), 0) as total_cached_tokens,
       COUNT(*) as total_records
     FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ?${devClause}
+    WHERE org_id = ? AND created_at_unix >= ?${devClause}
   `).bind(orgId, since, ...devArgs).first();
 
   // By provider
@@ -146,7 +127,7 @@ crossplatform.get('/summary', async (c) => {
       COALESCE(SUM(input_tokens + output_tokens), 0) as tokens,
       COUNT(*) as records
     FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ?${devClause}
+    WHERE org_id = ? AND created_at_unix >= ?${devClause}
     GROUP BY provider ORDER BY cost DESC
   `).bind(orgId, since, ...devArgs).all();
 
@@ -157,18 +138,18 @@ crossplatform.get('/summary', async (c) => {
       COALESCE(SUM(cost_usd), 0) as cost,
       COUNT(*) as records
     FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ?${devClause}
+    WHERE org_id = ? AND created_at_unix >= ?${devClause}
     GROUP BY source
   `).bind(orgId, since, ...devArgs).all();
 
-  // Today's spend
-  const todayStart = sqliteTodayStart();
+  // Today's spend (sinceUnix(0) = today UTC midnight)
+  const todayStartUnix = sinceUnix(0);
   const today = await c.env.DB.prepare(`
     SELECT COALESCE(SUM(cost_usd), 0) as today_cost,
            COALESCE(SUM(input_tokens + output_tokens), 0) as today_tokens
     FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ?${devClause}
-  `).bind(orgId, todayStart, ...devArgs).first();
+    WHERE org_id = ? AND created_at_unix >= ?${devClause}
+  `).bind(orgId, todayStartUnix, ...devArgs).first();
 
   // Budget check (always org-scoped — not filtered by developer)
   const budget = await c.env.DB.prepare(`
@@ -176,20 +157,20 @@ crossplatform.get('/summary', async (c) => {
     WHERE org_id = ? AND scope = 'org' LIMIT 1
   `).bind(orgId).first() as { monthly_limit_usd: number } | null;
 
-  const monthStart = sqliteMonthStart();
+  const monthStart = monthStartUnix();
   const monthSpend = await c.env.DB.prepare(`
     SELECT COALESCE(SUM(cost_usd), 0) as month_cost
     FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ?${devClause}
+    WHERE org_id = ? AND created_at_unix >= ?${devClause}
   `).bind(orgId, monthStart, ...devArgs).first() as { month_cost: number } | null;
 
   // Previous period for trend comparison
-  const prevSince = sqliteDateSince(days * 2);
+  const prevSince = sinceUnix(days * 2);
   const prevUntil = since;
   const prevTotal = await c.env.DB.prepare(`
     SELECT COALESCE(SUM(cost_usd), 0) as prev_cost
     FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ? AND created_at < ?${devClause}
+    WHERE org_id = ? AND created_at_unix >= ? AND created_at_unix < ?${devClause}
   `).bind(orgId, prevSince, prevUntil, ...devArgs).first() as { prev_cost: number } | null;
 
   const budgetLimit = budget?.monthly_limit_usd ?? 0;
@@ -228,7 +209,7 @@ crossplatform.get('/developers', async (c) => {
   } catch {
     return c.json({ error: 'days must be 7, 30, or 90' }, 400);
   }
-  const since = sqliteDateSince(days);
+  const since = sinceUnix(days);
 
   // Optional team and business_unit filters
   const teamFilter   = c.req.query('team') ?? null;
@@ -256,7 +237,7 @@ crossplatform.get('/developers', async (c) => {
       GROUP_CONCAT(DISTINCT provider)   AS providers,
       COUNT(*)                          AS records
     FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ?${filterClause}
+    WHERE org_id = ? AND created_at_unix >= ?${filterClause}
       AND developer_email IS NOT NULL
     GROUP BY developer_id, developer_email, team, business_unit
     ORDER BY total_cost DESC
@@ -269,7 +250,7 @@ crossplatform.get('/developers', async (c) => {
            COALESCE(SUM(cost_usd), 0) as cost,
            COUNT(*) as records
     FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ?${filterClause} AND developer_email IS NOT NULL
+    WHERE org_id = ? AND created_at_unix >= ?${filterClause} AND developer_email IS NOT NULL
     GROUP BY developer_id, developer_email, provider
     ORDER BY developer_email, cost DESC
   `).bind(...baseArgs).all();
@@ -342,7 +323,7 @@ crossplatform.get('/developer/:id', async (c) => {
   } catch {
     return c.json({ error: 'days must be 7, 30, or 90' }, 400);
   }
-  const since = sqliteDateSince(days);
+  const since = sinceUnix(days);
 
   const byProvider = await c.env.DB.prepare(`
     SELECT provider,
@@ -350,7 +331,7 @@ crossplatform.get('/developer/:id', async (c) => {
       COALESCE(SUM(input_tokens), 0)   AS input_tokens,
       COALESCE(SUM(output_tokens), 0)  AS output_tokens
     FROM cross_platform_usage
-    WHERE org_id = ? AND developer_id = ? AND created_at >= ?
+    WHERE org_id = ? AND developer_id = ? AND created_at_unix >= ?
     GROUP BY provider ORDER BY cost DESC
   `).bind(orgId, id, since).all();
 
@@ -359,7 +340,7 @@ crossplatform.get('/developer/:id', async (c) => {
       COALESCE(SUM(cost_usd), 0)                    AS cost,
       COALESCE(SUM(input_tokens + output_tokens), 0) AS tokens
     FROM cross_platform_usage
-    WHERE org_id = ? AND developer_id = ? AND created_at >= ? AND model IS NOT NULL
+    WHERE org_id = ? AND developer_id = ? AND created_at_unix >= ? AND model IS NOT NULL
     GROUP BY model ORDER BY cost DESC LIMIT 10
   `).bind(orgId, id, since).all();
 
@@ -368,7 +349,7 @@ crossplatform.get('/developer/:id', async (c) => {
       COALESCE(SUM(cost_usd), 0)                    AS cost,
       COALESCE(SUM(input_tokens + output_tokens), 0) AS tokens
     FROM cross_platform_usage
-    WHERE org_id = ? AND developer_id = ? AND created_at >= ?
+    WHERE org_id = ? AND developer_id = ? AND created_at_unix >= ?
     GROUP BY DATE(created_at) ORDER BY day DESC LIMIT 30
   `).bind(orgId, id, since).all();
 
@@ -380,7 +361,7 @@ crossplatform.get('/developer/:id', async (c) => {
       COALESCE(SUM(lines_removed), 0) AS lines_removed,
       COALESCE(SUM(active_time_s), 0) AS active_time_s
     FROM cross_platform_usage
-    WHERE org_id = ? AND developer_id = ? AND created_at >= ?
+    WHERE org_id = ? AND developer_id = ? AND created_at_unix >= ?
   `).bind(orgId, id, since).first();
 
   // Fetch email for display — not stored in the URL
@@ -547,7 +528,7 @@ crossplatform.get('/models', async (c) => {
   } catch {
     return c.json({ error: 'days must be 7, 30, or 90' }, 400);
   }
-  const since = sqliteDateSince(days);
+  const since = sinceUnix(days);
 
   const models = await c.env.DB.prepare(`
     SELECT model, provider,
@@ -556,7 +537,7 @@ crossplatform.get('/models', async (c) => {
       COALESCE(SUM(output_tokens), 0) as output_tokens,
       COUNT(*) as requests
     FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ? AND model IS NOT NULL${devClause}
+    WHERE org_id = ? AND created_at_unix >= ? AND model IS NOT NULL${devClause}
     GROUP BY model, provider ORDER BY cost DESC LIMIT 20
   `).bind(orgId, since, ...devArgs).all();
 
@@ -636,7 +617,7 @@ crossplatform.get('/budget', async (c) => {
   const orgId = c.get('orgId');
   const role  = c.get('role');
   const isPrivileged = hasRole(role, 'admin');
-  const monthStart = sqliteMonthStart();
+  const monthStart = monthStartUnix();
 
   const policies = await c.env.DB.prepare(`
     SELECT id, scope, scope_target, monthly_limit_usd,
@@ -648,20 +629,20 @@ crossplatform.get('/budget', async (c) => {
   // Current spend per scope
   const orgSpend = await c.env.DB.prepare(`
     SELECT COALESCE(SUM(cost_usd), 0) as spend
-    FROM cross_platform_usage WHERE org_id = ? AND created_at >= ?
+    FROM cross_platform_usage WHERE org_id = ? AND created_at_unix >= ?
   `).bind(orgId, monthStart).first() as { spend: number } | null;
 
   const teamSpend = await c.env.DB.prepare(`
     SELECT team, COALESCE(SUM(cost_usd), 0) as spend
     FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ? AND team IS NOT NULL
+    WHERE org_id = ? AND created_at_unix >= ? AND team IS NOT NULL
     GROUP BY team
   `).bind(orgId, monthStart).all();
 
   const devSpend = await c.env.DB.prepare(`
     SELECT developer_email, COALESCE(SUM(cost_usd), 0) as spend
     FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ? AND developer_email IS NOT NULL
+    WHERE org_id = ? AND created_at_unix >= ? AND developer_email IS NOT NULL
     GROUP BY developer_email ORDER BY spend DESC LIMIT 50
   `).bind(orgId, monthStart).all();
 

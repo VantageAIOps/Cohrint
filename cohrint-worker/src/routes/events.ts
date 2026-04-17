@@ -3,6 +3,8 @@ import { Bindings, Variables, EventIn, BatchIn } from '../types';
 import { authMiddleware } from '../middleware/auth';
 import { maybeSendBudgetAlert } from './alerts';
 import { logAudit } from '../lib/audit';
+import { getFreeTierCount, incrementFreeTierCount } from '../lib/freetier';
+import { scopedDb } from '../lib/db';
 
 const events = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -88,17 +90,18 @@ async function checkBudgetPolicy(
       startOfMonth.setUTCHours(0, 0, 0, 0);
       const monthStart = Math.floor(startOfMonth.getTime() / 1000);
 
+      const sdb = scopedDb(db, orgId);
       let mtdRow: { total: number } | null;
       if (policy.scope === 'team' && policy.scope_target) {
-        mtdRow = await db.prepare(`
+        mtdRow = await sdb.prepare(`
           SELECT COALESCE(SUM(cost_usd), 0) AS total FROM events
-          WHERE org_id = ? AND team = ? AND created_at >= ?
-        `).bind(orgId, policy.scope_target, monthStart).first<{ total: number }>();
+          WHERE {{ORG_SCOPE}} AND team = ? AND created_at >= ?
+        `).bind(policy.scope_target, monthStart).first<{ total: number }>();
       } else {
-        mtdRow = await db.prepare(`
+        mtdRow = await sdb.prepare(`
           SELECT COALESCE(SUM(cost_usd), 0) AS total FROM events
-          WHERE org_id = ? AND created_at >= ?
-        `).bind(orgId, monthStart).first<{ total: number }>();
+          WHERE {{ORG_SCOPE}} AND created_at >= ?
+        `).bind(monthStart).first<{ total: number }>();
       }
       mtdCost = mtdRow?.total ?? 0;
     }
@@ -120,26 +123,12 @@ async function checkBudgetPolicy(
 // ── Free-tier event limit helper ──────────────────────────────────────────────
 const FREE_TIER_LIMIT = 50_000;
 
-async function checkFreeTierLimit(db: D1Database, orgId: string, adding = 1): Promise<{ blocked: boolean; used: number }> {
-  // Compute month-start in UTC explicitly. Relying on strftime('%s', 'now',
-  // 'start of month') returns a TEXT and depends on SQLite numeric-affinity
-  // coercion; computing the unix int in JS makes the bind type unambiguous
-  // against events.created_at (INTEGER unixepoch).
-  const monthStartUnix = Math.floor(
-    new Date(new Date().toISOString().slice(0, 7) + '-01T00:00:00Z').getTime() / 1000,
-  );
-  const row = await db.prepare(`
-    SELECT o.plan,
-           COALESCE((
-             SELECT COUNT(*) FROM events
-             WHERE org_id = o.id
-               AND created_at >= ?
-           ), 0) AS mtd_count
-    FROM orgs o WHERE o.id = ?
-  `).bind(monthStartUnix, orgId).first<{ plan: string; mtd_count: number }>();
+async function checkFreeTierLimit(db: D1Database, kv: KVNamespace, orgId: string, adding = 1): Promise<{ blocked: boolean; used: number }> {
+  // Paid plans bypass the free-tier check entirely — check org plan first
+  const planRow = await db.prepare('SELECT plan FROM orgs WHERE id = ?').bind(orgId).first<{ plan: string }>();
+  if (!planRow || planRow.plan !== 'free') return { blocked: false, used: 0 };
 
-  if (!row || row.plan !== 'free') return { blocked: false, used: row?.mtd_count ?? 0 };
-  const used = Number(row.mtd_count);
+  const used = await getFreeTierCount(kv, db, orgId);
   return { blocked: used + adding >= FREE_TIER_LIMIT, used };
 }
 
@@ -150,7 +139,7 @@ events.post('/', async (c) => {
   try { body = await c.req.json<EventIn>(); }
   catch { return c.json({ error: 'Invalid JSON body' }, 400); }
 
-  const { blocked, used } = await checkFreeTierLimit(c.env.DB, orgId, 1);
+  const { blocked, used } = await checkFreeTierLimit(c.env.DB, c.env.KV, orgId, 1);
   if (blocked) {
     return c.json({
       error: 'Free tier limit reached',
@@ -208,6 +197,34 @@ events.post('/', async (c) => {
     } catch { /* KV unavailable — proceed without dedup */ }
   }
 
+  // ── Queue path (T010): async ingest via Cloudflare Queue ──────────────────
+  if (c.env.INGEST_QUEUE) {
+    // Write prompt_hash to KV for future dedup before queuing (best-effort)
+    if (body.prompt_hash) {
+      const phashKey = `phash:${orgId}:${body.prompt_hash}`;
+      const costUsd = body.total_cost_usd ?? body.cost_total_usd ?? 0;
+      try {
+        await c.env.KV.put(phashKey, JSON.stringify({
+          event_id: body.event_id,
+          cost_usd: costUsd,
+          model: body.model ?? '',
+          ts: Math.floor(Date.now() / 1000),
+        }), { expirationTtl: 86400 });
+      } catch { /* best-effort */ }
+    }
+    await c.env.INGEST_QUEUE.send({ type: 'event', orgId, event: body });
+    const response: Record<string, unknown> = {
+      ok:       true,
+      id:       body.event_id,
+      accepted: true,
+      status:   'queued',
+    };
+    if (cacheWarning) response.cache_warning = cacheWarning;
+    if (isBudgetThrottled) response.budget_warning = `Budget threshold exceeded (${Math.round(budgetCheck.pct)}% used). Events are being throttled.`;
+    return c.json(response, 202);
+  }
+
+  // ── Sync fallback path (local dev / no queue binding) ─────────────────────
   let result;
   try {
     result = await insertEvent(c.env.DB, orgId, body);
@@ -216,6 +233,12 @@ events.post('/', async (c) => {
     throw err;
   }
   if (!result.success) return c.json({ error: 'Failed to insert event' }, 500);
+  // INSERT OR IGNORE: changes() == 1 → inserted, 0 → duplicate (PK collision)
+  const wasInserted = (result.meta?.changes ?? 1) > 0;
+
+  // Increment free-tier KV counter for new insertions (fire-and-forget)
+  // NOTE: in the queue path the consumer is sole writer; here we keep sync path working
+  if (wasInserted) incrementFreeTierCount(c.env.KV, orgId);
 
   // Write prompt_hash to KV for future dedup (TTL: 24h)
   if (body.prompt_hash) {
@@ -243,9 +266,9 @@ events.post('/', async (c) => {
         const startOfMonth = new Date();
         startOfMonth.setUTCDate(1); startOfMonth.setUTCHours(0, 0, 0, 0);
         const monthStart = Math.floor(startOfMonth.getTime() / 1000);
-        const mtdRow = await c.env.DB.prepare(
-          'SELECT COALESCE(SUM(cost_usd), 0) AS total FROM events WHERE org_id = ? AND created_at >= ?'
-        ).bind(orgId, monthStart).first<{ total: number }>();
+        const mtdRow = await scopedDb(c.env.DB, orgId).prepare(
+          'SELECT COALESCE(SUM(cost_usd), 0) AS total FROM events WHERE {{ORG_SCOPE}} AND created_at >= ?'
+        ).bind(monthStart).first<{ total: number }>();
         await maybeSendBudgetAlert(c.env.DB, c.env.KV, orgId, mtdRow?.total ?? 0, org.budget_usd);
       }
     } catch { /* non-critical */ }
@@ -254,10 +277,16 @@ events.post('/', async (c) => {
   // Invalidate all analytics caches (all scopes including team-scoped variants)
   try { await invalidateOrgAnalyticsCache(c.env.KV, orgId); } catch { /* best-effort */ }
 
-  const response: Record<string, unknown> = { ok: true, id: body.event_id };
+  const response: Record<string, unknown> = {
+    ok:       true,
+    id:       body.event_id,
+    accepted: wasInserted,
+    reason:   wasInserted ? 'inserted' : 'duplicate',
+  };
   if (cacheWarning) response.cache_warning = cacheWarning;
   if (isBudgetThrottled) response.budget_warning = `Budget threshold exceeded (${Math.round(budgetCheck.pct)}% used). Events are being throttled.`;
-  return c.json(response, 201);
+  // 200 for duplicate (no new resource created); 201 for new insertion
+  return c.json(response, wasInserted ? 201 : 200);
 });
 
 // ── POST /v1/events/batch — ingest a batch of events ─────────────────────────
@@ -281,7 +310,7 @@ events.post('/batch', async (c) => {
     }
   }
 
-  const { blocked, used } = await checkFreeTierLimit(c.env.DB, orgId, body.events.length);
+  const { blocked, used } = await checkFreeTierLimit(c.env.DB, c.env.KV, orgId, body.events.length);
   if (blocked) {
     return c.json({
       error: 'Free tier limit reached',
@@ -325,7 +354,31 @@ events.post('/batch', async (c) => {
     } catch { /* KV unavailable — proceed without dedup */ }
   }
 
-  // Bulk insert using D1 batch API
+  // ── Queue path (T010): async ingest via Cloudflare Queue ──────────────────
+  if (c.env.INGEST_QUEUE) {
+    const submittedIds = body.events.map(ev => ev.event_id ?? '').filter(Boolean);
+    await c.env.INGEST_QUEUE.sendBatch(
+      body.events.map(ev => ({
+        body: {
+          type:  'event' as const,
+          orgId,
+          event: {
+            ...ev,
+            sdk_language: ev.sdk_language ?? body.sdk_language,
+            sdk_version:  ev.sdk_version  ?? body.sdk_version,
+          },
+        },
+      })),
+    );
+    return c.json({
+      ok:            true,
+      submitted_ids: submittedIds,
+      count:         submittedIds.length,
+      status:        'queued',
+    }, 202);
+  }
+
+  // ── Sync fallback path (local dev / no queue binding) ─────────────────────
   let stmts;
   try {
     stmts = body.events.map(ev =>
@@ -337,7 +390,22 @@ events.post('/batch', async (c) => {
   }
 
   const results = await c.env.DB.batch(stmts);
-  const failed  = results.filter(r => !r.success).length;
+
+  // Classify each result: inserted (changes=1) vs duplicate (changes=0) vs failed
+  const acceptedIds: string[] = [];
+  const duplicateIds: string[] = [];
+  let failed = 0;
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i];
+    const eventId = body.events[i]?.event_id ?? '';
+    if (!r.success) {
+      failed++;
+    } else if ((r.meta?.changes ?? 1) > 0) {
+      acceptedIds.push(eventId);
+    } else {
+      duplicateIds.push(eventId);
+    }
+  }
 
   // Broadcast last event for live stream
   if (body.events.length > 0) {
@@ -348,9 +416,11 @@ events.post('/batch', async (c) => {
   try { await invalidateOrgAnalyticsCache(c.env.KV, orgId); } catch { /* best-effort */ }
 
   return c.json({
-    ok:       true,
-    accepted: body.events.length - failed,
+    ok:           true,
+    accepted:     acceptedIds.length,
     failed,
+    accepted_ids: acceptedIds,
+    duplicate_ids: duplicateIds,
   }, 201);
 });
 

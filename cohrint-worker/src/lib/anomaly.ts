@@ -16,6 +16,7 @@
  */
 
 import { sendSlackMessage } from '../routes/alerts';
+import { createLogger } from './logger';
 
 // ── Stats helpers ────────────────────────────────────────────────────────────
 
@@ -222,7 +223,7 @@ export async function runAnomalyDetection(
         });
       }
     } catch (err) {
-      console.error(`[anomaly] Error checking org ${cfg.org_id}:`, err);
+      createLogger(crypto.randomUUID(), cfg.org_id).error('anomaly check failed', { err: err instanceof Error ? err : new Error(String(err)) });
     }
   }
 

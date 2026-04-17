@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
+import { createLogger } from '../lib/logger';
 
 async function sha256hex(data: string): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(data));
@@ -125,7 +126,7 @@ stream.get('/:orgId', async (c) => {
             }
           }
         } catch (kvErr) {
-          console.error('[stream] KV read error:', kvErr);
+          createLogger(c.get('requestId') ?? 'unknown').error('stream KV read failed', { err: kvErr instanceof Error ? kvErr : new Error(String(kvErr)) });
           // Send an error SSE event and close cleanly rather than aborting
           try { await write('event: error\ndata: {"error":"stream_unavailable"}\n\n'); } catch { /* ignore */ }
           await writer.close();

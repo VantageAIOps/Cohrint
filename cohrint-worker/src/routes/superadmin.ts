@@ -442,6 +442,185 @@ superadmin.post('/reset', async (c) => {
   });
 });
 
+// ── POST /v1/superadmin/events/rescore — queue score-field backfill for an org ──────────
+// Rate limited: 1 req / 15 min per org_id (KV key rescore:ratelimit:{orgId}, TTL 900s)
+// Body: { org_id, from (ISO date), to (ISO date), fields_to_clear: string[] }
+superadmin.post('/events/rescore', async (c) => {
+  let body: { org_id?: unknown; from?: unknown; to?: unknown; fields_to_clear?: unknown };
+  try { body = await c.req.json(); }
+  catch { return c.json({ error: 'Invalid JSON body' }, 400); }
+
+  const { org_id, from, to, fields_to_clear } = body;
+
+  // ── Validate required fields ────────────────────────────────────────────────
+  if (typeof org_id !== 'string' || !org_id.trim()) {
+    return c.json({ error: 'org_id is required' }, 400);
+  }
+  if (typeof from !== 'string' || isNaN(Date.parse(from))) {
+    return c.json({ error: 'from must be a valid ISO date string' }, 400);
+  }
+  if (typeof to !== 'string' || isNaN(Date.parse(to))) {
+    return c.json({ error: 'to must be a valid ISO date string' }, 400);
+  }
+  if (!Array.isArray(fields_to_clear) || fields_to_clear.length === 0) {
+    return c.json({ error: 'fields_to_clear must be a non-empty array' }, 400);
+  }
+
+  const ALLOWED_FIELDS = new Set([
+    'hallucination_score', 'faithfulness_score', 'relevancy_score',
+    'toxicity_score', 'efficiency_score',
+  ]);
+  const validFields = (fields_to_clear as unknown[]).filter(
+    (f): f is string => typeof f === 'string' && ALLOWED_FIELDS.has(f),
+  );
+  if (validFields.length === 0) {
+    return c.json({
+      error: `fields_to_clear contains no valid field names. Allowed: ${[...ALLOWED_FIELDS].join(', ')}`,
+    }, 400);
+  }
+
+  // ── Rate limit: 1 req / 15 min per org ────────────────────────────────────
+  const rlKey = `rescore:ratelimit:${org_id}`;
+  const existing = await c.env.KV.get(rlKey);
+  if (existing !== null) {
+    return c.json({ error: 'Rate limit exceeded: 1 rescore request per 15 minutes per org' }, 429);
+  }
+  await c.env.KV.put(rlKey, '1', { expirationTtl: 900 });
+
+  // ── Query events in date range (unix timestamps) ───────────────────────────
+  const fromUnix = Math.floor(new Date(from).getTime() / 1000);
+  const toUnix   = Math.floor(new Date(to).getTime()   / 1000);
+
+  const { results: rows } = await c.env.DB.prepare(`
+    SELECT id, event_id FROM events
+    WHERE org_id = ? AND created_at BETWEEN ? AND ?
+    LIMIT 10000
+  `).bind(org_id, fromUnix, toUnix).all<{ id: number; event_id: string }>();
+
+  // ── Enqueue rescore messages ───────────────────────────────────────────────
+  if (rows.length > 0 && c.env.INGEST_QUEUE) {
+    const QUEUE_BATCH_MAX = 100; // Cloudflare sendBatch limit
+    for (let i = 0; i < rows.length; i += QUEUE_BATCH_MAX) {
+      const slice = rows.slice(i, i + QUEUE_BATCH_MAX);
+      await c.env.INGEST_QUEUE.sendBatch(
+        slice.map(row => ({
+          body: {
+            type: 'rescore' as const,
+            orgId: org_id,
+            eventId: row.event_id,
+            fieldsToReset: validFields,
+          },
+        })),
+      );
+    }
+  }
+
+  // ── Audit log ─────────────────────────────────────────────────────────────
+  logAuditRaw(c.env.DB, c.executionCtx,
+    c.req.header('CF-Connecting-IP') ?? 'unknown',
+    org_id, 'superadmin', 'superadmin',
+    {
+      event_type: 'admin_action',
+      event_name: 'score.rescore_triggered',
+      resource_type: 'events',
+      metadata: { org_id, from, to, fields_to_clear: validFields, event_count: rows.length },
+    },
+  );
+
+  return c.json({
+    ok:              true,
+    queued:          rows.length,
+    org_id,
+    from,
+    to,
+    fields_to_clear: validFields,
+  });
+});
+
+// ── POST /v1/superadmin/rollup/backfill — rebuild events_daily_rollup from raw events ──
+// Idempotent: uses INSERT ... ON CONFLICT DO UPDATE. Safe to re-run.
+// Processes events in batches of 100 (D1 batch limit). Returns { processed: N }.
+superadmin.post('/rollup/backfill', async (c) => {
+  const BATCH_SIZE = 100;
+  let offset = 0;
+  let processed = 0;
+
+  logAuditRaw(c.env.DB, c.executionCtx,
+    c.req.header('CF-Connecting-IP') ?? 'unknown',
+    'superadmin', 'superadmin', 'superadmin',
+    {
+      event_type: 'admin_action',
+      event_name: 'admin_action.rollup_backfill_started',
+      metadata: { path: c.req.path },
+    }
+  );
+
+  while (true) {
+    const { results } = await c.env.DB.prepare(`
+      SELECT
+        org_id, model, provider, team,
+        prompt_tokens, completion_tokens, cache_tokens, total_tokens,
+        cost_usd, latency_ms, cache_hit, created_at
+      FROM events
+      ORDER BY created_at ASC
+      LIMIT ? OFFSET ?
+    `).bind(BATCH_SIZE, offset).all<{
+      org_id: string;
+      model: string | null;
+      provider: string | null;
+      team: string | null;
+      prompt_tokens: number | null;
+      completion_tokens: number | null;
+      cache_tokens: number | null;
+      total_tokens: number | null;
+      cost_usd: number | null;
+      latency_ms: number | null;
+      cache_hit: number | null;
+      created_at: number;
+    }>();
+
+    if (results.length === 0) break;
+
+    const stmts = results.map(row => {
+      const dayUnix = Math.floor(row.created_at / 86400) * 86400;
+      const model   = row.model    ?? 'unknown';
+      const provider = row.provider ?? '';
+      const team    = row.team     ?? '';
+      const cost    = row.cost_usd ?? 0;
+      const prompt  = row.prompt_tokens ?? 0;
+      const completion = row.completion_tokens ?? 0;
+      const cache   = row.cache_tokens ?? 0;
+      const total   = row.total_tokens ?? (prompt + completion);
+      const latency = row.latency_ms ?? 0;
+      const isHit   = row.cache_hit ? 1 : 0;
+
+      return c.env.DB.prepare(`
+        INSERT INTO events_daily_rollup
+          (org_id, date_unix_day, model, provider, team, cost_usd, prompt_tokens, completion_tokens,
+           cache_tokens, total_tokens, requests, cache_hits, latency_ms_sum)
+        VALUES (?,?,?,?,?,?,?,?,?,?,1,?,?)
+        ON CONFLICT(org_id, date_unix_day, model, team) DO UPDATE SET
+          cost_usd          = cost_usd + excluded.cost_usd,
+          prompt_tokens     = prompt_tokens + excluded.prompt_tokens,
+          completion_tokens = completion_tokens + excluded.completion_tokens,
+          cache_tokens      = cache_tokens + excluded.cache_tokens,
+          total_tokens      = total_tokens + excluded.total_tokens,
+          requests          = requests + 1,
+          cache_hits        = cache_hits + excluded.cache_hits,
+          latency_ms_sum    = latency_ms_sum + excluded.latency_ms_sum
+      `).bind(row.org_id, dayUnix, model, provider, team, cost, prompt, completion, cache, total, isHit, latency);
+    });
+
+    await c.env.DB.batch(stmts);
+    processed += results.length;
+    offset += BATCH_SIZE;
+
+    if (results.length < BATCH_SIZE) break;
+  }
+
+  return c.json({ ok: true, processed, ts: new Date().toISOString() });
+});
+
 // ── Helper: bootstrap platform tracking tables if missing ────────────────────
 async function bootstrapTables(db: D1Database): Promise<void> {
   await db.batch([

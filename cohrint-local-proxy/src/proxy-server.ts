@@ -212,7 +212,8 @@ class StatsQueue {
         },
         body,
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      // Accept 201 (sync created) and 202 (async queued via INGEST_QUEUE) as success
+      if (!res.ok && res.status !== 202) throw new Error(`HTTP ${res.status}`);
       if (this.debug) {
         process.stderr.write(`[cohrint-proxy] Sent ${events.length} stats → ${res.status}\n`);
       }

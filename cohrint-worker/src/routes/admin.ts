@@ -799,4 +799,31 @@ admin.get('/budget-control', superadminOnly, async (c) => {
   });
 });
 
+// ── PATCH /v1/admin/ratelimits — override per-key limit for an API key ───────
+admin.patch('/ratelimits', adminOnly, async (c) => {
+  const orgId = c.get('orgId');
+  const body = await c.req.json<{ key_prefix: string; rpm: number }>().catch(() => null);
+
+  if (!body?.key_prefix || typeof body.rpm !== 'number' || body.rpm < 1 || body.rpm > 10000) {
+    return c.json({ error: 'key_prefix and rpm (1–10000) are required' }, 400);
+  }
+
+  // Store override in KV: key-ratelimit-override:{orgId}:{keyPrefix}
+  await c.env.KV.put(
+    `key-ratelimit-override:${orgId}:${body.key_prefix}`,
+    String(body.rpm),
+    { expirationTtl: 86400 * 30 }, // 30-day override
+  );
+
+  logAudit(c, {
+    event_type:    'admin_action',
+    event_name:    'ratelimit.per_key_override',
+    resource_type: 'api_key',
+    resource_id:   body.key_prefix,
+    metadata:      { rpm: body.rpm },
+  });
+
+  return c.json({ ok: true, key_prefix: body.key_prefix, rpm: body.rpm });
+});
+
 export { admin };

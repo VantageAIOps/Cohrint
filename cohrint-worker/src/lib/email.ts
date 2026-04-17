@@ -6,6 +6,9 @@
  * If the key is not set, emails are silently skipped (non-blocking).
  */
 
+import { createLogger } from './logger';
+import { withBreaker } from './circuit';
+
 interface EmailOptions {
   to:      string;
   subject: string;
@@ -15,6 +18,7 @@ interface EmailOptions {
 export async function sendEmail(
   resendKey: string | undefined,
   opts: EmailOptions,
+  kv?: KVNamespace,
 ): Promise<void> {
   if (!resendKey) return; // silently skip if not configured
 
@@ -29,7 +33,7 @@ export async function sendEmail(
     'Cohrint <onboarding@resend.dev>',
   ];
 
-  try {
+  const doSend = async (): Promise<void> => {
     for (const from of senders) {
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
@@ -40,10 +44,21 @@ export async function sendEmail(
       const body = await res.json() as { name?: string };
       // Only retry with fallback sender on domain-not-verified error
       if (body.name !== 'validation_error') return;
-      console.warn('[cohrint] sendEmail: custom domain not verified — retrying with shared sender');
+      createLogger(crypto.randomUUID()).warn('sendEmail: custom domain not verified, retrying with shared sender');
     }
-  } catch {
-    console.warn('[cohrint] sendEmail failed — Resend unreachable');
+  };
+
+  if (kv) {
+    const result = await withBreaker('resend', kv, doSend);
+    if (result === null) {
+      createLogger(crypto.randomUUID()).warn('sendEmail skipped — Resend circuit breaker open');
+    }
+  } else {
+    try {
+      await doSend();
+    } catch {
+      createLogger(crypto.randomUUID()).warn('sendEmail failed — Resend unreachable');
+    }
   }
 }
 

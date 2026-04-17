@@ -29,7 +29,7 @@ async function getOrgCacheConfig(db: D1Database, orgId: string) {
     .prepare('SELECT * FROM org_cache_config WHERE org_id = ?')
     .bind(orgId)
     .first<{ enabled: number; similarity_threshold: number; min_prompt_length: number; max_cache_age_days: number }>();
-  return row ?? { enabled: 1, similarity_threshold: 0.92, min_prompt_length: 10, max_cache_age_days: 30 };
+  return row ?? { enabled: 1, similarity_threshold: 0.92, min_prompt_length: 100, max_cache_age_days: 30 };
 }
 
 async function embedText(ai: Ai, text: string): Promise<number[]> {
@@ -81,7 +81,7 @@ cache.post('/lookup', async (c) => {
     .prepare(`SELECT * FROM semantic_cache_entries WHERE id = ? AND org_id = ?${teamClause}`)
     .bind(...([top.id, orgId, ...(scopeTeam ? [scopeTeam] : [])] as [string, string, ...string[]]))
     .first<{
-      id: string; response_text: string; cost_usd: number;
+      id: string; response_text: string; response_r2_key: string | null; cost_usd: number;
       prompt_tokens: number; completion_tokens: number;
       hit_count: number; total_savings_usd: number;
     }>();
@@ -103,6 +103,21 @@ cache.post('/lookup', async (c) => {
     return c.json({ hit: false, reason: 'entry_expired' });
   }
 
+  // T013 — resolve response body: try R2 first, fall back to D1
+  let responseText = entry.response_text;
+  if (entry.response_r2_key && c.env.CACHE_BUCKET) {
+    try {
+      const r2Object = await c.env.CACHE_BUCKET.get(entry.response_r2_key);
+      if (r2Object !== null) {
+        responseText = await r2Object.text();
+      }
+      // r2Object === null → R2 has no object yet, fall back to D1 silently
+    } catch (err) {
+      console.warn('[cache/lookup] R2 get failed, falling back to D1', entry.response_r2_key, err);
+      // responseText already holds the D1 value
+    }
+  }
+
   // Record the hit — update counters asynchronously
   const newSavings = entry.total_savings_usd + entry.cost_usd;
   c.executionCtx.waitUntil(
@@ -119,7 +134,7 @@ cache.post('/lookup', async (c) => {
   return c.json({
     hit: true,
     score: top.score,
-    response: entry.response_text,
+    response: responseText,
     prompt_tokens: entry.prompt_tokens,
     completion_tokens: entry.completion_tokens,
     saved_usd: entry.cost_usd,
@@ -164,6 +179,21 @@ cache.post('/store', async (c) => {
   const id = generateId();
   const embedding = await embedText(c.env.AI, body.prompt);
 
+  // T013 Release A — try to write response body to R2 before D1 insert
+  let r2Key: string | null = null;
+  const candidateR2Key = `cache/${orgId}/${id}`;
+  if (c.env.CACHE_BUCKET) {
+    try {
+      await c.env.CACHE_BUCKET.put(candidateR2Key, body.response, {
+        httpMetadata: { contentType: 'text/plain' },
+      });
+      r2Key = candidateR2Key;
+    } catch (err) {
+      console.warn('[cache/store] R2 put failed, storing response in D1 only', err);
+      // r2Key stays null — D1 response_text is the fallback
+    }
+  }
+
   // Insert into Vectorize with org/model/team metadata for filtered search
   const vectorizeMeta: Record<string, string> = { org_id: orgId, model: body.model };
   if (scopeTeam) vectorizeMeta['team_id'] = scopeTeam;
@@ -173,17 +203,17 @@ cache.post('/store', async (c) => {
     metadata: vectorizeMeta,
   }]);
 
-  // Persist to D1
+  // Persist to D1 — response_text kept for Release A fallback, r2_key pointer added
   const promptHash = body.prompt_hash ?? null;
   await c.env.DB
     .prepare(`INSERT INTO semantic_cache_entries
               (id, org_id, team_id, prompt_hash, prompt_text, model, response_text,
-               prompt_tokens, completion_tokens, cost_usd, vectorize_id, created_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`)
+               prompt_tokens, completion_tokens, cost_usd, vectorize_id, response_r2_key, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`)
     .bind(
       id, orgId, scopeTeam ?? null, promptHash, body.prompt, body.model, body.response,
       body.prompt_tokens ?? 0, body.completion_tokens ?? 0,
-      body.cost_usd ?? 0, id,
+      body.cost_usd ?? 0, id, r2Key,
     )
     .run();
 
@@ -278,12 +308,24 @@ cache.delete('/entries/:id', adminOnly, async (c) => {
   const entryId = c.req.param('id');
 
   const entry = await c.env.DB
-    .prepare('SELECT vectorize_id FROM semantic_cache_entries WHERE id = ? AND org_id = ?')
+    .prepare('SELECT vectorize_id, response_r2_key FROM semantic_cache_entries WHERE id = ? AND org_id = ?')
     .bind(entryId, orgId)
-    .first<{ vectorize_id: string | null }>();
+    .first<{ vectorize_id: string | null; response_r2_key: string | null }>();
 
   if (!entry) return c.json({ error: 'not found' }, 404);
 
+  // T013 — delete R2 object FIRST to prevent orphaned objects.
+  // If R2 deletion fails, abort the entire delete so the caller can retry.
+  if (entry.response_r2_key && c.env.CACHE_BUCKET) {
+    try {
+      await c.env.CACHE_BUCKET.delete(entry.response_r2_key);
+    } catch (err) {
+      console.error('[cache/delete] R2 delete failed — aborting to prevent orphan', entry.response_r2_key, err);
+      return c.json({ error: 'R2 delete failed; entry not removed — please retry' }, 500);
+    }
+  }
+
+  // R2 clean — now delete Vectorize index and D1 row
   await Promise.all([
     entry.vectorize_id ? c.env.VECTORIZE.deleteByIds([entry.vectorize_id]) : Promise.resolve(),
     c.env.DB.prepare('DELETE FROM semantic_cache_entries WHERE id = ? AND org_id = ?').bind(entryId, orgId).run(),

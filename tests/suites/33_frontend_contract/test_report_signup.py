@@ -39,8 +39,11 @@ def _report_signup_deployed() -> bool:
     global _REPORT_SIGNUP_DEPLOYED
     if _REPORT_SIGNUP_DEPLOYED is None:
         try:
+            # Use a unique email each time so the write path (KV.put) is exercised,
+            # not just the read path for a previously-cached entry.
+            probe_email = f"probe-ci-{random.randint(100000, 999999)}@example.com"
             r = requests.post(SIGNUP_URL,
-                              json={"email": "probe@example.com"},
+                              json={"email": probe_email},
                               timeout=10)
             _REPORT_SIGNUP_DEPLOYED = r.status_code != 500
         except Exception:

@@ -34,6 +34,21 @@ binding = "AI"
 binding     = "VECTORIZE"
 index_name  = "cohrint-semantic-cache"
 
+# ── R2 Bucket (semantic cache response bodies + audit log backup) ─────────────
+# Create once: wrangler r2 bucket create cohrint-cache
+# T013: cache response bodies moved to R2 (Release A — D1 still primary)
+# T014: audit events dual-written to R2 for tamper-evident append-only log
+[[r2_buckets]]
+binding     = "CACHE_BUCKET"
+bucket_name = "cohrint-cache"
+
+# ── Workers Analytics Engine (per-endpoint metrics counters) ─────────────────
+# Free tier: 10M writes/month. High-volume writes (events ingest) are sampled
+# at 10% to stay within free-tier at up to 3M events/day (90M writes/mo × 10%).
+[[analytics_engine_datasets]]
+binding  = "METRICS"
+dataset  = "cohrint_metrics"
+
 # ── Environment variables (non-secret) ───────────────────────────────────────
 [vars]
 ENVIRONMENT        = "production"
@@ -49,6 +64,22 @@ crons = ["*/10 * * * *"]
 #                              Get a free key at resend.com — 3,000 emails/month
 # TOKEN_ENCRYPTION_SECRET    — AES-256-GCM key material for Copilot PAT encryption
 #                              Generate: openssl rand -base64 32
+
+# ── Cloudflare Queues (T010 — async event ingest) ────────────────────────────
+[[queues.producers]]
+queue   = "cohrint-ingest"
+binding = "INGEST_QUEUE"
+
+[[queues.producers]]
+queue   = "cohrint-ingest-dlq"
+binding = "INGEST_DLQ"
+
+[[queues.consumers]]
+queue              = "cohrint-ingest"
+max_batch_size     = 100
+max_batch_timeout  = 5
+max_retries        = 3
+dead_letter_queue  = "cohrint-ingest-dlq"
 
 # ── Preview environment ───────────────────────────────────────────────────────
 [env.preview]

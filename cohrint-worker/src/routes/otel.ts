@@ -33,6 +33,7 @@
 import { Hono } from 'hono';
 import type { Bindings, Variables } from '../types';
 import { estimateCostUsd } from '../lib/pricing';
+import { createLogger } from '../lib/logger';
 
 const otel = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -475,7 +476,7 @@ otel.post('/v1/metrics', async (c) => {
       r.cost_usd = estimateCostUsd(r.model, r.input_tokens, r.output_tokens, r.cached_tokens, r.cache_creation_tokens);
     }
     if (!r.model && (r.input_tokens > 0 || r.output_tokens > 0)) {
-      console.warn('[otel] model_missing org=%s provider=%s metric=%s — cost recorded as $0', orgId, r.provider, r.raw_metric_name);
+      createLogger(c.get('requestId') ?? 'unknown', orgId).warn('otel model_missing — cost recorded as $0', { provider: r.provider, metric: r.raw_metric_name });
     }
   }
 
@@ -549,7 +550,7 @@ otel.post('/v1/metrics', async (c) => {
     try {
       await c.env.DB.batch(batch);
     } catch (err) {
-      console.error('[otel] D1 batch insert error:', err);
+      createLogger(c.get('requestId') ?? 'unknown', orgId).error('otel D1 batch insert failed', { err: err instanceof Error ? err : new Error(String(err)) });
       return c.json({ error: 'Failed to store metrics' }, 500);
     }
 
@@ -605,8 +606,7 @@ otel.post('/v1/metrics', async (c) => {
       try {
         await c.env.DB.batch(sessionBatch);
       } catch (err) {
-        // Non-critical — log and continue
-        console.error('[otel] session upsert error:', err);
+        createLogger(c.get('requestId') ?? 'unknown', orgId).warn('otel session upsert failed (non-critical)', { err: err instanceof Error ? err : new Error(String(err)) });
       }
     }
 
@@ -645,7 +645,7 @@ otel.post('/v1/metrics', async (c) => {
   }
 
   const elapsed = Date.now() - startMs;
-  console.log(`[otel] ingested ${records.length} metric records in ${elapsed}ms from org=${orgId}`);
+  createLogger(c.get('requestId') ?? 'unknown', orgId).info('otel metrics ingested', { count: records.length, ms: elapsed });
 
   // OTLP success response (spec: partialSuccess with rejectedDataPoints = 0 means full success)
   return c.json({ partialSuccess: { rejectedDataPoints: 0 } }, 200);
@@ -725,7 +725,7 @@ otel.post('/v1/logs', async (c) => {
             ).run();
             eventCount++;
           } catch (err) {
-            console.error('[otel/logs] Insert error:', err);
+            createLogger(c.get('requestId') ?? 'unknown', orgId).error('otel/logs insert failed', { err: err instanceof Error ? err : new Error(String(err)) });
           }
         }
 
@@ -775,7 +775,7 @@ otel.post('/v1/logs', async (c) => {
     }
   }
 
-  console.log(`[otel/logs] ingested ${eventCount} events from org=${orgId}`);
+  createLogger(c.get('requestId') ?? 'unknown', orgId).info('otel logs ingested', { count: eventCount });
   return c.json({ partialSuccess: {} }, 200);
 });
 
@@ -856,12 +856,11 @@ otel.post('/v1/traces', async (c) => {
     try {
       await c.env.DB.batch(stmts);
     } catch (err) {
-      console.error('[otel/traces] D1 batch insert error:', err);
-      // Non-fatal — traces are diagnostic data
+      createLogger(c.get('requestId') ?? 'unknown', orgId).error('otel/traces D1 batch insert failed (non-fatal)', { err: err instanceof Error ? err : new Error(String(err)) });
     }
   }
 
-  console.log(`[otel/traces] ingested ${spanCount} spans from org=${orgId}`);
+  createLogger(c.get('requestId') ?? 'unknown', orgId).info('otel traces ingested', { count: spanCount });
   return c.json({ partialSuccess: { rejectedSpans: 0 } }, 200);
 });
 

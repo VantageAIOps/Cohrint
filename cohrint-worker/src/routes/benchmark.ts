@@ -16,6 +16,7 @@
 import { Hono } from 'hono';
 import type { Bindings, Variables } from '../types';
 import { authMiddleware, hasRole } from '../middleware/auth';
+import { createLogger } from '../lib/logger';
 
 const benchmark = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -307,16 +308,17 @@ export async function syncBenchmarkContributions(env: Bindings): Promise<void> {
     SELECT id FROM orgs WHERE benchmark_opt_in = 1
   `).all<{ id: string }>();
 
+  const log = createLogger(crypto.randomUUID());
   for (const org of orgs ?? []) {
     try {
       const result = await computeAndUpsertContribution(env.DB, org.id);
       if (result.contributed) {
-        console.log(`[benchmark-cron] org=${org.id} contributed`);
+        log.info('benchmark-cron org contributed', { org_id: org.id });
       } else {
-        console.log(`[benchmark-cron] org=${org.id} skipped reason=${result.reason}`);
+        log.info('benchmark-cron org skipped', { org_id: org.id, reason: result.reason });
       }
     } catch (err) {
-      console.error(`[benchmark-cron] org=${org.id} error:`, err);
+      log.error('benchmark-cron org error', { org_id: org.id, err: err instanceof Error ? err : new Error(String(err)) });
     }
   }
 }
