@@ -2097,12 +2097,12 @@ function apiFetch(path, opts) {
   var headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
 
   // Privacy mode header — tells the server whether the user has opted into
-  // storing prompts/responses on the backend. Matches the SDK's X-Vantage-Privacy
+  // storing prompts/responses on the backend. Matches the SDK's X-Cohrint-Privacy
   // header so server-side redaction policies stay consistent across clients.
   try {
-    var _privacy = localStorage.getItem('vantage_privacy') || 'strict';
-    if (!headers['X-Vantage-Privacy'] && !headers['x-vantage-privacy']) {
-      headers['X-Vantage-Privacy'] = _privacy;
+    var _privacy = localStorage.getItem('cohrint_privacy') || 'strict';
+    if (!headers['X-Cohrint-Privacy'] && !headers['x-cohrint-privacy']) {
+      headers['X-Cohrint-Privacy'] = _privacy;
     }
   } catch (_) { /* localStorage unavailable — continue without header */ }
 
@@ -4208,7 +4208,7 @@ function testSlack() {
 
 function loadSettings() {
   document.getElementById('settingsApiBase').value = localStorage.getItem('api_base') || 'https://api.cohrint.com';
-  document.getElementById('privacyMode').value = localStorage.getItem('vantage_privacy') || 'strict';
+  document.getElementById('privacyMode').value = localStorage.getItem('cohrint_privacy') || 'strict';
   loadBenchmarkOptIn();
   loadCopilotStatus();
   loadClaudeCodeStatus();
@@ -4530,7 +4530,7 @@ function saveApiBase() {
 
 function savePrivacy() {
   var val = document.getElementById('privacyMode').value;
-  localStorage.setItem('vantage_privacy', val);
+  localStorage.setItem('cohrint_privacy', val);
 }
 
 function loadBenchmarkOptIn() {
