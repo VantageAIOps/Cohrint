@@ -227,7 +227,7 @@ function countTokens(text: string): number {
  * 4. Deduplicate repeated sentences
  * 5. Collapse formatting (multi-spaces, redundant newlines, trailing punctuation)
  */
-function compressPrompt(prompt: string): string {
+function compressPrompt(prompt: string, systemPrompt?: string): string {
   let text = prompt;
 
   // Layer 1: Remove filler phrases
@@ -254,7 +254,32 @@ function compressPrompt(prompt: string): string {
   }
   text = unique.join(' ');
 
-  // Layer 5: Collapse whitespace and formatting
+  // Layer 6: Strip redundant XML wrapper tags that contain only plain text
+  const SAFE_TO_STRIP = ['context', 'input', 'text', 'content', 'prompt', 'data', 'query'];
+  for (const tag of SAFE_TO_STRIP) {
+    text = text.replace(
+      new RegExp(`<${tag}>([^<>]+)</${tag}>`, 'gi'),
+      (_match: string, inner: string) => inner.trim(),
+    );
+  }
+
+  // Layer 7: Remove user-turn constraints already present verbatim in the system prompt
+  if (systemPrompt && systemPrompt.trim().length > 0) {
+    const sysLines = systemPrompt
+      .split(/[.\n]+/)
+      .map((s: string) => s.trim())
+      .filter((s: string) => s.length > 20);
+    for (const sysLine of sysLines) {
+      const sysWords = new Set(sysLine.toLowerCase().split(/\s+/));
+      const resultWords = text.toLowerCase().split(/\s+/);
+      const overlap = resultWords.filter((w: string) => sysWords.has(w)).length;
+      if (sysWords.size > 0 && overlap / sysWords.size >= 0.9) {
+        text = text.replace(sysLine, '').trim();
+      }
+    }
+  }
+
+  // Layer 5: Collapse whitespace and formatting (always last)
   text = text.replace(/\n{3,}/g, '\n\n');        // max 2 newlines
   text = text.replace(/[ \t]{2,}/g, ' ');         // collapse spaces
   text = text.replace(/\s+([.!?,;:])/g, '$1');    // space before punct
@@ -268,6 +293,58 @@ function calcCost(model: string, inputTokens: number, outputTokens: number) {
   const inputCost = (inputTokens / 1000) * rates.input;
   const outputCost = (outputTokens / 1000) * rates.output;
   return { inputCost, outputCost, totalCost: inputCost + outputCost };
+}
+
+interface OptimizationImpact {
+  improvement_factor: number;
+  tokens_saved: number;
+  cost_before_usd: number;
+  cost_after_usd: number;
+  compression_ratio_pct: number;
+  model_switch_multiplier: number | null;
+  combined_multiplier: number;
+}
+
+function computeOptimizationImpact(
+  model: string,
+  originalTokens: number,
+  compressedTokens: number,
+  estimatedOutputTokens: number,
+): OptimizationImpact {
+  const costBefore = calcCost(model, originalTokens, estimatedOutputTokens).totalCost;
+  const costAfter  = calcCost(model, compressedTokens, estimatedOutputTokens).totalCost;
+
+  const improvementFactor =
+    costBefore > 0 && costAfter > 0
+      ? Math.round((costBefore / costAfter) * 10) / 10
+      : 1.0;
+  const compressionRatioPct =
+    originalTokens > 0
+      ? Math.round(((originalTokens - compressedTokens) / originalTokens) * 1000) / 10
+      : 0;
+
+  const cheapest = findCheapest(compressedTokens, estimatedOutputTokens);
+  const currentRates = MODEL_RATES[model] ?? MODEL_RATES['gpt-3.5-turbo'];
+  const cheapestRates = MODEL_RATES[cheapest.model] ?? currentRates;
+  const modelSwitchMultiplier =
+    cheapestRates.input < currentRates.input && cheapest.model !== model
+      ? Math.round((currentRates.input / cheapestRates.input) * 10) / 10
+      : null;
+
+  const combinedMultiplier =
+    modelSwitchMultiplier != null
+      ? Math.round(improvementFactor * modelSwitchMultiplier * 10) / 10
+      : improvementFactor;
+
+  return {
+    improvement_factor: improvementFactor,
+    tokens_saved: originalTokens - compressedTokens,
+    cost_before_usd: Math.round(costBefore * 1_000_000) / 1_000_000,
+    cost_after_usd:  Math.round(costAfter  * 1_000_000) / 1_000_000,
+    compression_ratio_pct: compressionRatioPct,
+    model_switch_multiplier: modelSwitchMultiplier,
+    combined_multiplier: combinedMultiplier,
+  };
 }
 
 /** Find the cheapest model for given token counts. */
@@ -735,19 +812,27 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const prompt = typeof args.prompt === 'string' ? args.prompt : '';
         if (!prompt.trim()) throw new Error('prompt is required — pass a non-empty string to optimize');
         const model = (args.model as string) || 'gpt-4o';
+        const systemPrompt = typeof args.system_prompt === 'string' ? args.system_prompt : undefined;
         const originalTokens = countTokens(prompt);
-        const compressed = compressPrompt(prompt);
+        const compressed = compressPrompt(prompt, systemPrompt);
         const compressedTokens = countTokens(compressed);
         const saved = originalTokens - compressedTokens;
         const tips = getOptimizationTips(prompt);
-        // Use a fixed output estimate (half of original input) so cost comparison is fair
         const estimatedOutputTokens = Math.round(originalTokens / 2);
         const costBefore = calcCost(model, originalTokens, estimatedOutputTokens);
         const costAfter = calcCost(model, compressedTokens, estimatedOutputTokens);
         const cheapest = findCheapest(compressedTokens, estimatedOutputTokens);
+        const impact = computeOptimizationImpact(model, originalTokens, compressedTokens, estimatedOutputTokens);
+
+        const summaryLine = impact.improvement_factor > 1.05
+          ? `✦ Prompt optimized — ${impact.improvement_factor}x cheaper (${impact.compression_ratio_pct}% fewer tokens, ${impact.tokens_saved} tokens saved)`
+          : `✦ Prompt compressed — ${impact.tokens_saved} tokens saved (${impact.compression_ratio_pct}% reduction)`;
+        const tipLine = impact.model_switch_multiplier != null
+          ? `\nTip: switch to ${cheapest.model} for another ${impact.model_switch_multiplier}x savings (combined: ${impact.combined_multiplier}x)`
+          : '';
 
         const lines = [
-          `🔧 **Prompt Optimizer** (${model})`,
+          summaryLine + tipLine,
           ``,
           `| Metric | Before | After | Saved |`,
           `|--------|--------|-------|-------|`,
@@ -758,7 +843,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           ...(tips.length > 0 ? ['**Tips:**', ...tips.map(t => `- ${t}`), ''] : []),
           `💡 Cheapest model for this prompt: **${cheapest.model}** (${cheapest.provider}) at $${cheapest.totalCost.toFixed(6)}`,
         ];
-        return { content: [{ type: 'text', text: lines.join('\n') }] };
+        return {
+          content: [{ type: 'text', text: lines.join('\n') }],
+          optimization_impact: impact,
+        };
       }
 
       case 'analyze_tokens': {
