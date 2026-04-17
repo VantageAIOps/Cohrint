@@ -155,7 +155,7 @@ Client                  Worker                    D1              KV
 ### wrangler.toml Bindings
 
 ```toml
-name = "vantageai-api"
+name = "cohrint-api"
 routes = [{ pattern = "api.cohrint.com/*", zone_name = "cohrint.com" }]
 
 [[d1_databases]]
