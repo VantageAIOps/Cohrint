@@ -15,7 +15,7 @@
 
 import { Hono } from 'hono';
 import type { Bindings, Variables } from '../types';
-import { authMiddleware } from '../middleware/auth';
+import { authMiddleware, hasRole } from '../middleware/auth';
 
 const benchmark = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -334,7 +334,7 @@ benchmark.post('/contribute', authMiddleware, async (c) => {
   // Restrict to owner/admin — any authenticated member triggering this causes
   // an O(N contributors) re-aggregation loop; a viewer should not be able to
   // initiate that workload.
-  if (role !== 'owner' && role !== 'admin') {
+  if (!hasRole(role, 'admin')) {
     return c.json({ error: 'Forbidden — admin or owner required' }, 403);
   }
   const result = await computeAndUpsertContribution(c.env.DB, orgId);

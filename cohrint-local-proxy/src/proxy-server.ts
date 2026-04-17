@@ -31,10 +31,10 @@ export interface LocalProxyConfig {
   port?: number;
 
   /** Cohrint API key for sending stats (crt_... or vnt_...) */
-  vantageApiKey: string;
+  apiKey: string;
 
   /** Cohrint ingest endpoint (default: https://api.cohrint.com) */
-  vantageApiBase?: string;
+  apiBase?: string;
 
   /** Privacy configuration */
   privacy?: PrivacyConfig;
@@ -87,8 +87,8 @@ class StatsQueue {
   private currentSession: ProxySessionRecord;
 
   constructor(
-    private readonly vantageApiKey: string,
-    private readonly vantageApiBase: string,
+    private readonly apiKey: string,
+    private readonly apiBase: string,
     private readonly batchSize: number,
     private readonly flushInterval: number,
     private readonly privacy: PrivacyConfig,
@@ -105,10 +105,10 @@ class StatsQueue {
     if (resumeSessionId) {
       const existing = this.sessionStore.loadSync(resumeSessionId);
       if (existing) {
-        if (this.debug) process.stderr.write(`[vantage-proxy] Resumed session ${resumeSessionId}\n`);
+        if (this.debug) process.stderr.write(`[cohrint-proxy] Resumed session ${resumeSessionId}\n`);
         this.currentSession = existing;
       } else {
-        process.stderr.write(`[vantage-proxy] WARN: session ${resumeSessionId} not found — starting new session\n`);
+        process.stderr.write(`[cohrint-proxy] WARN: session ${resumeSessionId} not found — starting new session\n`);
         this.currentSession = this._newSession(fixedSessionId ?? randomUUID(), orgId, team, environment, now);
       }
     } else {
@@ -157,7 +157,7 @@ class StatsQueue {
     const sanitized = sanitizeEvent(raw, this.privacy);
     this.queue.push({ event: sanitized as unknown as Record<string, unknown>, timestamp: Date.now() });
     if (this.debug) {
-      process.stderr.write(`[vantage-proxy] Queued: ${sanitized.model} ${sanitized.prompt_tokens}→${sanitized.completion_tokens} tokens $${sanitized.cost_total_usd.toFixed(4)}\n`);
+      process.stderr.write(`[cohrint-proxy] Queued: ${sanitized.model} ${sanitized.prompt_tokens}→${sanitized.completion_tokens} tokens $${sanitized.cost_total_usd.toFixed(4)}\n`);
     }
 
     // Persist to session
@@ -191,7 +191,7 @@ class StatsQueue {
     if (this.queue.length === 0) return;
     const batch = this.queue.splice(0, this.batchSize);
     this._send(batch.map((s) => s.event)).catch((err) => {
-      if (this.debug) process.stderr.write(`[vantage-proxy] Flush error: ${err}\n`);
+      if (this.debug) process.stderr.write(`[cohrint-proxy] Flush error: ${err}\n`);
       // Re-queue on failure so stats aren't permanently lost
       this.queue.unshift(...batch);
     });
@@ -204,20 +204,20 @@ class StatsQueue {
       sdk_language: "local-proxy",
     });
     try {
-      const res = await fetch(`${this.vantageApiBase}/v1/events`, {
+      const res = await fetch(`${this.apiBase}/v1/events`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${this.vantageApiKey}`,
+          Authorization: `Bearer ${this.apiKey}`,
         },
         body,
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       if (this.debug) {
-        process.stderr.write(`[vantage-proxy] Sent ${events.length} stats → ${res.status}\n`);
+        process.stderr.write(`[cohrint-proxy] Sent ${events.length} stats → ${res.status}\n`);
       }
     } catch (err) {
-      if (this.debug) process.stderr.write(`[vantage-proxy] Send failed: ${err}\n`);
+      if (this.debug) process.stderr.write(`[cohrint-proxy] Send failed: ${err}\n`);
       throw err; // re-throw so flush() re-queues the batch
     }
   }
@@ -302,8 +302,8 @@ function sendJson(res: ServerResponse, status: number, data: unknown): void {
 export function startProxyServer(config: LocalProxyConfig): void {
   const {
     port = 4891,
-    vantageApiKey,
-    vantageApiBase = "https://api.cohrint.com",
+    apiKey,
+    apiBase = "https://api.cohrint.com",
     privacy = DEFAULT_PRIVACY,
     team = "",
     environment = "production",
@@ -314,10 +314,10 @@ export function startProxyServer(config: LocalProxyConfig): void {
     sessionId,
   } = config;
 
-  const orgId = vantageApiKey.split("_")[1] ?? "default";
+  const orgId = apiKey.split("_")[1] ?? "default";
 
   const statsQueue = new StatsQueue(
-    vantageApiKey, vantageApiBase, batchSize, flushInterval, privacy, debug,
+    apiKey, apiBase, batchSize, flushInterval, privacy, debug,
     orgId, team, environment, resumeSessionId, sessionId,
   );
   statsQueue.start();
@@ -340,7 +340,7 @@ export function startProxyServer(config: LocalProxyConfig): void {
     if (url === "/health" && method === "GET") {
       return sendJson(res, 200, {
         status: "ok",
-        proxy: "vantage-local-proxy",
+        proxy: "cohrint-local-proxy",
         privacy: privacy.level,
         org: orgId,
         uptime: process.uptime(),
@@ -383,7 +383,7 @@ export function startProxyServer(config: LocalProxyConfig): void {
           "System prompts",
           "User data in prompts",
         ],
-        what_is_sent_to_vantage: [
+        what_is_sent_to_cohrint: [
           "Model name (e.g., gpt-4o)",
           "Provider (e.g., openai)",
           "Token counts (prompt_tokens, completion_tokens)",
@@ -483,7 +483,7 @@ export function startProxyServer(config: LocalProxyConfig): void {
 
     try {
       const targetUrl = `${targetBase}${targetPath}`;
-      if (debug) process.stderr.write(`[vantage-proxy] → ${provider} ${targetPath}\n`);
+      if (debug) process.stderr.write(`[cohrint-proxy] → ${provider} ${targetPath}\n`);
 
       const fetchController = new AbortController();
       const fetchTimeout = setTimeout(() => fetchController.abort(), 5 * 60 * 1000);
@@ -538,7 +538,7 @@ export function startProxyServer(config: LocalProxyConfig): void {
             }
           } catch (e) {
             // Stream interrupted — close response cleanly
-            if (debug) process.stderr.write(`[vantage-proxy] Stream interrupted: ${e}\n`);
+            if (debug) process.stderr.write(`[cohrint-proxy] Stream interrupted: ${e}\n`);
             if (!res.writableEnded) res.end();
           } finally {
             reader.releaseLock();

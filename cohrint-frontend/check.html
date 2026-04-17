@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
-<title>Vantage — Deployment Check</title>
+<title>Cohrint — Deployment Check</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#080c0f;color:#e8edf2;font-family:'DM Mono',monospace;padding:40px 24px;font-size:13px}
@@ -38,7 +38,7 @@ h1{color:#00d4a1;margin-bottom:8px;font-size:18px}
 </head>
 <body>
 
-<h1>&#9989; Vantage — Deployment Check</h1>
+<h1>&#9989; Cohrint — Deployment Check</h1>
 <p class="sub">Verifies all required files are accessible on this Cloudflare Pages deployment.</p>
 
 <div id="summary-box"></div>
@@ -69,7 +69,7 @@ const FILES = [
   { group:"Pages", file:"/docs.html",         label:"docs.html",         desc:"Documentation",          critical:false },
   { group:"Pages", file:"/signup.html",       label:"signup.html",       desc:"Waitlist",               critical:false },
   { group:"Pages", file:"/check.html",        label:"check.html",        desc:"This page",              critical:false },
-  { group:"JS",    file:"/vantage-models.js", label:"vantage-models.js", desc:"AI model pricing data",  critical:true  },
+  { group:"JS",    file:"/cohrint-models.js", label:"cohrint-models.js", desc:"AI model pricing data",  critical:true  },
   { group:"JS",    file:"/seed-data.js",      label:"seed-data.js",      desc:"Test data generator",    critical:true  },
   { group:"Config",file:"/_redirects",        label:"_redirects",        desc:"URL routing rules",      critical:false },
 ];

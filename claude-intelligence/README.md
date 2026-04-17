@@ -12,7 +12,7 @@ Plug-and-play Claude Code setup: hooks, agents, and settings templates that make
 | `pre-commit.sh` | `.claude/hooks/pre-commit.sh` | Blocks commits if TS check / lint / tests fail |
 | `lint-on-save.sh` | `.claude/hooks/lint-on-save.sh` | Auto-formats files after every Edit/Write |
 | `claude-md-enforcer.sh` | `.claude/hooks/claude-md-enforcer.sh` | Warns when CLAUDE.md exceeds 100 lines |
-| `vantage-track.js` | `.claude/hooks/vantage-track.js` | Posts Claude Code token costs to Cohrint (optional) |
+| `cohrint-track.js` | `.claude/hooks/cohrint-track.js` | Posts Claude Code token costs to Cohrint (optional) |
 | `agents/code-reviewer.md` | `.claude/agents/code-reviewer.md` | Reviews code for bugs, security, performance |
 | `agents/test-writer.md` | `.claude/agents/test-writer.md` | Writes comprehensive test suites |
 | `agents/debugger.md` | `.claude/agents/debugger.md` | Systematic root-cause bug diagnosis |
@@ -20,7 +20,7 @@ Plug-and-play Claude Code setup: hooks, agents, and settings templates that make
 ## Prerequisites
 
 - [Claude Code CLI](https://claude.ai/code) installed (`~/.claude/` must exist)
-- Node.js 18+ (for `vantage-track.js`)
+- Node.js 18+ (for `cohrint-track.js`)
 - bash
 
 ## One-command install
@@ -58,7 +58,7 @@ Run from your project root. The script is interactive — it will ask before ove
 
 **`claude-md-enforcer.sh`** — Monitors CLAUDE.md length. Emits a system message if it exceeds 100 lines, prompting Claude to compress it.
 
-**`vantage-track.js`** — Reads Claude Code session `.jsonl` files from `~/.claude/projects/` and posts token usage + cost data to [Cohrint](https://cohrint.com). Requires a free API key. Silent on errors — never breaks Claude Code.
+**`cohrint-track.js`** — Reads Claude Code session `.jsonl` files from `~/.claude/projects/` and posts token usage + cost data to [Cohrint](https://cohrint.com). Requires a free API key. Silent on errors — never breaks Claude Code.
 
 ### Agents
 
@@ -73,7 +73,7 @@ Run from your project root. The script is interactive — it will ask before ove
 `settings.json` configures:
 - **Model**: `claude-sonnet-4-6`
 - **Permissions**: broad allow list for common dev tools, deny list for destructive commands
-- **Hooks**: wires pre-commit, lint-on-save, and vantage-track to the right events
+- **Hooks**: wires pre-commit, lint-on-save, and cohrint-track to the right events
 
 ### CLAUDE.md
 

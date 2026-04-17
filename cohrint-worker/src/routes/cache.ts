@@ -174,7 +174,7 @@ cache.post('/store', async (c) => {
   }]);
 
   // Persist to D1
-  const promptHash = body.prompt_hash ?? body.prompt.slice(0, 16);
+  const promptHash = body.prompt_hash ?? null;
   await c.env.DB
     .prepare(`INSERT INTO semantic_cache_entries
               (id, org_id, team_id, prompt_hash, prompt_text, model, response_text,

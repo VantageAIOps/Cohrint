@@ -6,13 +6,13 @@ compatibility_date = "2024-09-23"
 binding = "AI"
 
 [[kv_namespaces]]
-binding = "VEGA_KV"
+binding = "COHRINT_KV"
 id = "3711f2ed67a04f7a981eb1ab33634313"
 preview_id = "8ad5c76d2e4b469096e2800dfa071948"
 
 [vars]
 RESEND_FROM = "vega@cohrint.com"
 SUPPORT_EMAIL = "support@cohrint.com"
-VANTAGE_API_URL = "https://api.cohrint.com"
+COHRINT_API_URL = "https://api.cohrint.com"
 # Required secrets (set via `npx wrangler secret put <NAME>` — never commit values):
 #   RESEND_API_KEY   — Resend API key for outbound ticket emails

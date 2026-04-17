@@ -163,7 +163,8 @@ export async function maybeSendBudgetAlert(
   const alreadySent = await kv.get(throttleKey);
   if (alreadySent) return;
 
-  const slackUrl = await kv.get(`slack:${orgId}`);
+  const slackUrl = await kv.get(`slack:${orgId}`)
+    ?? (await db.prepare('SELECT slack_url FROM alert_configs WHERE org_id = ?').bind(orgId).first<{ slack_url: string }>())?.slack_url;
   if (!slackUrl) return;
 
   const emoji = pct >= 100 ? '🚨' : '⚠️';

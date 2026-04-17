@@ -15,7 +15,7 @@ function score(text: string, query: string): number {
 async function loadDocChunks(
   env: Env
 ): Promise<Array<{ heading: string; body: string }>> {
-  const raw = await env.VEGA_KV.get("docs:chunks");
+  const raw = await env.COHRINT_KV.get("docs:chunks");
   if (!raw) return [];
   try {
     return JSON.parse(raw) as Array<{ heading: string; body: string }>;

@@ -36,10 +36,10 @@ auth.post('/signup', async (c) => {
     : 'organization';
 
   // Rate limit signup: 30 per IP per hour (degrade gracefully if KV unavailable)
-  // CI bypass: X-Vantage-CI header with matching secret skips rate limiting
+  // CI bypass: X-Cohrint-CI header with matching secret skips rate limiting (X-Vantage-CI accepted for backward compat)
   try {
-    const ciBypass = c.req.header('X-Vantage-CI');
-    const ciSecret = c.env.VANTAGE_CI_SECRET;
+    const ciBypass = c.req.header('X-Cohrint-CI') ?? c.req.header('X-Vantage-CI');
+    const ciSecret = c.env.COHRINT_CI_SECRET ?? c.env.VANTAGE_CI_SECRET;
     if (!(ciBypass && ciSecret && ciBypass === ciSecret)) {
       const ip = c.req.header('CF-Connecting-IP') ?? 'unknown';
       const rlKey = `rl:signup:${ip}`;
@@ -224,14 +224,23 @@ auth.post('/recover/redeem', async (c) => {
     return c.json({ error: 'invalid' }, 400);
   }
 
-  // Validate IP binding — token is only redeemable from the IP that requested it.
-  // Tokens with ip='unknown' (no CF-Connecting-IP at issue time) are only accepted
-  // when the redeeming request also has no CF-Connecting-IP, preventing cross-IP transfer.
+  // IP check with attempt throttle — mismatches are logged and tracked but the token
+  // is NOT immediately burned. NAT/proxy rotation can legitimately change the egress IP
+  // between issue and redeem, so hard-burning on first mismatch permanently locks out
+  // valid users with no recovery path. Instead, allow up to 3 attempts from different
+  // IPs before consuming the token as a brute-force circuit-breaker.
   const redeemIp = c.req.header('CF-Connecting-IP') ?? 'unknown';
-  if (payload.ip && payload.ip !== redeemIp) {
-    // Consume token on IP mismatch to prevent brute-force probing
-    await c.env.KV.delete(`recover:${token}`);
-    return c.json({ error: 'expired' }, 410);
+  if (payload.ip && payload.ip !== 'unknown' && payload.ip !== redeemIp) {
+    const attemptKey = `recover-attempt:${token}`;
+    const attempts = parseInt(await c.env.KV.get(attemptKey) ?? '0', 10) + 1;
+    console.warn('[cohrint] recover/redeem IP mismatch — issued from', payload.ip, 'redeemed from', redeemIp, `(attempt ${attempts})`);
+    if (attempts >= 3) {
+      await c.env.KV.delete(`recover:${token}`);
+      await c.env.KV.delete(attemptKey);
+      return c.json({ error: 'expired' }, 410);
+    }
+    await c.env.KV.put(attemptKey, String(attempts), { expirationTtl: 3600 });
+    return c.json({ error: 'ip_mismatch' }, 403);
   }
 
   // Consume the token immediately (single-use)
@@ -386,9 +395,10 @@ auth.patch('/members/:id', authMiddleware, adminOnly, async (c) => {
     const updaterRole = c.get('role') as string;
     const { hasRole: hr } = await import('../middleware/auth');
     // Can only assign roles up to your own level
-    if (VALID_ROLES.includes(body.role) && hr(updaterRole, body.role as import('../types').OrgRole)) {
-      updates.push('role = ?'); params.push(body.role);
+    if (!VALID_ROLES.includes(body.role) || !hr(updaterRole, body.role as import('../types').OrgRole)) {
+      return c.json({ error: 'Insufficient privilege to assign that role.' }, 403);
     }
+    updates.push('role = ?'); params.push(body.role);
   }
   if ('scope_team' in body) {
     const st = body.scope_team ?? null;

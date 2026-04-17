@@ -6,22 +6,22 @@ import { sanitize } from "./sanitize";
 import { checkRateLimit } from "./ratelimit";
 // randomUUID is available as a global in the Workers runtime
 
-/** Resolve the org's actual plan from the Vantage session API.
+/** Resolve the org's actual plan from the Cohrint session API.
  *  Falls back to "free" on any error so the chat remains usable. */
 async function resolveOrgPlan(token: string | undefined, env: Env): Promise<string> {
-  if (!token || !env.VANTAGE_API_URL) return "free";
+  if (!token || !env.COHRINT_API_URL) return "free";
   const cacheKey = `plan:${token.slice(-16)}`;
-  const cached = await env.VEGA_KV.get(cacheKey);
+  const cached = await env.COHRINT_KV.get(cacheKey);
   if (cached) return cached;
   try {
-    const res = await fetch(`${env.VANTAGE_API_URL}/v1/auth/session`, {
+    const res = await fetch(`${env.COHRINT_API_URL}/v1/auth/session`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) return "free";
     const data = await res.json() as { plan?: string };
     const plan = data.plan ?? "free";
     // Cache for 5 minutes to avoid per-request latency
-    await env.VEGA_KV.put(cacheKey, plan, { expirationTtl: 300 });
+    await env.COHRINT_KV.put(cacheKey, plan, { expirationTtl: 300 });
     return plan;
   } catch {
     return "free";

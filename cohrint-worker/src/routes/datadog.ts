@@ -3,7 +3,7 @@
  *
  * Pushes per-developer AI cost metrics from cross_platform_usage into an
  * org's own Datadog account. Additive — does not replace existing Datadog
- * dashboards; it simply adds vantage.ai.* metrics to them.
+ * dashboards; it simply adds cohrint.ai.* metrics to them.
  *
  * Endpoints (all require auth):
  *   POST   /v1/datadog/connect   — admin/owner only. Validate + store Datadog API key.
@@ -14,8 +14,8 @@
  *   syncDatadogMetrics(env, orgId?) — called from cron. Idempotent daily push.
  *
  * Metrics pushed:
- *   vantage.ai.cost_usd   — gauge, tags: provider, model, developer_id, org_id
- *   vantage.ai.tokens     — gauge, tags: provider, model, developer_id, org_id
+ *   cohrint.ai.cost_usd   — gauge, tags: provider, model, developer_id, org_id
+ *   cohrint.ai.tokens     — gauge, tags: provider, model, developer_id, org_id
  *
  * Key storage:
  *   Datadog API keys are AES-256-GCM encrypted (same HKDF as copilot.ts)
@@ -28,7 +28,7 @@
 
 import { Hono } from 'hono';
 import type { Bindings, Variables } from '../types';
-import { authMiddleware } from '../middleware/auth';
+import { authMiddleware, hasRole } from '../middleware/auth';
 
 const datadog = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -251,7 +251,7 @@ export async function syncDatadogMetricsForOrg(
     ];
 
     series.push({
-      metric: 'vantage.ai.cost_usd',
+      metric: 'cohrint.ai.cost_usd',
       type: 1,
       points: [{ timestamp: ts, value: Number(row.cost_usd) }],
       tags,
@@ -260,7 +260,7 @@ export async function syncDatadogMetricsForOrg(
     const totalTokens = Number(row.input_tokens) + Number(row.output_tokens);
     if (totalTokens > 0) {
       series.push({
-        metric: 'vantage.ai.tokens',
+        metric: 'cohrint.ai.tokens',
         type: 1,
         points: [{ timestamp: ts, value: totalTokens }],
         tags,
@@ -330,7 +330,7 @@ datadog.post('/connect', async (c) => {
   const orgId = c.get('orgId');
   const role  = c.get('role');
 
-  if (role !== 'owner' && role !== 'admin') {
+  if (!hasRole(role, 'admin')) {
     return c.json({ error: 'Forbidden — admin or owner required' }, 403);
   }
 
@@ -386,7 +386,7 @@ datadog.delete('/connect', async (c) => {
   const orgId = c.get('orgId');
   const role  = c.get('role');
 
-  if (role !== 'owner' && role !== 'admin') {
+  if (!hasRole(role, 'admin')) {
     return c.json({ error: 'Forbidden — admin or owner required' }, 403);
   }
 
@@ -406,7 +406,7 @@ datadog.delete('/connect', async (c) => {
 datadog.get('/status', async (c) => {
   const orgId   = c.get('orgId');
   const role    = c.get('role');
-  const isAdmin = role === 'owner' || role === 'admin';
+  const isAdmin = hasRole(role, 'admin');
 
   if (!isAdmin) {
     return c.json({ error: 'Forbidden — admin or owner required' }, 403);

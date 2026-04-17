@@ -278,7 +278,7 @@ otel.post('/v1/metrics', async (c) => {
             ?? inferModelFromServiceName(serviceName);
           const tokenType = getAttr(metricAttrs, 'type') ?? getAttr(metricAttrs, 'gen_ai.token.type');
           const value = getNumericValue(dp);
-          const ts = dp.timeUnixNano ? new Date(parseInt(dp.timeUnixNano) / 1e6).toISOString() : new Date().toISOString();
+          const ts = dp.timeUnixNano ? new Date(Number(BigInt(dp.timeUnixNano) / 1_000_000n)).toISOString() : new Date().toISOString();
 
           const record: ParsedOTelRecord = {
             org_id: orgId,
@@ -416,7 +416,7 @@ otel.post('/v1/metrics', async (c) => {
           const histAttrs = hp.attributes ?? [];
           const model = getAttr(histAttrs, 'gen_ai.request.model') ?? getAttr(histAttrs, 'model');
           const tokenType = getAttr(histAttrs, 'gen_ai.token.type') ?? getAttr(histAttrs, 'type');
-          const ts = hp.timeUnixNano ? new Date(parseInt(hp.timeUnixNano) / 1e6).toISOString() : new Date().toISOString();
+          const ts = hp.timeUnixNano ? new Date(Number(BigInt(hp.timeUnixNano) / 1_000_000n)).toISOString() : new Date().toISOString();
 
           if (metric.name === 'gen_ai.client.token.usage' && hp.sum !== undefined) {
             const record: ParsedOTelRecord = {
@@ -610,8 +610,14 @@ otel.post('/v1/metrics', async (c) => {
       }
     }
 
-    // Invalidate analytics summary cache for this org
-    try { await c.env.KV.delete(`analytics:summary:${orgId}`); } catch { /* best-effort */ }
+    // Invalidate analytics cache for this org (all prefixes including team-scoped variants)
+    try {
+      const prefixes = [`analytics:summary:${orgId}:`, `analytics:kpis:${orgId}:`, `analytics:timeseries:${orgId}:`];
+      await Promise.all(prefixes.map(async (p) => {
+        const listed = await c.env.KV.list({ prefix: p });
+        if (listed.keys.length > 0) await Promise.all(listed.keys.map(k => c.env.KV.delete(k.name)));
+      }));
+    } catch { /* best-effort */ }
 
     // Broadcast all token records to KV circular buffer for SSE live feed
     for (const r of tokenRecords) {
@@ -694,7 +700,7 @@ otel.post('/v1/logs', async (c) => {
         const cacheReadTokens = parseInt(getAttr(logAttrs, 'cache_read_tokens') ?? '0', 10);
         const durationMs = parseFloat(getAttr(logAttrs, 'duration_ms') ?? '0');
         const ts = log.timeUnixNano
-          ? new Date(parseInt(log.timeUnixNano) / 1e6).toISOString()
+          ? new Date(Number(BigInt(log.timeUnixNano) / 1_000_000n)).toISOString()
           : new Date().toISOString();
 
         // Store api_request events as usage records (most valuable)

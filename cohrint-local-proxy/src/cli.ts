@@ -3,16 +3,16 @@
  * CLI entry point for Cohrint Local Proxy.
  *
  * Usage:
- *   vantage-proxy                                # proxy mode (default)
- *   vantage-proxy --resume <session_id>          # resume existing session
- *   vantage-proxy --session-id <uuid>            # start with specific session ID
- *   vantage-proxy scan                           # scan all local AI tool sessions
- *   vantage-proxy scan --tool claude-code         # scan specific tool
- *   vantage-proxy scan --since 2026-03-01         # filter by date
- *   vantage-proxy scan --json                     # output raw JSON
- *   vantage-proxy scan --push                     # scan + push to Cohrint API
- *   vantage-proxy --port 4891 --privacy strict    # proxy with options
- *   COHRINT_API_KEY=crt_... vantage-proxy
+ *   cohrint-proxy                                # proxy mode (default)
+ *   cohrint-proxy --resume <session_id>          # resume existing session
+ *   cohrint-proxy --session-id <uuid>            # start with specific session ID
+ *   cohrint-proxy scan                           # scan all local AI tool sessions
+ *   cohrint-proxy scan --tool claude-code         # scan specific tool
+ *   cohrint-proxy scan --since 2026-03-01         # filter by date
+ *   cohrint-proxy scan --json                     # output raw JSON
+ *   cohrint-proxy scan --push                     # scan + push to Cohrint API
+ *   cohrint-proxy --port 4891 --privacy strict    # proxy with options
+ *   COHRINT_API_KEY=crt_... cohrint-proxy
  */
 
 import { readFile, writeFile } from "node:fs/promises";
@@ -69,22 +69,22 @@ if (command === "scan") {
 } else {
   // ── PROXY command (default) ──────────────────────────────────────────────
 
-  const vantageApiKey = args["api-key"] ?? process.env.COHRINT_API_KEY ?? process.env.VANTAGE_API_KEY ?? "";
-  if (!vantageApiKey) {
+  const apiKey = args["api-key"] ?? process.env.COHRINT_API_KEY ?? process.env.VANTAGE_API_KEY ?? "";
+  if (!apiKey) {
     console.error(`
 ERROR: COHRINT_API_KEY is required.
 
 Set it via environment variable or --api-key flag:
 
   export COHRINT_API_KEY=crt_yourorg_abc123
-  vantage-proxy
+  cohrint-proxy
 
   # or
-  vantage-proxy --api-key crt_yourorg_abc123
+  cohrint-proxy --api-key crt_yourorg_abc123
 
 Get your key at: https://cohrint.com/signup.html
 
-TIP: Use "vantage-proxy scan" to scan local AI tool sessions (no API key needed).
+TIP: Use "cohrint-proxy scan" to scan local AI tool sessions (no API key needed).
 `);
     process.exit(1);
   }
@@ -97,8 +97,8 @@ TIP: Use "vantage-proxy scan" to scan local AI tool sessions (no API key needed)
 
   startProxyServer({
     port: parseInt(args["port"] ?? process.env.COHRINT_PROXY_PORT ?? process.env.VANTAGE_PROXY_PORT ?? "4891", 10),
-    vantageApiKey,
-    vantageApiBase: args["api-base"] ?? process.env.COHRINT_API_BASE ?? process.env.VANTAGE_API_BASE ?? "https://api.cohrint.com",
+    apiKey: apiKey,
+    apiBase: args["api-base"] ?? process.env.COHRINT_API_BASE ?? process.env.VANTAGE_API_BASE ?? "https://api.cohrint.com",
     privacy: {
       level: privacyLevel,
       redactModelNames: args["redact-models"] === "true",
@@ -249,7 +249,7 @@ async function pushScanResults(
   console.log("  Pushing scan results to Cohrint...");
 
   // Load dedup state — skip turns already uploaded
-  const stateFile = join(homedir(), ".claude", "vantage-state.json");
+  const stateFile = join(homedir(), ".claude", "cohrint-state.json");
   let uploadedIds: Set<string> = new Set();
   try {
     const raw = await readFile(stateFile, "utf-8");

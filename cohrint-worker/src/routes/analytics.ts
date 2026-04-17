@@ -108,7 +108,7 @@ analytics.get('/summary', async (c) => {
     orgPlan = org?.plan ?? 'free';
   }
 
-  const t = totals.results[0] as Record<string, number>;
+  const t = (totals.results[0] ?? {}) as Record<string, number>;
   const s = (session.results[0] as Record<string, number>) ?? {};
   const budgetPct = budgetUsd > 0
     ? Math.round(((mtd?.mtd_cost_usd ?? 0) / budgetUsd) * 100)

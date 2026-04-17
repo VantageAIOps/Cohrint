@@ -22,7 +22,7 @@
 
 import { Hono } from 'hono';
 import type { Bindings, Variables } from '../types';
-import { authMiddleware } from '../middleware/auth';
+import { authMiddleware, hasRole } from '../middleware/auth';
 
 const copilot = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -427,7 +427,7 @@ copilot.post('/connect', async (c) => {
   const orgId = c.get('orgId');
   const role  = c.get('role');
 
-  if (role !== 'owner' && role !== 'admin') {
+  if (!hasRole(role, 'admin')) {
     return c.json({ error: 'Forbidden — admin or owner required' }, 403);
   }
 
@@ -495,7 +495,7 @@ copilot.delete('/connect', async (c) => {
   const orgId = c.get('orgId');
   const role  = c.get('role');
 
-  if (role !== 'owner' && role !== 'admin') {
+  if (!hasRole(role, 'admin')) {
     return c.json({ error: 'Forbidden — admin or owner required' }, 403);
   }
 
@@ -522,7 +522,7 @@ copilot.delete('/connect', async (c) => {
 copilot.get('/status', async (c) => {
   const orgId = c.get('orgId');
   const role  = c.get('role');
-  const isAdmin = role === 'owner' || role === 'admin';
+  const isAdmin = hasRole(role, 'admin');
 
   const rows = await c.env.DB.prepare(
     `SELECT github_org, status, last_synced_at, last_error, created_at

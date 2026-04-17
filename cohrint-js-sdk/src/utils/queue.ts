@@ -39,15 +39,15 @@ export class EventQueue {
   enqueue(event: VantageEvent): void {
     if (this.queue.length >= this.maxSize) {
       if (this.queue.length === this.maxSize) {
-        console.warn("[vantage] Event queue full (10k). Dropping event.");
+        console.warn("[cohrint] Event queue full (10k). Dropping event.");
       }
       return;
     }
     if (this.queue.length >= this.maxSize * 0.8 && this.queue.length % 500 === 0) {
-      console.warn(`[vantage] Queue at ${this.queue.length} events — consider flushing more frequently.`);
+      console.warn(`[cohrint] Queue at ${this.queue.length} events — consider flushing more frequently.`);
     }
     this.queue.push({ event, retries: 0 });
-    if (this.debug) console.debug(`[vantage] Enqueued event ${event.eventId} (queue size: ${this.queue.length})`);
+    if (this.debug) console.debug(`[cohrint] Enqueued event ${event.eventId} (queue size: ${this.queue.length})`);
   }
 
   flush(): void {
@@ -57,13 +57,13 @@ export class EventQueue {
     const batch = this.queue.splice(0, this.batchSize);
     this._send(batch)
       .catch((err) => {
-        if (this.debug) console.warn("[vantage] Flush error:", err);
+        if (this.debug) console.warn("[cohrint] Flush error:", err);
         // Re-queue only items that have not exceeded max retries
         const retryable = batch
           .map((item) => ({ ...item, retries: item.retries + 1 }))
           .filter((item) => {
             if (item.retries >= MAX_RETRIES) {
-              if (this.debug) console.warn(`[vantage] Dropping event ${item.event.eventId} after ${MAX_RETRIES} failures.`);
+              if (this.debug) console.warn(`[cohrint] Dropping event ${item.event.eventId} after ${MAX_RETRIES} failures.`);
               return false;
             }
             return true;
@@ -82,7 +82,7 @@ export class EventQueue {
     });
 
     try {
-      const res = await fetch(`${this.ingestUrl}/v1/events`, {
+      const res = await fetch(`${this.ingestUrl}/v1/events/batch`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -91,9 +91,9 @@ export class EventQueue {
         body,
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      if (this.debug) console.debug(`[vantage] Sent ${items.length} events → ${res.status}`);
+      if (this.debug) console.debug(`[cohrint] Sent ${items.length} events → ${res.status}`);
     } catch (err) {
-      if (this.debug) console.warn("[vantage] Ingest failed:", err);
+      if (this.debug) console.warn("[cohrint] Ingest failed:", err);
       throw err; // re-throw so flush() re-queues the batch
     }
   }

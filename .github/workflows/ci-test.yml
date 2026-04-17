@@ -128,7 +128,7 @@ jobs:
           HEADLESS: "1"
           VANTAGE_SITE_URL: "https://cohrint.com"
           VANTAGE_API_URL: "https://api.cohrint.com"
-          VANTAGE_CI_SECRET: ${{ secrets.VANTAGE_CI_SECRET }}
+          COHRINT_CI_SECRET: ${{ secrets.COHRINT_CI_SECRET }}
           EMAIL: ${{ secrets.EMAIL }}
           PASSWORD: ${{ secrets.PASSWORD }}
         run: |
@@ -208,7 +208,7 @@ jobs:
           HEADLESS: "1"
           VANTAGE_SITE_URL: "https://cohrint.com"
           VANTAGE_API_URL: "https://api.cohrint.com"
-          VANTAGE_CI_SECRET: ${{ secrets.VANTAGE_CI_SECRET }}
+          COHRINT_CI_SECRET: ${{ secrets.COHRINT_CI_SECRET }}
           EMAIL: ${{ secrets.EMAIL }}
           PASSWORD: ${{ secrets.PASSWORD }}
         run: |
@@ -278,7 +278,7 @@ jobs:
           HEADLESS: "1"
           VANTAGE_SITE_URL: "https://cohrint.com"
           VANTAGE_API_URL: "https://api.cohrint.com"
-          VANTAGE_CI_SECRET: ${{ secrets.VANTAGE_CI_SECRET }}
+          COHRINT_CI_SECRET: ${{ secrets.COHRINT_CI_SECRET }}
           EMAIL: ${{ secrets.EMAIL }}
           PASSWORD: ${{ secrets.PASSWORD }}
         run: |
@@ -323,7 +323,7 @@ jobs:
           HEADLESS: "1"
           VANTAGE_SITE_URL: "https://cohrint.com"
           VANTAGE_API_URL: "https://api.cohrint.com"
-          VANTAGE_CI_SECRET: ${{ secrets.VANTAGE_CI_SECRET }}
+          COHRINT_CI_SECRET: ${{ secrets.COHRINT_CI_SECRET }}
           EMAIL: ${{ secrets.EMAIL }}
           PASSWORD: ${{ secrets.PASSWORD }}
         run: |

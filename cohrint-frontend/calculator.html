@@ -188,6 +188,7 @@ footer a:hover{color:var(--text)}
   .cost-bar-cell{display:none}
 }
 </style>
+<script src="/cohrint-models.js"></script>
 </head>
 <body>
 
@@ -296,30 +297,17 @@ footer a:hover{color:var(--text)}
 </footer>
 
 <script>
-// ── Pricing DB ────────────────────────────────────────────────────────────────
-const MODELS = [
-  {provider:"openai",  model:"gpt-4o",              input:2.50,  output:10.00, context:128,  tier:"frontier"},
-  {provider:"openai",  model:"gpt-4o-mini",          input:0.15,  output:0.60,  context:128,  tier:"fast"},
-  {provider:"openai",  model:"o1",                   input:15.00, output:60.00, context:200,  tier:"frontier"},
-  {provider:"openai",  model:"o3-mini",              input:1.10,  output:4.40,  context:200,  tier:"mid"},
-  {provider:"openai",  model:"gpt-3.5-turbo",        input:0.50,  output:1.50,  context:16,   tier:"fast"},
-  {provider:"anthropic",model:"claude-opus-4-6",     input:15.00, output:75.00, context:200,  tier:"frontier"},
-  {provider:"anthropic",model:"claude-sonnet-4-6",   input:3.00,  output:15.00, context:200,  tier:"mid"},
-  {provider:"anthropic",model:"claude-haiku-4-5",    input:0.80,  output:4.00,  context:200,  tier:"fast"},
-  {provider:"anthropic",model:"claude-3-5-sonnet",   input:3.00,  output:15.00, context:200,  tier:"mid"},
-  {provider:"anthropic",model:"claude-3-haiku",      input:0.25,  output:1.25,  context:200,  tier:"fast"},
-  {provider:"google",  model:"gemini-1.5-pro",       input:1.25,  output:5.00,  context:1000, tier:"frontier"},
-  {provider:"google",  model:"gemini-1.5-flash",     input:0.075, output:0.30,  context:1000, tier:"fast"},
-  {provider:"google",  model:"gemini-2.0-flash",     input:0.10,  output:0.40,  context:1000, tier:"fast"},
-  {provider:"google",  model:"gemini-1.5-flash-8b",  input:0.0375,output:0.15,  context:1000, tier:"fast"},
-  {provider:"mistral", model:"mistral-large-latest", input:2.00,  output:6.00,  context:131,  tier:"frontier"},
-  {provider:"mistral", model:"mistral-small-latest", input:0.10,  output:0.30,  context:131,  tier:"fast"},
-  {provider:"meta",    model:"llama-3.3-70b",        input:0.23,  output:0.40,  context:128,  tier:"mid"},
-  {provider:"meta",    model:"llama-3.1-8b",         input:0.05,  output:0.08,  context:128,  tier:"fast"},
-  {provider:"meta",    model:"llama-3.1-405b",       input:3.00,  output:3.00,  context:128,  tier:"frontier"},
-];
+// ── Pricing DB — sourced from cohrint-models.js (single source of truth) ──────
+const MODELS = (typeof COHRINT_MODELS !== "undefined" ? COHRINT_MODELS : []).map(m => ({
+  provider: m.provider,
+  model:    m.name,
+  input:    m.input,
+  output:   m.output,
+  context:  m.context,
+  tier:     m.tier,
+}));
 
-const PROVIDER_COLORS = {openai:"#74aa9c",anthropic:"#d97757",google:"#4285f4",mistral:"#f97316",meta:"#0866ff"};
+const PROVIDER_COLORS = {openai:"#74aa9c",anthropic:"#d97757",google:"#4285f4",mistral:"#f97316",meta:"#a78bfa",cohere:"#06b6d4",xai:"#e2e8f0"};
 const TIER_TAGS = {frontier:"frontier",mid:"mid",fast:"fast & cheap"};
 
 let activeFilter = "all";
@@ -393,13 +381,42 @@ function update() {
     monthly:  calcCost(m, prompt, completion) * requests,
   })).sort((a,b)=>a.monthly-b.monthly);
 
+  if (!results.length) {
+    const sc = document.getElementById('summary-cards');
+    const rt = document.getElementById('results-table');
+    if (sc) sc.textContent = 'No models match the current filters.';
+    if (rt) rt.textContent = '';
+    return;
+  }
   const cheapest = results[0].monthly;
   const mostExpensive = results[results.length-1].monthly;
 
   // Summary cards
   const bestModel = results[0];
-  const currentModel = results.find(r=>r.model==="gpt-4o") || results[results.length-1];
-  const saving = currentModel.monthly - bestModel.monthly;
+  const gpt4oModel = results.find(r=>r.model==="gpt-4o");
+  const saving = gpt4oModel ? gpt4oModel.monthly - bestModel.monthly : null;
+
+  const compCard = gpt4oModel
+    ? `<div class="sum-card">
+        <div class="sum-label">GPT-4o equivalent</div>
+        <div class="sum-val">${fmt(gpt4oModel.monthly)}<span style="font-size:16px;color:var(--muted)">/mo</span></div>
+        <div class="sum-sub">Most common starting model</div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-label">Potential saving</div>
+        <div class="sum-val" style="color:var(--accent)">${fmt(saving)}<span style="font-size:16px">/mo</span></div>
+        <div class="sum-sub">Switching from GPT-4o \u2192 ${escapeHtml(bestModel.model)}</div>
+      </div>`
+    : `<div class="sum-card">
+        <div class="sum-label">Most expensive shown</div>
+        <div class="sum-val">${fmt(results[results.length-1].monthly)}<span style="font-size:16px;color:var(--muted)">/mo</span></div>
+        <div class="sum-sub">${escapeHtml(results[results.length-1].model)}</div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-label">Potential saving</div>
+        <div class="sum-val" style="color:var(--accent)">${fmt(results[results.length-1].monthly - bestModel.monthly)}<span style="font-size:16px">/mo</span></div>
+        <div class="sum-sub">Switching to ${escapeHtml(bestModel.model)}</div>
+      </div>`;
 
   document.getElementById("summary-row").innerHTML = `
     <div class="sum-card highlight">
@@ -407,16 +424,7 @@ function update() {
       <div class="sum-val">${fmt(bestModel.monthly)}<span style="font-size:16px;color:var(--muted)">/mo</span></div>
       <div class="sum-sub">${escapeHtml(bestModel.model)} · ${fmtTokens(prompt)}→${fmtTokens(completion)} tokens · ${fmtTokens(requests)} calls</div>
     </div>
-    <div class="sum-card">
-      <div class="sum-label">GPT-4o equivalent</div>
-      <div class="sum-val">${fmt(currentModel.monthly)}<span style="font-size:16px;color:var(--muted)">/mo</span></div>
-      <div class="sum-sub">Most common starting model</div>
-    </div>
-    <div class="sum-card">
-      <div class="sum-label">Potential saving</div>
-      <div class="sum-val" style="color:var(--accent)">${fmt(saving)}<span style="font-size:16px">/mo</span></div>
-      <div class="sum-sub">Switching from GPT-4o → ${escapeHtml(bestModel.model)}</div>
-    </div>
+    ${compCard}
   `;
 
   // Table rows

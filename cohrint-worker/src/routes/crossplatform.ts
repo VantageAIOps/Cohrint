@@ -81,7 +81,7 @@ crossplatform.get('/trend', async (c) => {
            COALESCE(SUM(cost_usd), 0) AS cost
     FROM cross_platform_usage
     WHERE org_id = ? AND created_at >= ?${devClause}
-    GROUP BY DATE(period_start), provider
+    GROUP BY DATE(created_at), provider
     ORDER BY day ASC
   `).bind(orgId, since, ...devArgs).all<{ day: string; provider: string; cost: number }>();
 
@@ -568,7 +568,7 @@ crossplatform.get('/models', async (c) => {
 crossplatform.get('/connections', async (c) => {
   const orgId = c.get('orgId');
   const role   = c.get('role');
-  const isAdmin = role === 'owner' || role === 'admin';
+  const isAdmin = hasRole(role, 'admin');
 
   const connections = await c.env.DB.prepare(`
     SELECT provider, status, last_sync_at, last_error, sync_interval_minutes, created_at

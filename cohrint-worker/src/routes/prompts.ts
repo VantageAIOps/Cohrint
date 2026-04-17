@@ -307,20 +307,20 @@ prompts.post('/:id/versions', adminOnly, async (c) => {
 
   if (!body?.content?.trim()) return c.json({ error: 'content is required' }, 400);
 
-  // Get next version number
-  const maxRow = await c.env.DB
-    .prepare('SELECT MAX(version_num) AS max_num FROM prompt_versions WHERE prompt_id = ?')
-    .bind(promptId)
-    .first<{ max_num: number | null }>();
-
-  const nextNum = (maxRow?.max_num ?? 0) + 1;
   const versionId = generateId();
 
+  // Atomic version_num assignment inside INSERT to avoid read-then-write race
   await c.env.DB
     .prepare(`INSERT INTO prompt_versions (id, prompt_id, version_num, content, model, notes, created_by)
-              VALUES (?, ?, ?, ?, ?, ?, ?)`)
-    .bind(versionId, promptId, nextNum, body.content.trim(), body.model ?? null, body.notes ?? null, memberEmail)
+              SELECT ?, ?, COALESCE(MAX(version_num), 0) + 1, ?, ?, ?, ?
+              FROM prompt_versions WHERE prompt_id = ?`)
+    .bind(versionId, promptId, body.content.trim(), body.model ?? null, body.notes ?? null, memberEmail, promptId)
     .run();
+
+  const newRow = await c.env.DB
+    .prepare('SELECT version_num FROM prompt_versions WHERE id = ?')
+    .bind(versionId).first<{ version_num: number }>();
+  const nextNum = newRow?.version_num ?? 1;
 
   // Touch parent updated_at
   await c.env.DB

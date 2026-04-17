@@ -73,16 +73,16 @@ async function checkBudgetPolicy(
       ? `mtd:${orgId}:team:${policy.scope_target}`
       : `mtd:${orgId}:org`;
 
-    let mtdCost: number;
+    let mtdCost: number | null;
     try {
       const cached = await kv.get(mtdKey);
-      mtdCost = cached ? parseFloat(cached) : 0;
+      mtdCost = cached !== null ? parseFloat(cached) : null;
     } catch {
-      mtdCost = 0;
+      mtdCost = null;
     }
 
-    // If KV cache is stale/zero, query D1 directly
-    if (mtdCost === 0) {
+    // If KV cache is a miss, query D1 directly
+    if (mtdCost === null) {
       const startOfMonth = new Date();
       startOfMonth.setUTCDate(1);
       startOfMonth.setUTCHours(0, 0, 0, 0);

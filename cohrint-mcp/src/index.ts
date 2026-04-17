@@ -81,7 +81,7 @@ async function api(path: string, opts: RequestInit = {}): Promise<unknown> {
       signal: AbortSignal.timeout(15_000),
       headers: {
         'Authorization': `Bearer ${API_KEY}`,
-        'X-Vantage-Org': ORG,
+        'X-Cohrint-Org': ORG,
         'Content-Type': 'application/json',
         ...(opts.headers ?? {}),
       },
