@@ -224,13 +224,23 @@ auth.post('/recover/redeem', async (c) => {
     return c.json({ error: 'invalid' }, 400);
   }
 
-  // Soft IP check — log mismatches but don't burn the token.
-  // NAT/proxy rotation legitimately changes the egress IP between issue and redeem,
-  // so consuming the token on mismatch would permanently lock out valid users with
-  // no recovery path. Token is already single-use, short-lived, and 48 random hex chars.
+  // IP check with attempt throttle — mismatches are logged and tracked but the token
+  // is NOT immediately burned. NAT/proxy rotation can legitimately change the egress IP
+  // between issue and redeem, so hard-burning on first mismatch permanently locks out
+  // valid users with no recovery path. Instead, allow up to 3 attempts from different
+  // IPs before consuming the token as a brute-force circuit-breaker.
   const redeemIp = c.req.header('CF-Connecting-IP') ?? 'unknown';
   if (payload.ip && payload.ip !== 'unknown' && payload.ip !== redeemIp) {
-    console.warn('[cohrint] recover/redeem IP mismatch — issued from', payload.ip, 'redeemed from', redeemIp);
+    const attemptKey = `recover-attempt:${token}`;
+    const attempts = parseInt(await c.env.KV.get(attemptKey) ?? '0', 10) + 1;
+    console.warn('[cohrint] recover/redeem IP mismatch — issued from', payload.ip, 'redeemed from', redeemIp, `(attempt ${attempts})`);
+    if (attempts >= 3) {
+      await c.env.KV.delete(`recover:${token}`);
+      await c.env.KV.delete(attemptKey);
+      return c.json({ error: 'expired' }, 410);
+    }
+    await c.env.KV.put(attemptKey, String(attempts), { expirationTtl: 3600 });
+    return c.json({ error: 'ip_mismatch' }, 403);
   }
 
   // Consume the token immediately (single-use)
