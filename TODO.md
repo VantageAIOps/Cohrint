@@ -1,16 +1,12 @@
 # Cohrint — TODO
 
-Last updated: 2026-04-15
+Last updated: 2026-04-17
 
 ---
 
 ## 🔴 P0 — SEO & Migration (do before next deploy)
 
-- [ ] **Deploy vantageaiops.com redirect** — new Pages project at `vantageaiops-redirect/`
-  ```bash
-  npx wrangler pages deploy vantageaiops-redirect --project-name=vantageaiops-redirect
-  # Then: Cloudflare dashboard → project → Settings → Custom Domains → add vantageaiops.com + www.vantageaiops.com
-  ```
+- [x] **Deploy vantageaiops.com redirect** — done via Cloudflare Single Redirect Rules (not Pages). Three rules created: apex, `/*` wildcard, and `www.vantageaiops.com/*`. All verified with curl — 301 → cohrint.com with path preserved. DNS: A record `192.0.2.1` (proxied) + CNAME `www` added.
 
 - [ ] **Deploy cohrint Pages with new SEO changes**
   ```bash
@@ -54,6 +50,7 @@ Last updated: 2026-04-15
   # Update any IDE workspace files, shell aliases, or scripts that reference the old path
   ```
 
+- [x] **Fix Stop hook API key** — hook was using dead `vnt_...` key. Updated `~/.claude/settings.json` to `crt_...` key. Claude Code card will show Active after next session. ⚠️ Rotate the key that was shared in chat.
 - [x] **Update all GitHub Actions workflows to cohrint naming** (done 2026-04-15, commit 5cca3f3)
   - Updated: `ci-test.yml`, `deploy.yml`, `deploy-worker.yml`, `cost-check.yml`, `ci-cross-browser.yml`
   - All URLs updated: `vantageaiops.com` → `cohrint.com`, `api.vantageaiops.com` → `api.cohrint.com`
@@ -224,11 +221,13 @@ Last updated: 2026-04-15
 
 ### Immediate (≤ 2 weeks)
 - [x] **Reframe hero copy** — changed from "Real-time cost visibility..." to "Know what your AI bill will be before it arrives — and cut it." (done 2026-04-15)
+- [x] **ADMIN_GUIDE v2.0** — full rewrite with 14 ASCII UML diagrams, new sections for semantic cache, prompt registry, benchmark dashboard, RBAC guards (2026-04-17)
+- [x] **PRODUCT_STRATEGY v8.0** — Section 15 restructured as Competitive Strategy, Section 5 updated with P3 features, task plan updated (2026-04-17)
 - [ ] **DPA / SOC 2 roadmap visible on Enterprise tier** — move "SOC 2 in progress — DPA available now" from pricing footnotes to Enterprise hero. Procurement won't move without compliance docs.
 - [ ] **Remove engineering keywords from landing page** — ongoing; review quarterly. No algorithm names, no internal field names, no exact thresholds.
 
 ### 30-day scope
-- [ ] **Cost forecasting widget** — "Projected month-end spend" + "Days until budget exhausted" on dashboard. Single aggregation query on existing `events` table. No competitor has this. Makes product sticky daily for engineering managers.
+- [x] **Cost forecasting widget** — `projected_month_end_usd`, `daily_avg_cost_usd`, `days_until_budget_exhausted` added to `/v1/analytics/summary`. Two new KPI cards on dashboard (color-coded runway). 11 tests in suite 52. PR #70.
 - [ ] **Chargeback report export** — Monthly PDF/CSV per team: cost center, total spend, event count, model breakdown. Opens VP Finance as a deal champion. First mover in this category.
 - [ ] **Model switch advisor** — Use existing 24-LLM price table + per-team usage data to surface: "Switching X% of Team B's requests to a cheaper model saves $Y/month." Requires quality-score correlation. palma cannot offer this (model-agnostic by design).
 - [ ] **GitHub Actions cost gate — dedicated landing page** — `/integrations/github-actions` with concrete example and copy-pasteable config. Unique feature, no competitor has documented it. Organic distribution opportunity.
