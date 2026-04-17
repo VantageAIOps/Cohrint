@@ -721,6 +721,9 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
       <button class="sb-item" onclick="nav('traces', this)">
         <span class="icon">&#9900;</span> Agent Traces
       </button>
+      <button class="sb-item" onclick="nav('optimization', this)">
+        <span class="icon">&#9889;</span> Optimization
+      </button>
     </div>
 
     <div class="sidebar-section" id="sb-section-executive" style="display:none">
@@ -1874,6 +1877,57 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
 </div>
 
 
+<div id="view-optimization" class="view">
+  <div class="view-content">
+    <div class="view-header">
+      <div class="view-title">Optimization Impact</div>
+    </div>
+
+    <!-- Panel 1: Hero metric card -->
+    <div class="card" style="padding:24px;margin-bottom:16px">
+      <div id="opt-hero-loading" class="skel" style="height:120px;border-radius:8px"></div>
+      <div id="opt-hero-content" style="display:none">
+        <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:16px">
+          Cohrint Optimization Impact &middot; <span id="opt-period"></span>
+        </div>
+        <div style="display:flex;gap:32px;flex-wrap:wrap;margin-bottom:20px">
+          <div>
+            <div id="opt-avg-factor" style="font-size:36px;font-weight:700;color:#a3e635">—</div>
+            <div style="font-size:13px;color:var(--text-secondary)">avg cost reduction</div>
+          </div>
+          <div>
+            <div id="opt-total-saved" style="font-size:36px;font-weight:700;color:#38bdf8">—</div>
+            <div style="font-size:13px;color:var(--text-secondary)">saved this month</div>
+          </div>
+          <div>
+            <div id="opt-tokens-saved" style="font-size:36px;font-weight:700;color:#f472b6">—</div>
+            <div style="font-size:13px;color:var(--text-secondary)">tokens optimized</div>
+          </div>
+        </div>
+        <div id="opt-badges" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+      </div>
+      <div id="opt-hero-empty" style="display:none;color:var(--text-secondary);font-size:14px">
+        No optimization data yet — use <code>optimize_prompt</code> or enable prompt caching to start tracking.
+      </div>
+    </div>
+
+    <!-- Panel 2: Monthly trend chart -->
+    <div class="card" style="padding:24px;margin-bottom:16px">
+      <div class="card-title">Cost Reduction Trend</div>
+      <div id="opt-trend-loading" class="skel" style="height:200px;border-radius:8px"></div>
+      <canvas id="opt-trend-chart" style="display:none;max-height:200px"></canvas>
+    </div>
+
+    <!-- Panel 3: Developer leaderboard -->
+    <div class="card" style="padding:24px">
+      <div class="card-title">Developer Leaderboard</div>
+      <div id="opt-leaderboard-loading" class="skel" style="height:160px;border-radius:8px"></div>
+      <div id="opt-leaderboard" style="display:none"></div>
+      <div id="opt-leaderboard-empty" style="display:none;color:var(--text-secondary);font-size:14px">No developer data available.</div>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ═══════════════════════════════════════════════════════════════════════════
    Cohrint Dashboard — All JavaScript
@@ -2326,6 +2380,7 @@ function loadViewData(view) {
     case 'account': loadAccount(); break;
     case 'executive': loadExecutive(); break;
     case 'traces': loadTraces(); break;
+    case 'optimization': loadOptimization(); break;
   }
 }
 
@@ -5296,6 +5351,125 @@ function checkBudgetAlertBanner(budgetPct) {
   } else {
     banner.style.display = 'none';
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Optimization Impact
+   ═══════════════════════════════════════════════════════════════════════════ */
+var _optTrendChart = null;
+
+function loadOptimization() {
+  apiFetch('/v1/optimizer/impact').then(function(data) {
+    // Panel 1: Hero
+    document.getElementById('opt-hero-loading').style.display = 'none';
+    if (!data || data.avg_improvement_factor <= 1.05) {
+      document.getElementById('opt-hero-empty').style.display = 'block';
+    } else {
+      document.getElementById('opt-hero-content').style.display = 'block';
+      document.getElementById('opt-period').textContent = data.period || '';
+      document.getElementById('opt-avg-factor').textContent = data.avg_improvement_factor.toFixed(1) + 'x';
+      document.getElementById('opt-total-saved').textContent = '$' + (data.total_cost_saved_usd || 0).toFixed(2);
+      var t = data.total_tokens_saved || 0;
+      document.getElementById('opt-tokens-saved').textContent =
+        t >= 1000000 ? (t / 1000000).toFixed(1) + 'M' :
+        t >= 1000   ? (t / 1000).toFixed(0) + 'K' : String(t);
+
+      // Badges — only numeric data, no user strings
+      var badges = document.getElementById('opt-badges');
+      badges.textContent = '';
+      var bt = data.by_type || {};
+      var badgeData = [
+        { label: '💡 Compression', factor: bt.compress   && bt.compress.avg_factor,    bg: '#1e3a2f', fg: '#a3e635' },
+        { label: '⚡ Caching',     factor: bt.cache       && bt.cache.avg_factor,        bg: '#1e2a3a', fg: '#38bdf8' },
+        { label: '🔀 Model switch',factor: bt.model_switch && bt.model_switch.avg_factor, bg: '#2a1e3a', fg: '#c084fc' },
+      ];
+      badgeData.forEach(function(b) {
+        if (!b.factor || b.factor <= 1.05) return;
+        var span = document.createElement('span');
+        span.style.cssText = 'background:' + b.bg + ';color:' + b.fg + ';padding:4px 12px;border-radius:12px;font-size:12px;margin-right:4px';
+        span.textContent = b.label + ': ' + b.factor.toFixed(1) + 'x';
+        badges.appendChild(span);
+      });
+    }
+
+    // Panel 2: Trend chart
+    document.getElementById('opt-trend-loading').style.display = 'none';
+    var canvas = document.getElementById('opt-trend-chart');
+    canvas.style.display = 'block';
+    var trend = data.monthly_trend || [];
+    if (_optTrendChart) { _optTrendChart.destroy(); _optTrendChart = null; }
+    if (trend.length > 0 && typeof Chart !== 'undefined') {
+      _optTrendChart = new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels: trend.map(function(r) { return r.month; }),
+          datasets: [{
+            label: 'Avg cost reduction',
+            data: trend.map(function(r) { return r.avg_factor; }),
+            backgroundColor: trend.map(function(_, i) { return i === trend.length - 1 ? '#a3e635' : '#166534'; }),
+            borderRadius: 4,
+          }],
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true, ticks: { callback: function(v) { return v + 'x'; } } } },
+        },
+      });
+    }
+
+    // Panel 3: Leaderboard — DOM methods to avoid XSS (email is user data)
+    document.getElementById('opt-leaderboard-loading').style.display = 'none';
+    var devs = data.per_developer || [];
+    var lb = document.getElementById('opt-leaderboard');
+    if (devs.length === 0) {
+      document.getElementById('opt-leaderboard-empty').style.display = 'block';
+    } else {
+      lb.style.display = 'block';
+      lb.textContent = '';
+      devs.slice(0, 13).forEach(function(d, i) {
+        var row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)';
+
+        var rank = document.createElement('span');
+        rank.style.cssText = 'color:var(--text-secondary);width:20px;font-size:12px';
+        rank.textContent = String(i + 1);
+
+        var email = document.createElement('span');
+        email.style.cssText = 'flex:1;font-size:13px';
+        email.textContent = d.email; // textContent — safe, no XSS
+
+        var isLow = d.avg_factor < 2;
+        var badge = document.createElement('span');
+        badge.style.cssText = 'background:' + (isLow ? '#2a1a1a' : '#1e3a2f') + ';color:' + (isLow ? '#f87171' : '#a3e635') + ';padding:2px 10px;border-radius:10px;font-size:12px';
+        badge.textContent = d.avg_factor.toFixed(1) + 'x';
+
+        var saved = document.createElement('span');
+        saved.style.cssText = 'font-size:12px;color:var(--text-secondary)';
+        saved.textContent = '$' + d.cost_saved_usd.toFixed(2) + ' saved';
+
+        row.appendChild(rank);
+        row.appendChild(email);
+        row.appendChild(badge);
+        row.appendChild(saved);
+
+        if (d.opportunity_usd) {
+          var opp = document.createElement('span');
+          opp.style.cssText = 'color:#f87171;font-size:12px';
+          opp.textContent = '↑ $' + d.opportunity_usd + ' opportunity';
+          row.appendChild(opp);
+        }
+        lb.appendChild(row);
+      });
+    }
+  }).catch(function(e) {
+    console.error('loadOptimization failed', e);
+    document.getElementById('opt-hero-loading').style.display = 'none';
+    document.getElementById('opt-hero-empty').style.display = 'block';
+    document.getElementById('opt-trend-loading').style.display = 'none';
+    document.getElementById('opt-leaderboard-loading').style.display = 'none';
+    document.getElementById('opt-leaderboard-empty').style.display = 'block';
+  });
 }
 </script>
 <script>

@@ -66,6 +66,30 @@ optimizer.post('/compress', async (c) => {
     ? Math.round((1 - compressedTokens / originalTokens) * 10000) / 100
     : 0;
 
+  // Persist optimization event (fire-and-forget — don't block the response)
+  const orgId = c.get('orgId');
+  if (orgId) {
+    const optimizationTags = JSON.stringify({
+      optimization: {
+        type: 'compress',
+        improvement_factor: originalTokens > 0
+          ? Math.round((originalTokens / Math.max(compressedTokens, 1)) * 10) / 10
+          : 1.0,
+        tokens_saved: tokensSaved,
+        cost_before_usd: null,
+        cost_after_usd: null,
+        compression_ratio_pct: compressionRatio,
+      },
+    });
+    c.env.DB.prepare(
+      `INSERT INTO events (id, org_id, model, prompt_tokens, completion_tokens, cache_tokens, total_tokens, cost_usd, tags)
+       VALUES (?, ?, 'optimizer/compress', ?, ?, 0, ?, 0, ?)`
+    )
+      .bind(crypto.randomUUID(), orgId, originalTokens, compressedTokens, originalTokens, optimizationTags)
+      .run()
+      .catch((e: unknown) => console.error('optimizer compress tag insert failed', e));
+  }
+
   return c.json({
     original_prompt:   original,
     compressed_prompt: compressed,
@@ -172,6 +196,143 @@ optimizer.get('/stats', async (c) => {
     total_cost_usd:     row?.total_cost_usd     ?? 0,
     total_tokens:       row?.total_tokens       ?? 0,
     scope_team:         scopeTeam ?? null,
+  });
+});
+
+// ── GET /v1/optimizer/impact ─────────────────────────────────────────────────
+optimizer.get('/impact', async (c) => {
+  const orgId     = c.get('orgId');
+  const scopeTeam = c.get('scopeTeam');
+  const db = c.env.DB;
+
+  const teamClause = scopeTeam ? ' AND team = ?' : '';
+  const eTeamClause = scopeTeam ? ' AND e.team = ?' : '';
+
+  const baseArgs  = scopeTeam ? [orgId, scopeTeam] : [orgId];
+
+  // Compress events: aggregate improvement_factor and tokens_saved from tags
+  const compressAgg = await db.prepare(`
+    SELECT
+      AVG(CAST(json_extract(tags, '$.optimization.improvement_factor') AS REAL)) AS avg_factor,
+      COUNT(*) AS event_count,
+      SUM(CAST(json_extract(tags, '$.optimization.tokens_saved') AS INTEGER)) AS tokens_saved
+    FROM events
+    WHERE org_id = ?${teamClause}
+      AND json_valid(tags)
+      AND json_extract(tags, '$.optimization.type') = 'compress'
+  `).bind(...baseArgs).first<{
+    avg_factor: number | null;
+    event_count: number;
+    tokens_saved: number | null;
+  }>();
+
+  // Cache events: also compute avg tokens per event for rate calculation
+  const cacheAgg = await db.prepare(`
+    SELECT
+      COUNT(*) AS event_count,
+      COALESCE(SUM(cache_tokens), 0) AS total_cache_tokens,
+      COALESCE(SUM(prompt_tokens), 0) AS total_prompt_tokens
+    FROM events
+    WHERE org_id = ?${teamClause} AND cache_tokens > 0
+  `).bind(...baseArgs).first<{
+    event_count: number;
+    total_cache_tokens: number;
+    total_prompt_tokens: number;
+  }>();
+
+  // Per-developer breakdown joined to org_members via user_id = org_members.id
+  const devAgg = await db.prepare(`
+    SELECT
+      m.email,
+      AVG(CAST(json_extract(e.tags, '$.optimization.improvement_factor') AS REAL)) AS avg_factor,
+      SUM(e.prompt_tokens) * 0.000003 AS total_cost_usd,
+      COALESCE(SUM(e.cache_tokens), 0) AS cache_tokens,
+      COALESCE(SUM(e.prompt_tokens), 0) AS total_prompt_tokens,
+      COUNT(*) AS total_events
+    FROM events e
+    JOIN org_members m ON m.id = e.user_id AND m.org_id = e.org_id
+    WHERE e.org_id = ?${eTeamClause}
+    GROUP BY m.email
+    ORDER BY avg_factor DESC
+  `).bind(...baseArgs).all<{
+    email: string;
+    avg_factor: number | null;
+    total_cost_usd: number;
+    cache_tokens: number;
+    total_prompt_tokens: number;
+    total_events: number;
+  }>();
+
+  // Monthly trend from compress-tagged events
+  const trendAgg = await db.prepare(`
+    SELECT
+      strftime('%Y-%m', datetime(created_at, 'unixepoch')) AS month,
+      AVG(CAST(json_extract(tags, '$.optimization.improvement_factor') AS REAL)) AS avg_factor
+    FROM events
+    WHERE org_id = ?${teamClause}
+      AND json_valid(tags)
+      AND json_extract(tags, '$.optimization.type') IS NOT NULL
+    GROUP BY month
+    ORDER BY month ASC
+  `).bind(...baseArgs).all<{ month: string; avg_factor: number | null }>();
+
+  const perDeveloper = (devAgg.results ?? []).map(d => {
+    // cache_rate = cached tokens as fraction of total prompt tokens (0–1)
+    const cacheRate = d.total_prompt_tokens > 0
+      ? d.cache_tokens / d.total_prompt_tokens
+      : 0;
+    const opportunityUsd =
+      cacheRate < 0.2 && d.total_cost_usd > 1
+        ? Math.round(d.total_cost_usd * 0.15 * 100) / 100
+        : null;
+    return {
+      email: d.email,
+      avg_factor: d.avg_factor != null ? Math.round(d.avg_factor * 10) / 10 : 1.0,
+      cost_saved_usd: 0,
+      opportunity_usd: opportunityUsd,
+    };
+  });
+
+  // Use DB-aggregated avg directly (correct weighted average, not average-of-averages)
+  const avgFactor = compressAgg?.avg_factor != null
+    ? Math.round(compressAgg.avg_factor * 10) / 10
+    : 1.0;
+
+  // cache avg_factor: tokens served from cache vs tokens that would have been computed
+  // Use null (no data) rather than a hardcoded guess when there are no cache events
+  const cacheAvgFactor = (cacheAgg?.total_prompt_tokens ?? 0) > 0
+    ? Math.round(((cacheAgg!.total_cache_tokens + cacheAgg!.total_prompt_tokens) / cacheAgg!.total_prompt_tokens) * 10) / 10
+    : null;
+
+  const now = new Date();
+  const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+  return c.json({
+    period,
+    avg_improvement_factor: avgFactor,
+    total_tokens_saved: compressAgg?.tokens_saved ?? 0,
+    total_cost_saved_usd: 0,
+    by_type: {
+      compress: {
+        avg_factor:
+          compressAgg?.avg_factor != null
+            ? Math.round(compressAgg.avg_factor * 10) / 10
+            : 1.0,
+        event_count: compressAgg?.event_count ?? 0,
+        cost_saved_usd: 0,
+      },
+      cache: {
+        avg_factor: cacheAvgFactor,
+        event_count: cacheAgg?.event_count ?? 0,
+        cost_saved_usd: 0,
+      },
+      model_switch: { avg_factor: 1.0, event_count: 0, cost_saved_usd: 0 },
+    },
+    per_developer: perDeveloper,
+    monthly_trend: (trendAgg.results ?? []).map(r => ({
+      month: r.month,
+      avg_factor: r.avg_factor != null ? Math.round(r.avg_factor * 10) / 10 : 1.0,
+    })),
   });
 });
 
