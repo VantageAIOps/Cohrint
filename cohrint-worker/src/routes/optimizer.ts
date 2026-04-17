@@ -199,4 +199,121 @@ optimizer.get('/stats', async (c) => {
   });
 });
 
+// ── GET /v1/optimizer/impact ─────────────────────────────────────────────────
+optimizer.get('/impact', async (c) => {
+  const orgId = c.get('orgId');
+  const db = c.env.DB;
+
+  // Compress events: aggregate improvement_factor and tokens_saved from tags
+  const compressAgg = await db.prepare(`
+    SELECT
+      AVG(CAST(json_extract(tags, '$.optimization.improvement_factor') AS REAL)) AS avg_factor,
+      COUNT(*) AS event_count,
+      SUM(CAST(json_extract(tags, '$.optimization.tokens_saved') AS INTEGER)) AS tokens_saved
+    FROM events
+    WHERE org_id = ?
+      AND json_valid(tags)
+      AND json_extract(tags, '$.optimization.type') = 'compress'
+  `).bind(orgId).first<{
+    avg_factor: number | null;
+    event_count: number;
+    tokens_saved: number | null;
+  }>();
+
+  // Cache events
+  const cacheAgg = await db.prepare(`
+    SELECT COUNT(*) AS event_count
+    FROM events
+    WHERE org_id = ? AND cache_tokens > 0
+  `).bind(orgId).first<{ event_count: number }>();
+
+  // Per-developer breakdown joined to org_members via user_id = org_members.id
+  const devAgg = await db.prepare(`
+    SELECT
+      m.email,
+      AVG(CAST(json_extract(e.tags, '$.optimization.improvement_factor') AS REAL)) AS avg_factor,
+      SUM(e.prompt_tokens) * 0.000003 AS total_cost_usd,
+      SUM(e.cache_tokens) AS cache_tokens,
+      COUNT(*) AS total_events
+    FROM events e
+    JOIN org_members m ON m.id = e.user_id AND m.org_id = e.org_id
+    WHERE e.org_id = ?
+    GROUP BY m.email
+    ORDER BY avg_factor DESC
+  `).bind(orgId).all<{
+    email: string;
+    avg_factor: number | null;
+    total_cost_usd: number;
+    cache_tokens: number | null;
+    total_events: number;
+  }>();
+
+  // Monthly trend from compress-tagged events
+  const trendAgg = await db.prepare(`
+    SELECT
+      strftime('%Y-%m', datetime(created_at, 'unixepoch')) AS month,
+      AVG(CAST(json_extract(tags, '$.optimization.improvement_factor') AS REAL)) AS avg_factor
+    FROM events
+    WHERE org_id = ?
+      AND json_valid(tags)
+      AND json_extract(tags, '$.optimization.type') IS NOT NULL
+    GROUP BY month
+    ORDER BY month ASC
+  `).bind(orgId).all<{ month: string; avg_factor: number | null }>();
+
+  const perDeveloper = (devAgg.results ?? []).map(d => {
+    const cacheRate = d.total_events > 0
+      ? (d.cache_tokens ?? 0) / Math.max(d.total_events * 100, 1)
+      : 0;
+    const opportunityUsd =
+      cacheRate < 0.2 && d.total_cost_usd > 1
+        ? Math.round(d.total_cost_usd * 0.15 * 100) / 100
+        : null;
+    return {
+      email: d.email,
+      avg_factor: d.avg_factor != null ? Math.round(d.avg_factor * 10) / 10 : 1.0,
+      cost_saved_usd: 0, // compress cost_before/after is null (no model passed to compress endpoint)
+      opportunity_usd: opportunityUsd,
+    };
+  });
+
+  const avgFactor =
+    perDeveloper.length > 0
+      ? Math.round(
+          (perDeveloper.reduce((s, d) => s + d.avg_factor, 0) / perDeveloper.length) * 10,
+        ) / 10
+      : 1.0;
+
+  const now = new Date();
+  const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+  return c.json({
+    period,
+    avg_improvement_factor: avgFactor,
+    total_tokens_saved: compressAgg?.tokens_saved ?? 0,
+    total_cost_saved_usd: 0,
+    by_type: {
+      compress: {
+        avg_factor:
+          compressAgg?.avg_factor != null
+            ? Math.round(compressAgg.avg_factor * 10) / 10
+            : 1.0,
+        event_count: compressAgg?.event_count ?? 0,
+        cost_saved_usd: 0,
+      },
+      cache: {
+        avg_factor: 10.0,
+        event_count: cacheAgg?.event_count ?? 0,
+        cost_saved_usd: 0,
+      },
+      model_switch: { avg_factor: 1.0, event_count: 0, cost_saved_usd: 0 },
+    },
+    per_developer: perDeveloper,
+    monthly_trend: (trendAgg.results ?? []).map(r => ({
+      month: r.month,
+      avg_factor: r.avg_factor != null ? Math.round(r.avg_factor * 10) / 10 : 1.0,
+    })),
+  });
+});
+
 export { optimizer };
