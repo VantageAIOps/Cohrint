@@ -208,7 +208,7 @@ vantage-ai/
 ├── signup.html           Waitlist / join page
 ├── check.html            Deployment health checker
 │
-├── vantage-models.js     Pricing database — 23 models, 7 providers
+├── cohrint-models.js     Pricing database — 23 models, 7 providers
 ├── seed-data.js          Test data generator — 52k events, IndexedDB
 │
 ├── _headers              Cloudflare Pages security headers (CSP)
@@ -559,8 +559,8 @@ Supabase blocks requests from `file://` origins.
 This is a monorepo of static files — no build system required.
 Edit any `.html` file, save, and refresh to see changes locally.
 
-The shared pricing database (`vantage-models.js`) is imported by both
-`app.html` and `calculator.html` via `<script src="vantage-models.js">`.
+The shared pricing database (`cohrint-models.js`) is imported by both
+`app.html` and `calculator.html` via `<script src="cohrint-models.js">`.
 Update model prices there and both pages update automatically.
 
 ---
