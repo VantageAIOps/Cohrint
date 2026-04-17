@@ -1,8 +1,23 @@
 # Semantic Caching for track_llm_call — Design Spec
 
-> **Status:** Approved for implementation
+> **Status:** SHIPPED — PR #65 (2026-04-15)
 > **Date:** 2026-04-09
 > **Scope:** `track_llm_call` MCP tool + Worker analytics + dashboard
+
+---
+
+## Shipped Summary (PR #65)
+
+Phase 3 (Semantic Proxy) shipped ahead of schedule via PR #65, built on Cloudflare Vectorize + Workers AI:
+- Vectorize namespace per org (`{orgId}-prompt-cache`) — matches Phase 3 design
+- Similarity threshold: 0.92 (as designed in §Phase 3)
+- Workers AI embedding model: `@cf/baai/bge-small-en-v1.5`
+- New bindings added to `wrangler.toml`: `VECTORIZE` + `AI`
+- Prompt Registry MVP also shipped in same PR (prompt versioning, usage tracking)
+- Tables added: `prompts`, `prompt_versions`, `prompt_usage`, `semantic_cache_entries`, `org_cache_config`
+- Phase 1 (cache analytics fix) and Phase 2 (exact-match dedup) shipped as part of prior work
+
+Phase 3 prerequisite note from this spec ("Provision Vectorize + Workers AI bindings") was completed as part of PR #65.
 
 ---
 

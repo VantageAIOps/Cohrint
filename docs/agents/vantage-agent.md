@@ -1,6 +1,6 @@
 ---
 name: vantage-agent
-description: Expert agent for the Cohrint codebase. Trained on architecture, DB schema (8 tables), API contracts, test suites (38 suites, 283+ checks), known limitations, integrations, and deployment. Use for feature dev, debugging, test writing, infra changes. ALWAYS reads actual source files before writing code — this document is a navigation aid, not ground truth.
+description: Expert agent for the Cohrint codebase. Trained on architecture, DB schema (25 tables), API contracts, test suites (52 suites, 283+ checks), known limitations, integrations, and deployment. Use for feature dev, debugging, test writing, infra changes. ALWAYS reads actual source files before writing code — this document is a navigation aid, not ground truth.
 tools: Read, Glob, Grep, Bash, Edit, Write
 model: sonnet
 ---
@@ -50,7 +50,7 @@ Before writing **any** code that touches a file:
 2. Verify the function signatures, field names, table names match what you see here
 3. If there is a discrepancy, trust the file — update your mental model, not the file
 
-This document snapshots the codebase as of 2026-04-09. Schema, routes, and helper signatures evolve. Never write SQL, API calls, or test code based solely on this document.
+This document snapshots the codebase as of 2026-04-17 (PR #71). Schema, routes, and helper signatures evolve. Never write SQL, API calls, or test code based solely on this document.
 
 ---
 
@@ -59,16 +59,16 @@ This document snapshots the codebase as of 2026-04-09. Schema, routes, and helpe
 ### Stack
 | Layer | Tech | Path |
 |-------|------|------|
-| API Worker | Cloudflare Workers + Hono | `vantage-worker/src/` |
-| Database | Cloudflare D1 (SQLite) | 8 tables (see schema below) |
+| API Worker | Cloudflare Workers + Hono | `cohrint-worker/src/` |
+| Database | Cloudflare D1 (SQLite) | 25 tables (see schema below) |
 | KV | Cloudflare KV | Rate limiting, SSE broadcast, alert throttle, session/recovery tokens |
-| Frontend | Cloudflare Pages | `vantage-final-v4/` — static HTML/CSS/JS + Chart.js |
+| Frontend | Cloudflare Pages | `cohrint-frontend/` — static HTML/CSS/JS + Chart.js |
 | Email | Resend API | `RESEND_API_KEY` wrangler secret |
-| SDK Python | `cohrint` on PyPI | `vantage-backend/sdk/` |
-| SDK JS | `cohrint` on npm | `vantage-js-sdk/` — streaming support |
-| MCP Server | `vantage-mcp` npm v1.1.1 | `vantage-mcp/` |
-| CLI Agent | `vantage-agent` PyPI v0.1.0 | `vantage-agent/` |
-| Local Proxy | `vantage-local-proxy` | `vantage-local-proxy/` |
+| SDK Python | `cohrint` on PyPI | `cohrint-backend/sdk/` |
+| SDK JS | `cohrint` on npm | `cohrint-js-sdk/` — streaming support |
+| MCP Server | `cohrint-mcp` npm v1.1.1 | `cohrint-mcp/` |
+| CLI Agent | `cohrint-cli` PyPI v0.1.0 | `cohrint-cli/` |
+| Local Proxy | `cohrint-local-proxy` | `cohrint-local-proxy/` |
 
 ### Request Lifecycle
 ```
@@ -95,16 +95,16 @@ Only SHA-256 hash stored. Raw key shown once at signup. Never log or commit.
 
 ---
 
-## DATABASE SCHEMA (8 tables)
+## DATABASE SCHEMA (25 tables)
 
-> **VERIFY BEFORE USE — this snapshot was accurate on 2026-04-09 and WILL drift.**
+> **VERIFY BEFORE USE — this snapshot was accurate on 2026-04-17 and WILL drift.**
 >
 > Before writing ANY SQL, migration, or query, run these commands:
 > ```bash
 > # Verify table exists and get current column list:
-> grep -n "CREATE TABLE <tablename>" vantage-worker/src/ -r
+> grep -n "CREATE TABLE <tablename>" cohrint-worker/src/ -r
 > # Check for recent migrations:
-> git log --oneline --all -- "vantage-worker/src/db*" "vantage-worker/migrations*" | head -10
+> git log --oneline --all -- "cohrint-worker/src/db*" "cohrint-worker/migrations*" | head -10
 > ```
 > If the live schema contradicts this doc, trust the source file. Do not update the source file to match stale docs.
 >
@@ -171,7 +171,7 @@ event_name TEXT, model TEXT, cost_usd REAL,
 tokens_in INT, tokens_out INT, duration_ms INT,
 timestamp TEXT, raw_attrs TEXT  -- JSON
 ```
-Written by `vantage-worker/src/routes/otel.ts`. May not exist yet — inserts wrapped in try/catch.
+Written by `cohrint-worker/src/routes/otel.ts`. May not exist yet — inserts wrapped in try/catch.
 
 ### `cross_platform_usage` (OTel rollup — one row per tool session)
 ```sql
@@ -192,9 +192,9 @@ raw_data TEXT  -- JSON
 
 > **To verify any route exists before calling or testing it:**
 > ```bash
-> grep -n "app\.\(get\|post\|patch\|delete\)" vantage-worker/src/routes/<file>.ts
+> grep -n "app\.\(get\|post\|patch\|delete\)" cohrint-worker/src/routes/<file>.ts
 > ```
-> Route files by group: `events.ts`, `analytics.ts`, `cross-platform.ts`, `auth.ts`, `otel.ts`, `stream.ts`, `alerts.ts`
+> Route files by group: `events.ts`, `analytics.ts`, `cross-platform.ts`, `auth.ts`, `otel.ts`, `stream.ts`, `alerts.ts`, `cache.ts`, `prompts.ts`, `benchmark.ts`
 >
 > If a route you expect is missing from grep output, it does not exist — do not assume this doc is correct.
 
@@ -235,6 +235,24 @@ raw_data TEXT  -- JSON
 - `POST /v1/alerts/slack/:orgId`
 - `GET /v1/alerts/config/:orgId`
 
+### Semantic Cache — `vantage-worker/src/routes/cache.ts`
+- `GET /v1/cache/stats` — hit rate, wasted cost USD, dedup count
+- `POST /v1/cache/lookup` — similarity lookup (Vectorize embeddings)
+- `POST /v1/cache/store` — store prompt vector + response
+
+### Prompt Registry — `vantage-worker/src/routes/prompts.ts`
+- `GET /v1/prompts` — list prompts for org
+- `POST /v1/prompts` — create prompt with version
+- `GET /v1/prompts/:id` — get prompt + version history
+- `PATCH /v1/prompts/:id` — update prompt (creates new version)
+- `DELETE /v1/prompts/:id` — soft delete
+- `POST /v1/prompts/:id/usage` — record prompt usage event
+
+### Benchmarks — `vantage-worker/src/routes/benchmark.ts`
+- `GET /v1/benchmark/public` — public leaderboard (no auth required)
+- `GET /v1/benchmark/snapshots` — org benchmark history
+- `POST /v1/benchmark/snapshots` — submit benchmark snapshot
+
 ---
 
 ## RATE LIMITING
@@ -262,11 +280,11 @@ Counter increments ONLY on auth failure — not on every request
 > - `strftime('%s','now','start of month')` — exact calendar month boundary (preferred)
 > - `CAST(strftime('%s','now') AS INTEGER) - 30*86400` — rolling 30-day window (deprecated approximation)
 >
-> Run `grep -n "start of month\|30\*86400\|events_limit" vantage-worker/src/routes/events.ts` to confirm which is live before writing any count query or test assertion.
+> Run `grep -n "start of month\|30\*86400\|events_limit" cohrint-worker/src/routes/events.ts` to confirm which is live before writing any count query or test assertion.
 
 ---
 
-## TEST SUITE (38 suites)
+## TEST SUITE (52 suites)
 
 ### CI on Every PR (`ci-pr-gate.yml`)
 Runs: `python -m pytest tests/ -q --tb=short -x --ignore=tests/test_integration.py`
@@ -286,6 +304,18 @@ All non-excluded suites run. Extended/security/browser suites are opt-in via wor
 | 36_semantic_cache | Cache hit rate, wasted cost, dedup detection |
 | 37_all_dashboard_cards | Every KPI card has real data |
 | 38_security_hardening | prompt_hash validation, brute-force protection |
+| 39_copilot_adapter | GitHub Copilot Metrics API adapter |
+| 40_benchmark | Public leaderboard + snapshot submit |
+| 41_datadog_exporter | Datadog push model (vantage.ai.cost_usd gauge) |
+| 43_enterprise_rbac | Role hierarchy, team scoping, viewer guards |
+| 45_dashboard_api_coverage | All dashboard API contracts with DA45 seed data |
+| 46_quality_scores_and_recommendations | 6-dimension LLM quality + recommendation engine |
+| 47_semantic_cache | Semantic cache vector lookup + threshold |
+| 48_prompt_registry | Prompt CRUD + version history + usage tracking |
+| 49_agent_traces_dag | Trace DAG parent/child span attribution |
+| 50_benchmark_dashboard | Benchmark leaderboard dashboard rendering |
+| 51_dashboard_role_ui | Role-gated tab visibility (admin/ceo/member) |
+| 52_cost_forecasting | Projected month-end spend + budget runway |
 
 ### Opt-In Suites
 | Suites | Trigger |
@@ -344,7 +374,7 @@ Run: `python -m pytest tests/suites/XX_name/ -v`
 
 ## INTEGRATIONS
 
-### MCP Server (13 tools) — `vantage-mcp/`
+### MCP Server (13 tools) — `cohrint-mcp/`
 ```
 analyze_tokens       estimate_costs       get_summary          get_traces
 get_model_breakdown  get_team_breakdown   get_kpis             get_recommendations
@@ -392,11 +422,11 @@ COST=$(curl -s -H "Authorization: Bearer $VANTAGE_KEY" \
 | Safari/WebKit session | ITP drops cross-origin cookie on reload | `SameSite=Lax` stripped by ITP | Fix: `SameSite=None;Secure` — needs Worker deploy |
 | D1 batch | No transactions — partial write possible | D1 batch API limitation | `INSERT OR IGNORE` makes retries safe |
 | Free tier count | 30-day window ≠ exact calendar month | `now - 30*86400` approximation | Known; strftime `start of month` is more exact |
-| Quality scores | Null at insert, async writeback | LLM judge runs offline | Dashboard defaults to `74` when null — verify source: `grep -n "74\|defaultScore\|score.*null" vantage-final-v4/` before replicating this value |
+| Quality scores | Null at insert, async writeback | LLM judge runs offline | Dashboard defaults to `74` when null — verify source: `grep -n "74\|defaultScore\|score.*null" cohrint-frontend/` before replicating this value |
 | prompt_hash | Must be 32–128 char lowercase hex | Validation in events.ts | Min: `hashlib.sha256().hexdigest()[:32]` |
 | Semantic cache | Exact-match dedup only | No embedding similarity yet | Fuzzy matching is roadmap Sprint 3 |
 | otel_events table | May not exist in older deploys | Created lazily | OTel inserts wrapped in try/catch |
-| cross_platform timestamp | TEXT not INTEGER | Legacy schema decision | Use `'YYYY-MM-DD HH:MM:SS'` format; don't apply unix epoch assumptions |
+| cross_platform timestamp | TEXT not INTEGER | Legacy schema decision | Use `'YYYY-MM-DD HH:MM:SS'` format; don't apply unix epoch assumptions. **Fixed in PR #67** — all analytics routes now bind correct type per table. |
 
 ---
 
@@ -424,7 +454,7 @@ COST=$(curl -s -H "Authorization: Bearer $VANTAGE_KEY" \
 - Concatenate user input into SQL strings — parameterized queries only
 - Re-use SSE tokens across page loads (one-time use)
 
-### CSP (`vantage-final-v4/_headers`)
+### CSP (`cohrint-frontend/_headers`)
 - `/superadmin.html`: `frame-ancestors 'none'`
 - All pages: `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`
 
@@ -434,14 +464,14 @@ COST=$(curl -s -H "Authorization: Bearer $VANTAGE_KEY" \
 
 ### Worker
 ```bash
-cd vantage-worker
+cd cohrint-worker
 npm run typecheck       # must be zero errors
 npx wrangler deploy     # → api.cohrint.com
 ```
 
 ### Pages
 ```bash
-npx wrangler pages deploy ./vantage-final-v4 --project-name=vantageai
+npx wrangler pages deploy ./cohrint-frontend --project-name=cohrint
 ```
 
 ### CI Triggers
@@ -471,7 +501,7 @@ wrangler kv namespace list
 
 ### Before Any Change
 1. Boot sequence (git status, log, PR list, CI status)
-2. `cd vantage-worker && npm run typecheck` — baseline must be clean
+2. `cd cohrint-worker && npm run typecheck` — baseline must be clean
 3. Read the specific file(s) you'll modify with the Read tool
 4. `ls tests/suites/` — identify which suite covers your area
 
@@ -482,7 +512,7 @@ wrangler kv namespace list
 4. `npm run typecheck` — zero errors
 5. `python -m pytest tests/suites/XX_name/ -v`
 6. `git add <specific files>` — never `git add -A`
-7. Push to `CohrintOps/Cohrint`, create PR
+7. Push to `VantageAIOps/VantageAI`, create PR
 
 ### Common Gotchas
 - `events` timestamps: `INTEGER` unix epoch — never ISO 8601
@@ -521,6 +551,7 @@ wrangler kv namespace list
 - Brute-force protection (10 attempts / 5 min)
 - Key recovery (single-use token, email scanner safe)
 - CI cost gate endpoint
+- Cost forecasting widget (projected month-end spend + budget runway)
 
 **Not yet shipped (roadmap):**
 - Sprint 1: L3 Billing API connectors (AWS Bedrock, Azure OpenAI, GCP Vertex)
@@ -543,8 +574,8 @@ When asked to "refresh context", "check what changed", or "reload":
 2. Read: MEMORY.md (memory index — locate path with Bash: ls ~/.claude/projects/ | grep vantage)
 3. Bash: git log --oneline -10 (new commits = new patterns)
 4. Bash: ls tests/suites/ | sort (new suites?)
-5. Grep "app\.(get|post|patch|delete)" in vantage-worker/src/routes/ (new routes?)
-6. Grep "CREATE TABLE" in vantage-worker/src/ (schema migrations?)
+5. Grep "app\.(get|post|patch|delete)" in cohrint-worker/src/routes/ (new routes?)
+6. Grep "CREATE TABLE" in cohrint-worker/src/ (schema migrations?)
 7. Cross-check any memory entry that names a specific file: verify the file still exists and content matches
 ```
 
