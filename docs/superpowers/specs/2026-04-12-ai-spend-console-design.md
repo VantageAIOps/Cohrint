@@ -1,5 +1,7 @@
 # AI Spend Console — Design Spec
 
+> **Status:** SHIPPED — PR #51 (2026-04-12)
+
 **Goal:** Add a "Cross-Platform" tab to the Dashboard showing consolidated Copilot + Claude Code + Cursor + Gemini CLI spend with per-developer attribution, real-time feed, and a local test runner script.
 
 **Architecture:** New Dashboard tab in `app.html` wired to existing `/v1/cross-platform/*` routes plus one new `/v1/cross-platform/trend` endpoint for the stacked daily chart. Cross-platform JS extracted to `cp-console.js` to keep `app.html` manageable. Live feed polls every 15s with jitter and backoff. Developer row opens a full-detail modal routed by internal `developer_id`.

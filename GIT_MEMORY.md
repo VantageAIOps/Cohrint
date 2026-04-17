@@ -1,18 +1,26 @@
 # GIT_MEMORY — Cohrint / VantageAI
 
-_Last updated: 2026-04-16_
+_Last updated: 2026-04-17_
 
 ## Current Branch
-`feat/semantic-cache-and-prompt-registry` — PR #65 open, awaiting merge.
+`feat/cost-forecasting-widget` — PR #70 open, in progress.
 
 ## Open PRs
 | PR | Title | Branch |
 |----|-------|--------|
-| #65 | feat: semantic cache (Vectorize + Workers AI) + prompt registry MVP | feat/semantic-cache-and-prompt-registry |
+| #70 | feat: cost forecasting widget (projected_month_end_usd, daily_avg_cost_usd, days_until_budget_exhausted) | feat/cost-forecasting-widget |
 
 ## Latest 15 Commits
 | SHA | Message |
 |-----|---------|
+| `234c876` | fix(audit): full audit sprint — security, RBAC, date-type bugs, dead code |
+| `0aedeef` | Merge pull request #67 from VantageAIOps/fix/dashboard-role-visibility-and-date-bugs |
+| `10fdae1` | feat: suite 51 — Playwright + API dashboard role visibility tests (49 checks) |
+| `2c6e9fe` | fix: add nav() guard for integrations view (non-admin redirect to overview) |
+| `b1fcc6f` | fix: replace unix timestamps with text dates across all analytics routes |
+| _(commits from PRs #65/#66 below)_ | |
+| — | feat: agent trace DAG visualization + public benchmark dashboard (PR #66) |
+| — | feat: semantic cache (Vectorize + Workers AI) + prompt registry MVP (PR #65) |
 | `9ead355` | Fix 3 code-review issues: bind order, route shadowing, COALESCE defaults |
 | `b9fa9b0` | feat: semantic cache (Vectorize + Workers AI) + prompt registry MVP |
 | `d04ab96` | Merge pull request #64 from VantageAIOps/fix/code-review-issues |
@@ -20,18 +28,13 @@ _Last updated: 2026-04-16_
 | `9dcbd68` | Fix 6 code-review issues: key hint, privilege escalation, batch budget, seed event_id, cache prefix, calcCost |
 | `52b1a0a` | Fix 5 code-review issues: Infinity validation, token double-count, cache suppression, empty_reason, QS.07 test |
 | `06e7603` | Fix 15 hallucination detection and recommendation engine bugs |
-| `0cdef5c` | Add Suite 46: quality scores + recommendation engine tests (47 checks) |
-| `a1c73aa` | Rename vantage-track.js → cohrint-track.js across all installers |
-| `547b564` | Fix setup_claude_hook to install cohrint-track.js consistently |
-| `7213a81` | Add missing package.json for cohrint-cli (rebranded from vantageai-cli) |
-| `bf1881c` | Merge PR #63 — Fix stale vantageaiops references |
-| `160e6aa` | Fix test suite failures across suites 17, 33, 35, 40 |
-| `cfc826b` | Fix code review issues: CORS wildcard, state migration, BU cost field, benchmark UX, seed CI header |
-| `93cbbd8` | Add da45 seed script + fix test shape assertions |
 
 ## Recent Merged PRs
 | PR | Title |
 |----|-------|
+| #67 | fix: full security/RBAC audit, date-type bug fixes, dead code removal |
+| #66 | feat: agent trace DAG visualization + public benchmark dashboard |
+| #65 | feat: semantic cache (Vectorize + Workers AI) + prompt registry MVP |
 | #64 | Fix 11 code-review issues: security, budget enforcement, cost accuracy, test correctness |
 | #63 | Fix stale vantageaiops references (CORS, hook env vars, drop claude-code publish) |
 | #62 | SEO verification + account hierarchy + cohrint rebrand |
@@ -41,15 +44,17 @@ _Last updated: 2026-04-16_
 ## Package Versions
 | Package | Path | Version |
 |---------|------|---------|
-| cohrint-cli | cohrint-cli/package.json | 1.0.0 |
-| cohrint-mcp | cohrint-mcp/package.json | (check file) |
-| cohrint-js-sdk | cohrint-js-sdk/package.json | (check file) |
+| cohrint-cli | cohrint-cli/package.json | 2.2.4 |
+| cohrint-mcp | cohrint-mcp/package.json | 1.1.1 |
+| cohrint-js-sdk | cohrint-js-sdk/package.json | 1.0.1 |
 
 ## Outstanding Items
-- **PR #65 pending merge** — semantic cache + prompt registry MVP
-- **Pre-deploy step for PR #65**: `wrangler vectorize create cohrint-semantic-cache --dimensions=384 --metric=cosine` + `wrangler d1 migrations apply vantage-events --remote`
-- **GitHub Actions billing**: All CI jobs failing — resolve at GitHub Settings → Billing & plans
-- **Branch cleanup**: Delete `fix/code-review-issues` (already merged)
-- **P3 complete**: semantic cache ✅ + prompt registry ✅ (both in PR #65)
-- **Next P3 tasks**: Design partner CTO outreach, n8n deploy on Railway, SOC2 prep
-- **Next P4 tasks**: Agent trace DAG visualization, public benchmark dashboard
+- **PR #70 open** — cost forecasting widget: `projected_month_end_usd`, `daily_avg_cost_usd`, `days_until_budget_exhausted`
+- **API key rotation needed** — rotate any keys that were logged during the `vnt_...` → `crt_...` prefix fix period
+- **vantageaiops.com redirect** — live via Cloudflare rules → cohrint.com (no code action needed)
+- **Stop hook API key** — fixed: `vnt_...` → `crt_...` prefix (PR #67)
+- **Branch cleanup** — delete merged branches: `fix/dashboard-role-visibility-and-date-bugs`, `feat/semantic-cache-and-prompt-registry`, `feat/agent-trace-dag`
+- **Next tasks**:
+  - Chargeback report export (CSV/PDF per team, per billing period)
+  - Model switch advisor (recommend cheaper model when quality delta < threshold)
+  - Merge PR #70 after CI passes

@@ -1,8 +1,20 @@
 # Vantage Agent — Permission Granularity & UX Overhaul
 
 **Date:** 2026-04-12  
-**Status:** Implemented — see plan `docs/superpowers/plans/2026-04-12-vantage-agent-permission-ux-overhaul.md`  
+**Status:** Partially Shipped — RBAC/role-tab-visibility hardening shipped in PR #67 (2026-04-15). Full Claude CLI backend overhaul (§3) remains pending.  
 **Scope:** vantage-agent CLI — all dimensions: permissions, Claude CLI backend, installation, upgrade, config, sessions, stability
+
+---
+
+## Shipped in PR #67 (Security/RBAC Audit)
+
+Related RBAC work shipped as part of the broader security audit sprint:
+- Role-based tab visibility enforced in dashboard (members cannot see admin-only tabs)
+- Date-type bugs fixed across all analytics routes (INTEGER unixepoch vs TEXT date columns)
+- Per-developer hallucination scores added to analytics
+- `vnt_` → `crt_` key prefix migration completed (Stop hook fixed)
+
+The CLI permission overhaul (§3 PreToolUse hook architecture) has not shipped yet.
 
 ---
 

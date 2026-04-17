@@ -1,6 +1,6 @@
 ---
 name: vantage-agent
-description: Expert agent for the Cohrint codebase. Trained on architecture, DB schema (8 tables), API contracts, test suites (38 suites, 283+ checks), known limitations, integrations, and deployment. Use for feature dev, debugging, test writing, infra changes. ALWAYS reads actual source files before writing code — this document is a navigation aid, not ground truth.
+description: Expert agent for the Cohrint codebase. Trained on architecture, DB schema (25 tables), API contracts, test suites (52 suites, 300+ checks), known limitations, integrations, and deployment. Use for feature dev, debugging, test writing, infra changes. ALWAYS reads actual source files before writing code — this document is a navigation aid, not ground truth.
 tools: Read, Glob, Grep, Bash, Edit, Write
 model: sonnet
 ---
@@ -50,7 +50,7 @@ Before writing **any** code that touches a file:
 2. Verify the function signatures, field names, table names match what you see here
 3. If there is a discrepancy, trust the file — update your mental model, not the file
 
-This document snapshots the codebase as of 2026-04-09. Schema, routes, and helper signatures evolve. Never write SQL, API calls, or test code based solely on this document.
+This document snapshots the codebase as of 2026-04-17. Schema, routes, and helper signatures evolve. Never write SQL, API calls, or test code based solely on this document.
 
 ---
 
@@ -60,7 +60,7 @@ This document snapshots the codebase as of 2026-04-09. Schema, routes, and helpe
 | Layer | Tech | Path |
 |-------|------|------|
 | API Worker | Cloudflare Workers + Hono | `vantage-worker/src/` |
-| Database | Cloudflare D1 (SQLite) | 8 tables (see schema below) |
+| Database | Cloudflare D1 (SQLite) | 25 tables (see schema below) |
 | KV | Cloudflare KV | Rate limiting, SSE broadcast, alert throttle, session/recovery tokens |
 | Frontend | Cloudflare Pages | `vantage-final-v4/` — static HTML/CSS/JS + Chart.js |
 | Email | Resend API | `RESEND_API_KEY` wrangler secret |
@@ -95,9 +95,9 @@ Only SHA-256 hash stored. Raw key shown once at signup. Never log or commit.
 
 ---
 
-## DATABASE SCHEMA (8 tables)
+## DATABASE SCHEMA (25 tables)
 
-> **VERIFY BEFORE USE — this snapshot was accurate on 2026-04-09 and WILL drift.**
+> **VERIFY BEFORE USE — this snapshot was accurate on 2026-04-17 and WILL drift.**
 >
 > Before writing ANY SQL, migration, or query, run these commands:
 > ```bash
@@ -194,7 +194,7 @@ raw_data TEXT  -- JSON
 > ```bash
 > grep -n "app\.\(get\|post\|patch\|delete\)" vantage-worker/src/routes/<file>.ts
 > ```
-> Route files by group: `events.ts`, `analytics.ts`, `cross-platform.ts`, `auth.ts`, `otel.ts`, `stream.ts`, `alerts.ts`
+> Route files by group: `events.ts`, `analytics.ts`, `cross-platform.ts`, `auth.ts`, `otel.ts`, `stream.ts`, `alerts.ts`, `cache.ts`, `prompts.ts`, `benchmark.ts`
 >
 > If a route you expect is missing from grep output, it does not exist — do not assume this doc is correct.
 
@@ -235,6 +235,24 @@ raw_data TEXT  -- JSON
 - `POST /v1/alerts/slack/:orgId`
 - `GET /v1/alerts/config/:orgId`
 
+### Semantic Cache — `vantage-worker/src/routes/cache.ts`
+- `GET /v1/cache/stats` — hit rate, wasted cost USD, dedup count
+- `POST /v1/cache/lookup` — similarity lookup (Vectorize embeddings)
+- `POST /v1/cache/store` — store prompt vector + response
+
+### Prompt Registry — `vantage-worker/src/routes/prompts.ts`
+- `GET /v1/prompts` — list prompts for org
+- `POST /v1/prompts` — create prompt with version
+- `GET /v1/prompts/:id` — get prompt + version history
+- `PATCH /v1/prompts/:id` — update prompt (creates new version)
+- `DELETE /v1/prompts/:id` — soft delete
+- `POST /v1/prompts/:id/usage` — record prompt usage event
+
+### Benchmarks — `vantage-worker/src/routes/benchmark.ts`
+- `GET /v1/benchmark/public` — public leaderboard (no auth required)
+- `GET /v1/benchmark/snapshots` — org benchmark history
+- `POST /v1/benchmark/snapshots` — submit benchmark snapshot
+
 ---
 
 ## RATE LIMITING
@@ -266,7 +284,7 @@ Counter increments ONLY on auth failure — not on every request
 
 ---
 
-## TEST SUITE (38 suites)
+## TEST SUITE (52 suites)
 
 ### CI on Every PR (`ci-pr-gate.yml`)
 Runs: `python -m pytest tests/ -q --tb=short -x --ignore=tests/test_integration.py`
@@ -396,7 +414,7 @@ COST=$(curl -s -H "Authorization: Bearer $VANTAGE_KEY" \
 | prompt_hash | Must be 32–128 char lowercase hex | Validation in events.ts | Min: `hashlib.sha256().hexdigest()[:32]` |
 | Semantic cache | Exact-match dedup only | No embedding similarity yet | Fuzzy matching is roadmap Sprint 3 |
 | otel_events table | May not exist in older deploys | Created lazily | OTel inserts wrapped in try/catch |
-| cross_platform timestamp | TEXT not INTEGER | Legacy schema decision | Use `'YYYY-MM-DD HH:MM:SS'` format; don't apply unix epoch assumptions |
+| cross_platform timestamp | TEXT not INTEGER | Legacy schema decision | Use `'YYYY-MM-DD HH:MM:SS'` format; don't apply unix epoch assumptions. **Fixed in PR #67** — all analytics routes now bind correct type per table. |
 
 ---
 
