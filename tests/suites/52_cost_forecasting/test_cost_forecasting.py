@@ -145,14 +145,14 @@ class TestForecastEdgeCases:
         chk("float or null", True)
 
     def test_CF10_days_until_exhausted_positive_or_null(self):
-        """CF.10 — days_until_budget_exhausted is positive int or null, never negative."""
+        """CF.10 — days_until_budget_exhausted is non-negative int or null (0 = budget already exceeded)."""
         section("CF.10 — days > 0 or null")
         r = _api("/v1/analytics/summary")
         assert r.status_code == 200
         body = r.json()
         assert "days_until_budget_exhausted" in body
         days = body["days_until_budget_exhausted"]
-        assert days is None or days > 0, f"expected positive or null, got {days}"
+        assert days is None or days >= 0, f"expected non-negative or null, got {days}"
         chk("positive or null", True)
 
     def test_CF11_member_also_gets_forecast_fields(self):
