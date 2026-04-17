@@ -66,6 +66,30 @@ optimizer.post('/compress', async (c) => {
     ? Math.round((1 - compressedTokens / originalTokens) * 10000) / 100
     : 0;
 
+  // Persist optimization event (fire-and-forget — don't block the response)
+  const orgId = c.get('orgId');
+  if (orgId) {
+    const optimizationTags = JSON.stringify({
+      optimization: {
+        type: 'compress',
+        improvement_factor: originalTokens > 0
+          ? Math.round((originalTokens / Math.max(compressedTokens, 1)) * 10) / 10
+          : 1.0,
+        tokens_saved: tokensSaved,
+        cost_before_usd: null,
+        cost_after_usd: null,
+        compression_ratio_pct: compressionRatio,
+      },
+    });
+    c.env.DB.prepare(
+      `INSERT INTO events (id, org_id, model, prompt_tokens, completion_tokens, cache_tokens, total_tokens, cost_usd, tags)
+       VALUES (?, ?, 'optimizer/compress', ?, ?, 0, ?, 0, ?)`
+    )
+      .bind(crypto.randomUUID(), orgId, originalTokens, compressedTokens, originalTokens, optimizationTags)
+      .run()
+      .catch((e: unknown) => console.error('optimizer compress tag insert failed', e));
+  }
+
   return c.json({
     original_prompt:   original,
     compressed_prompt: compressed,
