@@ -347,6 +347,29 @@ function computeOptimizationImpact(
   };
 }
 
+interface ModelMultiplier {
+  model: string;
+  cost_usd: number;
+  multiplier: string;
+}
+
+function buildModelMultipliers(inputTokens: number, outputTokens: number): ModelMultiplier[] {
+  const entries = Object.entries(MODEL_RATES).map(([model, rates]) => ({
+    model,
+    cost_usd: ((inputTokens / 1000) * rates.input) + ((outputTokens / 1000) * rates.output),
+  }));
+  entries.sort((a, b) => a.cost_usd - b.cost_usd);
+  const cheapestCost = entries[0]?.cost_usd ?? 1;
+  return entries.map(e => {
+    const ratio = cheapestCost > 0 ? Math.round((e.cost_usd / cheapestCost) * 10) / 10 : 1;
+    return {
+      model: e.model,
+      cost_usd: Math.round(e.cost_usd * 1_000_000) / 1_000_000,
+      multiplier: ratio <= 1.1 ? '1x (cheapest)' : `${ratio}x more expensive`,
+    };
+  });
+}
+
 /** Find the cheapest model for given token counts. */
 function findCheapest(inputTokens: number, outputTokens: number) {
   let best = { model: '', totalCost: Infinity, provider: '' };
@@ -859,6 +882,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const cheapest = findCheapest(inputTokens, outputTokens);
         const tips = getOptimizationTips(text);
 
+        const multipliers = buildModelMultipliers(inputTokens, outputTokens);
+        const topFive = multipliers.slice(0, 5);
+
         const lines = [
           `📊 **Token Analysis**`,
           ``,
@@ -873,9 +899,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           `| **Total cost** | **$${cost.totalCost.toFixed(6)}** |`,
           ``,
           `💡 Cheapest alternative: **${cheapest.model}** at $${cheapest.totalCost.toFixed(6)} (save $${(cost.totalCost - cheapest.totalCost).toFixed(6)})`,
+          ``,
+          `**Model cost comparison (cheapest first):**`,
+          ...topFive.map(m => `- ${m.model}: $${m.cost_usd.toFixed(6)} (${m.multiplier})`),
           ...(tips.length > 0 ? ['', '**Optimization tips:**', ...tips.map(t => `- ${t}`)] : []),
         ];
-        return { content: [{ type: 'text', text: lines.join('\n') }] };
+        return {
+          content: [{ type: 'text', text: lines.join('\n') }],
+          model_multipliers: multipliers,
+        };
       }
 
       case 'estimate_costs': {
