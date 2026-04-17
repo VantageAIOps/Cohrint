@@ -307,6 +307,16 @@ admin.delete('/team-budgets/:team', async (c) => {
   return c.json({ ok: true });
 });
 
+// ── GET /v1/admin/org — fetch org settings ────────────────────────────────────
+admin.get('/org', async (c) => {
+  const orgId = c.get('orgId');
+  const row = await c.env.DB.prepare(
+    `SELECT id, name, budget_usd, benchmark_opt_in FROM orgs WHERE id = ?`
+  ).bind(orgId).first<{ id: string; name: string; budget_usd: number; benchmark_opt_in: number }>();
+  if (!row) return c.json({ error: 'Org not found' }, 404);
+  return c.json({ org: { ...row, benchmark_opt_in: row.benchmark_opt_in === 1 } });
+});
+
 // ── PATCH /v1/admin/org — update org-level budget, name, or benchmark opt-in ─
 admin.patch('/org', async (c) => {
   const orgId = c.get('orgId');
