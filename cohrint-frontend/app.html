@@ -843,6 +843,16 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
             <div class="kpi-value" id="kpiStreamingReqs">&mdash;</div>
             <div class="kpi-sub neutral" id="kpiStreamingReqsSub">&nbsp;</div>
           </div>
+          <div class="kpi-card animate-in delay-9" data-insight="Projected total spend by end of month based on your daily average so far. Use this to anticipate overage before it happens.">
+            <div class="kpi-label">Projected Month-End</div>
+            <div class="kpi-value" id="kpiProjected" style="color:var(--accent-amber);">&mdash;</div>
+            <div class="kpi-sub neutral" id="kpiProjectedSub">&nbsp;</div>
+          </div>
+          <div class="kpi-card animate-in delay-10" data-insight="Days until your monthly budget is exhausted at the current spend rate. Only shown when a budget is set.">
+            <div class="kpi-label">Budget Runway</div>
+            <div class="kpi-value" id="kpiBudgetRunway">&mdash;</div>
+            <div class="kpi-sub neutral" id="kpiBudgetRunwaySub">&nbsp;</div>
+          </div>
         </div>
 
         <div class="chart-row animate-in delay-5">
@@ -2342,6 +2352,7 @@ function loadOverview() {
     apiFetch('/v1/cross-platform/live?limit=30').catch(function() { return null; }),
     apiFetch('/v1/analytics/kpis?period=' + period).catch(function() { return null; }),
     apiFetch('/v1/analytics/timeseries?period=' + period).catch(function() { return null; }),
+    apiFetch('/v1/analytics/summary').catch(function() { return null; }),
   ]).then(function(results) {
     if (gen !== _renderGen) return; // stale render — a newer one is in flight
     _skelOff();
@@ -2350,6 +2361,7 @@ function loadOverview() {
     var live = results[2];
     var kpis = results[3];
     var timeseries = results[4];
+    var analyticsSum = results[5];
 
     if (!summary) {
       document.getElementById('kpiTotalSpend').textContent = 'Error';
@@ -2467,6 +2479,39 @@ function loadOverview() {
       streamEl.textContent = fmtNum(streamingReqs);
       if (streamSubEl && totalKpiReqs > 0) {
         streamSubEl.textContent = Math.round((streamingReqs / totalKpiReqs) * 100) + '% of all requests';
+      }
+    }
+
+    // Forecast KPI cards — sourced from /v1/analytics/summary
+    if (analyticsSum) {
+      var projected = analyticsSum.projected_month_end_usd;
+      var dailyAvg  = analyticsSum.daily_avg_cost_usd;
+      var runway    = analyticsSum.days_until_budget_exhausted;
+
+      var projEl    = document.getElementById('kpiProjected');
+      var projSubEl = document.getElementById('kpiProjectedSub');
+      if (projEl && projected != null) {
+        projEl.textContent = fmt(projected);
+        if (projSubEl && dailyAvg != null) {
+          projSubEl.textContent = fmt(dailyAvg) + '/day avg';
+        }
+      }
+
+      var runwayEl    = document.getElementById('kpiBudgetRunway');
+      var runwaySubEl = document.getElementById('kpiBudgetRunwaySub');
+      if (runwayEl) {
+        if (runway === null || runway === undefined) {
+          runwayEl.textContent = '\u2014';
+          if (runwaySubEl) runwaySubEl.textContent = 'No budget set';
+        } else if (runway === 0) {
+          runwayEl.textContent = 'Exceeded';
+          runwayEl.style.color = 'var(--accent-red)';
+          if (runwaySubEl) runwaySubEl.textContent = 'Budget exhausted';
+        } else {
+          runwayEl.textContent = runway + 'd';
+          runwayEl.style.color = runway <= 7 ? 'var(--accent-red)' : runway <= 14 ? 'var(--accent-amber)' : 'var(--accent-green)';
+          if (runwaySubEl) runwaySubEl.textContent = runway + ' days remaining';
+        }
       }
     }
 

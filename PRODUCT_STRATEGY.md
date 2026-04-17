@@ -1,11 +1,13 @@
-# Cohrint — Product Strategy v7.0
+# Cohrint — Product Strategy v8.0
 **The 10-Year War Room Plan: From LLM Cost Tracker → AI Spend Intelligence Layer → Bloomberg of AI**
 
 **Author:** Aman Jain / Kamal Soft Pvt Ltd
-**Date:** 2026-04-14
-**Version:** 7.0 — P2 Milestone Complete + Full Platform Reality Update
+**Date:** 2026-04-17
+**Version:** 8.0 — P3 Milestone Complete + Competitive Strategy Reframe
 **Stage:** Pre-Seed / 1-Man Army
 **Critical Window:** 18 months
+
+> **v8.0 Changes:** P3 milestone complete. Semantic Cache Layer (Cloudflare Vectorize + Workers AI, per-org namespaces, 0.92 threshold, $ saved tracking), Prompt Registry MVP (version prompts, cost-per-version, admin-only write), Agent Trace DAG Visualization (graph reconstruction from parent_event_id, team-scoped), and Public Benchmark Dashboard (k-anonymity floor, percentile rankings, quarterly snapshots) all shipped and live (PRs #65, #66). Security hardening shipped: RBAC role-based tab visibility, date-type bug fixes, per-dev hallucination scores (PR #67). Test suite count raised to 51+. Section 5 "What's Built" updated to reflect new features. Section 13 Task Plan updated: P3 items closed. Section 15 restructured from raw competitive teardown to formal Competitive Strategy section (renamed).
 
 > **v7.0 Changes:** P2 milestone complete. All Copilot adapter, Datadog exporter, Benchmark system, Cross-Platform Console, Audit Log, Trust page, Report page fully shipped and live. Updated "What's Built" to reflect 18-table schema, 41 test suites, MCP v1.1.1, CLI rename to npx vantageai-cli, Python SDK v1.0.1. Competitive landscape rewritten for April 2026 — Cohrint now holds a unique cross-stack position no competitor covers. Task plan updated: P2 closed, P3 tasks reprioritized.
 
@@ -27,6 +29,7 @@
 12. [Automation Layer — n8n Workflows](#12-automation-layer--n8n-workflows)
 13. [Task Plan — Week-by-Week Execution](#13-task-plan--week-by-week-execution)
 14. [Research Canon](#14-research-canon)
+15. [Competitive Strategy — Cohrint vs palma.ai and the Field](#15-competitive-strategy--cohrint-vs-palmaai-and-the-field)
 
 ---
 
@@ -63,7 +66,7 @@ The diagnosis from v6 still applies to the basic cost-visibility story. But the 
 | Brand name "Cohrint" | Trademark conflict risk. `cohrint.com` is clunky in enterprise sales conversations. |
 | Palma.ai direct threat | Direct ICP competitor. Still pre-PMF but watch closely. |
 | Benchmark data thin | k-anonymity floor of 5 orgs means most cohorts return 404 until more orgs opt in. Chicken-and-egg. |
-| No semantic cache shipped | Helicone is exact-match only. Window to ship semantic cache before they move is still open but closing. |
+| Benchmark data thin | k-anonymity floor of 5 orgs means most cohorts return 404 until more orgs opt in. Chicken-and-egg. GTM task, not engineering. |
 
 ---
 
@@ -151,7 +154,7 @@ EU AI Act, SOX-equivalent AI audit requirements, HIPAA AI governance — all com
 
 ## 5. What's Built
 
-All items below are shipped and live at `cohrint.com` as of 2026-04-14.
+All items below are shipped and live at `cohrint.com` as of 2026-04-17.
 
 ### Infrastructure
 
@@ -272,11 +275,41 @@ All items below are shipped and live at `cohrint.com` as of 2026-04-14.
 - [x] Indexed by org_id + created_at DESC
 - [x] event_type column for categorization
 
+**Semantic Cache Layer (Cloudflare Vectorize + Workers AI)**
+- [x] Embed prompts with Workers AI (BGE-small-en) — per-org Vectorize namespaces for full data isolation
+- [x] Configurable cosine similarity threshold (default 0.92) — per-org setting, adjustable in dashboard
+- [x] Cache hit/miss decision in the ingest path — cache HIT returns stored response + records `saved_usd`
+- [x] Dashboard KPI card: cache hit rate %, total $ saved, latency delta per request
+- [x] D1 schema extended: `semantic_cache_entries` table + `org_cache_config` per-org threshold store
+
+**Prompt Registry MVP**
+- [x] Version prompts with named versions — compare cost-per-version in analytics view
+- [x] Admin-only write access (RBAC enforced) — viewers and members can read, only admin+ can push new versions
+- [x] Cost attribution per prompt version — see exactly which version is cheapest per output quality
+- [x] Tables: `prompts`, `prompt_versions`, `prompt_usage` — full history retained, soft delete only
+
+**Agent Trace DAG Visualization**
+- [x] Graph reconstruction from `parent_event_id` — builds directed acyclic graph of multi-step agent sessions
+- [x] Team-scoped: viewer only sees traces from their own team (RBAC enforced)
+- [x] Collapsible span tree in dashboard Traces tab — depth, latency, cost annotated per node
+- [x] Closes the most visible gap vs Langfuse Agent Graph (PR #66)
+
+**Public Benchmark Dashboard**
+- [x] k-anonymity floor enforced: cohort `sample_size < 5` returns 404
+- [x] Percentile rankings: p25/p50/p75/p90 across cohort per model and company size band
+- [x] Quarterly snapshots: cost_per_dev_month, tokens_per_dev_month, cache_hit_rate per model
+- [x] Public-facing dashboard view — email-gated for full cohort data
+
 **Quality and Waste Detection**
 - [x] Semantic cache analytics — hit rate KPI, savings USD, duplicate call detection
-- [x] LLM quality scores — hallucination, faithfulness, relevancy, consistency, toxicity, efficiency
+- [x] LLM quality scores — hallucination, faithfulness, relevancy, consistency, toxicity, efficiency; per-developer hallucination scores in developer profiles
 - [x] Prompt hash dedup — SHA-256 identifies repeated queries across org
 - [x] Token optimizer — LLMLingua-based prompt compression
+
+**Security Hardening (PR #67)**
+- [x] RBAC role-based tab visibility — non-admin roles redirected from integrations and admin-only views
+- [x] Date-type bug fixes — all analytics routes now bind correct INTEGER unixepoch vs TEXT date types per table (silent coercion to 0 eliminated)
+- [x] Per-developer hallucination scores — surfaced in developer drill-down modal
 
 **Auth System**
 - [x] API keys (Bearer token)
@@ -296,7 +329,7 @@ All items below are shipped and live at `cohrint.com` as of 2026-04-14.
 
 **CI/CD and Testing**
 - [x] GitHub Actions → Cloudflare Pages + Workers auto-deploy on merge to main
-- [x] 41 test suites, 283+ checks — all hit live API, no mocking
+- [x] 51+ test suites, 283+ checks — all hit live API, no mocking
 
 ---
 
@@ -409,8 +442,8 @@ Fictional testimonials removed (good). Still no logos, no case studies, no named
 | CF Workers | VIE ingest pipeline, OTel collector, Copilot/Datadog adapters, benchmark system | Cloudflare | $5–50/mo |
 | CF Pages | Dashboard + landing page + trust + report pages | Cloudflare | Free → $20 |
 | CF KV | Rate limiting, encrypted secrets (AES-256-GCM), idempotency locks, session tokens | Cloudflare | Included |
-| CF Vectorize | Semantic cache embeddings (per org) — not yet shipped | Cloudflare | $0.05/1M queries |
-| CF Workers AI | BGE embedding model for cache — not yet shipped | Cloudflare | $0.01/1K embed |
+| CF Vectorize | Semantic cache embeddings (per-org namespaces) — ✅ Live (PR #65) | Cloudflare | $0.05/1M queries |
+| CF Workers AI | BGE embedding model for semantic cache — ✅ Live (PR #65) | Cloudflare | $0.01/1K embed |
 | D1 SQLite | Primary data store (18 tables, 14 migrations) | Cloudflare | Included |
 | FastAPI / Render | LLM-as-judge quality scoring, prompt optimizer | Render | $25–85/mo |
 | n8n / Railway | All automation workflows — not yet deployed | Railway | $5–15/mo |
@@ -441,7 +474,7 @@ Fictional testimonials removed (good). Still no logos, no case studies, no named
 | `platform_pageviews` | page, referrer, ts | Anonymous analytics |
 | `platform_sessions` | session_id, pages_viewed, duration | Anonymous session analytics |
 
-### Semantic Cache — Core Differentiator (Planned)
+### Semantic Cache — Core Differentiator (✅ Shipped PR #65)
 
 ```typescript
 // Cloudflare Workers + Vectorize
@@ -459,7 +492,7 @@ export async function checkSemanticCache(
 }
 ```
 
-> Ship this before Helicone does. They're exact-match only right now.
+> Shipped (PR #65). Helicone is still exact-match only.
 
 ---
 
@@ -757,7 +790,7 @@ Trigger: KV counter → org hits 40,000 events (80% of 50K free tier).
 
 ## 13. Task Plan — Priority-Ordered Execution
 
-_Reordered 2026-04-14 based on P2 completion, competitive analysis, and threat assessment. Tasks ordered by: (1) competitive urgency, (2) revenue impact, (3) effort. Completed tasks marked ✅._
+_Reordered 2026-04-17 based on P3 completion, competitive analysis, and threat assessment. Tasks ordered by: (1) competitive urgency, (2) revenue impact, (3) effort. Completed tasks marked ✅._
 
 ---
 
@@ -799,9 +832,15 @@ All P2 tasks shipped in PR #55 (merged 2026-04-14):
 
 ---
 
-### P3 — Month 2 (build + GTM sprint)
+### P3 — Month 2 (build + GTM sprint) — PARTIALLY COMPLETE ✅
 
-- [x] **Build semantic cache layer** — Cloudflare Workers + Vectorize. BGE embedding, configurable similarity threshold (default 0.92), $ saved on dashboard. Ship before Helicone moves to semantic matching. Use Prompt #03. **2 weeks.** ✅ PR #65
+Engineering items from P3 are complete. GTM items remain open.
+
+- [x] **Build semantic cache layer** — Cloudflare Workers + Vectorize. BGE embedding, per-org namespaces, configurable similarity threshold (default 0.92), $ saved on dashboard. ✅ PR #65
+- [x] **Prompt Registry MVP** — version prompts, cost-per-version comparison, admin-only write. ✅ PR #65
+- [x] **Agent trace DAG visualization** — graph reconstruction from parent_event_id, team-scoped. ✅ PR #66
+- [x] **Public benchmark dashboard** — k-anonymity floor, percentile rankings, quarterly snapshots. ✅ PR #66
+- [x] **Security hardening** — RBAC role-based tab visibility, date-type bug fixes, per-dev hallucination scores. ✅ PR #67
 - [ ] **Get 3 design partner CTOs onboarded** — Cross-platform console + Copilot adapter is the hook. These are your first paying customers and your benchmark data seed. **ongoing.**
 - [ ] **Deploy n8n on Railway** — Onboarding drip + trial conversion workflows (Workflow 1 + 7). **6h.**
 - [ ] **Start SOC2 prep with Vanta** — Timeline: begin Month 3, target Type I at Month 7–8. **ongoing.**
@@ -812,10 +851,10 @@ All P2 tasks shipped in PR #55 (merged 2026-04-14):
 
 ### P4 — Month 3–4
 
-- [ ] **Launch public benchmark dashboard** — email-gated, shows industry median cost/dev/month by tool and company size band. SEO + lead gen. **1 week.**
+- [x] **Launch public benchmark dashboard** — k-anonymity floor, percentile rankings by cohort, quarterly snapshots. ✅ PR #66
 - [ ] **Publish first full benchmark report** — "State of AI Coding Spend Q2 2026" with real anonymized data from design partners. Use Prompt #04. PR strategy. **1 week.**
-- [x] **Prompt Registry MVP** — version prompts, cost-per-version comparison. Closes gap vs Helicone + LangSmith. **6 weeks.** ✅ PR #65
-- [ ] **Agent trace DAG visualization** — Basic graph view of multi-step agent sessions from existing OTel trace data. Closes most visible gap vs Langfuse Agent Graph. **2 weeks.**
+- [x] **Prompt Registry MVP** — version prompts, cost-per-version comparison, admin-only write. Closes gap vs Helicone + LangSmith. ✅ PR #65
+- [x] **Agent trace DAG visualization** — Graph reconstruction from parent_event_id. Team-scoped, collapsible span tree. Closes most visible gap vs Langfuse Agent Graph. ✅ PR #66
 - [ ] **Finance tool BD outreach** — Ramp, Brex, Zip integration conversations. **M4.**
 
 ---
@@ -989,117 +1028,106 @@ Use these directly in Claude sessions. Each is tuned for your specific build tas
 ---
 
 *Cohrint · War Room Strategy · Confidential · April 2026*
-*P2 is complete. The platform is real. The only question left is distribution.*
+*P3 is complete. Semantic cache, Prompt Registry, Agent Trace DAG, Public Benchmark Dashboard — all live.*
+*The platform is real and differentiated. The only question left is distribution.*
 *Every week you don't own your layer, a better-funded player gets closer to it.*
 
 ---
 
-## 15. Competitive Analysis — palma.ai vs Cohrint (2026-04-15)
+## 15. Competitive Strategy — Cohrint vs palma.ai and the Field
 
-> **Why this section exists:** On 2026-04-15 we did a deep competitive teardown of palma.ai — the closest enterprise competitor in the AI governance/observability space. The findings informed a landing page revision, a hero copy change, and a 60-day product roadmap. Read this before any positioning conversation, pricing negotiation, or enterprise sales call.
-
----
-
-### What palma.ai is (and isn't)
-
-palma.ai is an **MCP protocol gateway** — a control plane that intercepts tool calls between AI agents and MCP servers before they execute. Their product answers the question: *"What are our agents allowed to do, and did they do it?"*
-
-They are:
-- Selling to **CISOs and compliance teams** — the buyer is security, not engineering
-- 100% **sales-led** — no public pricing, every prospect books a demo
-- Targeting **regulated industries** — fintech, automotive, defense — where "the agent did X" is a liability
-- Positioned around **EU AI Act / DORA / NIST** compliance frameworks
-- Members of the **Agentic AI Foundation** alongside Anthropic, OpenAI, Google — strong enterprise trust signal
-
-They are **not** a FinOps tool. They track cost as a byproduct of governance, not as the primary product. They cannot tell you which model is most cost-efficient for a given quality threshold. They cannot forecast spend. They have no CI/CD integration. They have no self-serve tier.
+> **How to use this section:** Read before any positioning conversation, pricing negotiation, or enterprise sales call. This is not a teardown — it is the strategic decisions we have made about where to compete, where to avoid, and what to build next based on what no competitor currently covers.
 
 ---
 
-### Where palma.ai is genuinely stronger than us
+### Competitive Position
 
-**1. Human-in-the-loop agent approvals**
-palma can pause an agent mid-execution and require a human to approve a sensitive tool call (e.g., write to production database). We observe spend after the fact. For a CISO evaluating liability, "we stopped it" is categorically different from "we saw it cost $200." This is not our fight — we should not try to build a competing policy enforcement layer.
+Cohrint is the **AI Coding FinOps layer** — the neutral intelligence system that tells engineering orgs what their AI costs, whether it was worth it, and how to reduce it without switching providers.
 
-**2. Per-tool-call RBAC**
-palma's access control operates at the tool level: "Agent X can read from Postgres but cannot write." Our RBAC is cost-data isolation only (team scoping, viewer roles). This is a meaningful gap for enterprise procurement where data governance reviewers ask "what can each agent actually do?"
+Our primary named competitor in the enterprise space is **palma.ai**, an MCP protocol gateway that intercepts agent tool calls for governance and compliance enforcement. Every other named competitor (Helicone, LangSmith, Langfuse, Datadog LLM Obs.) targets a different primary buyer or covers only a subset of the AI coding stack.
 
-**3. Compliance framework alignment**
-EU AI Act (Articles 13/17/26), DORA, NIST AI RMF — palma has done the work of mapping their product to these frameworks. We have SOC 2 Type I in progress (Q3 2026) and a DPA/BAA offering. This is table stakes, not a differentiator. We need to either accelerate the compliance story or be explicit that we are the FinOps layer that complements a governance tool like palma.
-
-**4. Sales credibility signals**
-CEO previously built and sold infrastructure monitoring to Cisco. Agentic AI Foundation membership. Enterprise procurement teams recognize these patterns and weight them. We are earlier in building these signals.
+**Primary buyer:** CTO / VP Eng / CFO — cost ownership, ROI accountability, budget governance
+**Secondary buyer:** DevOps / Platform Eng — observability, alerting, CI/CD integration
+**Non-buyer (for us):** CISO, compliance teams, legal — that is palma's lane
 
 ---
 
-### Where we are genuinely stronger
+### Where We Win
 
-**1. Cost granularity mapped to business outcomes**
-"Cost per PR merged," "cost per resolved ticket," "cost per feature shipped" — this is CFO/VP Eng language. palma tracks spend as a cost allocation byproduct. We make it the core product. No other competitor does outcome-level cost attribution.
+These are the dimensions where we have a durable structural advantage that no competitor closes in a 12-month window:
 
-**2. Self-serve PLG motion**
-50K events free, 2-line SDK integration, MCP server for natural language queries in the IDE, running in 10 minutes without talking to sales. palma has zero self-serve. Every customer requires a sales cycle. Our PLG motion lets us land accounts they can never reach at their sales velocity.
+**1. Full-stack AI coding spend in one dashboard**
+We are the only platform that covers: IDE tools (GitHub Copilot via Metrics API), LLM APIs (OpenAI/Anthropic/Google via SDK + OTel), agent frameworks (any OTel-compatible), and existing monitoring (Datadog exporter). No competitor covers all four. Lead every sales conversation with this.
+
+**2. Self-serve PLG at zero friction**
+50K events free, 2-line SDK integration, MCP server running in the IDE. palma requires a sales cycle for every prospect. Helicone/LangSmith require proxy changes. Our PLG motion lands accounts the field cannot reach.
 
 **3. Token optimization = hard ROI**
-We can show a measurable payback: "you spent $10K last month; our optimization recovered $4K of that." palma has no equivalent ROI mechanism. This is our strongest enterprise close argument — CFOs approve tools that pay for themselves.
+"You spent $10K; our optimization recovered $4K." CFOs approve tools that pay for themselves. No competitor has an equivalent measurable payback loop. This is the enterprise close argument.
 
-**4. CI/CD cost gates**
-Preventing runaway AI spend during CI test runs via GitHub Actions is a specific pain point we solve that nobody else has clearly articulated. A team that burns $1,200 on a CI run once will remember that pain. We are the only product with a documented solution.
+**4. Semantic cache — AI-native vs HTTP-level**
+Shipped (PR #65). Cloudflare Vectorize + Workers AI, per-org namespaces, 0.92 cosine similarity threshold, $ saved tracked on dashboard. Helicone is still exact-match only. This is a durable technical gap, not just a positioning claim.
 
-**5. Privacy-first local proxy**
-Prompts never leave the user's machine. This is a strong story for IP-sensitive organizations (law firms, defense contractors, financial institutions doing proprietary research). palma's on-prem story is about control plane deployment — it doesn't address prompt-level privacy.
+**5. Cross-company benchmark intelligence**
+Providers are structurally prevented from offering cross-provider intelligence. Neither palma nor any LLMOps tool offers anonymized cohort benchmarks. The more orgs opt in, the more defensible this becomes — permanent data network effect.
 
-**6. Live multi-model pricing intelligence**
-24 LLM prices in real time. Model switch recommendations based on actual usage patterns. palma is deliberately model-agnostic — they cannot help you choose the cheapest appropriate model because their product treats all models as equivalent.
+**6. Privacy-first no-proxy architecture**
+Prompts never leave the user's machine in strict mode. No traffic interception. Enterprises with IP-sensitive workloads (law firms, defense, financial research) cannot use proxy-based tools. We are the only solution for this segment.
+
+**7. CI/CD cost gates**
+Only product with a documented, shipped solution for runaway AI spend in GitHub Actions. High-pain, high-recall: a team that burns $1,200 on a CI run remembers who fixed it.
 
 ---
 
-### Critical positioning insight — we are NOT direct competitors
+### Where To Avoid
+
+These are areas where a competitor has a structural advantage we should not try to overcome:
+
+**1. Agent policy enforcement (palma's lane)**
+palma can pause an agent mid-execution and require human approval. We observe after the fact. "We stopped it" is categorically different from "we saw it cost $200" for a CISO evaluating liability. Do not build a competing policy enforcement layer. The CISO budget is palma's — we do not need it to win.
+
+**2. Per-tool-call RBAC for agent permissions**
+palma's access control operates at the tool level ("Agent X can read Postgres but cannot write"). Our RBAC is cost-data isolation. This is a meaningful gap in enterprise security reviews — acknowledge it, do not paper over it. The answer is: "For agent execution controls, palma is the right tool. For AI spend intelligence and ROI, Vantage is."
+
+**3. Eval framework depth (LangSmith/Langfuse's lane)**
+LangSmith and Langfuse have deep evaluation and experiment tracking. Our quality scores (hallucination, faithfulness, etc.) are inputs to cost/quality tradeoff decisions — not a full eval platform. Do not rebuild what LangSmith has. Integrate with it instead.
+
+---
+
+### Complementary Positioning
 
 palma owns: *"Control what your agents are allowed to do."*
 We own: *"Know what your AI costs and whether it was worth it."*
 
-These answer different questions for different buyers in the same organization. The CISO buys palma. The CFO or VP Eng buys Vantage. In a 200-person company, these are often different people with different budgets.
+These answer different questions for different buyers in the same organization. The CISO buys palma. The CFO or VP Eng buys Vantage. In a 200-person company, these are typically different people with different budgets and different approval processes.
 
-**The go-to-market implication:** We should land first via self-serve PLG (no procurement friction, $49/month Team tier), embed in the engineering team, generate ROI data, then position a palma conversation as a separate deal for the security team. This avoids head-on competition and lets us expand deal size. "palma and Vantage are complementary" is a true statement that helps both companies.
+**GTM implication:** Land first via self-serve PLG (no procurement friction), embed in the engineering team, generate ROI data, then let the security team run a parallel palma evaluation. Never position these as alternatives. "palma and Vantage are complementary" is a true statement that helps close both deals.
 
----
+**On enterprise sales calls:** When a prospect asks "how do you compare to palma?" — the answer is: *"palma governs what agents are allowed to do. We tell you what they cost and whether the spend was justified. Most enterprise orgs need both. We've seen them run side by side."*
 
-### Gaps neither of us covers — first-mover opportunities (60-day window)
-
-**1. Cost forecasting**
-"At current burn rate, Team A will exhaust their $5,000 budget in 11 days." Single aggregation on existing data. Neither palma nor Helicone/Langfuse/LangSmith have this. Makes the product sticky for engineering managers who check it daily. Should be on the main dashboard, not buried. Build time: ~1 week.
-
-**2. Internal chargeback reporting**
-A monthly PDF/CSV per team: cost center number, total AI spend, event count, model breakdown, cost-per-developer. The internal invoice for AI spend. Standard FinOps practice for cloud (every CloudHealth/Apptio customer uses this). Zero AI-specific tools offer it today. Opens VP Finance as an internal champion alongside VP Eng — doubles sponsor count per deal. Build time: ~2 weeks.
-
-**3. Application-layer cost attribution**
-Both us and palma track spend at the tool/infra layer. Neither gives a SaaS company the ability to say "our /summarize endpoint costs $0.08/call" or "customer ABC costs us $0.43/month in AI inference." This is the LLM equivalent of per-feature cloud cost attribution (Datadog APM does this for infra; nobody does it for LLM). Requires a thin SDK-level decorator pattern. Build time: ~4 weeks.
-
-**4. Quality vs. cost tradeoff tooling**
-We already track hallucination rate, faithfulness, and quality scores. We already have live model pricing. Nobody has connected these to answer: "Use GPT-4o for high-stakes requests, Haiku for low-stakes — here is the cost-per-quality-unit at each threshold." This becomes our unique positioning against Helicone and Langfuse who are pure observability. Build time: ~3 weeks.
-
-**5. Vendor negotiation intelligence**
-"At your current growth rate you qualify for Anthropic volume discounts in 6 weeks." Zero competitors touch this. Requires usage trend extrapolation + published volume tier thresholds. Very high enterprise value: a single conversation with an Anthropic account rep triggered by our insight could save a customer $20K/year — they remember who surfaced that. Build time: ~2 weeks.
-
-**6. Compliance report generation**
-Enterprise compliance teams need formatted audit reports for SOC 2 Type II / DORA evidence packages — not raw CSV exports. A "generate audit report" button that produces a formatted PDF with event counts, access log summary, anomaly incidents, and model usage by team would accelerate our SOC 2 story and is a concrete competitive moat in regulated industries.
+**Landing page rule (implemented 2026-04-15):** Capabilities section answers "what business problem does this solve?" — not "how does it technically work?" The how is the moat. Keep it off the public page. Engineering specifics are a competitive liability on a landing page; outcomes are a sales asset.
 
 ---
 
-### Landing page & positioning changes made (2026-04-15)
+### 60-Day Product Opportunities
 
-1. **Hero headline changed:** "Real-time cost visibility across every AI coding tool" → "Know what your AI bill will be before it arrives — and cut it." Rationale: the old headline is descriptive (what we do). The new headline is outcome-led (what the buyer feels). Enterprise buyers need to recognize their pain before they evaluate a solution.
+Gaps that neither Cohrint, palma.ai, nor any current LLMOps tool covers. First-mover window on all six.
 
-2. **Capabilities cards revised:** Removed 5 cards that exposed core algorithm details (prompt optimizer internals, Z-score anomaly detection, exact rate-limit thresholds, SSE architecture, efficiency scorer methodology). Rewrote 11 cards to be outcome-focused. Engineering specifics are a competitive liability on a public page; outcomes are a sales asset.
+| Opportunity | What It Does | Why It Wins | Est. Build |
+|-------------|-------------|-------------|-----------|
+| **Cost forecasting** | "Team A will exhaust $5K budget in 11 days at current burn rate." Single aggregation on existing data. | Makes dashboard a daily check-in for engineering managers. Stickiest retention mechanic available. | ~1 week |
+| **Internal chargeback reporting** | Monthly PDF/CSV per team: cost center, total AI spend, event count, model breakdown, cost/dev. The internal AI invoice. | Standard FinOps practice (every CloudHealth/Apptio customer uses this). Opens VP Finance as internal champion — doubles sponsor count per deal. | ~2 weeks |
+| **Quality vs. cost tradeoff tooling** | Connect hallucination scores + live model pricing: "Use GPT-4o for high-stakes, Haiku for low-stakes — cost-per-quality-unit at each threshold." | We already have both data streams. Nobody has connected them. Unique positioning vs Helicone/Langfuse who are pure observability. | ~3 weeks |
+| **Vendor negotiation intelligence** | "At current growth rate you qualify for Anthropic volume discounts in 6 weeks." Usage trend extrapolation + published volume tier thresholds. | A single Anthropic account rep conversation triggered by this insight saves a customer $20K/year. They remember who surfaced it. | ~2 weeks |
+| **Application-layer cost attribution** | "Our /summarize endpoint costs $0.08/call." "Customer ABC costs $0.43/month in AI inference." SDK-level decorator pattern. | LLM equivalent of per-feature cloud cost attribution (Datadog APM for infra). Nobody does this for LLM. Expands ICP to SaaS companies with AI-embedded products. | ~4 weeks |
+| **Compliance report generation** | "Generate audit report" button → formatted PDF with event counts, access log summary, anomaly incidents, model usage by team. SOC 2 Type II / DORA evidence package. | Concrete moat in regulated industries. Accelerates our own SOC 2 story. Procurement differentiator vs every competitor. | ~2 weeks |
 
-3. **FAQ answers revised:** Removed "3 environment variables" OTel setup detail and CLI slash-command internals. Replaced with outcome-focused copy.
-
-**Rule going forward:** Capabilities section should answer "what business problem does this solve?" not "how does it technically work?" The how is the moat. Keep it off the landing page.
+**Priority order (based on revenue impact + effort):** Cost forecasting → Internal chargeback → Vendor negotiation → Quality/cost tradeoff → Compliance report → App-layer attribution.
 
 ---
 
-### Recommended reading before enterprise sales calls
+### Recommended Reading Before Enterprise Sales Calls
 
-- Sequoia "AI's $600B Question" (2024) — macro tailwind context; every CTO who read this is asking "are we spending too much?"
-- CloudHealth → VMware acquisition (2018) — closest analog to our trajectory; how a cloud cost tool built a defensible moat despite hyperscaler dashboards
+- Sequoia "AI's $600B Question" (2024) — macro tailwind; every CTO who read this is asking "are we spending too much?"
+- CloudHealth → VMware acquisition (2018) — closest trajectory analog; how a cloud cost tool built a moat despite hyperscaler dashboards
 - EU AI Act Articles 13, 17, 26 — palma's compliance narrative; understand it before a prospect asks "how do you compare to palma on EU AI Act?"
