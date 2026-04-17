@@ -2143,8 +2143,10 @@ function apiFetch(path, opts) {
   return fetch(API_BASE + path, Object.assign({}, opts, { headers: headers, credentials: 'include' }))
     .then(function(res) {
       if (res.status === 401) {
-        window.location.replace('/auth.html?next=' + encodeURIComponent(window.location.pathname));
-        return;
+        // Only redirect to auth if the session check itself confirms we're logged out.
+        // Redirecting here causes infinite loops when a single endpoint returns 401
+        // (e.g. permission denied) while the session is otherwise valid.
+        throw new Error('401');
       }
       if (res.status === 429) {
         var retryAfter = parseInt(res.headers.get('Retry-After') || '60', 10);
@@ -2184,7 +2186,12 @@ function initKeyAuth() {
     .catch(function() { console.warn('[cohrint] offline'); return null; })
     .then(function(res) {
       if (!res || !res.ok) {
-        window.location.replace('/auth.html?next=' + encodeURIComponent(window.location.pathname));
+        // Session is genuinely invalid — redirect to sign-in.
+        // Guard against double-redirect in case this is called more than once.
+        if (!window._cohrintRedirecting) {
+          window._cohrintRedirecting = true;
+          window.location.replace('/auth.html?next=' + encodeURIComponent(window.location.pathname));
+        }
         return false;
       }
       return res.json().then(function(data) {
@@ -2193,7 +2200,10 @@ function initKeyAuth() {
         return true;
       }).catch(function(e) {
         console.error('[cohrint] bad session JSON', e);
-        window.location.href = '/auth.html';
+        if (!window._cohrintRedirecting) {
+          window._cohrintRedirecting = true;
+          window.location.href = '/auth.html';
+        }
         return false;
       });
     });
