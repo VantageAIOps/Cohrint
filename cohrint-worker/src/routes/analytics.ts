@@ -352,6 +352,8 @@ analytics.get('/teams', async (c) => {
 // ── GET /v1/analytics/business-units — spend per business unit ────────────────
 analytics.get('/business-units', async (c) => {
   const orgId  = c.get('orgId');
+  const role   = c.get('role') as string;
+  if (!hasRole(role, 'admin')) return c.json({ business_units: [], by_team_provider: [], period_days: 0 });
   const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
   const sinceIso   = sinceText(period);  // cross_platform_usage = TEXT
   const sinceEvts  = sinceUnix(period);  // events               = INTEGER
@@ -424,9 +426,14 @@ analytics.get('/business-units', async (c) => {
 
 // ── GET /v1/analytics/traces?period=1 ────────────────────────────────────────
 analytics.get('/traces', async (c) => {
-  const orgId     = c.get('orgId');
-  const scopeTeam = c.get('scopeTeam');
+  const orgId      = c.get('orgId');
+  const scopeTeam  = c.get('scopeTeam');
+  const role       = c.get('role') as string;
+  const memberEmail = c.get('memberEmail') as string | undefined;
   const { clause, args } = teamScope(scopeTeam);
+  const isPrivileged = hasRole(role, 'admin');
+  const devClause  = isPrivileged ? '' : ' AND developer_email = ?';
+  const devArgs    = isPrivileged ? [] : [memberEmail];
   const period = Math.min(parseInt(c.req.query('period') ?? '1', 10) || 1, 30);
   const since  = sinceUnix(period);
 
@@ -440,11 +447,11 @@ analytics.get('/traces', async (c) => {
       MAX(CASE WHEN parent_event_id IS NULL THEN 1 ELSE 0 END) AS has_root,
       MIN(created_at)      AS started_at
     FROM events
-    WHERE org_id = ? AND trace_id IS NOT NULL AND created_at >= ?${clause}
+    WHERE org_id = ? AND trace_id IS NOT NULL AND created_at >= ?${clause}${devClause}
     GROUP BY trace_id
     ORDER BY started_at DESC
     LIMIT 100
-  `).bind(orgId, since, ...args).all();
+  `).bind(orgId, since, ...args, ...devArgs).all();
 
   return c.json({ traces: results });
 });
@@ -542,20 +549,25 @@ analytics.get('/today', async (c) => {
 
 // ── GET /v1/analytics/cost — CI cost gate ────────────────────────────────────
 analytics.get('/cost', async (c) => {
-  const orgId     = c.get('orgId');
-  const scopeTeam = c.get('scopeTeam');
+  const orgId      = c.get('orgId');
+  const scopeTeam  = c.get('scopeTeam');
+  const role       = c.get('role') as string;
+  const memberEmail = c.get('memberEmail') as string | undefined;
   const { clause, args } = teamScope(scopeTeam);
+  const isPrivileged = hasRole(role, 'admin');
+  const devClause  = isPrivileged ? '' : ' AND developer_email = ?';
+  const devArgs    = isPrivileged ? [] : [memberEmail];
   const period = Math.min(parseInt(c.req.query('period') ?? '7', 10) || 7, 30);
   const since  = sinceUnix(period);
   const today  = todayUnix();
 
   const [total, todayRow] = await c.env.DB.batch([
     c.env.DB.prepare(
-      `SELECT COALESCE(SUM(cost_usd),0) AS cost FROM events WHERE org_id=? AND created_at>=?${clause}`
-    ).bind(orgId, since, ...args),
+      `SELECT COALESCE(SUM(cost_usd),0) AS cost FROM events WHERE org_id=? AND created_at>=?${clause}${devClause}`
+    ).bind(orgId, since, ...args, ...devArgs),
     c.env.DB.prepare(
-      `SELECT COALESCE(SUM(cost_usd),0) AS cost FROM events WHERE org_id=? AND created_at>=?${clause}`
-    ).bind(orgId, today, ...args),
+      `SELECT COALESCE(SUM(cost_usd),0) AS cost FROM events WHERE org_id=? AND created_at>=?${clause}${devClause}`
+    ).bind(orgId, today, ...args, ...devArgs),
   ]);
 
   return c.json({
