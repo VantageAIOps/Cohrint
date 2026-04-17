@@ -52,8 +52,8 @@ function compressPrompt(prompt: string): string {
 
 // ── POST /v1/optimizer/compress ──────────────────────────────────────────────
 optimizer.post('/compress', async (c) => {
-  const body = await c.req.json<{ prompt: string; compression_rate?: number }>();
-  if (!body.prompt) {
+  const body = await c.req.json<{ prompt: string; compression_rate?: number }>().catch(() => null);
+  if (!body?.prompt) {
     return c.json({ error: 'prompt is required' }, 400);
   }
 
@@ -102,8 +102,8 @@ optimizer.post('/compress', async (c) => {
 
 // ── POST /v1/optimizer/analyze ───────────────────────────────────────────────
 optimizer.post('/analyze', async (c) => {
-  const body = await c.req.json<{ text: string; model?: string }>();
-  if (!body.text) {
+  const body = await c.req.json<{ text: string; model?: string }>().catch(() => null);
+  if (!body?.text) {
     return c.json({ error: 'text is required' }, 400);
   }
 
@@ -132,8 +132,8 @@ optimizer.post('/analyze', async (c) => {
 
 // ── POST /v1/optimizer/estimate ──────────────────────────────────────────────
 optimizer.post('/estimate', async (c) => {
-  const body = await c.req.json<{ prompt: string; completion_tokens?: number }>();
-  if (!body.prompt) {
+  const body = await c.req.json<{ prompt: string; completion_tokens?: number }>().catch(() => null);
+  if (!body?.prompt) {
     return c.json({ error: 'prompt is required' }, 400);
   }
 

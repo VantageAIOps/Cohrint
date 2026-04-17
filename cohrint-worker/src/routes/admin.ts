@@ -187,7 +187,7 @@ admin.get('/security', async (c) => {
 
   return c.json({
     audit_events_today: auditToday?.count ?? 0,
-    active_members: (memberCount?.count ?? 0) + 1, // +1 for owner
+    active_members: memberCount?.count ?? 0,
     plan,
     retention_days: retentionDays,
     security_features: {
