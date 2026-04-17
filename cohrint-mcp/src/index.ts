@@ -1184,7 +1184,32 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           `Track all your AI costs at https://cohrint.com/app.html`,
         );
 
-        return { content: [{ type: 'text', text: lines.join('\n') }] };
+        const RECOMMENDATION_MULTIPLIERS: Record<string, { multiplier: string; basis: string }> = {
+          prompt_caching:    { multiplier: '10x',    basis: 'cache_read_vs_input_price' },
+          compress_prompts:  { multiplier: '2-3x',   basis: 'avg_compression_ratio' },
+          model_switch:      { multiplier: '8-60x',  basis: 'model_price_ratio' },
+          context_reset:     { multiplier: '30-50%', basis: 'session_token_reduction' },
+          remove_duplicates: { multiplier: '10-20%', basis: 'dedup_savings' },
+        };
+        const categorizeRec = (tip: Tip): string => {
+          const t = (tip.title + ' ' + tip.action).toLowerCase();
+          if (t.includes('cach')) return 'prompt_caching';
+          if (t.includes('compress') || t.includes('optim') || t.includes('shorter')) return 'compress_prompts';
+          if (t.includes('model') || t.includes('haiku') || t.includes('switch') || t.includes('cheaper')) return 'model_switch';
+          if (t.includes('context') || t.includes('clear') || t.includes('compact')) return 'context_reset';
+          if (t.includes('duplic') || t.includes('repeat')) return 'remove_duplicates';
+          return 'compress_prompts';
+        };
+        const enrichedRecs = tips.slice(0, 7).map(tip => {
+          const category = categorizeRec(tip);
+          const meta = RECOMMENDATION_MULTIPLIERS[category];
+          return { ...tip, estimated_multiplier: meta.multiplier, basis: meta.basis, category };
+        });
+
+        return {
+          content: [{ type: 'text', text: lines.join('\n') }],
+          recommendations: enrichedRecs,
+        };
       }
 
       case 'setup_claude_hook': {
