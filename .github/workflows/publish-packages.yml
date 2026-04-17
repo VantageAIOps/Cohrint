@@ -13,6 +13,13 @@ on:
       - 'cohrint-agent/**'
   workflow_dispatch: # Manual trigger for force-publish
 
+# Only one publish at a time. Rapid merges to main would otherwise queue
+# multiple publish runs that each fetch the registry; detect-changes + 4
+# publish jobs × duplicate runs is the single most expensive way to burn minutes.
+concurrency:
+  group: publish-packages
+  cancel-in-progress: true
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 

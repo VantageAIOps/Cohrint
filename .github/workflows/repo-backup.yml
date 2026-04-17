@@ -17,11 +17,8 @@ env:
   BACKUP_REPO: https://github.com/Amanjain98/Vantage-AI.git
 
 on:
-  push:
-    branches:
-      - main           # backup after every production push
-  schedule:
-    - cron: '0 3 * * 0'    # weekly on Sunday 03:00 UTC (was daily; saves ~120 min/month)
+  # Auto-triggers disabled — weekly cron + push-on-main was billing unnecessary
+  # minutes. Run manually from the Actions tab after major milestones instead.
   workflow_dispatch:        # manual trigger anytime
 
 jobs:

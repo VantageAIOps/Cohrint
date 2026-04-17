@@ -15,6 +15,15 @@ on:
       - '**.ts'
       - '**.js'
       - '**.mjs'
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+
+# Cancel superseded runs on the same PR to avoid billing duplicate invocations
+# when the user pushes a rapid sequence of commits.
+concurrency:
+  group: cost-check-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   cost-gate:
