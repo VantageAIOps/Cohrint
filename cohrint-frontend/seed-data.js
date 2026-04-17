@@ -9,15 +9,15 @@
  *
  * Usage:
  *   <script src="seed-data.js"></script>
- *   const gen = new VantageDataGen();
+ *   const gen = new CohrintDataGen();
  *   await gen.seed();  // generates + stores in IndexedDB
  *   const events = await gen.query({ days: 30 });
  */
 
-class VantageDataGen {
+class CohrintDataGen {
   constructor(orgId = "demo-org") {
     this.orgId   = orgId;
-    this.DB_NAME = "vantage_seed";
+    this.DB_NAME = "cohrint_seed";
     this.DB_VER  = 2;
     this.db      = null;
   }
@@ -70,12 +70,12 @@ class VantageDataGen {
     } = opts;
 
     if (!force && await this.isSeedDone()) {
-      console.log("[vantageai] Already seeded — use seed({ force: true }) to reseed");
+      console.log("[cohrint] Already seeded — use seed({ force: true }) to reseed");
       return;
     }
 
     await this.openDB();
-    console.log(`[vantageai] Generating ${eventsTotal.toLocaleString()} events over ${days} days...`);
+    console.log(`[cohrint] Generating ${eventsTotal.toLocaleString()} events over ${days} days...`);
     const t0 = performance.now();
 
     const BATCH = 500;
@@ -116,7 +116,7 @@ class VantageDataGen {
 
     await this.markSeedDone(generated);
     const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
-    console.log(`[vantageai] Done — ${generated.toLocaleString()} events in ${elapsed}s`);
+    console.log(`[cohrint] Done — ${generated.toLocaleString()} events in ${elapsed}s`);
     return generated;
   }
 
@@ -326,7 +326,7 @@ class VantageDataGen {
       ["claude-opus-4-6",      1],
     ];
     // Map to model objects
-    const ALL_MODELS = window.VANTAGE_MODELS || this._fallbackModels();
+    const ALL_MODELS = window.COHRINT_MODELS || this._fallbackModels();
     return weights.map(([name, w]) => {
       const m = ALL_MODELS.find(x => x.name === name);
       return m ? [m, w] : null;
@@ -374,7 +374,7 @@ class VantageDataGen {
   }
 
   _findCheapest(modelName, promptTokens, completionTokens) {
-    const models = window.VANTAGE_MODELS || this._fallbackModels();
+    const models = window.COHRINT_MODELS || this._fallbackModels();
     const current = models.find(m => m.name === modelName);
     if (!current) return { name: modelName, cost: 0 };
     const currentCost = (promptTokens / 1e6) * current.input + (completionTokens / 1e6) * current.output;
@@ -441,7 +441,7 @@ class VantageDataGen {
   }
 
   _fallbackModels() {
-    // Minimal fallback if vantage-models.js not loaded
+    // Minimal fallback if cohrint-models.js not loaded
     return [
       {name:"gpt-4o",provider:"openai",input:2.50,output:10.00,cacheRead:1.25},
       {name:"claude-sonnet-4-6",provider:"anthropic",input:3.00,output:15.00,cacheRead:0.30},
@@ -502,7 +502,7 @@ class VantageDataGen {
 }
 
 // Auto-attach to window
-window.VantageDataGen = VantageDataGen;
+window.CohrintDataGen = CohrintDataGen;
 
 // Convenience: seed on first load if not done
-window.vantageData = new VantageDataGen("demo-org");
+window.cohrintData = new CohrintDataGen("demo-org");

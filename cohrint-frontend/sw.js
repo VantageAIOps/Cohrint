@@ -9,13 +9,13 @@
  * Auto-update: when a new SW activates, it sends a 'reload' message to all
  * open tabs so they pick up the latest HTML without the user clearing cache.
  */
-const CACHE = 'vantage-v4';
+const CACHE = 'cohrint-v4';
 
 // Static assets that change rarely — cache-first
 const PRECACHE = [
   '/manifest.json',
   '/seed-data.js',
-  '/vantage-models.js',
+  '/cohrint-models.js',
 ];
 
 // ── Install — pre-cache static assets only (NOT HTML) ────────────────────────

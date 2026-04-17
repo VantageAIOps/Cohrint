@@ -29,7 +29,7 @@
   var cpLiveErrors    = 0;
 
   // Period persistence
-  var PERIOD_KEY = 'vantage_cp_period';
+  var PERIOD_KEY = 'cohrint_cp_period';
   function getSavedPeriod() {
     var v = parseInt(localStorage.getItem(PERIOD_KEY) || '30', 10);
     return [7, 30, 90].indexOf(v) >= 0 ? v : 30;
@@ -295,7 +295,7 @@
         row.className = 'cp-dev-row';
         row.style.cursor = 'pointer';
       } else {
-        row.title = 'Install vantage-agent to enable drill-down';
+        row.title = 'Install cohrint-agent to enable drill-down';
         row.style.opacity = '0.6';
       }
 

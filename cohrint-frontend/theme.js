@@ -7,16 +7,16 @@
  * Usage: <script src="/theme.js"></script>
  *
  * API:
- *   vantageTheme.get()    → 'dark' | 'light'
- *   vantageTheme.set(t)   → sets theme + persists
- *   vantageTheme.toggle() → toggles dark ↔ light
+ *   cohrintTheme.get()    → 'dark' | 'light'
+ *   cohrintTheme.set(t)   → sets theme + persists
+ *   cohrintTheme.toggle() → toggles dark ↔ light
  */
 (function() {
-  var KEY = 'vantage_theme';
+  var KEY = 'cohrint_theme';
   var theme = localStorage.getItem(KEY) || 'light';
   document.documentElement.setAttribute('data-theme', theme);
 
-  window.vantageTheme = {
+  window.cohrintTheme = {
     get: function() { return localStorage.getItem(KEY) || 'light'; },
     set: function(t) {
       document.documentElement.setAttribute('data-theme', t);

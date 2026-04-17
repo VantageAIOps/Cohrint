@@ -25,8 +25,8 @@
 <meta name="twitter:image" content="https://cohrint.com/og-image.png">
 <script src="/theme.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
-<script src="/vantage-models.js"></script>
+<script src="/chart.umd.min.js"></script>
+<script src="/cohrint-models.js"></script>
 <script src="/traces.js" defer></script>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -788,7 +788,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
         <a href="/docs.html" target="_blank" rel="noopener" style="font-size:12px;color:var(--text-muted);text-decoration:none;padding:6px 12px;border:1px solid var(--border);border-radius:6px;transition:color .2s,border-color .2s" onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border)'">Docs ↗</a>
         <span class="topbar-user" id="topbarUser"></span>
         <button onclick="signOut()" style="font-size:11px;color:var(--text-muted);background:none;border:1px solid var(--border);border-radius:6px;padding:5px 10px;cursor:pointer;font-family:var(--font-mono)" onmouseover="this.style.borderColor='var(--accent-red)';this.style.color='var(--accent-red)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">Sign out</button>
-        <button id="theme-toggle" data-theme-toggle onclick="vantageTheme.toggle()">&#9789;</button>
+        <button id="theme-toggle" data-theme-toggle onclick="cohrintTheme.toggle()">&#9789;</button>
       </div>
     </div>
 
@@ -1373,7 +1373,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
             <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
               Toggle between dark and light mode. Your preference is saved locally.
             </p>
-            <button class="btn" onclick="vantageTheme.toggle()">Toggle Theme</button>
+            <button class="btn" onclick="cohrintTheme.toggle()">Toggle Theme</button>
           </div>
 
           <div class="card">
@@ -1508,7 +1508,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
                 </div>
               </div>
               <div style="margin-bottom:12px;font-size:11px;color:var(--text-muted);line-height:1.6;">
-                The setup command installs <code style="font-family:var(--font-mono);color:var(--accent-blue);">vantage-track.js</code> into
+                The setup command installs <code style="font-family:var(--font-mono);color:var(--accent-blue);">cohrint-track.js</code> into
                 <code style="font-family:var(--font-mono);color:var(--accent-blue);">~/.claude/hooks/</code> and registers it as a Stop hook.
                 Costs are tracked automatically after each session.
               </div>
@@ -2037,6 +2037,13 @@ function fmt(n) {
   return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function fmtCost(n) {
+  if (n == null || isNaN(n)) return '0.00';
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+  return Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+}
+
 function fmtNum(n) {
   if (n == null || isNaN(n)) return '\u2014';
   return Number(n).toLocaleString('en-US');
@@ -2137,7 +2144,7 @@ function apiFetch(path, opts) {
       if (isRead) {
         var stale = _cacheGetStale(path);
         if (stale) {
-          console.warn('[vantage] offline/error for ' + path + ', serving stale cache');
+          console.warn('[cohrint] offline/error for ' + path + ', serving stale cache');
           return stale;
         }
       }
@@ -2153,7 +2160,7 @@ window.__cpRegister = function (cb) {
 
 function initKeyAuth() {
   return fetch(API_BASE + '/v1/auth/session', { credentials: 'include' })
-    .catch(function() { console.warn('[vantage] offline'); return null; })
+    .catch(function() { console.warn('[cohrint] offline'); return null; })
     .then(function(res) {
       if (!res || !res.ok) {
         window.location.replace('/auth.html?next=' + encodeURIComponent(window.location.pathname));
@@ -2164,7 +2171,7 @@ function initKeyAuth() {
         populateUserFromSession(_session);
         return true;
       }).catch(function(e) {
-        console.error('[vantage] bad session JSON', e);
+        console.error('[cohrint] bad session JSON', e);
         window.location.href = '/auth.html';
         return false;
       });
@@ -2578,7 +2585,7 @@ function loadOverview() {
 
   }).catch(function(e) {
     _skelOff();
-    console.error('[vantage] overview error:', e);
+    console.error('[cohrint] overview error:', e);
     var isRateLimit = e && e.message && e.message.indexOf('Rate limit') !== -1;
     document.getElementById('kpiTotalSpend').textContent = isRateLimit ? 'Rate limited' : 'Error';
     document.getElementById('kpiTotalSpendSub').textContent = isRateLimit ? e.message : 'Network error \u2014 retrying in 8s';
@@ -3054,7 +3061,7 @@ function loadSpend() {
 
   }).catch(function(e) {
     _skelOff();
-    console.error('[vantage] spend error:', e);
+    console.error('[cohrint] spend error:', e);
     var spendTotalEl = document.getElementById('spendTotal');
     if (spendTotalEl) spendTotalEl.textContent = 'Error';
     var spendTotalSubEl = document.getElementById('spendTotalSub');
@@ -3301,7 +3308,7 @@ function updateModelCalc() {
   var compTokens = parseInt(document.getElementById('calcCompTokens').value) || 500;
   var reqs = parseInt(document.getElementById('calcRequests').value) || 1000;
 
-  var models = typeof VANTAGE_MODELS !== 'undefined' ? VANTAGE_MODELS : [];
+  var models = typeof COHRINT_MODELS !== 'undefined' ? COHRINT_MODELS : [];
   if (_modelFilter !== 'all') {
     models = models.filter(function(m) { return m.tier === _modelFilter; });
   }
@@ -3679,7 +3686,7 @@ function loadMembers() {
     renderTeamBudgets(overview);
 
   }).catch(function(e) {
-    console.error('[vantage] members error:', e);
+    console.error('[cohrint] members error:', e);
   });
 }
 
@@ -4113,7 +4120,7 @@ function loadBudgets() {
     }).catch(function(){});
 
   }).catch(function(e) {
-    console.error('[vantage] budgets error:', e);
+    console.error('[cohrint] budgets error:', e);
   });
 }
 
@@ -5108,7 +5115,7 @@ function signOut() {
   // Clear cached API responses so next user can't see previous user's data
   try {
     Object.keys(localStorage).forEach(function(k) {
-      if (k.startsWith('cohrint_cache:') || k.startsWith('vantage_cache:')) localStorage.removeItem(k);
+      if (k.startsWith('cohrint_cache:') || k.startsWith('cohrint_cache:')) localStorage.removeItem(k);
     });
   } catch (_) {}
   // Close SSE if open
@@ -5235,7 +5242,7 @@ function loadConnectedTools() {
 
 (function init() {
   // Apply theme toggle label
-  var theme = (typeof vantageTheme !== 'undefined') ? vantageTheme.get() : 'dark';
+  var theme = (typeof cohrintTheme !== 'undefined') ? cohrintTheme.get() : 'dark';
   var toggle = document.getElementById('theme-toggle');
   if (toggle) {
     toggle.textContent = theme === 'dark' ? '\u263D' : '\u2600';
