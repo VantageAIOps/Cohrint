@@ -1873,8 +1873,14 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
 // ── Constants ──
 (function() {
   var _stored = localStorage.getItem('api_base');
-  // Only accept the known API host or relative paths — rejects arbitrary https:// origins
-  var _ALLOWED_API_HOSTS = ['api.cohrint.com', 'localhost', '127.0.0.1'];
+  // Only accept the known API host or relative paths — rejects arbitrary https:// origins.
+  // localhost / 127.0.0.1 are allowed only when the page itself is served from a
+  // non-production origin, so an attacker can't pivot a prod session to a local dev
+  // server they control (e.g., by planting `api_base` via an XSS on another tab).
+  var _isLocalHost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  var _ALLOWED_API_HOSTS = _isLocalHost
+    ? ['api.cohrint.com', 'localhost', '127.0.0.1']
+    : ['api.cohrint.com'];
   var _valid = false;
   if (_stored) {
     if (/^\/[^/]/.test(_stored)) {
@@ -1882,7 +1888,9 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
     } else {
       try {
         var _u = new URL(_stored);
-        _valid = _u.protocol === 'https:' && _ALLOWED_API_HOSTS.indexOf(_u.hostname) !== -1;
+        // On localhost, allow http:// for local dev; elsewhere force https://
+        var _protoOk = _isLocalHost ? (_u.protocol === 'https:' || _u.protocol === 'http:') : (_u.protocol === 'https:');
+        _valid = _protoOk && _ALLOWED_API_HOSTS.indexOf(_u.hostname) !== -1;
       } catch (_) { _valid = false; }
     }
   }
@@ -2024,6 +2032,16 @@ function apiFetch(path, opts) {
   var isRead = !opts.method || opts.method === 'GET';
   var headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
 
+  // Privacy mode header — tells the server whether the user has opted into
+  // storing prompts/responses on the backend. Matches the SDK's X-Vantage-Privacy
+  // header so server-side redaction policies stay consistent across clients.
+  try {
+    var _privacy = localStorage.getItem('vantage_privacy') || 'strict';
+    if (!headers['X-Vantage-Privacy'] && !headers['x-vantage-privacy']) {
+      headers['X-Vantage-Privacy'] = _privacy;
+    }
+  } catch (_) { /* localStorage unavailable — continue without header */ }
+
   // Serve from fresh cache first (GET only)
   if (isRead) {
     var cached = _cacheGet(path);
@@ -2137,6 +2155,17 @@ function populateUserFromSession(s) {
 var _ROLE_RANK = { viewer: 0, member: 1, admin: 2, ceo: 3, superadmin: 4, owner: 5 };
 function hasRole(role, minimum) {
   return (_ROLE_RANK[role] || 0) >= (_ROLE_RANK[minimum] || 0);
+}
+
+// Client-side gate for admin-only mutations. Backend re-enforces adminOnly;
+// this just prevents accidental clicks and gives an immediate error message.
+function _requireAdmin() {
+  var r = (_session && (_session.role || (_session.user && _session.user.role))) || 'member';
+  if (!hasRole(r, 'admin')) {
+    alert('Admin permissions required.');
+    return false;
+  }
+  return true;
 }
 
 function applyRoleUI(role) {
@@ -3697,6 +3726,7 @@ function closeModal(id) {
 }
 
 function inviteMember() {
+  if (!_requireAdmin()) return;
   var email = document.getElementById('inviteEmail').value.trim();
   var name = document.getElementById('inviteName').value.trim();
   var role = document.getElementById('inviteRole').value;
@@ -3840,6 +3870,7 @@ function rotateMemberKey(memberId, email) {
 }
 
 function revokeMember(memberId, email) {
+  if (!_requireAdmin()) return;
   if (!confirm('Revoke access for ' + email + '?')) return;
   apiFetch('/v1/auth/members/' + encodeURIComponent(memberId), {
     method: 'DELETE',
@@ -4021,6 +4052,7 @@ function addTeamBudget() {
 }
 
 function deleteTeamBudget(team) {
+  if (!_requireAdmin()) return;
   if (!confirm('Delete budget for team "' + team + '"?')) return;
   apiFetch('/v1/admin/team-budgets', {
     method: 'DELETE',
@@ -4141,6 +4173,7 @@ function hideCreateTeamForm() {
 }
 
 function createTeam() {
+  if (!_requireAdmin()) return;
   var name = document.getElementById('newTeamName').value.trim();
   var status = document.getElementById('createTeamStatus');
   if (!name) { status.textContent = 'Team name is required.'; return; }
@@ -4156,6 +4189,7 @@ function createTeam() {
 }
 
 function deleteTeam(teamId) {
+  if (!_requireAdmin()) return;
   if (!confirm('Delete team "' + teamId + '"? Members will be unassigned but not removed.')) return;
   apiFetch('/v1/teams/' + encodeURIComponent(teamId), { method: 'DELETE' }).then(function() {
     refreshTeamsList();
@@ -5162,6 +5196,7 @@ function updateBpScopeTarget() {
 }
 
 function saveBudgetPolicy() {
+  if (!_requireAdmin()) return;
   var modal = document.getElementById('modal-budget-policy');
   var scope = document.getElementById('bp-scope').value;
   var limit = parseFloat(document.getElementById('bp-limit').value);

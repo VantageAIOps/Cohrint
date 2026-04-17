@@ -1174,7 +1174,8 @@ function toggleFaq(qEl) {
 })();
 
 // ── Live Demo button ──────────────────────────────────────────────────────────
-// POST /v1/auth/session with the hardcoded demo viewer key.
+// POST /v1/auth/demo — server reads DEMO_API_KEY from env and issues a 1-hour
+// viewer session cookie. The key never appears in client code.
 // On success: redirect to /app.html (session cookie set by server).
 // On failure: show inline error.
 (function() {
@@ -1184,11 +1185,10 @@ function toggleFaq(qEl) {
     e.preventDefault();
     btn.textContent = 'Loading demo…';
     btn.style.pointerEvents = 'none';
-    fetch('https://api.cohrint.com/v1/auth/session', {
+    fetch('https://api.cohrint.com/v1/auth/demo', {
       method: 'POST',
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ api_key: 'crt_demo_viewerkey2026' })
+      headers: { 'Content-Type': 'application/json' }
     }).then(function(res) {
       if (res.ok) {
         window.location.href = '/app.html';

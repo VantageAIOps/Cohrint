@@ -11,11 +11,14 @@ admin.use('*', authMiddleware, adminOnly);
 admin.get('/overview', async (c) => {
   const orgId  = c.get('orgId');
   const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
-  // events.created_at is TEXT 'YYYY-MM-DD HH:MM:SS' — use ISO text, not unix seconds
+  // events.created_at is INTEGER unixepoch per schema.sql. Binding ISO TEXT
+  // silently coerces to 0 and returns ALL rows, so use unix seconds here.
   const d = new Date(Date.now() - (period - 1) * 86_400_000);
   d.setUTCHours(0, 0, 0, 0);
-  const since = d.toISOString().replace('T', ' ').slice(0, 19);
-  const monthStart = new Date().toISOString().slice(0, 7) + '-01 00:00:00';
+  const sinceUnix      = Math.floor(d.getTime() / 1000);
+  const monthStartUnix = Math.floor(
+    new Date(new Date().toISOString().slice(0, 7) + '-01T00:00:00Z').getTime() / 1000,
+  );
 
   // Org-level totals
   const orgRow = await c.env.DB.prepare(`
@@ -25,14 +28,14 @@ admin.get('/overview', async (c) => {
       COALESCE(COUNT(*), 0)          AS total_requests,
       COALESCE(AVG(latency_ms), 0)   AS avg_latency_ms
     FROM events WHERE org_id = ? AND created_at >= ?
-  `).bind(orgId, since).first<Record<string, number>>();
+  `).bind(orgId, sinceUnix).first<Record<string, number>>();
 
   const mtd = await c.env.DB.prepare(`
     SELECT
       COALESCE(SUM(cost_usd), 0) AS mtd_cost_usd,
       COUNT(*) AS mtd_event_count
     FROM events WHERE org_id = ? AND created_at >= ?
-  `).bind(orgId, monthStart).first<{ mtd_cost_usd: number; mtd_event_count: number }>();
+  `).bind(orgId, monthStartUnix).first<{ mtd_cost_usd: number; mtd_event_count: number }>();
 
   const org = await c.env.DB.prepare(
     'SELECT budget_usd, plan, name, email FROM orgs WHERE id = ?'
@@ -68,16 +71,21 @@ admin.get('/overview', async (c) => {
     WHERE e.org_id = ? AND e.created_at >= ?
     GROUP BY e.team
     ORDER BY cost_usd DESC
-  `).bind(orgId, since).all();
+  `).bind(orgId, sinceUnix).all();
 
-  // Members list with their usage (join on user_id or scope_team)
+  // Members list with their usage — paginated to keep /overview responses bounded
+  // for large orgs. Use /v1/admin/members for a paginated listing beyond the
+  // first page if needed.
+  const membersLimit  = Math.min(Math.max(parseInt(c.req.query('members_limit')  ?? '50', 10) || 50, 1), 500);
+  const membersOffset = Math.max(parseInt(c.req.query('members_offset') ?? '0',  10) || 0, 0);
   const { results: members } = await c.env.DB.prepare(`
     SELECT m.id, m.email, m.name, m.role, m.scope_team, m.api_key_hint,
            datetime(m.created_at, 'unixepoch') AS created_at
     FROM org_members m
     WHERE m.org_id = ?
     ORDER BY m.created_at ASC
-  `).bind(orgId).all();
+    LIMIT ? OFFSET ?
+  `).bind(orgId, membersLimit, membersOffset).all();
 
   const budgetPct = org?.budget_usd
     ? Math.round(((mtd?.mtd_cost_usd ?? 0) / org.budget_usd) * 100)
@@ -205,10 +213,14 @@ admin.get('/members/:id/usage', async (c) => {
 
   if (!member) return c.json({ error: 'Member not found' }, 404);
 
-  // If member has a scope_team, filter by it; otherwise show all org events
-  // (members without a scope can ingest under any team tag — use user_id for attribution)
-  const clause = member.scope_team ? ' AND team = ?' : '';
-  const args   = member.scope_team ? [orgId, since, member.scope_team] : [orgId, since];
+  // Scope events to THIS member:
+  //   - scope_team set   → events tagged with that team
+  //   - scope_team null  → events attributed to this developer_email
+  // Previously the null-scope branch returned org-wide totals, exposing every
+  // member's usage in any given member's usage page.
+  const clause = member.scope_team ? ' AND team = ?' : ' AND developer_email = ?';
+  const filterArg: string | null = member.scope_team ?? member.email;
+  const args = [orgId, since, filterArg];
 
   const stats = await c.env.DB.prepare(`
     SELECT

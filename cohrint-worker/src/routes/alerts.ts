@@ -1,14 +1,33 @@
 import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
-import { authMiddleware } from '../middleware/auth';
+import { authMiddleware, adminOnly } from '../middleware/auth';
 import { logAudit } from '../lib/audit';
 
 const alerts = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 alerts.use('*', authMiddleware);
 
-// ── POST /v1/alerts/slack/:orgId — save webhook URL ──────────────────────────
-alerts.post('/slack/:orgId', async (c) => {
+// NOTE on URL shape: the legacy routes include `/:orgId` in the path but the
+// handlers always read orgId from the authenticated context (c.get('orgId')),
+// so the URL segment is decorative and cannot be used to access another org's
+// config. We keep the `/:orgId` shape for backwards compatibility with the
+// frontend and external callers.
+
+// Validate that a URL has protocol=https and hostname exactly === hooks.slack.com.
+// Prevents bypasses like https://hooks.slack.com.evil.com/... which pass a naive
+// startsWith('https://hooks.slack.com/') check.
+function isValidSlackWebhook(raw: unknown): boolean {
+  if (typeof raw !== 'string') return false;
+  try {
+    const u = new URL(raw);
+    return u.protocol === 'https:' && u.hostname === 'hooks.slack.com';
+  } catch {
+    return false;
+  }
+}
+
+// ── POST /v1/alerts/slack/:orgId — save webhook URL (admin only) ─────────────
+alerts.post('/slack/:orgId', adminOnly, async (c) => {
   const orgId = c.get('orgId');
   const body  = await c.req.json<{
     webhook_url:      string;
@@ -17,7 +36,7 @@ alerts.post('/slack/:orgId', async (c) => {
     trigger_daily?:   boolean;
   }>();
 
-  if (!body.webhook_url?.startsWith('https://hooks.slack.com/')) {
+  if (!isValidSlackWebhook(body.webhook_url)) {
     return c.json({ error: 'Invalid Slack webhook URL' }, 400);
   }
 
@@ -51,8 +70,8 @@ alerts.post('/slack/:orgId', async (c) => {
   return c.json({ ok: true });
 });
 
-// ── POST /v1/alerts/slack/:orgId/test — send a test message ──────────────────
-alerts.post('/slack/:orgId/test', async (c) => {
+// ── POST /v1/alerts/slack/:orgId/test — send a test message (admin only) ─────
+alerts.post('/slack/:orgId/test', adminOnly, async (c) => {
   const orgId = c.get('orgId');
 
   const cfg = await c.env.DB.prepare(

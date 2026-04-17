@@ -16,17 +16,26 @@ function teamScope(scopeTeam: string | null): { clause: string; args: unknown[] 
     : { clause: '',                args: [] };
 }
 
-// ── Date helper — returns YYYY-MM-DD HH:MM:SS for use in events.created_at ────
-// events.created_at is stored as text, not unix. Always use this for comparisons.
+// ── Date helpers ──────────────────────────────────────────────────────────────
+// created_at column types diverge by table:
+//   events / orgs / org_members / platform_*       → INTEGER unixepoch  (use *Unix)
+//   cross_platform_usage / otel_events / audit_*   → TEXT 'YYYY-MM-DD HH:MM:SS'  (use *Text)
+// Binding the wrong side silently coerces to 0 and returns ALL rows instead
+// of the filtered window, so pick per-table.
 function sinceText(periodDays: number): string {
   const d = new Date(Date.now() - (periodDays - 1) * 86_400_000);
   d.setUTCHours(0, 0, 0, 0);
   return d.toISOString().replace('T', ' ').slice(0, 19);
 }
-function todayText(): string {
+function sinceUnix(periodDays: number): number {
+  const d = new Date(Date.now() - (periodDays - 1) * 86_400_000);
+  d.setUTCHours(0, 0, 0, 0);
+  return Math.floor(d.getTime() / 1000);
+}
+function todayUnix(): number {
   const d = new Date();
   d.setUTCHours(0, 0, 0, 0);
-  return d.toISOString().replace('T', ' ').slice(0, 19);
+  return Math.floor(d.getTime() / 1000);
 }
 
 // ── GET /v1/analytics/summary ─────────────────────────────────────────────────
@@ -55,10 +64,10 @@ analytics.get('/summary', async (c) => {
     } catch { /* KV unavailable — continue to DB */ }
   }
 
-  // Use text dates — events.created_at is stored as YYYY-MM-DD HH:MM:SS text
-  const today      = todayText();
-  const month      = sinceText(30);
-  const thirty     = new Date(Date.now() - 30 * 60_000).toISOString().replace('T', ' ').slice(0, 19);
+  // events.created_at is INTEGER unixepoch — bind unix seconds, not ISO text.
+  const today      = todayUnix();
+  const month      = sinceUnix(30);
+  const thirty     = Math.floor((Date.now() - 30 * 60_000) / 1000);
 
   const [totals, session] = await c.env.DB.batch([
     c.env.DB.prepare(`
@@ -139,7 +148,7 @@ analytics.get('/kpis', async (c) => {
   const devClause = isPrivileged ? '' : ' AND developer_email = ?';
   const devArgs   = isPrivileged ? [] : [memberEmail];
   const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
-  const since  = sinceText(period);
+  const since  = sinceUnix(period);
 
   const kpisCacheKey = `analytics:kpis:${orgId}:${period}:${scopeTeam ?? 'all'}:${isPrivileged ? 'all' : (memberEmail ?? 'anon')}`;
   try {
@@ -261,6 +270,8 @@ analytics.get('/models', async (c) => {
   const memberEmail = c.get('memberEmail');
   const isPrivileged = hasRole(role, 'admin');
   const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
+  const limit  = Math.min(Math.max(parseInt(c.req.query('limit')  ?? '25', 10) || 25, 1), 200);
+  const offset = Math.max(parseInt(c.req.query('offset') ?? '0', 10) || 0, 0);
   const todayMidnightMs = Math.floor(Date.now() / 86_400_000) * 86_400_000;
   const sinceMs = todayMidnightMs - (period - 1) * 86_400_000;
   const since = new Date(sinceMs).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
@@ -280,11 +291,11 @@ analytics.get('/models', async (c) => {
     WHERE org_id = ? AND created_at >= ?${teamClause}${devClause}
     GROUP BY model, provider
     ORDER BY cost_usd DESC
-    LIMIT 25
-  `).bind(orgId, since, ...teamArgs, ...devArgs).all();
+    LIMIT ? OFFSET ?
+  `).bind(orgId, since, ...teamArgs, ...devArgs, limit, offset).all();
 
   logAudit(c, { event_type: 'data_access', event_name: 'data_access.analytics', resource_type: 'analytics', metadata: { endpoint: '/v1/analytics/models' } });
-  return c.json({ models: results });
+  return c.json({ models: results, limit, offset });
 });
 
 // ── GET /v1/analytics/teams?period=30 ────────────────────────────────────────
@@ -295,7 +306,7 @@ analytics.get('/teams', async (c) => {
   const scopeTeam = c.get('scopeTeam');
   const { clause, args } = teamScope(scopeTeam);
   const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
-  const since  = sinceText(period);
+  const since  = sinceUnix(period);
 
   const { results } = await c.env.DB.prepare(`
     SELECT
@@ -324,7 +335,8 @@ analytics.get('/teams', async (c) => {
 analytics.get('/business-units', async (c) => {
   const orgId  = c.get('orgId');
   const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
-  const sinceIso  = sinceText(period);  // used for both tables (both store text dates)
+  const sinceIso   = sinceText(period);  // cross_platform_usage = TEXT
+  const sinceEvts  = sinceUnix(period);  // events               = INTEGER
 
   // UNION events + cross_platform_usage for complete picture
   const { results } = await c.env.DB.prepare(`
@@ -366,7 +378,7 @@ analytics.get('/business-units', async (c) => {
     GROUP BY business_unit
     ORDER BY cost_usd DESC
     LIMIT 50
-  `).bind(orgId, sinceIso, orgId, sinceIso).all();
+  `).bind(orgId, sinceIso, orgId, sinceEvts).all();
 
   // Per-business-unit team breakdown
   const { results: byTeam } = await c.env.DB.prepare(`
@@ -387,7 +399,7 @@ analytics.get('/business-units', async (c) => {
     GROUP BY business_unit, team, provider
     ORDER BY cost_usd DESC
     LIMIT 200
-  `).bind(orgId, sinceIso, orgId, sinceIso).all();
+  `).bind(orgId, sinceIso, orgId, sinceEvts).all();
 
   return c.json({ business_units: results, by_team_provider: byTeam, period_days: period });
 });
@@ -398,9 +410,7 @@ analytics.get('/traces', async (c) => {
   const scopeTeam = c.get('scopeTeam');
   const { clause, args } = teamScope(scopeTeam);
   const period = Math.min(parseInt(c.req.query('period') ?? '1', 10) || 1, 30);
-  const sinceDate = new Date(Date.now() - (period - 1) * 86_400_000);
-  sinceDate.setUTCHours(0, 0, 0, 0);
-  const since = sinceDate.toISOString().replace('T', ' ').slice(0, 19);
+  const since  = sinceUnix(period);
 
   const { results } = await c.env.DB.prepare(`
     SELECT
@@ -468,20 +478,21 @@ analytics.get('/today', async (c) => {
   const teamArgs   = scopeTeam ? [scopeTeam] : [];
   const devClause  = isPrivileged ? '' : ' AND developer_email = ?';
   const devArgs    = isPrivileged ? [] : [memberEmail];
-  // events.created_at is TEXT 'YYYY-MM-DD HH:MM:SS' — use ISO text for both tables
-  const todayStr   = new Date().toISOString().split('T')[0] + ' 00:00:00';
+  // created_at is INTEGER unixepoch on events, TEXT on cross_platform_usage — bind per-table.
+  const todayStr  = new Date().toISOString().split('T')[0] + ' 00:00:00';
+  const todayUnix = Math.floor(Date.now() / 86_400_000) * 86_400;
 
   const [evRows, cpuRows] = await Promise.all([
     c.env.DB.prepare(`
       SELECT
-        CAST(strftime('%H', created_at) AS INTEGER) AS hour,
+        CAST(strftime('%H', created_at, 'unixepoch') AS INTEGER) AS hour,
         SUM(cost_usd)                        AS cost_usd,
         SUM(prompt_tokens + completion_tokens) AS tokens,
         COUNT(*)                             AS requests
       FROM events
       WHERE org_id = ? AND created_at >= ?${teamClause}${devClause}
       GROUP BY hour
-    `).bind(orgId, todayStr, ...teamArgs, ...devArgs).all<{ hour: number; cost_usd: number; tokens: number; requests: number }>(),
+    `).bind(orgId, todayUnix, ...teamArgs, ...devArgs).all<{ hour: number; cost_usd: number; tokens: number; requests: number }>(),
     c.env.DB.prepare(`
       SELECT
         CAST(strftime('%H', created_at) AS INTEGER) AS hour,
@@ -517,8 +528,8 @@ analytics.get('/cost', async (c) => {
   const scopeTeam = c.get('scopeTeam');
   const { clause, args } = teamScope(scopeTeam);
   const period = Math.min(parseInt(c.req.query('period') ?? '7', 10) || 7, 30);
-  const since  = sinceText(period);
-  const today  = todayText();
+  const since  = sinceUnix(period);
+  const today  = todayUnix();
 
   const [total, todayRow] = await c.env.DB.batch([
     c.env.DB.prepare(

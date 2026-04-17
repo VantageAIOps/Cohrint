@@ -151,15 +151,18 @@ app.notFound((c) => c.json({
 app.onError((err, c) => {
   console.error('[vantageai]', err);
   const origin  = c.req.header('Origin') ?? '';
-  const allowed = (c.env.ALLOWED_ORIGINS ?? '').split(',').map(s => s.trim());
-  const isAllowed = allowed.includes('*') || allowed.includes(origin) ||
+  const allowed = (c.env.ALLOWED_ORIGINS ?? '').split(',').map(s => s.trim()).filter(Boolean);
+  const isAllowed = allowed.includes(origin) ||
     allowed.some(p => p.endsWith('*') && origin.startsWith(p.slice(0, -1)));
-  const corsOrigin = isAllowed ? origin : (allowed[0] ?? '*');
-  return c.json({ error: 'Internal server error' }, 500, {
-    'Access-Control-Allow-Origin':      corsOrigin,
-    'Access-Control-Allow-Credentials': 'true',
-    'Vary': 'Origin',
-  });
+  // Per CORS spec, Access-Control-Allow-Origin: * is INVALID when credentials
+  // are true. Only echo a concrete matching origin; otherwise omit CORS headers
+  // entirely so the browser blocks the response (safer default for an error path).
+  const headers: Record<string, string> = { 'Vary': 'Origin' };
+  if (isAllowed && origin) {
+    headers['Access-Control-Allow-Origin']      = origin;
+    headers['Access-Control-Allow-Credentials'] = 'true';
+  }
+  return c.json({ error: 'Internal server error' }, 500, headers);
 });
 
 // ── Export with scheduled handler for cron-based anomaly detection ────────────
