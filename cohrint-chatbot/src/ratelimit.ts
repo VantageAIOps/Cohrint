@@ -24,15 +24,15 @@ export async function checkRateLimit(
 
   // Write this request's unique slot first
   const reqKey = `${prefix}${crypto.randomUUID()}`;
-  await env.VEGA_KV.put(reqKey, "1", { expirationTtl: ttl });
+  await env.COHRINT_KV.put(reqKey, "1", { expirationTtl: ttl });
 
   // Count all slots for this org+window
-  const { keys } = await env.VEGA_KV.list({ prefix });
+  const { keys } = await env.COHRINT_KV.list({ prefix });
   const count = keys.length;
 
   if (count > MAX_MESSAGES) {
     // Clean up the slot we just wrote so it doesn't inflate future counts
-    await env.VEGA_KV.delete(reqKey);
+    await env.COHRINT_KV.delete(reqKey);
     return { allowed: false, remaining: 0 };
   }
 

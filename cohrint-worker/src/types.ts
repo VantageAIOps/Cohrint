@@ -17,8 +17,9 @@ export type Bindings = {
   FROM_EMAIL?:         string;   // defaults to noreply@cohrint.com
   // Superadmin — set via: wrangler secret put SUPERADMIN_SECRET
   SUPERADMIN_SECRET?:  string;
-  // CI bypass for signup rate limiting — set via: wrangler secret put VANTAGE_CI_SECRET
-  VANTAGE_CI_SECRET?:  string;
+  // CI bypass for signup rate limiting — set via: wrangler secret put COHRINT_CI_SECRET
+  COHRINT_CI_SECRET?:  string;
+  VANTAGE_CI_SECRET?:  string;  // legacy alias — prefer COHRINT_CI_SECRET
   // AES-256-GCM key material for Copilot PAT encryption — set via: wrangler secret put TOKEN_ENCRYPTION_SECRET
   TOKEN_ENCRYPTION_SECRET?: string;
   // Demo viewer key used by the Live Demo button — set via: wrangler secret put DEMO_API_KEY

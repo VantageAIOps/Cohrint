@@ -11,7 +11,7 @@ import { checkRateLimit } from "./ratelimit";
 async function resolveOrgPlan(token: string | undefined, env: Env): Promise<string> {
   if (!token || !env.COHRINT_API_URL) return "free";
   const cacheKey = `plan:${token.slice(-16)}`;
-  const cached = await env.VEGA_KV.get(cacheKey);
+  const cached = await env.COHRINT_KV.get(cacheKey);
   if (cached) return cached;
   try {
     const res = await fetch(`${env.COHRINT_API_URL}/v1/auth/session`, {
@@ -21,7 +21,7 @@ async function resolveOrgPlan(token: string | undefined, env: Env): Promise<stri
     const data = await res.json() as { plan?: string };
     const plan = data.plan ?? "free";
     // Cache for 5 minutes to avoid per-request latency
-    await env.VEGA_KV.put(cacheKey, plan, { expirationTtl: 300 });
+    await env.COHRINT_KV.put(cacheKey, plan, { expirationTtl: 300 });
     return plan;
   } catch {
     return "free";

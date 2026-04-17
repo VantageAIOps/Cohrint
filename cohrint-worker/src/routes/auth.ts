@@ -36,10 +36,10 @@ auth.post('/signup', async (c) => {
     : 'organization';
 
   // Rate limit signup: 30 per IP per hour (degrade gracefully if KV unavailable)
-  // CI bypass: X-Vantage-CI header with matching secret skips rate limiting
+  // CI bypass: X-Cohrint-CI header with matching secret skips rate limiting (X-Vantage-CI accepted for backward compat)
   try {
-    const ciBypass = c.req.header('X-Vantage-CI');
-    const ciSecret = c.env.VANTAGE_CI_SECRET;
+    const ciBypass = c.req.header('X-Cohrint-CI') ?? c.req.header('X-Vantage-CI');
+    const ciSecret = c.env.COHRINT_CI_SECRET ?? c.env.VANTAGE_CI_SECRET;
     if (!(ciBypass && ciSecret && ciBypass === ciSecret)) {
       const ip = c.req.header('CF-Connecting-IP') ?? 'unknown';
       const rlKey = `rl:signup:${ip}`;

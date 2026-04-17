@@ -13,7 +13,7 @@ custom_domain = true
 # After running `npm run db:create`, replace the placeholder IDs below.
 [[d1_databases]]
 binding         = "DB"
-database_name   = "vantage-events"
+database_name   = "cohrint-events"
 database_id     = "a1301c2a-19bf-4fa3-8321-bba5e497de10"
 migrations_dir  = "migrations"
 

@@ -127,7 +127,7 @@ jobs:
           HEADLESS: '1'
           VANTAGE_SITE_URL: "https://cohrint.com"
           VANTAGE_API_URL: "https://api.cohrint.com"
-          VANTAGE_CI_SECRET: ${{ secrets.VANTAGE_CI_SECRET }}
+          COHRINT_CI_SECRET: ${{ secrets.COHRINT_CI_SECRET }}
           SUPERADMIN_SECRET: ${{ secrets.SUPERADMIN_SECRET }}
         run: |
           python tests/run_suite.py --no-browser --superadmin --clean --no-report 2>&1 | tee /tmp/api-tests.txt
@@ -175,7 +175,7 @@ jobs:
           CB_ALL_DEVICES: '1'
           VANTAGE_SITE_URL: "https://cohrint.com"
           VANTAGE_API_URL: "https://api.cohrint.com"
-          VANTAGE_CI_SECRET: ${{ secrets.VANTAGE_CI_SECRET }}
+          COHRINT_CI_SECRET: ${{ secrets.COHRINT_CI_SECRET }}
         run: |
           if [ "${{ inputs.extended }}" = "true" ] || [ "${{ github.event_name }}" = "push" ]; then
             python tests/run_suite.py \
