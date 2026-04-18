@@ -1482,6 +1482,17 @@ document.querySelectorAll('.feat-card,.int-card').forEach(function(c){
   c.addEventListener('mouseleave',function(){c.style.transform='';});
 });
 
+// ── Auto-login from ?api_key= URL param ──────────────────────────────────────
+(function(){
+  var k=(new URLSearchParams(window.location.search)).get('api_key')||'';
+  if(!k||(!k.startsWith('crt_')&&!k.startsWith('vnt_')))return;
+  fetch('https://api.cohrint.com/v1/auth/session',{
+    method:'POST',credentials:'include',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({api_key:k})
+  }).then(function(r){if(r.ok)window.location.replace('/app');}).catch(function(){});
+})();
+
 // ── Particle network ──────────────────────────────────────────────────────────
 (function(){
   var canvas=document.getElementById('hero-canvas');

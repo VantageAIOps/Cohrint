@@ -285,6 +285,15 @@ document.getElementById('inp-email').addEventListener('keydown', e => {
   if (e.key === 'Enter') doRecover();
 });
 
+// ── Auto-login from ?api_key= URL param ──────────────────────────────────────
+(function() {
+  const autoKey = new URLSearchParams(window.location.search).get('api_key') || '';
+  if (autoKey && (autoKey.startsWith('crt_') || autoKey.startsWith('vnt_'))) {
+    document.getElementById('inp-key').value = autoKey;
+    setTimeout(doSignin, 100);
+  }
+})();
+
 // ── Handle recovery redirect params ──────────────────────────────────────────
 (function() {
   const params       = new URLSearchParams(window.location.search);

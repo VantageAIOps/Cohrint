@@ -524,9 +524,22 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
 .live-item {
   display: flex; align-items: center; gap: 10px; padding: 6px 10px;
   border-radius: 4px; font-size: 11px; font-family: var(--font-mono);
-  transition: background 0.15s; animation: fadeUp 0.3s ease both;
+  transition: background 0.15s; animation: liveItemIn 0.4s cubic-bezier(0.22,1,0.36,1) both;
+  border-left: 2px solid transparent;
 }
 .live-item:hover { background: var(--bg-hover); }
+.live-item.live-new {
+  border-left-color: var(--accent-green);
+  animation: liveItemIn 0.4s cubic-bezier(0.22,1,0.36,1) both, liveFlash 1.2s ease forwards;
+}
+@keyframes liveItemIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes liveFlash {
+  0%   { background: rgba(0,212,161,0.12); }
+  100% { background: transparent; }
+}
 
 .live-time { color: var(--text-muted); font-size: 10px; min-width: 52px; }
 .live-provider { font-weight: 600; min-width: 80px; }
@@ -1644,7 +1657,13 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
       <div id="view-security" class="view">
         <div class="card">
           <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-            <div class="card-title">Audit Log</div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div class="card-title">Audit Log</div>
+              <div class="live-indicator" style="font-size:9px;padding:3px 8px;">
+                <div class="live-dot" style="width:5px;height:5px;"></div> LIVE
+              </div>
+              <span id="audit-live-ts" style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono);"></span>
+            </div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
               <select id="auditTypeFilter" onchange="loadAuditLog()" style="font-size:11px;padding:4px 8px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);border-radius:4px;">
                 <option value="">All events</option>
@@ -2467,6 +2486,10 @@ function nav(view, btn) {
   if (activeView === 'overview' && view !== 'overview') {
     if (_sseSource) { _sseSource.close(); _sseSource = null; }
   }
+  // Stop audit log auto-refresh when leaving security tab
+  if (activeView === 'security' && view !== 'security') {
+    clearInterval(_auditRefreshTimer); _auditRefreshTimer = null;
+  }
   activeView = view;
   document.querySelectorAll('button.sb-item').forEach(function(b) { b.classList.remove('active'); });
   if (btn) btn.classList.add('active');
@@ -3091,7 +3114,8 @@ function prependLiveItem(ev) {
   var timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 
   var item = document.createElement('div');
-  item.className = 'live-item';
+  item.className = 'live-item live-new';
+  setTimeout(function() { item.classList.remove('live-new'); }, 1400);
 
   var timeSpan = document.createElement('span');
   timeSpan.className = 'live-time';
@@ -4739,8 +4763,39 @@ function saveBenchmarkOptIn() {
 var auditOffset = 0;
 var auditLimit  = 50;
 var auditTotal  = 0;
+var _auditRefreshTimer = null;
+var _auditLastCount = 0;
 
-function loadAuditLog()  { auditOffset = 0; fetchAuditPage(); }
+function loadAuditLog() {
+  auditOffset = 0;
+  fetchAuditPage();
+  clearInterval(_auditRefreshTimer);
+  _auditRefreshTimer = setInterval(function() {
+    if (activeView === 'security') _silentAuditRefresh();
+  }, 30000);
+}
+
+function _silentAuditRefresh() {
+  var type = document.getElementById('auditTypeFilter').value;
+  var from = document.getElementById('auditDateFrom').value;
+  var to   = document.getElementById('auditDateTo').value;
+  var qs = '?limit=' + auditLimit + '&offset=0';
+  if (type) qs += '&event_type=' + encodeURIComponent(type);
+  if (from) qs += '&from=' + encodeURIComponent(from);
+  if (to)   qs += '&to=' + encodeURIComponent(to);
+  apiFetch('/v1/audit-log' + qs).then(function(data) {
+    if (!data) return;
+    var newCount = data.total || 0;
+    if (newCount !== _auditLastCount) {
+      _auditLastCount = newCount;
+      auditOffset = 0;
+      fetchAuditPage();
+    }
+    var indicator = document.getElementById('audit-live-ts');
+    if (indicator) indicator.textContent = 'Updated ' + new Date().toLocaleTimeString();
+  }).catch(function(){});
+}
+
 function auditPage(dir)  { auditOffset = Math.max(0, auditOffset + dir * auditLimit); fetchAuditPage(); }
 
 function fetchAuditPage() {
@@ -4770,6 +4825,7 @@ function fetchAuditPage() {
     }
 
     auditTotal = data.total || 0;
+    _auditLastCount = auditTotal;
     var events = data.events || [];
 
     if (events.length === 0) {
@@ -4814,6 +4870,7 @@ function fetchAuditPage() {
       var ip       = String(e.ip_address || '');
 
       var tr = document.createElement('tr');
+      tr.style.animation = 'fadeUp 0.3s ease both';
 
       var tdTime = document.createElement('td');
       tdTime.style.color = 'var(--text-muted)';

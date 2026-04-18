@@ -151,29 +151,30 @@ crossplatform.get('/summary', async (c) => {
     WHERE org_id = ? AND created_at_unix >= ?${devClause}
   `).bind(orgId, todayStartUnix, ...devArgs).first();
 
-  // Budget check (always org-scoped — not filtered by developer)
-  const budget = await c.env.DB.prepare(`
-    SELECT monthly_limit_usd FROM budget_policies
-    WHERE org_id = ? AND scope = 'org' LIMIT 1
-  `).bind(orgId).first() as { monthly_limit_usd: number } | null;
-
   const monthStart = monthStartUnix();
-  const monthSpend = await c.env.DB.prepare(`
-    SELECT COALESCE(SUM(cost_usd), 0) as month_cost
-    FROM cross_platform_usage
-    WHERE org_id = ? AND created_at_unix >= ?${devClause}
-  `).bind(orgId, monthStart, ...devArgs).first() as { month_cost: number } | null;
 
-  // Previous period for trend comparison
-  const prevSince = sinceUnix(days * 2);
-  const prevUntil = since;
-  const prevTotal = await c.env.DB.prepare(`
-    SELECT COALESCE(SUM(cost_usd), 0) as prev_cost
-    FROM cross_platform_usage
-    WHERE org_id = ? AND created_at_unix >= ? AND created_at_unix < ?${devClause}
-  `).bind(orgId, prevSince, prevUntil, ...devArgs).first() as { prev_cost: number } | null;
+  // Budget: prefer org-scoped policy, fall back to orgs.budget_usd (set via Budgets tab)
+  const [budgetPolicy, orgBudgetRow, monthSpend, prevTotal] = await Promise.all([
+    c.env.DB.prepare(`
+      SELECT monthly_limit_usd FROM budget_policies
+      WHERE org_id = ? AND scope = 'org' LIMIT 1
+    `).bind(orgId).first() as Promise<{ monthly_limit_usd: number } | null>,
+    c.env.DB.prepare(`
+      SELECT budget_usd FROM orgs WHERE id = ?
+    `).bind(orgId).first() as Promise<{ budget_usd: number } | null>,
+    c.env.DB.prepare(`
+      SELECT COALESCE(SUM(cost_usd), 0) as month_cost
+      FROM cross_platform_usage
+      WHERE org_id = ? AND created_at_unix >= ?${devClause}
+    `).bind(orgId, monthStart, ...devArgs).first() as Promise<{ month_cost: number } | null>,
+    c.env.DB.prepare(`
+      SELECT COALESCE(SUM(cost_usd), 0) as prev_cost
+      FROM cross_platform_usage
+      WHERE org_id = ? AND created_at_unix >= ? AND created_at_unix < ?${devClause}
+    `).bind(orgId, sinceUnix(days * 2), since, ...devArgs).first() as Promise<{ prev_cost: number } | null>,
+  ]);
 
-  const budgetLimit = budget?.monthly_limit_usd ?? 0;
+  const budgetLimit = budgetPolicy?.monthly_limit_usd ?? orgBudgetRow?.budget_usd ?? 0;
   const budgetUsed = monthSpend?.month_cost ?? 0;
   const budgetPct = budgetLimit > 0 ? Math.round((budgetUsed / budgetLimit) * 100) : 0;
 
