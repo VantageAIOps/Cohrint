@@ -55,7 +55,7 @@ These tasks make the rest of the work safe. They must land before structural cha
 
 ### T001 — Add structured logging with request correlation IDs
 
-- **status:** pending
+- **status:** in_review
 - **requires:** —
 - **why:** §2.7 of guidebook review — `wrangler tail` is not sufficient past MVP. Every later task will need correlated logs to prove it didn't regress anything.
 - **scope:**
@@ -82,7 +82,7 @@ These tasks make the rest of the work safe. They must land before structural cha
 
 ### T002 — Workers Analytics Engine counters for every ingest outcome
 
-- **status:** pending
+- **status:** in_review
 - **requires:** T001
 - **why:** We need to see failure rates, duplicate rates, and free-tier reject rates without querying D1. WAE is free up to 10M writes/mo and is the right long-term home for per-endpoint metrics.
 - **scope:**
@@ -106,7 +106,7 @@ These tasks make the rest of the work safe. They must land before structural cha
 
 ### T003 — Typed D1 date-binding helper (stops silent full-table scans)
 
-- **status:** pending
+- **status:** in_review
 - **requires:** T001
 - **why:** §2.3 of review — documented silent-coercion bug is the highest-severity correctness risk. Banning raw date binds is the only durable fix.
 - **scope:**
@@ -143,7 +143,7 @@ These tasks make the rest of the work safe. They must land before structural cha
 
 ### T004 — Idempotent ingest response distinguishes accepted vs duplicate
 
-- **status:** pending
+- **status:** in_review
 - **requires:** T001
 - **superseded_by:** T010 (see note below)
 - **why:** §2.7 — SDKs can't detect client-side dedup bugs when server silently swallows duplicates. Pre-T010 this is synchronous; post-T010 the dedup-detection semantics change (see note).
@@ -179,7 +179,7 @@ Land these after Phase 0. They pay down the bugs the guidebook already documents
 
 ### T005 — Atomic increment for prompt_versions rolling stats
 
-- **status:** pending
+- **status:** in_review
 - **requires:** T001
 - **why:** §2.3 — read-modify-write race on `prompt_versions.total_calls` drifts at scale.
 - **scope:**
@@ -200,7 +200,7 @@ Land these after Phase 0. They pay down the bugs the guidebook already documents
 
 ### T006 — Cache free-tier monthly count in KV
 
-- **status:** pending
+- **status:** in_review
 - **requires:** T001, T002
 - **why:** §2.5 — `SELECT COUNT(*) FROM events WHERE org_id=? AND created_at >= month_start` runs per ingest, latency grows with customer size. Exactly backwards.
 - **scope:**
@@ -221,7 +221,7 @@ Land these after Phase 0. They pay down the bugs the guidebook already documents
 
 ### T007 — Per-API-key rate limit, keep per-org as outer guard
 
-- **status:** pending
+- **status:** in_review
 - **requires:** T001
 - **why:** §2.4 — one noisy key starves the org. Per-key is the correct granularity; per-org becomes the DoS backstop.
 - **scope:**
@@ -242,7 +242,7 @@ Land these after Phase 0. They pay down the bugs the guidebook already documents
 
 ### T008 — Fix `events` index for per-org time range scans
 
-- **status:** pending
+- **status:** in_review
 - **requires:** T001
 - **why:** §2.1 — PK is `(id, org_id)` so every analytics query does a table scan for time predicates. This is the single biggest analytics perf fix.
 - **scope:**
@@ -262,7 +262,7 @@ Land these after Phase 0. They pay down the bugs the guidebook already documents
 
 ### T009 — Distributed lock around benchmark + copilot + datadog crons
 
-- **status:** pending
+- **status:** in_review
 - **requires:** T001
 - **why:** §2.3 — race between a retry and a scheduled run can corrupt percentiles. Cloudflare does not guarantee cron exclusivity across deploys.
 - **scope:**
@@ -290,7 +290,7 @@ Land these after Phase 0. They pay down the bugs the guidebook already documents
 
 ### T010 — Introduce Cloudflare Queues between ingest and D1
 
-- **status:** pending
+- **status:** in_review
 - **requires:** T001, T002, T003, T004, T008
 - **why:** §3.1 of review — D1 is the SPOF. Queue decouples ingest availability from D1 availability, enables batching, and gives a retry surface.
 - **scope:**
@@ -327,7 +327,7 @@ Land these after Phase 0. They pay down the bugs the guidebook already documents
 
 ### T011 — Daily rollup consumer for analytics
 
-- **status:** pending
+- **status:** in_review
 - **requires:** T010
 - **why:** §3.3 of review — dashboard endpoints currently scan raw `events` for every analytics call. Rollups make `/summary`, `/timeseries`, `/models`, `/teams` O(orgs) instead of O(events).
 - **scope:**
@@ -352,7 +352,7 @@ Land these after Phase 0. They pay down the bugs the guidebook already documents
 
 ### T012 — SDK client-side spool with retry
 
-- **status:** pending
+- **status:** in_review
 - **requires:** T010
 - **why:** §2.6 — paired with Queue, this gets effective event loss to ~zero even under multi-hour control-plane incidents.
 - **scope:**
@@ -386,7 +386,7 @@ Land these after Phase 0. They pay down the bugs the guidebook already documents
 
 ### T013 — Move semantic cache response bodies to R2
 
-- **status:** pending
+- **status:** in_review
 - **requires:** T001
 - **why:** §3.5 of review — `response_text` in D1 bloats the primary DB and caps semantic-cache size at D1's 10GB limit.
 - **scope:**
@@ -415,7 +415,7 @@ Land these after Phase 0. They pay down the bugs the guidebook already documents
 
 ### T014 — Append-only audit log to R2 + D1 index
 
-- **status:** pending
+- **status:** in_review
 - **requires:** T001
 - **why:** §2.4 — audit log is "immutable by convention" which is not immutable. SOC 2 wants tamper-evident.
 - **note:** Earlier drafts had this depending on T013. That was wrong — T013 and T014 both use R2 but are otherwise independent concerns. T014 can ship without waiting for cache migration. The R2 bucket may be shared (`cohrint-cache` with `cache/` and `audit/` prefixes) or split into two buckets; prefer one bucket with prefixes to stay under free-tier bucket count.
@@ -439,7 +439,7 @@ Land these after Phase 0. They pay down the bugs the guidebook already documents
 
 ### T015 — Kill the `TEXT`-date tables (unify on INTEGER unix seconds)
 
-- **status:** pending
+- **status:** in_review
 - **requires:** T003
 - **phase_b_gate:** Phase A migration must have been on production `main` for ≥ 14 days AND survived at least one production deploy before Phase B (column drops) is allowed.
 - **why:** §2.3 — one date convention ends an entire bug class.
@@ -470,7 +470,7 @@ Land these after Phase 0. They pay down the bugs the guidebook already documents
 
 ### T016 — Query wrapper enforces `org_id` in every query
 
-- **status:** pending
+- **status:** in_review
 - **requires:** T001
 - **why:** §2.4 — SQL-layer isolation is one forgotten WHERE away from a CVE. Make the wrong thing impossible.
 - **scope:**
@@ -493,7 +493,7 @@ Land these after Phase 0. They pay down the bugs the guidebook already documents
 
 ### T017 — Circuit breakers around third-party calls (per-region best-effort)
 
-- **status:** pending
+- **status:** in_review
 - **requires:** T001
 - **why:** §2.6 — slow Slack/Resend/GitHub/Datadog wastes Worker CPU and delays user-visible responses.
 - **known limitation (document in the PR):** KV is eventually consistent with ~60s global propagation. The breaker is effectively **per-region best-effort**: state propagates to other regions within ~60s, so during that window some regions may still call a failing service while others short-circuit. This is acceptable given the alternative (Durable Objects) is deferred to Phase 6. Customer-facing impact: ≤60s additional failed-call exposure during the propagation window — trivial compared to the baseline "no breaker at all." Revisit if we observe breaker flapping or customer reports of slow responses caused by cross-region state drift.
@@ -522,7 +522,7 @@ Land these after Phase 0. They pay down the bugs the guidebook already documents
 
 ### T018 — Min prompt length 100 chars default for semantic cache
 
-- **status:** pending
+- **status:** in_review
 - **requires:** —
 - **why:** §2.5 — for short prompts the embed+query round-trip beats the LLM call for cheap models; caching is net-negative.
 - **scope:**
@@ -548,7 +548,7 @@ Land these after Phase 0. They pay down the bugs the guidebook already documents
 
 ### T019 — Replay/backfill endpoint for score corrections
 
-- **status:** pending
+- **status:** in_review
 - **requires:** T001, T010, T016
 - **why:** §2.7 — right now a buggy scoring run requires manual D1 script.
 - **scope:**
@@ -570,7 +570,7 @@ Land these after Phase 0. They pay down the bugs the guidebook already documents
 
 ### T020 — Guidebook Section 29: document exit paths from every free-tier ceiling
 
-- **status:** pending
+- **status:** in_review
 - **requires:** T010, T011, T013, T014
 - **why:** Every free-tier choice is a ceiling. Document where each one breaks so future-us is not surprised.
 - **scope:**

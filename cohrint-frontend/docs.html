@@ -2340,8 +2340,14 @@ cohrint-agent --backend claude
 <tr><td><code>sse:{orgId}:latest</code></td><td><code>src/routes/stream.ts</code></td><td>1 write per ingest that has SSE subscribers</td></tr>
 <tr><td><code>lock:cron:{name}</code></td><td><code>src/lib/cron-lock.ts</code></td><td>2 writes per cron tick (acquire + release)</td></tr>
 <tr><td><code>anomaly:{orgId}:latest</code></td><td><code>src/lib/anomaly.ts</code></td><td>1 write per anomaly detected (throttled)</td></tr>
+<tr><td><code>dlq:entry:{ts}:{id}</code></td><td><code>src/consumers/events-ingest.ts</code> (<code>handleDlqBatch</code>)</td><td>1 write per dead-lettered message (7-day TTL)</td></tr>
 </tbody>
 </table>
+<h3>Scheduled crons</h3>
+<ul style="font-size:14px;color:var(--muted);line-height:1.9;padding-left:20px;margin-bottom:16px">
+  <li><strong>Every 10 min:</strong> <code>src/lib/anomaly.ts</code> — Z-score anomaly detection on rolling 7-day hourly cost; fires Slack alert when spend exceeds 3 std dev above mean. Lock key: <code>anomaly-check</code>.</li>
+  <li><strong>Daily at 02:00 UTC:</strong> <code>src/crons/cache-reconcile.ts</code> — scans last-24 h <code>semantic_cache_entries</code> with <code>response_r2_key</code>, verifies R2 object exists via <code>CACHE_BUCKET.head()</code>, emits <code>cache.reconciliation_drift</code> WAE metric for any missing objects. Lock key: <code>cache-reconcile</code> (2 h TTL).</li>
+</ul>
 <h3>Migration: KV → Upstash Redis</h3>
 <ol style="font-size:14px;color:var(--muted);line-height:1.9;padding-left:20px;margin-bottom:16px">
   <li>Add Upstash Redis REST URL + token to Worker secrets (<code>wrangler secret put UPSTASH_REDIS_URL</code>).</li>
@@ -2368,10 +2374,34 @@ cohrint-agent --backend claude
 <ul style="font-size:14px;color:var(--muted);line-height:1.9;padding-left:20px;margin-bottom:16px">
   <li><code>src/routes/events.ts:215</code> — <code>c.env.INGEST_QUEUE.send({ type: 'event', orgId, event: body })</code> (post-T010)</li>
   <li><code>src/consumers/events-ingest.ts</code> — consumer acks each message after successful D1 batch insert</li>
-  <li><code>src/consumers/events-ingest-dlq.ts</code> — DLQ consumer surfaces failed messages to <code>GET /v1/superadmin/ingest/dlq</code></li>
+  <li><code>src/consumers/events-ingest.ts</code> — <code>handleDlqBatch</code> receives dead-lettered messages, stores each to KV under <code>dlq:entry:{ts}:{id}</code> (7-day TTL)</li>
+  <li><code>src/routes/superadmin.ts</code> — <code>GET /v1/superadmin/ingest/dlq</code> lists recent DLQ entries from KV (superadmin-only, audit-logged)</li>
 </ul>
 <h3>Migration: Queues free tier → Queues paid tier</h3>
 <p>The first paid tier is $0.40/M operations — at 1 M events/mo the monthly cost is $0.80. No code changes required; billing activates automatically when the Workers Paid plan is active. For Kafka migration (Upstash), replace <code>INGEST_QUEUE.send()</code> with an HTTP POST to the Upstash Kafka REST endpoint and replace the consumer binding with a <code>scheduled</code> handler that calls <code>kafka.consume()</code>.</p>
+
+<h2>Superadmin endpoints</h2>
+<p>These endpoints require a <code>superadmin</code>-role API key. All calls are audit-logged.</p>
+<table class="api-table">
+<thead><tr><th>Endpoint</th><th>Description</th><th>Auth</th></tr></thead>
+<tbody>
+<tr>
+  <td><code>GET /v1/superadmin/ingest/dlq</code></td>
+  <td>Lists recent dead-letter queue entries from KV. Query param: <code>?limit=50</code> (max 200). Returns <code>{ count, entries[], generated_at }</code>. See <code>src/routes/superadmin.ts</code> and <code>dlq:entry:{ts}:{id}</code> KV keys (7-day TTL).</td>
+  <td>superadmin</td>
+</tr>
+<tr>
+  <td><code>POST /v1/superadmin/events/rescore</code></td>
+  <td>Clears scoring fields and re-queues events via the <code>cohrint-ingest</code> queue. Body: <code>{ org_id, from, to, fields_to_clear[] }</code>. Rate-limited to 1 request per 15 minutes per org. Returns <code>{ ok, queued, org_id, from, to, fields_to_clear }</code>.</td>
+  <td>superadmin</td>
+</tr>
+<tr>
+  <td><code>POST /v1/superadmin/rollup/backfill</code></td>
+  <td>Idempotently rebuilds <code>events_daily_rollup</code> from raw events in batches of 100. Returns <code>{ ok, processed }</code>. Safe to re-run — duplicate rows are upserted, not doubled.</td>
+  <td>superadmin</td>
+</tr>
+</tbody>
+</table>
 
 <h2>Workers AI — details &amp; migration path</h2>
 <p>Workers AI runs <code>@cf/baai/bge-small-en-v1.5</code> (384 dimensions) for semantic cache embeddings. Each model call consumes approximately 512 neurons. The free tier provides 10 k neurons/day, yielding ~19 embedding calls/day before cost begins. In practice the semantic cache is only active when <code>env.AI</code> and <code>env.VECTORIZE</code> are bound — on the free tier this can be throttled by simply not binding the AI resource during low-volume periods.</p>
