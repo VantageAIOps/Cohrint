@@ -5528,8 +5528,11 @@ function confirmUpgrade() {
   });
 }
 
-document.getElementById('upgrade-modal').addEventListener('click', function(e) {
-  if (e.target === this) closeUpgradeModal();
+document.addEventListener('DOMContentLoaded', function() {
+  var _upgModal = document.getElementById('upgrade-modal');
+  if (_upgModal) _upgModal.addEventListener('click', function(e) {
+    if (e.target === this) closeUpgradeModal();
+  });
 });
 
 (function init() {
