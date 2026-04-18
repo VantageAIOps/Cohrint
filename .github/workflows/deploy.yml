@@ -6,8 +6,8 @@ env:
 on:
   push:
     branches:
-      - main          # → production
-      - preview       # → preview environment
+      - production    # → cohrint.com (stable, customer-facing)
+      - main          # → main.cohrint.com (staging, auth-gated)
     paths:
       - 'cohrint-frontend/**'
       - 'wrangler.toml'
@@ -56,14 +56,15 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DEPLOY_BRANCH: ${{ steps.branch.outputs.branch }}
         run: |
           MAX_ATTEMPTS=4
           DELAY=30
           for attempt in $(seq 1 $MAX_ATTEMPTS); do
-            echo "▶ Deploy attempt $attempt / $MAX_ATTEMPTS"
+            echo "▶ Deploy attempt $attempt / $MAX_ATTEMPTS (branch: ${DEPLOY_BRANCH})"
             if npx wrangler pages deploy ./cohrint-frontend \
                 --project-name=cohrint \
-                --branch=${{ steps.branch.outputs.branch }}; then
+                --branch="$DEPLOY_BRANCH"; then
               echo "✅ Deploy succeeded on attempt $attempt"
               exit 0
             fi
@@ -77,5 +78,11 @@ jobs:
           exit 1
 
       - name: Confirm deployment
-        if: github.ref == 'refs/heads/main'
-        run: echo "✅ Frontend deployed — https://cohrint.com"
+        env:
+          DEPLOY_BRANCH: ${{ steps.branch.outputs.branch }}
+        run: |
+          if [ "$DEPLOY_BRANCH" = "production" ]; then
+            echo "✅ Frontend deployed — https://cohrint.com"
+          else
+            echo "✅ Staging deployed — configure main.cohrint.com in Pages + set STAGING_CODE env var"
+          fi
