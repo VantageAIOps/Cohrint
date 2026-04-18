@@ -19,6 +19,7 @@
 import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
 import { authMiddleware, adminOnly } from '../middleware/auth';
+import { scopedDb } from '../lib/db';
 
 export const prompts = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -35,7 +36,7 @@ function generateId(): string {
 prompts.get('/', async (c) => {
   const orgId = c.get('orgId');
 
-  const rows = await c.env.DB
+  const rows = await scopedDb(c.env.DB, orgId)
     .prepare(`SELECT p.id, p.name, p.description, p.created_by, p.created_at, p.updated_at,
                 COUNT(pv.id) AS version_count,
                 MAX(pv.version_num) AS latest_version,
@@ -43,10 +44,9 @@ prompts.get('/', async (c) => {
                 SUM(pv.total_calls) AS total_calls
               FROM prompts p
               LEFT JOIN prompt_versions pv ON pv.prompt_id = p.id
-              WHERE p.org_id = ? AND p.deleted_at IS NULL
+              WHERE p.{{ORG_SCOPE}} AND p.deleted_at IS NULL
               GROUP BY p.id
               ORDER BY p.updated_at DESC`)
-    .bind(orgId)
     .all<{
       id: string; name: string; description: string | null;
       created_by: string; created_at: string; updated_at: string;
@@ -119,12 +119,12 @@ prompts.post('/usage', async (c) => {
   }
 
   // Verify version belongs to an org prompt
-  const version = await c.env.DB
+  const version = await scopedDb(c.env.DB, orgId)
     .prepare(`SELECT pv.id, pv.prompt_id
               FROM prompt_versions pv
               JOIN prompts p ON p.id = pv.prompt_id
-              WHERE pv.id = ? AND p.org_id = ? AND p.deleted_at IS NULL`)
-    .bind(body.version_id, orgId)
+              WHERE pv.id = ? AND p.{{ORG_SCOPE}} AND p.deleted_at IS NULL`)
+    .bind(body.version_id)
     .first<{ id: string; prompt_id: string }>();
 
   if (!version) return c.json({ error: 'version not found' }, 404);
@@ -165,10 +165,10 @@ prompts.get('/analytics/comparison', async (c) => {
 
   if (!promptId) return c.json({ error: 'prompt_id query param required' }, 400);
 
-  // Verify prompt ownership
-  const prompt = await c.env.DB
-    .prepare('SELECT id, name FROM prompts WHERE id = ? AND org_id = ? AND deleted_at IS NULL')
-    .bind(promptId, orgId)
+  // Verify prompt ownership via scopedDb
+  const prompt = await scopedDb(c.env.DB, orgId)
+    .prepare('SELECT id, name FROM prompts WHERE id = ? AND {{ORG_SCOPE}} AND deleted_at IS NULL')
+    .bind(promptId)
     .first<{ id: string; name: string }>();
   if (!prompt) return c.json({ error: 'not found' }, 404);
 
@@ -207,10 +207,11 @@ prompts.get('/analytics/comparison', async (c) => {
 prompts.get('/:id', async (c) => {
   const orgId = c.get('orgId');
   const promptId = c.req.param('id');
+  const sdb = scopedDb(c.env.DB, orgId);
 
-  const prompt = await c.env.DB
-    .prepare('SELECT * FROM prompts WHERE id = ? AND org_id = ? AND deleted_at IS NULL')
-    .bind(promptId, orgId)
+  const prompt = await sdb
+    .prepare('SELECT * FROM prompts WHERE id = ? AND {{ORG_SCOPE}} AND deleted_at IS NULL')
+    .bind(promptId)
     .first<{ id: string; name: string; description: string | null; created_by: string; created_at: string; updated_at: string }>();
 
   if (!prompt) return c.json({ error: 'not found' }, 404);
@@ -245,9 +246,9 @@ prompts.patch('/:id', adminOnly, async (c) => {
 
   if (!body) return c.json({ error: 'invalid body' }, 400);
 
-  const prompt = await c.env.DB
-    .prepare('SELECT id FROM prompts WHERE id = ? AND org_id = ? AND deleted_at IS NULL')
-    .bind(promptId, orgId)
+  const prompt = await scopedDb(c.env.DB, orgId)
+    .prepare('SELECT id FROM prompts WHERE id = ? AND {{ORG_SCOPE}} AND deleted_at IS NULL')
+    .bind(promptId)
     .first();
   if (!prompt) return c.json({ error: 'not found' }, 404);
 
@@ -269,9 +270,9 @@ prompts.delete('/:id', adminOnly, async (c) => {
   const orgId = c.get('orgId');
   const promptId = c.req.param('id');
 
-  const result = await c.env.DB
-    .prepare("UPDATE prompts SET deleted_at = datetime('now') WHERE id = ? AND org_id = ? AND deleted_at IS NULL")
-    .bind(promptId, orgId)
+  const result = await scopedDb(c.env.DB, orgId)
+    .prepare("UPDATE prompts SET deleted_at = datetime('now') WHERE id = ? AND {{ORG_SCOPE}} AND deleted_at IS NULL")
+    .bind(promptId)
     .run();
 
   if (!result.meta.changes) return c.json({ error: 'not found' }, 404);
@@ -285,9 +286,9 @@ prompts.post('/:id/versions', adminOnly, async (c) => {
   const promptId = c.req.param('id');
   const memberEmail = c.get('memberEmail') ?? 'owner';
 
-  const prompt = await c.env.DB
-    .prepare('SELECT id FROM prompts WHERE id = ? AND org_id = ? AND deleted_at IS NULL')
-    .bind(promptId, orgId)
+  const prompt = await scopedDb(c.env.DB, orgId)
+    .prepare('SELECT id FROM prompts WHERE id = ? AND {{ORG_SCOPE}} AND deleted_at IS NULL')
+    .bind(promptId)
     .first();
   if (!prompt) return c.json({ error: 'not found' }, 404);
 
@@ -331,9 +332,9 @@ prompts.get('/:id/versions/:versionId', adminOnly, async (c) => {
   const versionId = c.req.param('versionId');
 
   // Verify prompt belongs to org
-  const prompt = await c.env.DB
-    .prepare('SELECT id FROM prompts WHERE id = ? AND org_id = ? AND deleted_at IS NULL')
-    .bind(promptId, orgId)
+  const prompt = await scopedDb(c.env.DB, orgId)
+    .prepare('SELECT id FROM prompts WHERE id = ? AND {{ORG_SCOPE}} AND deleted_at IS NULL')
+    .bind(promptId)
     .first();
   if (!prompt) return c.json({ error: 'not found' }, 404);
 

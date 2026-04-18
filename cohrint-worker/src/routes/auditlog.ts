@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Bindings, Variables } from '../types';
 import { authMiddleware, hasRole } from '../middleware/auth';
 import { logAudit } from '../lib/audit';
+import { createLogger } from '../lib/logger';
 
 const auditlog = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -136,7 +137,8 @@ auditlog.get('/verify', async (c) => {
       }
     }
   } catch (err) {
-    console.warn('[audit/verify] R2 list/get failed', err);
+    const log = createLogger(c.get('requestId') ?? 'auditlog-verify', orgId);
+    log.warn('auditlog: R2 list/get failed', { err: err instanceof Error ? err : new Error(String(err)) });
     return c.json({ consistent: null, id, reason: 'R2 read error' });
   }
 

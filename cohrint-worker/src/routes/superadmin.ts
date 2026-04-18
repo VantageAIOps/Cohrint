@@ -650,4 +650,48 @@ async function bootstrapTables(db: D1Database): Promise<void> {
   ]);
 }
 
+// ── GET /v1/superadmin/ingest/dlq — list DLQ entries stored in KV ────────────
+superadmin.get('/ingest/dlq', async (c) => {
+  const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10), 200);
+
+  let entries: unknown[] = [];
+  try {
+    const listed = await c.env.KV.list({ prefix: 'dlq:entry:', limit });
+    const values = await Promise.all(
+      listed.keys.map(async (k) => {
+        try {
+          const raw = await c.env.KV.get(k.name);
+          return raw ? JSON.parse(raw) : null;
+        } catch {
+          return null;
+        }
+      }),
+    );
+    entries = values.filter(Boolean);
+    entries.sort((a: unknown, b: unknown) =>
+      ((b as Record<string, string>).timestamp ?? '').localeCompare(
+        (a as Record<string, string>).timestamp ?? '',
+      ),
+    );
+  } catch (err) {
+    return c.json({ error: `KV list failed: ${err instanceof Error ? err.message : String(err)}` }, 500);
+  }
+
+  logAuditRaw(c.env.DB, c.executionCtx,
+    c.req.header('CF-Connecting-IP') ?? 'unknown',
+    'superadmin', 'superadmin', 'superadmin',
+    {
+      event_type: 'admin_action',
+      event_name: 'admin_action.superadmin_access',
+      metadata: { path: c.req.path, method: c.req.method },
+    },
+  );
+
+  return c.json({
+    count:        entries.length,
+    entries,
+    generated_at: new Date().toISOString(),
+  });
+});
+
 export { superadmin };

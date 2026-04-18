@@ -204,9 +204,9 @@ export async function runAnomalyDetection(
       const alreadySent = await kv.get(throttleKey);
       if (alreadySent) continue;
 
-      // Send Slack alert
+      // Send Slack alert — pass kv so circuit breaker can short-circuit on repeated failures
       const payload = formatAnomalyAlert(result);
-      const sent = await sendSlackMessage(cfg.slack_url, payload);
+      const sent = await sendSlackMessage(cfg.slack_url, payload, kv);
 
       if (sent) {
         alertsSent++;

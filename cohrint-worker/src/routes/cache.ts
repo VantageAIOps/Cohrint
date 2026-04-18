@@ -15,6 +15,9 @@
 import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
 import { authMiddleware, adminOnly } from '../middleware/auth';
+import { createLogger } from '../lib/logger';
+import { emitMetric } from '../lib/metrics';
+import { scopedDb } from '../lib/db';
 
 const EMBEDDING_MODEL = '@cf/baai/bge-small-en-v1.5' as const;
 
@@ -72,21 +75,23 @@ cache.post('/lookup', async (c) => {
 
   const top = matches.matches[0];
   if (!top || top.score < config.similarity_threshold) {
+    emitMetric(c.env.METRICS, { event: 'cache.miss', orgId });
     return c.json({ hit: false, score: top?.score ?? 0 });
   }
 
   // Fetch full entry from D1 — re-enforce team isolation at DB level
   const teamClause = scopeTeam ? ' AND (team_id = ? OR team_id IS NULL)' : '';
-  const entry = await c.env.DB
-    .prepare(`SELECT * FROM semantic_cache_entries WHERE id = ? AND org_id = ?${teamClause}`)
-    .bind(...([top.id, orgId, ...(scopeTeam ? [scopeTeam] : [])] as [string, string, ...string[]]))
+  const teamArgs   = scopeTeam ? [scopeTeam] : [];
+  const entry = await scopedDb(c.env.DB, orgId)
+    .prepare(`SELECT * FROM semantic_cache_entries WHERE id = ? AND {{ORG_SCOPE}}${teamClause}`)
+    .bind(top.id, ...teamArgs)
     .first<{
       id: string; response_text: string; response_r2_key: string | null; cost_usd: number;
       prompt_tokens: number; completion_tokens: number;
       hit_count: number; total_savings_usd: number;
     }>();
 
-  if (!entry) return c.json({ hit: false, reason: 'entry_not_found' });
+  if (!entry) { emitMetric(c.env.METRICS, { event: 'cache.miss', orgId }); return c.json({ hit: false, reason: 'entry_not_found' }); }
 
   // Check age
   const ageQuery = await c.env.DB
@@ -100,6 +105,7 @@ cache.post('/lookup', async (c) => {
       c.env.VECTORIZE.deleteByIds([top.id]),
       c.env.DB.prepare('DELETE FROM semantic_cache_entries WHERE id = ?').bind(top.id).run(),
     ]));
+    emitMetric(c.env.METRICS, { event: 'cache.miss', orgId });
     return c.json({ hit: false, reason: 'entry_expired' });
   }
 
@@ -113,7 +119,8 @@ cache.post('/lookup', async (c) => {
       }
       // r2Object === null → R2 has no object yet, fall back to D1 silently
     } catch (err) {
-      console.warn('[cache/lookup] R2 get failed, falling back to D1', entry.response_r2_key, err);
+      const log = createLogger(c.get('requestId') ?? 'cache', orgId);
+      log.warn('cache: R2 get failed, falling back to D1', { r2Key: entry.response_r2_key, err: err instanceof Error ? err : new Error(String(err)) });
       // responseText already holds the D1 value
     }
   }
@@ -131,6 +138,7 @@ cache.post('/lookup', async (c) => {
       .run()
   );
 
+  emitMetric(c.env.METRICS, { event: 'cache.hit', orgId });
   return c.json({
     hit: true,
     score: top.score,
@@ -169,9 +177,9 @@ cache.post('/store', async (c) => {
 
   // Check for exact-match duplicate via prompt_hash
   if (body.prompt_hash) {
-    const existing = await c.env.DB
-      .prepare('SELECT id FROM semantic_cache_entries WHERE org_id = ? AND prompt_hash = ? AND model = ?')
-      .bind(orgId, body.prompt_hash, body.model)
+    const existing = await scopedDb(c.env.DB, orgId)
+      .prepare('SELECT id FROM semantic_cache_entries WHERE {{ORG_SCOPE}} AND prompt_hash = ? AND model = ?')
+      .bind(body.prompt_hash, body.model)
       .first<{ id: string }>();
     if (existing) return c.json({ stored: false, reason: 'duplicate', cache_entry_id: existing.id });
   }
@@ -189,7 +197,8 @@ cache.post('/store', async (c) => {
       });
       r2Key = candidateR2Key;
     } catch (err) {
-      console.warn('[cache/store] R2 put failed, storing response in D1 only', err);
+      const log = createLogger(c.get('requestId') ?? 'cache', orgId);
+      log.warn('cache: R2 put failed, storing response in D1 only', { err: err instanceof Error ? err : new Error(String(err)) });
       // r2Key stays null — D1 response_text is the fallback
     }
   }
@@ -224,30 +233,27 @@ cache.post('/store', async (c) => {
 
 cache.get('/stats', async (c) => {
   const orgId = c.get('orgId');
+  const sdb = scopedDb(c.env.DB, orgId);
   const [stats, config] = await Promise.all([
-    c.env.DB
-      .prepare(`SELECT
+    sdb.prepare(`SELECT
           COUNT(*) AS total_entries,
           SUM(hit_count) AS total_hits,
           SUM(total_savings_usd) AS total_savings_usd,
           COUNT(DISTINCT model) AS models_cached
         FROM semantic_cache_entries
-        WHERE org_id = ?`)
-      .bind(orgId)
-      .first<{
-        total_entries: number; total_hits: number;
-        total_savings_usd: number; models_cached: number;
-      }>(),
+        WHERE {{ORG_SCOPE}}`).first<{
+      total_entries: number; total_hits: number;
+      total_savings_usd: number; models_cached: number;
+    }>(),
     getOrgCacheConfig(c.env.DB, orgId),
   ]);
 
   // Recent entries (last 10)
-  const recent = await c.env.DB
+  const recent = await sdb
     .prepare(`SELECT id, model, prompt_hash, hit_count, total_savings_usd, cost_usd, created_at, last_hit_at
               FROM semantic_cache_entries
-              WHERE org_id = ?
+              WHERE {{ORG_SCOPE}}
               ORDER BY created_at DESC LIMIT 10`)
-    .bind(orgId)
     .all<{ id: string; model: string; prompt_hash: string; hit_count: number; total_savings_usd: number; cost_usd: number; created_at: string; last_hit_at: string | null }>();
 
   return c.json({
@@ -307,9 +313,10 @@ cache.delete('/entries/:id', adminOnly, async (c) => {
   const orgId = c.get('orgId');
   const entryId = c.req.param('id');
 
-  const entry = await c.env.DB
-    .prepare('SELECT vectorize_id, response_r2_key FROM semantic_cache_entries WHERE id = ? AND org_id = ?')
-    .bind(entryId, orgId)
+  const esdb = scopedDb(c.env.DB, orgId);
+  const entry = await esdb
+    .prepare('SELECT vectorize_id, response_r2_key FROM semantic_cache_entries WHERE id = ? AND {{ORG_SCOPE}}')
+    .bind(entryId)
     .first<{ vectorize_id: string | null; response_r2_key: string | null }>();
 
   if (!entry) return c.json({ error: 'not found' }, 404);
@@ -320,7 +327,8 @@ cache.delete('/entries/:id', adminOnly, async (c) => {
     try {
       await c.env.CACHE_BUCKET.delete(entry.response_r2_key);
     } catch (err) {
-      console.error('[cache/delete] R2 delete failed — aborting to prevent orphan', entry.response_r2_key, err);
+      const log = createLogger(c.get('requestId') ?? 'cache', orgId);
+      log.error('cache: R2 delete failed — aborting to prevent orphan', { r2Key: entry.response_r2_key, err: err instanceof Error ? err : new Error(String(err)) });
       return c.json({ error: 'R2 delete failed; entry not removed — please retry' }, 500);
     }
   }
@@ -328,7 +336,7 @@ cache.delete('/entries/:id', adminOnly, async (c) => {
   // R2 clean — now delete Vectorize index and D1 row
   await Promise.all([
     entry.vectorize_id ? c.env.VECTORIZE.deleteByIds([entry.vectorize_id]) : Promise.resolve(),
-    c.env.DB.prepare('DELETE FROM semantic_cache_entries WHERE id = ? AND org_id = ?').bind(entryId, orgId).run(),
+    esdb.prepare('DELETE FROM semantic_cache_entries WHERE id = ? AND {{ORG_SCOPE}}').bind(entryId).run(),
   ]);
 
   return c.json({ deleted: true });

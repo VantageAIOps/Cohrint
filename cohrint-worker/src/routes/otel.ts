@@ -488,8 +488,8 @@ otel.post('/v1/metrics', async (c) => {
         team, cost_center, model, input_tokens, output_tokens, cached_tokens,
         cache_creation_tokens, cost_usd, session_id, terminal_type,
         lines_added, lines_removed, commits, pull_requests, active_time_s,
-        ttft_ms, latency_ms, period_start, period_end, raw_data
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ttft_ms, latency_ms, period_start, period_end, raw_data, created_at_unix
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(strftime('%s', 'now') AS INTEGER))
     `);
 
     const batch = records.map(r => usageStmt.bind(
@@ -711,8 +711,8 @@ otel.post('/v1/logs', async (c) => {
               team, cost_center, model, input_tokens, output_tokens, cached_tokens,
               cache_creation_tokens, cost_usd, session_id, terminal_type,
               lines_added, lines_removed, commits, pull_requests, active_time_s,
-              ttft_ms, latency_ms, period_start, period_end, raw_data
-            ) VALUES (?, ?, ?, 'otel', ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 0, 0, 0, 0, 0, ?, ?, ?, ?, ?)
+              ttft_ms, latency_ms, period_start, period_end, raw_data, created_at_unix
+            ) VALUES (?, ?, ?, 'otel', ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 0, 0, 0, 0, 0, ?, ?, ?, ?, ?, CAST(strftime('%s', 'now') AS INTEGER))
           `);
           try {
             await stmt.bind(

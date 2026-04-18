@@ -1,5 +1,6 @@
 import { Context, Next } from 'hono';
 import type { Bindings, Variables } from '../types';
+import { emitMetric } from '../lib/metrics';
 
 // Default limits (configurable via env vars in wrangler.toml)
 const DEFAULT_KEY_RPM = 200;
@@ -52,9 +53,11 @@ export async function perKeyRateLimit(
   c.header('X-RateLimit-Remaining-Org',  String(Math.max(0, orgLimitRpm - orgCount - 1)));
 
   if (keyCount >= keyLimitRpm) {
+    emitMetric(c.env.METRICS, { event: 'ratelimit.rejected', orgId });
     return c.json({ error: 'Per-key rate limit exceeded', retry_after_seconds: 60 }, 429);
   }
   if (orgCount >= orgLimitRpm) {
+    emitMetric(c.env.METRICS, { event: 'ratelimit.rejected', orgId });
     return c.json({ error: 'Org rate limit exceeded', retry_after_seconds: 60 }, 429);
   }
 

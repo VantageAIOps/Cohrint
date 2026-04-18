@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
 import type { Bindings, Variables } from '../types';
+import { createLogger } from './logger';
 
 export interface AuditEvent {
   event_type: 'auth' | 'data_access' | 'admin_action';
@@ -60,7 +61,8 @@ function writeAuditToR2(
     bucket.put(r2Key, payload, {
       httpMetadata: { contentType: 'application/json' },
     }).catch((err: unknown) => {
-      console.warn('[audit] R2 write failed (non-fatal)', r2Key, err);
+      const log = createLogger('audit-r2', orgId);
+      log.warn('audit: R2 write failed (non-fatal)', { r2Key, err: err instanceof Error ? err : new Error(String(err)) });
     }),
   );
 }

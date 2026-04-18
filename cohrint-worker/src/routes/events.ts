@@ -5,6 +5,7 @@ import { maybeSendBudgetAlert } from './alerts';
 import { logAudit } from '../lib/audit';
 import { getFreeTierCount, incrementFreeTierCount } from '../lib/freetier';
 import { scopedDb } from '../lib/db';
+import { emitMetric } from '../lib/metrics';
 
 const events = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -141,6 +142,7 @@ events.post('/', async (c) => {
 
   const { blocked, used } = await checkFreeTierLimit(c.env.DB, c.env.KV, orgId, 1);
   if (blocked) {
+    emitMetric(c.env.METRICS, { event: 'events.free_tier_rejected', orgId });
     return c.json({
       error: 'Free tier limit reached',
       message: `Your org has used ${used.toLocaleString()} / ${FREE_TIER_LIMIT.toLocaleString()} free events this month. Upgrade to Team plan to continue tracking.`,
@@ -312,6 +314,7 @@ events.post('/batch', async (c) => {
 
   const { blocked, used } = await checkFreeTierLimit(c.env.DB, c.env.KV, orgId, body.events.length);
   if (blocked) {
+    emitMetric(c.env.METRICS, { event: 'events.free_tier_rejected', orgId });
     return c.json({
       error: 'Free tier limit reached',
       message: `Your org has used ${used.toLocaleString()} / ${FREE_TIER_LIMIT.toLocaleString()} free events this month. Upgrade to Team plan to continue tracking.`,

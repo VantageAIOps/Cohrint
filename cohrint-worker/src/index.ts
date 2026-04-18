@@ -105,7 +105,8 @@ import { prompts }   from './routes/prompts';
 import { runAnomalyDetection } from './lib/anomaly';
 import { createLogger } from './lib/logger';
 import { acquireLock } from './lib/cron-lock';
-import { handleIngestBatch } from './consumers/events-ingest';
+import { handleIngestBatch, handleDlqBatch } from './consumers/events-ingest';
+import { runCacheReconcile } from './crons/cache-reconcile';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -174,7 +175,11 @@ app.onError((err, c) => {
 export default {
   fetch: app.fetch,
   async queue(batch: MessageBatch, env: Bindings, ctx: ExecutionContext) {
-    ctx.waitUntil(handleIngestBatch(batch as MessageBatch<never>, env))
+    if (batch.queue === 'cohrint-ingest-dlq') {
+      ctx.waitUntil(handleDlqBatch(batch as MessageBatch<never>, env))
+    } else {
+      ctx.waitUntil(handleIngestBatch(batch as MessageBatch<never>, env))
+    }
   },
   async scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionContext) {
     ctx.waitUntil((async () => {
@@ -244,6 +249,20 @@ export default {
           log.error('benchmark-cron fatal', { err: err instanceof Error ? err : new Error(String(err)) });
         } finally {
           await benchmarkLock.release();
+        }
+      }
+
+      // ── Cache reconciliation (daily 02:00 UTC — R2/D1 drift detection) ────
+      const cacheReconcileLock = await acquireLock(env.KV, 'cache-reconcile', 7200);
+      if (!cacheReconcileLock) {
+        log.info('cache-reconcile-cron skipped (lock held by another instance)');
+      } else {
+        try {
+          await runCacheReconcile(env);
+        } catch (err) {
+          log.error('cache-reconcile-cron fatal', { err: err instanceof Error ? err : new Error(String(err)) });
+        } finally {
+          await cacheReconcileLock.release();
         }
       }
     })());

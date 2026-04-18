@@ -57,7 +57,7 @@ RATE_LIMIT_RPM     = "1000"
 
 # ── Cron Triggers — anomaly detection every 10 minutes ──────────────────
 [triggers]
-crons = ["*/10 * * * *"]
+crons = ["*/10 * * * *", "0 2 * * *"]
 
 # ── Secrets (set via: wrangler secret put SECRET_NAME) ───────────────────────
 # RESEND_API_KEY             — Resend API key for email (member invites, key recovery)
@@ -80,6 +80,12 @@ max_batch_size     = 100
 max_batch_timeout  = 5
 max_retries        = 3
 dead_letter_queue  = "cohrint-ingest-dlq"
+
+[[queues.consumers]]
+queue              = "cohrint-ingest-dlq"
+max_batch_size     = 50
+max_batch_timeout  = 10
+max_retries        = 1
 
 # ── Preview environment ───────────────────────────────────────────────────────
 [env.preview]

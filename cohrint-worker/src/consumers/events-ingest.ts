@@ -121,6 +121,7 @@ async function processEvents(
     log.error('events-consumer: D1 batch failed', {
       err: err instanceof Error ? err : new Error(String(err)),
     })
+    emitMetric(env.METRICS, { event: 'events.d1_error', orgId: 'batch', values: { count: messages.length } })
     throw err // Let Queues retry the batch
   }
 
@@ -259,4 +260,40 @@ async function processRescore(
 
     msg.ack()
   }
+}
+
+// ── DLQ consumer ──────────────────────────────────────────────────────────────
+// Receives messages that exhausted all retries from the main ingest queue.
+// Stores each message to KV under key `dlq:entry:{timestamp_ms}:{id}`
+// with a 7-day TTL so GET /v1/superadmin/ingest/dlq can surface them.
+
+export async function handleDlqBatch(
+  batch: MessageBatch<QueueMessage>,
+  env: Bindings,
+): Promise<void> {
+  const log = createLogger(batch.queue)
+
+  for (const msg of batch.messages) {
+    const ts  = Date.now()
+    const key = `dlq:entry:${ts}:${msg.id}`
+    const entry = {
+      id:        msg.id,
+      body:      msg.body,
+      timestamp: new Date(ts).toISOString(),
+      queue:     batch.queue,
+    }
+    try {
+      await env.KV.put(key, JSON.stringify(entry), { expirationTtl: 7 * 24 * 3600 })
+      const orgId = (msg.body as IngestMessage).orgId ?? 'unknown'
+      emitMetric(env.METRICS, { event: 'ingest.dlq_stored', orgId, values: { count: 1 } })
+    } catch (err) {
+      log.error('dlq-consumer: KV write failed', {
+        err:   err instanceof Error ? err : new Error(String(err)),
+        msgId: msg.id,
+      })
+    }
+    msg.ack()
+  }
+
+  log.info('dlq-consumer: batch processed', { count: batch.messages.length })
 }

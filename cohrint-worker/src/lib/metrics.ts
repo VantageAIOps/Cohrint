@@ -11,7 +11,9 @@ export type MetricEvent =
   | 'cache.hit'
   | 'cache.miss'
   | 'ratelimit.rejected'
-  | 'circuit.short_circuited';
+  | 'circuit.short_circuited'
+  | 'cache.reconciliation_drift'
+  | 'ingest.dlq_stored';
 
 interface MetricPayload {
   event: MetricEvent;

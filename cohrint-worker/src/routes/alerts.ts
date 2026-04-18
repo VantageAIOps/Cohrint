@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
 import { authMiddleware, adminOnly } from '../middleware/auth';
 import { logAudit } from '../lib/audit';
+import { withBreaker } from '../lib/circuit';
 
 const alerts = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -91,7 +92,7 @@ alerts.post('/slack/:orgId/test', adminOnly, async (c) => {
         text: '*✅ Cohrint — Test Alert*\nYour Slack integration is working correctly.\nYou\'ll receive alerts here when budget thresholds or anomalies are detected.',
       },
     }],
-  });
+  }, c.env.KV);
 
   if (!sent) return c.json({ error: 'Failed to deliver message to Slack' }, 502);
   return c.json({ ok: true, message: 'Test message sent' });
@@ -129,14 +130,26 @@ alerts.get('/:orgId/anomaly', async (c) => {
 export async function sendSlackMessage(
   webhookUrl: string,
   payload: Record<string, unknown>,
+  kv?: KVNamespace,
 ): Promise<boolean> {
-  try {
+  const doFetch = async (): Promise<boolean> => {
     const res = await fetch(webhookUrl, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify(payload),
     });
-    return res.ok;
+    if (!res.ok) throw new Error(`Slack webhook returned ${res.status}`);
+    return true;
+  };
+
+  if (kv) {
+    const result = await withBreaker('slack', kv, doFetch);
+    // null means circuit is open — skip silently
+    return result ?? false;
+  }
+
+  try {
+    return await doFetch();
   } catch {
     return false;
   }
@@ -177,7 +190,7 @@ export async function maybeSendBudgetAlert(
         text: `${emoji} *Budget Alert — ${Math.round(pct)}% used*\nOrg *${orgId}* has spent *$${mtdCost.toFixed(2)}* of *$${budgetUsd.toFixed(2)}* this month.\n<https://cohrint.com/app.html|View dashboard →>`,
       },
     }],
-  });
+  }, kv);
 
   // Throttle for 1 hour
   await kv.put(throttleKey, '1', { expirationTtl: 3600 });
