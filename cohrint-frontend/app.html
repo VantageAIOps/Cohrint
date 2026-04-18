@@ -276,44 +276,6 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
 }
 #offlineBanner.visible { display: block; }
 
-/* ── Upgrade banner ── */
-#upgrade-banner {
-  display: none;
-  position: relative;
-  background: linear-gradient(90deg, rgba(52,211,153,.12), rgba(96,165,250,.08));
-  border-bottom: 1px solid rgba(52,211,153,.25);
-  padding: 9px 20px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
-}
-#upgrade-banner.visible { display: flex; }
-#upgrade-banner .upg-dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: var(--accent-green); flex-shrink: 0;
-  box-shadow: 0 0 6px var(--accent-green);
-  animation: pulse 2s infinite;
-}
-#upgrade-banner .upg-msg { flex: 1; }
-#upgrade-banner .upg-version {
-  font-family: var(--font-mono); font-size: 11px;
-  color: var(--accent-green); font-weight: 600;
-}
-#upgrade-banner .upg-btn {
-  padding: 5px 14px; border-radius: 6px; cursor: pointer;
-  font-size: 12px; font-weight: 600; border: none;
-  background: var(--accent-green); color: #000;
-  transition: background .15s;
-}
-#upgrade-banner .upg-btn:hover { background: #10b981; }
-#upgrade-banner .upg-dismiss {
-  background: none; border: none; cursor: pointer;
-  color: var(--text-muted); font-size: 16px; line-height: 1;
-  padding: 0 4px;
-}
-#upgrade-banner .upg-dismiss:hover { color: var(--text-secondary); }
 
 /* ── Upgrade modal ── */
 #upgrade-modal {
@@ -870,13 +832,6 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
   <div id="main" class="main">
     <!-- Demo banner (shown only for demo org session) -->
     <div id="demo-banner" style="display:none;background:#3b4ef8;color:#fff;font-size:12px;font-family:monospace;padding:8px 20px;text-align:center;letter-spacing:.02em;flex-shrink:0"></div>
-    <!-- Upgrade banner (shown when a newer version is available) -->
-    <div id="upgrade-banner">
-      <div class="upg-dot"></div>
-      <div class="upg-msg">New version available: <span id="upg-latest" class="upg-version"></span> — see what's new</div>
-      <button class="upg-btn" onclick="openUpgradeModal()">View &amp; Upgrade</button>
-      <button class="upg-dismiss" onclick="dismissUpgradeBanner()" title="Dismiss">&#xd7;</button>
-    </div>
     <!-- Top bar -->
     <div class="topbar">
       <div class="topbar-left">
@@ -913,6 +868,9 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
               </button>
               <button onclick="closeAcctMenu(); nav('account', null)" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;width:100%;text-align:left;background:none;border:none;color:var(--text-secondary);font-size:13px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">
                 <span style="font-size:15px">&#9683;</span> Account
+              </button>
+              <button id="acct-upgrade-btn" onclick="closeAcctMenu(); openUpgradeModal()" style="display:none;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;width:100%;text-align:left;background:none;border:none;color:var(--accent-green);font-size:13px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">
+                <span style="font-size:15px">⬆</span> <span>What's new</span> <span id="acct-upgrade-version" style="font-family:var(--font-mono);font-size:10px;background:rgba(52,211,153,.15);color:var(--accent-green);padding:1px 6px;border-radius:8px;margin-left:auto"></span>
               </button>
               <div style="height:1px;background:var(--border);margin:4px 0"></div>
               <button onclick="signOut()" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;width:100%;text-align:left;background:none;border:none;color:var(--accent-red);font-size:13px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='rgba(220,38,38,.08)'" onmouseout="this.style.background=''">
@@ -5446,17 +5404,18 @@ function checkUpgradeAvailable() {
   apiFetch('/v1/admin/versions').then(function(data) {
     _upgradeData = data;
     if (!data.can_upgrade || dismissed === data.latest_version) return;
-    var el = document.getElementById('upg-latest');
-    if (el) el.textContent = data.latest_version;
-    var banner = document.getElementById('upgrade-banner');
-    if (banner) banner.classList.add('visible');
+    // Show "What's new" in account dropdown
+    var btn = document.getElementById('acct-upgrade-btn');
+    if (btn) btn.style.display = 'flex';
+    var ver = document.getElementById('acct-upgrade-version');
+    if (ver) ver.textContent = data.latest_version;
   }).catch(function() {});
 }
 
 function dismissUpgradeBanner() {
   if (_upgradeData) sessionStorage.setItem('upgrade_dismissed', _upgradeData.latest_version);
-  var banner = document.getElementById('upgrade-banner');
-  if (banner) banner.classList.remove('visible');
+  var btn = document.getElementById('acct-upgrade-btn');
+  if (btn) btn.style.display = 'none';
 }
 
 function _makeChangelogEntry(entry, latestVersion, currentVersion) {
