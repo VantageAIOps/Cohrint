@@ -1,11 +1,11 @@
 {
   "mcpServers": {
-    "vantage": {
+    "cohrint": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "vantageaiops-mcp"],
+      "args": ["-y", "cohrint-mcp"],
       "env": {
-        "VANTAGE_API_KEY": "vnt_aaravbagraab_465dd2e76ca2abe8914305acf3964eba"
+        "COHRINT_API_KEY": "crt_aaravbagraab_cad3d3a38c38dcf9eeee210ff6239819"
       }
     }
   }

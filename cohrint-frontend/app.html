@@ -2213,9 +2213,13 @@ function apiFetch(path, opts) {
   var isRead = !opts.method || opts.method === 'GET';
   var headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
 
-  // Privacy mode header — tells the server whether the user has opted into
-  // storing prompts/responses on the backend. Matches the SDK's X-Cohrint-Privacy
-  // header so server-side redaction policies stay consistent across clients.
+  // Per-tab Bearer auth — overrides shared session cookie so multiple tabs
+  // can be logged in as different accounts simultaneously.
+  try {
+    var _tabKey = sessionStorage.getItem('cohrint_tab_key');
+    if (_tabKey && !headers['Authorization']) headers['Authorization'] = 'Bearer ' + _tabKey;
+  } catch (_) {}
+
   try {
     var _privacy = localStorage.getItem('cohrint_privacy') || 'strict';
     if (!headers['X-Cohrint-Privacy'] && !headers['x-cohrint-privacy']) {
@@ -2271,7 +2275,12 @@ window.__cpRegister = function (cb) {
 };
 
 function initKeyAuth() {
-  return fetch(API_BASE + '/v1/auth/session', { credentials: 'include' })
+  var _initHeaders = { 'Content-Type': 'application/json' };
+  try {
+    var _tk = sessionStorage.getItem('cohrint_tab_key');
+    if (_tk) _initHeaders['Authorization'] = 'Bearer ' + _tk;
+  } catch (_) {}
+  return fetch(API_BASE + '/v1/auth/session', { credentials: 'include', headers: _initHeaders })
     .catch(function() { console.warn('[cohrint] offline'); return null; })
     .then(function(res) {
       if (!res || !res.ok) {
@@ -5571,21 +5580,17 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  // If ?api_key= is present, create a fresh session with that key before
-  // loading the app — otherwise the existing personal session cookie wins.
+  // If ?api_key= is present, store it in sessionStorage (tab-isolated) so
+  // this tab authenticates via Bearer token — no session cookie is created,
+  // allowing multiple tabs to be logged in as different accounts at once.
   var _urlKey = new URLSearchParams(window.location.search).get('api_key') || '';
   if (_urlKey && (_urlKey.startsWith('crt_') || _urlKey.startsWith('vnt_'))) {
+    try { sessionStorage.setItem('cohrint_tab_key', _urlKey); } catch (_) {}
     var _cleanUrl = new URL(window.location.href);
     _cleanUrl.searchParams.delete('api_key');
     window.history.replaceState({}, '', _cleanUrl.toString());
-    fetch(API_BASE + '/v1/auth/session', {
-      method: 'POST', credentials: 'include',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({api_key: _urlKey})
-    }).then(function() { _bootApp(); }).catch(function() { _bootApp(); });
-  } else {
-    _bootApp();
   }
+  _bootApp();
 })();
 
 // Close modals on overlay click or Escape key

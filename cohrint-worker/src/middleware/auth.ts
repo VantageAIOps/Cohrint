@@ -52,16 +52,80 @@ function parseCookie(header: string, name: string): string | null {
 
 // ── Auth middleware ───────────────────────────────────────────────────────────
 // Lookup order:
-//   1. Session cookie (cohrint_session)  → dashboard UI
-//   2. Authorization: Bearer crt_...     → SDK / API
+//   1. Authorization: Bearer crt_... → explicit per-request / per-tab auth
+//   2. Session cookie (cohrint_session) → dashboard UI fallback
+// Bearer is checked first so a tab-scoped key (stored in sessionStorage) can
+// override the shared session cookie without logging out other tabs.
 export async function authMiddleware(
   c: Context<{ Bindings: Bindings; Variables: Variables }>,
   next: Next,
 ) {
-  // ── 1. Session cookie auth ────────────────────────────────────────────────
+  // ── 1. Bearer API key auth ────────────────────────────────────────────────
+  const authHeader = c.req.header('Authorization') ?? '';
+  const apiKey = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+
+  if (apiKey && (apiKey.startsWith('vnt_') || apiKey.startsWith('crt_'))) {
+    const parts = apiKey.split('_');
+    const orgId = parts.length >= 3 ? parts[1] : '';
+    if (!orgId) return c.json({ error: 'Malformed API key — cannot extract org ID' }, 401);
+
+    const hash = await sha256hex(apiKey);
+    const org = await c.env.DB.prepare(
+      'SELECT id, plan, account_type FROM orgs WHERE api_key_hash = ?'
+    ).bind(hash).first<{ id: string; plan: string; account_type: string }>();
+
+    if (org) {
+      c.set('orgId',       org.id);
+      c.set('role',        'owner' as OrgRole);
+      c.set('accountType', (org.account_type ?? 'organization') as import('../types').AccountType);
+      c.set('scopeTeam',   null);
+      c.set('teamId',      null);
+      c.set('memberId',    null);
+      c.set('memberEmail', null);
+    } else {
+      const member = await c.env.DB.prepare(
+        'SELECT id, org_id, role, scope_team, email, team_id FROM org_members WHERE api_key_hash = ?'
+      ).bind(hash).first<{ id: string; org_id: string; role: string; scope_team: string | null; email: string | null; team_id: string | null }>();
+
+      if (!member) {
+        const ip = c.req.header('CF-Connecting-IP') ?? '';
+        logAuditRaw(c.env.DB, c.executionCtx, ip, orgId || 'unknown',
+          `key:${hash.substring(0, 8)}`, 'unknown', {
+            event_type: 'auth', event_name: 'auth.failed',
+            metadata: { reason: 'key_not_found', path: c.req.path },
+          });
+        return c.json({ error: 'API key not found. Sign up at cohrint.com' }, 401);
+      }
+      c.set('orgId',       member.org_id);
+      c.set('role',        (member.role as OrgRole) || 'member');
+      c.set('scopeTeam',   member.scope_team ?? null);
+      c.set('teamId',      member.team_id ?? null);
+      c.set('memberId',    member.id);
+      c.set('memberEmail', member.email ?? null);
+      const orgMeta2 = await c.env.DB.prepare(
+        'SELECT account_type FROM orgs WHERE id = ?'
+      ).bind(member.org_id).first<{ account_type: string }>();
+      c.set('accountType', (orgMeta2?.account_type ?? 'organization') as import('../types').AccountType);
+    }
+
+    const rpm     = parseInt(c.env.RATE_LIMIT_RPM ?? '1000', 10);
+    const allowed = await checkRateLimit(c.env.KV, c.get('orgId'), rpm);
+    if (!allowed) {
+      const retryAt = Math.ceil(Date.now() / 60_000) * 60;
+      c.header('Retry-After', String(retryAt - Math.floor(Date.now() / 1000)));
+      c.header('X-RateLimit-Limit', String(rpm));
+      c.header('X-RateLimit-Remaining', '0');
+      return c.json({ error: 'Rate limit exceeded', retry_after: retryAt }, 429);
+    }
+    if (!c.req.path.startsWith('/v1/audit-log')) {
+      logAudit(c, { event_type: 'auth', event_name: 'auth.login', resource_type: 'api_key',
+        metadata: { method: 'api_key', role: c.get('role'), ua: (c.req.header('User-Agent') ?? '').slice(0, 80) } });
+    }
+    return await next();
+  }
+
+  // ── 2. Session cookie auth ────────────────────────────────────────────────
   const cookieHeader = c.req.header('Cookie') ?? '';
-  // __Host- prefix enforces Secure + Path=/ + no Domain= (origin-bound).
-  // Legacy names kept for backward compat during transition.
   const sessionToken = parseCookie(cookieHeader, '__Host-cohrint_session')
     ?? parseCookie(cookieHeader, 'cohrint_session')
     ?? parseCookie(cookieHeader, '__Host-vantage_session')
@@ -112,92 +176,16 @@ export async function authMiddleware(
       }
       return await next();
     }
-    // Expired / invalid session — fall through to API key check
+    // Expired / invalid session — fall through to 401
   }
 
-  // ── 2. Bearer API key auth ────────────────────────────────────────────────
-  const authHeader = c.req.header('Authorization') ?? '';
-  const apiKey = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
-
-  if (!apiKey || (!apiKey.startsWith('vnt_') && !apiKey.startsWith('crt_'))) {
-    const ip = c.req.header('CF-Connecting-IP') ?? '';
-    logAuditRaw(c.env.DB, c.executionCtx, ip, 'unknown', 'unknown', 'unknown', {
-      event_type: 'auth',
-      event_name: 'auth.failed',
-      metadata: { reason: 'missing_or_malformed_key', path: c.req.path },
-    });
-    return c.json({ error: 'Missing or invalid API key. Expected: Bearer crt_...' }, 401);
-  }
-
-  const parts = apiKey.split('_');
-  const orgId = parts.length >= 3 ? parts[1] : '';
-
-  if (!orgId) {
-    return c.json({ error: 'Malformed API key — cannot extract org ID' }, 401);
-  }
-
-  const hash = await sha256hex(apiKey);
-
-  // 2a. Check owner key (orgs table)
-  const org = await c.env.DB.prepare(
-    'SELECT id, plan, account_type FROM orgs WHERE api_key_hash = ?'
-  ).bind(hash).first<{ id: string; plan: string; account_type: string }>();
-
-  if (org) {
-    c.set('orgId',       org.id);
-    c.set('role',        'owner' as OrgRole);
-    c.set('accountType', (org.account_type ?? 'organization') as import('../types').AccountType);
-    c.set('scopeTeam',   null);
-    c.set('teamId',      null);
-    c.set('memberId',    null);
-    c.set('memberEmail', null);
-  } else {
-    // 2b. Check member key (org_members table)
-    const member = await c.env.DB.prepare(
-      'SELECT id, org_id, role, scope_team, email, team_id FROM org_members WHERE api_key_hash = ?'
-    ).bind(hash).first<{ id: string; org_id: string; role: string; scope_team: string | null; email: string | null; team_id: string | null }>();
-
-    if (!member) {
-      const ip = c.req.header('CF-Connecting-IP') ?? '';
-      logAuditRaw(c.env.DB, c.executionCtx, ip, orgId || 'unknown',
-        `key:${hash.substring(0, 8)}`, 'unknown', {
-          event_type: 'auth',
-          event_name: 'auth.failed',
-          metadata: { reason: 'key_not_found', path: c.req.path },
-        });
-      return c.json({ error: 'API key not found. Sign up at cohrint.com' }, 401);
-    } else {
-      c.set('orgId',       member.org_id);
-      c.set('role',        (member.role as OrgRole) || 'member');
-      c.set('scopeTeam',   member.scope_team ?? null);
-      c.set('teamId',      member.team_id ?? null);
-      c.set('memberId',    member.id);
-      c.set('memberEmail', member.email ?? null);
-
-      const orgMeta2 = await c.env.DB.prepare(
-        'SELECT account_type FROM orgs WHERE id = ?'
-      ).bind(member.org_id).first<{ account_type: string }>();
-      c.set('accountType', (orgMeta2?.account_type ?? 'organization') as import('../types').AccountType);
-    }
-  }
-
-  // Rate limit (keyed to org, shared across all members)
-  const rpm     = parseInt(c.env.RATE_LIMIT_RPM ?? '1000', 10);
-  const allowed = await checkRateLimit(c.env.KV, c.get('orgId'), rpm);
-  if (!allowed) {
-    const retryAt = Math.ceil(Date.now() / 60_000) * 60;
-    c.header('Retry-After', String(retryAt - Math.floor(Date.now() / 1000)));
-    c.header('X-RateLimit-Limit', String(rpm));
-    c.header('X-RateLimit-Remaining', '0');
-    return c.json({ error: 'Rate limit exceeded', retry_after: retryAt }, 429);
-  }
-
-  // Don't log auth.login for audit-log reads — it would shift offset pagination
-  if (!c.req.path.startsWith('/v1/audit-log')) {
-    logAudit(c, { event_type: 'auth', event_name: 'auth.login', resource_type: 'api_key',
-      metadata: { method: 'api_key', role: c.get('role'), ua: (c.req.header('User-Agent') ?? '').slice(0, 80) } });
-  }
-  return await next();
+  const ip = c.req.header('CF-Connecting-IP') ?? '';
+  logAuditRaw(c.env.DB, c.executionCtx, ip, 'unknown', 'unknown', 'unknown', {
+    event_type: 'auth',
+    event_name: 'auth.failed',
+    metadata: { reason: 'missing_or_malformed_key', path: c.req.path },
+  });
+  return c.json({ error: 'Missing or invalid API key. Expected: Bearer crt_...' }, 401);
 }
 
 // ── Role guards — call after authMiddleware ───────────────────────────────────
