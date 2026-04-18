@@ -645,6 +645,17 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
 .filter-btn:hover { border-color: var(--border-active); }
 .filter-btn.active { background: var(--bg-card); border-color: var(--accent-green); color: var(--accent-green); }
 
+.th-sort { cursor: pointer; user-select: none; }
+.th-sort:hover { color: var(--text-primary); }
+.th-sort.sort-asc::after  { content: ' ↑'; font-size: 10px; opacity: 0.7; }
+.th-sort.sort-desc::after { content: ' ↓'; font-size: 10px; opacity: 0.7; }
+.speed-badge { display:inline-block; padding:2px 7px; border-radius:10px; font-size:10px; font-weight:600; white-space:nowrap; }
+.speed-fast   { background:rgba(52,211,153,.15); color:#34d399; }
+.speed-medium { background:rgba(251,191,36,.15);  color:var(--accent-amber,#f59e0b); }
+.speed-slow   { background:rgba(148,163,184,.15); color:#94a3b8; }
+.model-search { flex:1; max-width:220px; padding:5px 10px; background:var(--bg-deep); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-primary); font-size:12px; font-family:var(--font-mono); outline:none; }
+.model-search:focus { border-color:var(--border-active); }
+
 .usage-inputs {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
 }
@@ -1141,10 +1152,11 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
           </div>
         </div>
 
-        <div class="card" data-insight="Full pricing table across all providers. Filter by tier — Frontier, Mid, or Fast — to narrow down options.">
-          <div class="card-header">
+        <div class="card" data-insight="Full pricing table across all providers. Click column headers to sort. Search by model name or provider. Cache $/1M shows prompt-caching discounts; vs GPT-4o shows relative cost difference.">
+          <div class="card-header" style="gap:10px;flex-wrap:wrap;align-items:center;">
             <div class="card-title">Pricing Rates</div>
-            <div class="model-filters">
+            <input type="text" id="modelSearch" class="model-search" placeholder="Search model or provider…" oninput="updateModelCalc()">
+            <div class="model-filters" style="margin-bottom:0;">
               <button class="filter-btn active" onclick="filterModels('all', this)">All</button>
               <button class="filter-btn" onclick="filterModels('frontier', this)">Frontier</button>
               <button class="filter-btn" onclick="filterModels('mid', this)">Mid</button>
@@ -1153,7 +1165,17 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
           </div>
           <table class="tool-table">
             <thead>
-              <tr><th>Model</th><th>Provider</th><th>Input $/1M</th><th>Output $/1M</th><th>Context</th><th>Monthly Cost</th></tr>
+              <tr>
+                <th class="th-sort" id="th-label"    onclick="sortModelTable('label')">Model</th>
+                <th class="th-sort" id="th-provider" onclick="sortModelTable('provider')">Provider</th>
+                <th class="th-sort" id="th-input"    onclick="sortModelTable('input')">Input $/1M</th>
+                <th class="th-sort" id="th-output"   onclick="sortModelTable('output')">Output $/1M</th>
+                <th class="th-sort" id="th-cache"    onclick="sortModelTable('cacheRead')" title="Prompt-caching read rate — cost when tokens are served from cache">Cache $/1M</th>
+                <th class="th-sort" id="th-context"  onclick="sortModelTable('context')">Context</th>
+                <th class="th-sort" id="th-speed"    onclick="sortModelTable('speed')">Speed</th>
+                <th class="th-sort" id="th-baseline" onclick="sortModelTable('vsBaseline')">vs GPT-4o</th>
+                <th class="th-sort sort-asc" id="th-monthly" onclick="sortModelTable('monthlyCost')">Monthly Cost</th>
+              </tr>
             </thead>
             <tbody id="modelTableBody"></tbody>
           </table>
@@ -3421,6 +3443,17 @@ function renderTeamPie(teams) {
    ═══════════════════════════════════════════════════════════════════════════ */
 var _providerChart = null;
 var _modelFilter = 'all';
+var _modelSort = { col: 'monthlyCost', dir: 1 };
+
+function sortModelTable(col) {
+  if (_modelSort.col === col) { _modelSort.dir *= -1; } else { _modelSort.col = col; _modelSort.dir = 1; }
+  var idMap = { label:'label', provider:'provider', input:'input', output:'output', cacheRead:'cache', context:'context', speed:'speed', vsBaseline:'baseline', monthlyCost:'monthly' };
+  document.querySelectorAll('.th-sort').forEach(function(th) { th.classList.remove('sort-asc','sort-desc'); });
+  var thId = 'th-' + (idMap[col] || col);
+  var el = document.getElementById(thId);
+  if (el) el.classList.add(_modelSort.dir === 1 ? 'sort-asc' : 'sort-desc');
+  updateModelCalc();
+}
 
 function filterModels(tier, btn) {
   _modelFilter = tier;
@@ -3431,88 +3464,177 @@ function filterModels(tier, btn) {
 
 function updateModelCalc() {
   var promptTokens = parseInt(document.getElementById('calcPromptTokens').value) || 2000;
-  var compTokens = parseInt(document.getElementById('calcCompTokens').value) || 500;
-  var reqs = parseInt(document.getElementById('calcRequests').value) || 1000;
+  var compTokens   = parseInt(document.getElementById('calcCompTokens').value)   || 500;
+  var reqs         = parseInt(document.getElementById('calcRequests').value)     || 1000;
+  var searchEl     = document.getElementById('modelSearch');
+  var searchTerm   = searchEl ? searchEl.value.trim().toLowerCase() : '';
 
-  var models = typeof COHRINT_MODELS !== 'undefined' ? COHRINT_MODELS : [];
-  if (_modelFilter !== 'all') {
-    models = models.filter(function(m) { return m.tier === _modelFilter; });
+  var allModels = typeof COHRINT_MODELS !== 'undefined' ? COHRINT_MODELS : [];
+
+  // GPT-4o baseline cost (always computed from full list regardless of filter)
+  var gpt4oModel    = allModels.find(function(m) { return m.name === 'gpt-4o'; });
+  var gpt4oBaseline = gpt4oModel
+    ? ((promptTokens / 1e6) * gpt4oModel.input + (compTokens / 1e6) * gpt4oModel.output) * reqs
+    : 0;
+
+  var models = allModels;
+  if (_modelFilter !== 'all') models = models.filter(function(m) { return m.tier === _modelFilter; });
+  if (searchTerm) {
+    models = models.filter(function(m) {
+      return m.label.toLowerCase().indexOf(searchTerm) !== -1 ||
+             m.provider.toLowerCase().indexOf(searchTerm) !== -1 ||
+             m.name.toLowerCase().indexOf(searchTerm) !== -1;
+    });
   }
+
+  var SPEED_ORDER = { fast: 0, medium: 1, slow: 2 };
 
   var costs = models.map(function(m) {
     var monthlyCost = ((promptTokens / 1e6) * m.input + (compTokens / 1e6) * m.output) * reqs;
-    return Object.assign({}, m, { monthlyCost: monthlyCost });
-  }).sort(function(a, b) { return a.monthlyCost - b.monthlyCost; });
+    var vsBaseline  = gpt4oBaseline > 0 ? monthlyCost / gpt4oBaseline : 1;
+    return Object.assign({}, m, { monthlyCost: monthlyCost, vsBaseline: vsBaseline });
+  });
 
+  // Sort
+  var col = _modelSort.col, dir = _modelSort.dir;
+  costs.sort(function(a, b) {
+    var av = col === 'speed' ? (SPEED_ORDER[a.speed] != null ? SPEED_ORDER[a.speed] : 1) : a[col];
+    var bv = col === 'speed' ? (SPEED_ORDER[b.speed] != null ? SPEED_ORDER[b.speed] : 1) : b[col];
+    if (typeof av === 'string') return dir * av.localeCompare(bv);
+    return dir * ((av || 0) - (bv || 0));
+  });
+
+  // KPIs (always use cost-ascending order for cheapest)
   document.getElementById('calcModelCount').textContent = costs.length;
-
-  if (costs.length > 0) {
-    var cheapest = costs[0];
+  var byCost = costs.slice().sort(function(a, b) { return a.monthlyCost - b.monthlyCost; });
+  if (byCost.length > 0) {
+    var cheapest = byCost[0];
     document.getElementById('calcCheapestName').textContent = cheapest.label;
     document.getElementById('calcCheapestCost').textContent = fmt(cheapest.monthlyCost) + '/month';
-
-    var gpt4o = costs.find(function(m) { return m.name === 'gpt-4o'; });
-    if (gpt4o) {
-      document.getElementById('calcGpt4oCost').textContent = fmt(gpt4o.monthlyCost);
-      var saving = gpt4o.monthlyCost > 0 ? ((1 - cheapest.monthlyCost / gpt4o.monthlyCost) * 100).toFixed(0) : 0;
+    if (gpt4oBaseline > 0) {
+      document.getElementById('calcGpt4oCost').textContent = fmt(gpt4oBaseline);
+      var saving = ((1 - cheapest.monthlyCost / gpt4oBaseline) * 100).toFixed(0);
       document.getElementById('calcMaxSaving').textContent = saving + '%';
       document.getElementById('calcMaxSavingSub').textContent = 'by using ' + cheapest.label;
     }
   }
 
-  // Model table — DOM-safe
+  var cheapestCost = byCost.length > 0 ? byCost[0].monthlyCost : Infinity;
+
+  // Render table — DOM-safe
   var tbody = document.getElementById('modelTableBody');
   tbody.textContent = '';
 
   if (costs.length === 0) {
     var emptyTr = document.createElement('tr');
     var emptyTd = document.createElement('td');
-    emptyTd.colSpan = 6;
+    emptyTd.colSpan = 9;
     emptyTd.className = 'empty-state';
-    emptyTd.textContent = 'No models available';
+    emptyTd.textContent = 'No models match';
     emptyTr.appendChild(emptyTd);
     tbody.appendChild(emptyTr);
-  } else {
-    costs.forEach(function(m) {
-      var provMeta = typeof PROVIDER_META !== 'undefined' ? PROVIDER_META[m.provider] : null;
-      var provLabel = provMeta ? provMeta.label : m.provider;
-      var provColor = provMeta ? provMeta.color : '#94a3b8';
-
-      var tr = document.createElement('tr');
-
-      var td1 = document.createElement('td');
-      td1.style.color = 'var(--text-primary)';
-      td1.style.fontWeight = '500';
-      td1.textContent = m.label;
-      tr.appendChild(td1);
-
-      var td2 = document.createElement('td');
-      var provSpan = document.createElement('span');
-      provSpan.style.color = provColor;
-      provSpan.textContent = provLabel;
-      td2.appendChild(provSpan);
-      tr.appendChild(td2);
-
-      var td3 = document.createElement('td');
-      td3.textContent = fmt(m.input);
-      tr.appendChild(td3);
-
-      var td4 = document.createElement('td');
-      td4.textContent = fmt(m.output);
-      tr.appendChild(td4);
-
-      var td5 = document.createElement('td');
-      td5.textContent = m.context + 'K';
-      tr.appendChild(td5);
-
-      var td6 = document.createElement('td');
-      td6.className = 'cost-highlight';
-      td6.textContent = fmt(m.monthlyCost);
-      tr.appendChild(td6);
-
-      tbody.appendChild(tr);
-    });
+    renderProviderBreakdown(costs);
+    return;
   }
+
+  var SPEED_LABEL = { fast: '⚡ Fast', medium: '● Medium', slow: '◑ Slow' };
+
+  costs.forEach(function(m) {
+    var provMeta  = typeof PROVIDER_META !== 'undefined' ? PROVIDER_META[m.provider] : null;
+    var provLabel = provMeta ? provMeta.label : m.provider;
+    var provColor = provMeta ? provMeta.color : '#94a3b8';
+    var isCheapest = m.monthlyCost === cheapestCost;
+
+    var tr = document.createElement('tr');
+    if (isCheapest) tr.style.background = 'rgba(52,211,153,.04)';
+
+    // Model name (with star badge if cheapest)
+    var td1 = document.createElement('td');
+    td1.style.cssText = 'color:var(--text-primary);font-weight:500;white-space:nowrap;';
+    if (isCheapest) {
+      var star = document.createElement('span');
+      star.textContent = '★ ';
+      star.style.cssText = 'color:#34d399;font-size:10px;';
+      td1.appendChild(star);
+    }
+    td1.appendChild(document.createTextNode(m.label));
+    tr.appendChild(td1);
+
+    // Provider
+    var td2 = document.createElement('td');
+    var ps = document.createElement('span');
+    ps.style.color = provColor;
+    ps.textContent = provLabel;
+    td2.appendChild(ps);
+    tr.appendChild(td2);
+
+    // Input $/1M
+    var td3 = document.createElement('td');
+    td3.textContent = '$' + m.input.toFixed(m.input < 1 ? (m.input < 0.01 ? 4 : 3) : 2);
+    tr.appendChild(td3);
+
+    // Output $/1M
+    var td4 = document.createElement('td');
+    td4.textContent = '$' + m.output.toFixed(m.output < 1 ? (m.output < 0.01 ? 4 : 3) : 2);
+    tr.appendChild(td4);
+
+    // Cache $/1M
+    var td5 = document.createElement('td');
+    if (m.cacheRead > 0) {
+      td5.textContent = '$' + m.cacheRead.toFixed(m.cacheRead < 0.01 ? 4 : 3);
+      td5.style.color = '#34d399';
+    } else {
+      td5.textContent = '—';
+      td5.style.color = 'var(--text-muted)';
+    }
+    tr.appendChild(td5);
+
+    // Context window
+    var td6 = document.createElement('td');
+    td6.textContent = m.context >= 1000 ? (m.context / 1000) + 'M' : m.context + 'K';
+    tr.appendChild(td6);
+
+    // Speed badge
+    var td7 = document.createElement('td');
+    var sb = document.createElement('span');
+    sb.className = 'speed-badge speed-' + (m.speed || 'medium');
+    sb.textContent = SPEED_LABEL[m.speed] || m.speed;
+    td7.appendChild(sb);
+    tr.appendChild(td7);
+
+    // vs GPT-4o
+    var td8 = document.createElement('td');
+    td8.style.fontSize = '12px';
+    if (m.name === 'gpt-4o') {
+      td8.textContent = 'Baseline';
+      td8.style.color = 'var(--text-muted)';
+    } else if (gpt4oBaseline > 0) {
+      var pct = (m.monthlyCost / gpt4oBaseline - 1) * 100;
+      if (pct < -0.5) {
+        td8.textContent = Math.abs(pct).toFixed(0) + '% cheaper';
+        td8.style.color = '#34d399';
+      } else if (pct > 0.5) {
+        td8.textContent = Math.abs(pct).toFixed(0) + '% pricier';
+        td8.style.color = '#ef4444';
+      } else {
+        td8.textContent = '≈ Same';
+        td8.style.color = 'var(--text-muted)';
+      }
+    } else {
+      td8.textContent = '—';
+      td8.style.color = 'var(--text-muted)';
+    }
+    tr.appendChild(td8);
+
+    // Monthly Cost
+    var td9 = document.createElement('td');
+    td9.className = 'cost-highlight';
+    td9.textContent = fmt(m.monthlyCost);
+    if (isCheapest) td9.style.color = '#34d399';
+    tr.appendChild(td9);
+
+    tbody.appendChild(tr);
+  });
 
   renderProviderBreakdown(costs);
 }
