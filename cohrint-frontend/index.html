@@ -1483,14 +1483,12 @@ document.querySelectorAll('.feat-card,.int-card').forEach(function(c){
 });
 
 // ── Auto-login from ?api_key= URL param ──────────────────────────────────────
+// Forward the key to /app — app.html stores it in sessionStorage (per-tab)
+// and uses Bearer auth, so multiple tabs can log in as different accounts.
 (function(){
   var k=(new URLSearchParams(window.location.search)).get('api_key')||'';
   if(!k||(!k.startsWith('crt_')&&!k.startsWith('vnt_')))return;
-  fetch('https://api.cohrint.com/v1/auth/session',{
-    method:'POST',credentials:'include',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({api_key:k})
-  }).then(function(r){if(r.ok)window.location.replace('/app');}).catch(function(){});
+  window.location.replace('/app?api_key='+encodeURIComponent(k));
 })();
 
 // ── Particle network ──────────────────────────────────────────────────────────
