@@ -40,7 +40,7 @@ ARTIFACTS_DIR = TESTS_ROOT / "artifacts"
 STATE_FILE    = ARTIFACTS_DIR / "da45_seed_state.json"
 CREDS_FILE    = ARTIFACTS_DIR / "da45_credentials.txt"
 
-SITE_URL = "https://cohrint.com"
+SITE_URL = "https://app.vantageaiops.com"
 
 # ---------------------------------------------------------------------------
 # Helpers
