@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
 import { authMiddleware, adminOnly } from '../middleware/auth';
+import { nowUnix } from '../lib/db-dates';
 
 // Bump this whenever a meaningful dashboard version ships to production.
 const LATEST_VERSION = 'v1.4.0';
@@ -36,7 +37,7 @@ versions.get('/', async (c) => {
 
 versions.post('/upgrade', async (c) => {
   const orgId = c.get('orgId');
-  const now = Math.floor(Date.now() / 1000);
+  const now = nowUnix();
 
   await c.env.DB.prepare(`
     INSERT INTO org_versions (org_id, current_version, upgraded_at)
