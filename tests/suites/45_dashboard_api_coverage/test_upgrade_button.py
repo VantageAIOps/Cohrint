@@ -151,15 +151,15 @@ def _mock_fetch_js(versions_resp: dict, upgrade_resp: dict) -> str:
 
 
 def _setup_banner_js(versions_resp: dict) -> str:
-    """Reset sessionStorage, set _upgradeData, and show the banner."""
+    """Reset sessionStorage, set _upgradeData, and show the upgrade dropdown button."""
     return f"""
 (function() {{
   sessionStorage.removeItem('upgrade_dismissed');
   window._upgradeData = {json.dumps(versions_resp)};
-  var el = document.getElementById('upg-latest');
-  if (el) el.textContent = '{versions_resp["latest_version"]}';
-  var b = document.getElementById('upgrade-banner');
-  if (b) b.classList.add('visible');
+  var ver = document.getElementById('acct-upgrade-version');
+  if (ver) ver.textContent = '{versions_resp["latest_version"]}';
+  var btn = document.getElementById('acct-upgrade-btn');
+  if (btn) btn.style.display = 'flex';
 }})();
 """
 
@@ -214,11 +214,11 @@ def _open_modal_js(versions_resp: dict) -> str:
     btn.textContent = 'Upgrade to ' + _upgradeData.latest_version;
   }}
 
-  // Show banner
-  var el = document.getElementById('upg-latest');
-  if (el) el.textContent = _upgradeData.latest_version;
-  var b = document.getElementById('upgrade-banner');
-  if (b) b.classList.add('visible');
+  // Show upgrade dropdown button
+  var ver = document.getElementById('acct-upgrade-version');
+  if (ver) ver.textContent = _upgradeData.latest_version;
+  var acctBtn = document.getElementById('acct-upgrade-btn');
+  if (acctBtn) acctBtn.style.display = 'flex';
 
   // Open modal
   var m = document.getElementById('upgrade-modal');
@@ -234,18 +234,18 @@ def _screenshot(page: Page, name: str) -> None:
 
 def _banner_state(page: Page) -> dict:
     return page.evaluate("""() => {
-      const b   = document.getElementById('upgrade-banner');
-      const m   = document.getElementById('upgrade-modal');
-      const btn = document.getElementById('upg-confirm-btn');
+      const acctBtn = document.getElementById('acct-upgrade-btn');
+      const m       = document.getElementById('upgrade-modal');
+      const btn     = document.getElementById('upg-confirm-btn');
       return {
-        bannerExists:  !!b,
-        bannerVisible: b   ? b.classList.contains('visible')   : false,
+        bannerExists:  !!acctBtn,
+        bannerVisible: acctBtn ? (acctBtn.style.display !== 'none' && acctBtn.style.display !== '') : false,
         modalExists:   !!m,
         modalVisible:  m   ? m.classList.contains('visible')   : false,
         btnText:       btn ? btn.textContent.trim()             : null,
         btnDisabled:   btn ? btn.disabled                       : null,
-        latestText:    document.getElementById('upg-latest')
-                         ? document.getElementById('upg-latest').textContent : null,
+        latestText:    document.getElementById('acct-upgrade-version')
+                         ? document.getElementById('acct-upgrade-version').textContent : null,
       };
     }""")
 
@@ -346,8 +346,8 @@ class TestUB2ViewUpgradeOpensModal:
         state = _banner_state(p)
         chk("pre-condition: banner is visible", state["bannerVisible"])
 
-        # Use evaluate click to avoid Playwright visibility/viewport restrictions
-        p.evaluate("document.querySelector('button.upg-btn').click()")
+        # Click the upgrade button in the account dropdown
+        p.evaluate("document.getElementById('acct-upgrade-btn').click()")
         p.wait_for_timeout(300)
 
         state = _banner_state(p)
@@ -455,11 +455,11 @@ class TestUB5NoReshowAfterUpgrade:
         }
         p.evaluate(_mock_fetch_js(already_upgraded, MOCK_UPGRADE_RESPONSE))
 
-        # Clear banner and reset dismissed state
+        # Clear upgrade button and reset dismissed state
         p.evaluate("""() => {
           sessionStorage.removeItem('upgrade_dismissed');
-          var b = document.getElementById('upgrade-banner');
-          if (b) b.classList.remove('visible');
+          var btn = document.getElementById('acct-upgrade-btn');
+          if (btn) btn.style.display = 'none';
           window._upgradeData = null;
         }""")
 
@@ -494,20 +494,20 @@ class TestUB6DismissBanner:
         chk("pre-condition: banner is visible", state["bannerVisible"])
         chk("pre-condition: modal is NOT open", not state["modalVisible"])
 
-        # Click dismiss button
-        p.evaluate("document.querySelector('#upgrade-banner .upg-dismiss').click()")
+        # Dismiss via the dismissUpgradeBanner() function (no standalone × button in dropdown UI)
+        p.evaluate("dismissUpgradeBanner()")
         p.wait_for_timeout(200)
 
         result = p.evaluate("""() => {
-          const b = document.getElementById('upgrade-banner');
+          const btn = document.getElementById('acct-upgrade-btn');
           return {
-            bannerVisible:     b ? b.classList.contains('visible') : true,
+            bannerVisible:     btn ? (btn.style.display !== 'none' && btn.style.display !== '') : true,
             modalVisible:      document.getElementById('upgrade-modal').classList.contains('visible'),
             sessionDismissed:  sessionStorage.getItem('upgrade_dismissed'),
           };
         }""")
 
-        chk("banner hidden after dismiss",            not result["bannerVisible"])
+        chk("upgrade button hidden after dismiss",    not result["bannerVisible"])
         chk("modal NOT opened by dismiss",            not result["modalVisible"])
         chk(f"sessionStorage 'upgrade_dismissed' = '{LATEST_VERSION}'",
             result["sessionDismissed"] == LATEST_VERSION)
