@@ -29,6 +29,7 @@
 import { Hono } from 'hono';
 import type { Bindings, Variables } from '../types';
 import { authMiddleware, hasRole } from '../middleware/auth';
+import { withBreaker } from '../lib/circuit';
 
 const datadog = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -274,7 +275,18 @@ export async function syncDatadogMetricsForOrg(
 
   for (let i = 0; i < series.length; i += BATCH_SIZE) {
     const batch = series.slice(i, i + BATCH_SIZE);
-    const result = await pushToDatadog({ series: batch }, apiKey, conn.datadog_site);
+    // Wrap push with circuit breaker — null means breaker is open (Datadog unreachable)
+    const result = await withBreaker('datadog', env.KV, () => pushToDatadog({ series: batch }, apiKey, conn.datadog_site));
+
+    if (result === null) {
+      const errMsg = 'Datadog API unavailable (circuit breaker open)';
+      await env.DB.prepare(
+        `UPDATE datadog_connections
+         SET status = 'error', last_error = ?, updated_at = datetime('now')
+         WHERE org_id = ?`,
+      ).bind(errMsg.slice(0, 500), orgId).run();
+      return { org_id: orgId, series_pushed: totalPushed, skipped: false, error: errMsg };
+    }
 
     if (!result.ok) {
       const errMsg = result.error ?? 'Unknown push error';

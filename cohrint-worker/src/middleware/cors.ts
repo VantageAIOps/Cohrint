@@ -1,7 +1,8 @@
 import { Context, Next } from 'hono';
-import { Bindings } from '../types';
+import { Bindings, Variables } from '../types';
 
-export async function corsMiddleware(c: Context<{ Bindings: Bindings }>, next: Next): Promise<void | Response> {
+export async function corsMiddleware(c: Context<{ Bindings: Bindings; Variables: Variables }>, next: Next): Promise<void | Response> {
+  c.set('requestId', crypto.randomUUID());
   const origin = c.req.header('Origin') ?? '';
   const allowed = (c.env.ALLOWED_ORIGINS ?? '').split(',').map(s => s.trim());
 
@@ -36,4 +37,5 @@ export async function corsMiddleware(c: Context<{ Bindings: Bindings }>, next: N
   c.res.headers.set('Access-Control-Allow-Headers',     'Authorization, Content-Type, X-Cohrint-Org, X-Vantage-Org, X-Cohrint-Privacy');
   if (canCredential) c.res.headers.set('Access-Control-Allow-Credentials', 'true');
   c.res.headers.set('Vary', 'Origin');
+  c.res.headers.set('X-Request-Id', c.get('requestId'));
 }

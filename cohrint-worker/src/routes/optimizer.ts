@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
 import { authMiddleware, hasRole } from '../middleware/auth';
+import { createLogger } from '../lib/logger';
 
 const optimizer = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -87,7 +88,7 @@ optimizer.post('/compress', async (c) => {
     )
       .bind(crypto.randomUUID(), orgId, originalTokens, compressedTokens, originalTokens, optimizationTags)
       .run()
-      .catch((e: unknown) => console.error('optimizer compress tag insert failed', e));
+      .catch((e: unknown) => createLogger(c.get('requestId'), orgId).error('optimizer compress tag insert failed', { err: e instanceof Error ? e : new Error(String(e)) }));
   }
 
   return c.json({

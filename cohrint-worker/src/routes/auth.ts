@@ -3,6 +3,7 @@ import { Bindings, Variables } from '../types';
 import { authMiddleware, adminOnly, sha256hex } from '../middleware/auth';
 import { sendEmail, memberInviteEmail, keyRecoveryEmail } from '../lib/email';
 import { logAudit } from '../lib/audit';
+import { createLogger } from '../lib/logger';
 
 const auth = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -144,7 +145,7 @@ auth.post('/recover', async (c) => {
         isOwner:    true,
         redeemUrl,
       });
-      await sendEmail(c.env.RESEND_API_KEY, { to: email, subject, html });
+      await sendEmail(c.env.RESEND_API_KEY, { to: email, subject, html }, c.env.KV);
     } else {
       // Check org_members table
       const member = await c.env.DB.prepare(
@@ -159,7 +160,7 @@ auth.post('/recover', async (c) => {
           keyHint: member.api_key_hint || 'crt_...',
           isOwner: false,
         });
-        await sendEmail(c.env.RESEND_API_KEY, { to: email, subject, html });
+        await sendEmail(c.env.RESEND_API_KEY, { to: email, subject, html }, c.env.KV);
       }
     }
     // Audit log: recovery attempted
@@ -170,7 +171,7 @@ auth.post('/recover', async (c) => {
       resource_id:   email,
     }, { orgId: resolvedOrgId });
   } catch (err) {
-    console.error('[recover] D1/email error — returning 200 to avoid leaking info', err);
+    createLogger(c.get('requestId') ?? 'unknown').error('recover: D1/email error (returning 200 to avoid leak)', { err: err instanceof Error ? err : new Error(String(err)) });
     // Still return 200 — don't expose internal errors to caller
   }
 
@@ -233,7 +234,7 @@ auth.post('/recover/redeem', async (c) => {
   if (payload.ip && payload.ip !== 'unknown' && payload.ip !== redeemIp) {
     const attemptKey = `recover-attempt:${token}`;
     const attempts = parseInt(await c.env.KV.get(attemptKey) ?? '0', 10) + 1;
-    console.warn('[cohrint] recover/redeem IP mismatch — issued from', payload.ip, 'redeemed from', redeemIp, `(attempt ${attempts})`);
+    createLogger(c.get('requestId') ?? 'unknown').warn('recover/redeem IP mismatch', { issued_from: payload.ip, redeemed_from: redeemIp, attempt: attempts });
     if (attempts >= 3) {
       await c.env.KV.delete(`recover:${token}`);
       await c.env.KV.delete(attemptKey);
@@ -340,7 +341,7 @@ auth.post('/members', authMiddleware, adminOnly, async (c) => {
     keyHint,
   });
   c.executionCtx.waitUntil(
-    sendEmail(c.env.RESEND_API_KEY, { to: email, subject, html })
+    sendEmail(c.env.RESEND_API_KEY, { to: email, subject, html }, c.env.KV)
   );
 
   logAudit(c, {
@@ -504,7 +505,7 @@ auth.post('/members/:id/rotate', authMiddleware, adminOnly, async (c) => {
     keyHint,
   });
   c.executionCtx.waitUntil(
-    sendEmail(c.env.RESEND_API_KEY, { to: member.email, subject: `[Cohrint] Your API key has been rotated`, html: rotateHtml })
+    sendEmail(c.env.RESEND_API_KEY, { to: member.email, subject: `[Cohrint] Your API key has been rotated`, html: rotateHtml }, c.env.KV)
   );
 
   logAudit(c, {
@@ -564,7 +565,7 @@ auth.post('/demo', async (c) => {
       'SELECT id, org_id FROM org_members WHERE api_key_hash = ?'
     ).bind(hash).first<{ id: string; org_id: string }>();
     if (!member) {
-      console.error('[auth/demo] DEMO_API_KEY set but does not resolve to any org/member');
+      createLogger(c.get('requestId') ?? 'unknown').error('DEMO_API_KEY set but does not resolve to any org/member');
       return c.json({ error: 'Demo unavailable' }, 503);
     }
     orgId    = member.org_id;

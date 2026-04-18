@@ -156,7 +156,9 @@ Client                  Worker                    D1              KV
 
 ```toml
 name = "cohrint-api"
-routes = [{ pattern = "api.cohrint.com/*", zone_name = "cohrint.com" }]
+[[routes]]
+pattern = "api.cohrint.com"
+custom_domain = true
 
 [[d1_databases]]
 binding = "DB"
@@ -169,12 +171,44 @@ binding = "KV"
 # retrieve: wrangler kv namespace list
 
 [ai]
-binding = "AI"          # Workers AI — used by semantic cache
+binding = "AI"          # Workers AI (BGE embeddings for semantic cache)
 
 [[vectorize]]
 binding = "VECTORIZE"   # Vectorize index — used by semantic cache
 # index_name in wrangler.toml (gitignored)
 # retrieve: wrangler vectorize list
+
+[[r2_buckets]]
+binding = "CACHE_BUCKET"           # R2 — semantic cache response bodies + audit log backup
+bucket_name = "cohrint-cache"
+
+[[analytics_engine_datasets]]
+binding = "METRICS"                # Workers Analytics Engine — per-endpoint counters
+dataset  = "cohrint_metrics"
+
+[[queues.producers]]
+queue   = "cohrint-ingest"
+binding = "INGEST_QUEUE"           # High-throughput event ingest queue
+
+[[queues.producers]]
+queue   = "cohrint-ingest-dlq"
+binding = "INGEST_DLQ"
+
+[[queues.consumers]]
+queue              = "cohrint-ingest"
+max_batch_size     = 100
+max_batch_timeout  = 5
+max_retries        = 3
+dead_letter_queue  = "cohrint-ingest-dlq"
+
+[[queues.consumers]]
+queue              = "cohrint-ingest-dlq"
+max_batch_size     = 50
+max_batch_timeout  = 10
+max_retries        = 1
+
+[triggers]
+crons = ["*/10 * * * *", "0 2 * * *"]
 
 [vars]
 ENVIRONMENT = "production"
@@ -279,11 +313,12 @@ cd cohrint-worker && npm run typecheck   # runs: tsc --noEmit
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-Helper functions — use these, never raw date math:
-- **INTEGER tables:** `sinceUnix(days)`, `todayUnix()` in `analytics.ts`
-- **TEXT tables:** `sqliteDateSince(days)`, `sqliteTodayStart()`, `sqliteMonthStart()` in `crossplatform.ts`
+Helper functions — use these, never raw date math (all in `src/lib/db-dates.ts`):
+- **INTEGER tables:** `sinceUnix(days)`, `monthStartUnix()`, `nowUnix()`
+- **TEXT tables:** `sinceIso(days)`, `monthStartIso()`, `nowIso()`
 - For INTEGER hour extraction: `strftime('%H', created_at, 'unixepoch')`
 - Never use ISO 8601 `T`/`Z` format (`2026-03-24T00:00:00Z`) in TEXT WHERE clauses — `T` sorts differently than space.
+- **Phase A complete (PR #76):** All TEXT-date tables now also have a `created_at_unix INTEGER` column (`0028_unify_dates_phase_a.sql`). New writes set both columns. Phase B (drop old TEXT columns) pending 14-day burn-in after Phase A.
 
 ### Database ERD
 
@@ -606,20 +641,34 @@ CREATE INDEX idx_audit_events_org_created ON audit_events(org_id, created_at DES
 | `0012_datadog_connections.sql` | `datadog_connections` table |
 | `0013_schema_fixes.sql` | Additional indexes and fixes |
 | `0014_drop_copilot_kv_key.sql` | Removes `kv_key` from `copilot_connections` (token KV-only) |
-| `0015_semantic_cache.sql` | `semantic_cache_entries`, `org_cache_config` tables |
-| `0016_prompt_registry.sql` | `prompts`, `prompt_versions`, `prompt_usage` tables |
-| `0017_benchmark_metric_name.sql` | `ALTER TABLE benchmark_snapshots ADD COLUMN metric_name TEXT` + `p25/p50/p75/p90` |
+| `0015_enterprise_roles.sql` | `role` column on `org_members` + `ceo`/`owner` role support |
+| `0016_developer_email_indexes.sql` | Indexes on `developer_email` for per-developer analytics |
+| `0017_role_check_constraint.sql` | CHECK constraint enforcing valid role values |
+| `0018_account_type.sql` | `ALTER TABLE orgs ADD COLUMN account_type TEXT` (individual/team/organization) |
+| `0019_teams_table.sql` | `teams` table for sub-team grouping within org accounts |
+| `0020_member_team_fk.sql` | `ALTER TABLE org_members ADD COLUMN team_id FK → teams` |
+| `0021_semantic_cache.sql` | `semantic_cache_entries`, `org_cache_config` tables |
+| `0022_prompt_registry.sql` | `prompts`, `prompt_versions`, `prompt_usage` tables |
+| `0023_cache_team_isolation.sql` | `team_id` column on `semantic_cache_entries` for team-scoped caching |
+| `0024_cache_creator_and_member_index.sql` | `creator_member_id` column + composite index on cache entries |
+| `0025_events_org_time_index.sql` | Composite indexes on `events(org_id, created_at)` for analytics scan perf |
+| `0026_cache_min_prompt_length.sql` | Raise default `min_prompt_length` 10 → 100 for new orgs |
+| `0027_prompt_versions_totals_only.sql` | `total_prompt_tokens` + `total_completion_tokens` on `prompt_versions` |
+| `0028_unify_dates_phase_a.sql` | Phase A: add `created_at_unix INTEGER` to all TEXT-date tables (T015) |
+| `0029_events_daily_rollup.sql` | `events_daily_rollup` table for pre-aggregated per-org/day/model rollups |
+| `0030_cache_r2_pointer.sql` | `response_r2_key TEXT` on `semantic_cache_entries` for R2-backed cache bodies |
 
-### All 25 D1 Tables
+### All 26 D1 Tables
 
 `orgs`, `org_members`, `sessions`, `events`, `team_budgets`, `alert_configs`,
 `cross_platform_usage`, `otel_events`, `otel_traces`, `otel_sessions`,
 `provider_connections`, `budget_policies`, `audit_events`,
-`copilot_connections`, `datadog_connections`,
+`teams`, `copilot_connections`, `datadog_connections`,
 `benchmark_cohorts`, `benchmark_snapshots`, `benchmark_contributions`,
 `platform_pageviews`, `platform_sessions`,
 `semantic_cache_entries`, `org_cache_config`,
-`prompts`, `prompt_versions`, `prompt_usage`
+`prompts`, `prompt_versions`, `prompt_usage`,
+`events_daily_rollup`
 
 ---
 
@@ -908,7 +957,10 @@ Key request fields:
 | `span_depth` | — | Visual indentation hint |
 | `developer_email` | — | Developer attribution |
 
-Response: `201 { ok: true, id: event_id }`
+Response:
+- `201 { ok: true, id, accepted: true, reason: "new" }` — inserted (new event)
+- `200 { ok: true, id, accepted: false, reason: "duplicate" }` — dedup hit (INSERT OR IGNORE no-op)
+- `202 { ok: true, id, accepted: true, status: "queued" }` — sent to `cohrint-ingest` Queue (high-throughput path; consumer batch-inserts to D1)
 
 ```bash
 curl -X POST https://api.cohrint.com/v1/events \
@@ -949,7 +1001,7 @@ All analytics endpoints require auth. Team-scoped members automatically get filt
 
 #### GET /v1/analytics/summary
 
-No query params required. KV-cached 5 minutes. Bypass cache: add `?agent=<name>`.
+No query params required. KV-cached 2 minutes. Bypass cache: add `?agent=<name>`.
 
 Key response fields:
 
@@ -2689,7 +2741,12 @@ TEXT tables (YYYY-MM-DD HH:MM:SS):  bind "2026-04-17 00:00:00"
   prompt_versions, prompt_usage, semantic_cache_entries,
   org_cache_config
 
+Phase A (PR #76, migration 0028): TEXT tables now ALSO have
+  created_at_unix INTEGER — use for new index-backed queries.
+  Phase B (drop old TEXT columns) pending 14-day burn-in.
+
 WRONG BIND = silent full-table scan (no error, all rows returned)
+Always use helpers from src/lib/db-dates.ts — never raw Date.now()
 ```
 
 ### Common curl Examples
@@ -2778,28 +2835,40 @@ curl "https://api.cohrint.com/v1/benchmark/percentiles?metric=cost_per_token&mod
 
 ### Cron Schedule
 
-| Job | Schedule |
-|---|---|
-| Benchmark sync + Copilot metrics | Sundays UTC |
-| Datadog export | Daily UTC |
+Defined in `wrangler.toml` `[triggers].crons`. Two cron expressions registered:
+
+| Cron | Expression | Jobs run |
+|---|---|---|
+| Every 10 min | `*/10 * * * *` | Anomaly detection; Copilot metrics sync (daily KV guard); Datadog export (daily KV guard); Benchmark contributions (Sunday KV guard) |
+| Daily 02:00 UTC | `0 2 * * *` | Cache reconciliation (`src/crons/cache-reconcile.ts`) — verifies R2 objects exist for last-24h `semantic_cache_entries` |
+
+All cron jobs use `acquireLock(kv, name, ttlSec)` to prevent duplicate runs across instances.
 
 ### KV Key Schema
 
 | Key | TTL | Description |
 |---|---|---|
-| `rl:{orgId}:{minuteBucket}` | 70s | Rate limit counter |
+| `rl:{orgId}:{minuteBucket}` | 70s | Rate limit counter (per-org RPM) |
+| `rl:key:{keyPrefix}:{bucket}` | 70s | Rate limit counter (per API key) |
 | `stream:{orgId}:latest` | 60s | Latest SSE event payload |
 | `slack:{orgId}` | — | Cached Slack webhook URL |
 | `alert:{orgId}:{type}` | 3600s | Alert throttle |
 | `recover:{token}` | 3600s | Recovery token |
 | `copilot:token:{orgId}:{githubOrg}` | — | AES-256-GCM encrypted Copilot PAT |
 | `sse:{orgId}:{token}` | 120s | SSE one-time token |
+| `freetier:{orgId}:{YYYY-MM}` | 40 days | Free-tier event counter (consumer-only writes) |
+| `phash:{orgId}:{promptHash}` | — | Semantic cache prompt hash dedup guard |
+| `cronlock:{name}` | varies | Distributed cron lock (TTL = job guard window) |
+| `dlq:entry:{ts}:{id}` | 7 days | Dead-lettered ingest message (written by DLQ consumer) |
+| `analytics:summary:{orgId}` | 120s | Cached `/v1/analytics/summary` response |
+| `analytics:kpis:{orgId}` | 120s | Cached `/v1/analytics/kpis` response |
+| `circuit:{service}:open` | 30s | Circuit-breaker open hint (slack/copilot/datadog) |
 
 ---
 
-*Cohrint — Complete Developer & Admin Guidebook · Version 1.2 · April 2026*  
+*Cohrint — Complete Developer & Admin Guidebook · Version 1.4 · April 2026*  
 *Source of truth: ADMIN_GUIDE.md (v2.0) + PRODUCT_STRATEGY.md (v8.0)*  
-*All shipped features as of PR #67 (2026-04-17)*
+*All shipped features as of PR #76 (2026-04-18)*
 
 ---
 

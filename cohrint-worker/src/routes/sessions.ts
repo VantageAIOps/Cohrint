@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
 import { authMiddleware, hasRole } from '../middleware/auth';
+import { createLogger } from '../lib/logger';
 
 const sessions = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -58,7 +59,7 @@ sessions.get('/', async (c) => {
       total: countResult?.total ?? 0,
     });
   } catch (err) {
-    console.error('[sessions] query error:', err);
+    createLogger(c.get('requestId'), c.get('orgId')).error('sessions query failed', { err: err instanceof Error ? err : new Error(String(err)) });
     return c.json({ error: 'Failed to query sessions' }, 500);
   }
 });

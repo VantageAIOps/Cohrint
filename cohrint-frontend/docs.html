@@ -252,6 +252,11 @@ pre{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;pad
       <a class="docs-nav-item" onclick="show('mcp-tools',this)">MCP tools</a>
       <a class="docs-nav-item" onclick="show('mcp-workflows',this)">MCP workflow examples</a>
     </div>
+
+    <div class="docs-nav-group">
+      <div class="docs-nav-sec" onclick="toggleNavGroup(this)">Architecture</div>
+      <a class="docs-nav-item" onclick="show('free-tier-ceilings',this)">§29 Free-Tier Ceilings</a>
+    </div>
   </div>
 
   <!-- CONTENT -->
@@ -2220,6 +2225,245 @@ cohrint-agent --backend claude
 <tr><td>429</td><td>IP has submitted 5 or more attempts within the past hour</td></tr>
 </tbody>
 </table>
+`,
+
+'free-tier-ceilings': `
+<h1>§29 Free-Tier Ceilings &amp; Exit Paths</h1>
+<p>Every Cloudflare free-tier choice is a ceiling. This section documents exactly where each service breaks, what the first paid tier costs, and what code-side changes are required to migrate out. Read this before starting Phase 2 work (T010+); the phase gate requires 7 days of production burn-in at each phase boundary before the next phase may begin.</p>
+
+<div class="warn-box"><strong>Phase gate reminder.</strong> Phase 2 (T010–T012) may not start until Phase 0 and Phase 1 are each entirely <code>status: done</code> AND have been on production <code>main</code> for &ge;7 days. This burn-in window exists because subtle races (KV storms, schema drift, duplicate-count drift) only surface under real traffic. The ceilings below are what you will hit if you skip the gate and rush to scale.</div>
+
+<h2>Ceiling summary table</h2>
+<p>One row per Cloudflare service. "Est. month-to-exceed" is the ingest volume that pushes usage past the free tier in a 30-day month.</p>
+
+<table class="api-table">
+<thead>
+<tr>
+  <th>Service</th>
+  <th>Current usage in Cohrint</th>
+  <th>Free-tier ceiling</th>
+  <th>First paid tier</th>
+  <th>Est. month-to-exceed</th>
+  <th>Exit architecture</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><strong>D1</strong></td>
+  <td>Events, daily rollup, orgs, members, prompts, cache entries, audit log</td>
+  <td>10 GB storage · 1 M reads/day · 100 k writes/day</td>
+  <td>$5/mo — 25 GB storage + 25 M reads + 1 M writes/day</td>
+  <td>~1 M events/mo (raw row ~1 KB avg)</td>
+  <td>Neon Postgres (free 512 MB) → RDS Postgres + RDS Proxy</td>
+</tr>
+<tr>
+  <td><strong>KV</strong></td>
+  <td>Rate-limit counters, free-tier monthly counts (<code>freetier:{orgId}:{YYYY-MM}</code>), analytics cache, dedup prompt-hash keys, SSE broadcast channel, cron lock, anomaly-alert throttle</td>
+  <td>100 k reads/day · 1 k writes/day</td>
+  <td>$5/mo — 10 M reads + 1 M writes/day</td>
+  <td>~500 k events/day (one write per ingest on non-debounced path)</td>
+  <td>Workers KV paid tier → Upstash Redis (10 k commands/day free) → Durable Objects per-org counter (Phase 6)</td>
+</tr>
+<tr>
+  <td><strong>R2</strong></td>
+  <td>Semantic cache response bodies (<code>cohrint-cache</code> bucket, key <code>cache/{orgId}/{entryId}</code>); audit log export blobs (future)</td>
+  <td>10 GB storage · 1 M Class A ops (PUT/POST/DELETE) · 10 M Class B ops (GET/HEAD) per month</td>
+  <td>$0.015/GB-mo + $4.50/M Class A ops + $0.36/M Class B ops — no egress fees</td>
+  <td>Cache: ~5 M entries at 2 KB avg ≈ 10 GB; Audit: ~500 k events/mo at Class A</td>
+  <td>R2 paid tier (no egress fee advantage is permanent) → Cloudflare terminal architecture</td>
+</tr>
+<tr>
+  <td><strong>Queues</strong></td>
+  <td>Event ingest producer (<code>POST /v1/events</code> writes to <code>cohrint-ingest</code>); consumer worker batches into D1; DLQ (<code>cohrint-ingest-dlq</code>) for failed messages</td>
+  <td>1 M ops/month — both producer send and consumer ack count, so effectively 500 k ingests/mo on free tier</td>
+  <td>$0.40/M operations</td>
+  <td>~15 k ingests/day (500 k ops ÷ 30 days ÷ 2 sides)</td>
+  <td>Queues paid tier ($0.40/M is cheap at any realistic scale) → Upstash Kafka (free 200 msg/day, $0.16/M beyond)</td>
+</tr>
+<tr>
+  <td><strong>Workers AI</strong></td>
+  <td>Semantic cache embeddings: <code>@cf/baai/bge-small-en-v1.5</code> (384 dims) called once per <code>POST /v1/cache/lookup</code> and once per <code>POST /v1/cache/store</code></td>
+  <td>10 k neurons/day free (BGE-small = ~512 neurons per inference)</td>
+  <td>$0.011/1 k neurons (Cloudflare AI Gateway)</td>
+  <td>~2 k cache lookups/day hits the neuron ceiling</td>
+  <td>OpenAI <code>text-embedding-ada-002</code> ($0.0001/1 k tokens) → <code>text-embedding-3-small</code> (5× cheaper) → self-hosted BGE on a VPS</td>
+</tr>
+<tr>
+  <td><strong>Vectorize</strong></td>
+  <td>Cache vector search: one <code>VECTORIZE.query()</code> per lookup, one <code>VECTORIZE.upsert()</code> per store, one <code>VECTORIZE.deleteByIds()</code> per eviction. Metadata filter: <code>{ org_id, model, team_id? }</code></td>
+  <td>200 k queried vectors/day · 30 M stored vectors total</td>
+  <td>$0.01/1 M queried vectors + $0.05/1 M stored vectors/mo</td>
+  <td>30 M stored entries ≈ effectively never on free tier; 200 k/day query limit ≈ 200 k cache lookups/day</td>
+  <td>Pinecone serverless (free 5 M vectors, $0.08/M beyond) → Weaviate Cloud (free sandbox) → pgvector on Neon</td>
+</tr>
+<tr>
+  <td><strong>WAE</strong> (Workers Analytics Engine)</td>
+  <td>One data point emitted per ingest outcome: <code>events.accepted</code>, <code>events.duplicate</code>, <code>events.free_tier_rejected</code>, <code>events.d1_error</code>, <code>cache.hit</code>, <code>cache.miss</code>, <code>ratelimit.rejected</code>; 1% sample of request latency for <code>/v1/events</code> and <code>/v1/cache/lookup</code></td>
+  <td>100 k data points/day</td>
+  <td>$0.25/1 M data points beyond free allowance</td>
+  <td>~10 metric writes/event × 10 k events/day = 100 k/day ceiling; latency sampling at 1% adds negligible headroom</td>
+  <td>WAE paid tier ($0.25/M is minimal) → Axiom (free 500 MB/day ingest) → ClickHouse Cloud (free 25 GB storage)</td>
+</tr>
+</tbody>
+</table>
+
+<h2>D1 — details &amp; migration path</h2>
+<p>D1 is the primary store for all persistent data. The free tier (10 GB, 1 M reads/day) is sufficient through ~1 M cumulative events. Raw event rows average ~1 KB; the <code>events_daily_rollup</code> table (added in T011) compresses ~1 000 events per row into ~256 bytes, extending the runway significantly. The read limit (1 M/day) is the more likely ceiling: every analytics API call fans out into 3–5 queries against the rollup table.</p>
+<h3>Code paths that hit D1</h3>
+<ul style="font-size:14px;color:var(--muted);line-height:1.9;padding-left:20px;margin-bottom:16px">
+  <li><code>src/routes/events.ts</code> — <code>INSERT OR IGNORE INTO events</code> on every ingest; <code>SELECT COUNT(*)</code> for free-tier fallback when KV misses</li>
+  <li><code>src/routes/analytics.ts</code> — <code>SELECT</code> against <code>events_daily_rollup</code> for summary, timeseries, models, teams endpoints</li>
+  <li><code>src/routes/cache.ts</code> — <code>INSERT INTO semantic_cache_entries</code> on store; <code>SELECT</code> on hit for response body fallback</li>
+  <li><code>src/routes/auditlog.ts</code> — append-only <code>INSERT INTO audit_events</code></li>
+  <li><code>src/lib/freetier.ts</code> — <code>SELECT COUNT(*) FROM events WHERE org_id=? AND created_at &gt;= ?</code> on KV miss</li>
+</ul>
+<h3>Migration: D1 → Neon Postgres</h3>
+<ol style="font-size:14px;color:var(--muted);line-height:1.9;padding-left:20px;margin-bottom:16px">
+  <li>Replace <code>c.env.DB</code> (D1Database) binding with a <code>hyperdrive</code> binding pointing at the Neon connection string. Update <code>wrangler.toml</code>.</li>
+  <li>Update all queries to use Postgres dialect: replace <code>INSERT OR IGNORE</code> with <code>INSERT ... ON CONFLICT DO NOTHING</code>; replace <code>strftime('%s', 'now')</code> with <code>EXTRACT(EPOCH FROM NOW())</code>; replace <code>AUTOINCREMENT</code> with <code>BIGSERIAL</code>.</li>
+  <li>Update <code>src/lib/db-dates.ts</code> helpers — integer unix epoch binds remain valid in Postgres (<code>WHERE created_at &gt; $1</code>).</li>
+  <li>Run schema migrations against Neon via <code>psql</code> (not <code>wrangler d1 migrations apply</code>).</li>
+  <li>Backfill: <code>pg_dump</code> D1 export (CSV) → <code>COPY events FROM stdin</code> on Neon.</li>
+</ol>
+<div class="info-box">The date-binding helpers in <code>src/lib/db-dates.ts</code> (T003) are the intended swap point: replace their body once, not a thousand callsites. INTEGER unix seconds bind identically to Postgres bigint columns.</div>
+
+<h2>KV — details &amp; migration path</h2>
+<p>KV is used for several distinct purposes. The 1 k writes/day free-tier limit is the binding constraint, not the 100 k reads/day limit. T006 adds a 10-second in-memory debounce so the free-tier counter increments are coalesced — without the debounce, each of ~1 000 events/day would be a separate write.</p>
+<h3>KV key namespace (current)</h3>
+<table class="api-table">
+<thead><tr><th>Key pattern</th><th>Source file</th><th>Write frequency</th></tr></thead>
+<tbody>
+<tr><td><code>freetier:{orgId}:{YYYY-MM}</code></td><td><code>src/lib/freetier.ts</code></td><td>Debounced; 1 write per ~10 s of sustained ingest</td></tr>
+<tr><td><code>analytics:summary:{orgId}[:{team}]</code></td><td><code>src/routes/events.ts</code>, invalidated on every accepted ingest</td><td>1 write per accepted event (TTL 2 min)</td></tr>
+<tr><td><code>ratelimit:{ip}:{endpoint}:{window}</code></td><td><code>src/middleware/ratelimit.ts</code></td><td>1 write per unique (IP, endpoint, window) — up to ~50 k/day at traffic scale</td></tr>
+<tr><td><code>dedup:{orgId}:{promptHash}</code></td><td><code>src/routes/events.ts</code></td><td>1 write per new prompt hash (24 h TTL)</td></tr>
+<tr><td><code>sse:{orgId}:latest</code></td><td><code>src/routes/stream.ts</code></td><td>1 write per ingest that has SSE subscribers</td></tr>
+<tr><td><code>lock:cron:{name}</code></td><td><code>src/lib/cron-lock.ts</code></td><td>2 writes per cron tick (acquire + release)</td></tr>
+<tr><td><code>anomaly:{orgId}:latest</code></td><td><code>src/lib/anomaly.ts</code></td><td>1 write per anomaly detected (throttled)</td></tr>
+<tr><td><code>dlq:entry:{ts}:{id}</code></td><td><code>src/consumers/events-ingest.ts</code> (<code>handleDlqBatch</code>)</td><td>1 write per dead-lettered message (7-day TTL)</td></tr>
+</tbody>
+</table>
+<h3>Scheduled crons</h3>
+<ul style="font-size:14px;color:var(--muted);line-height:1.9;padding-left:20px;margin-bottom:16px">
+  <li><strong>Every 10 min:</strong> <code>src/lib/anomaly.ts</code> — Z-score anomaly detection on rolling 7-day hourly cost; fires Slack alert when spend exceeds 3 std dev above mean. Lock key: <code>anomaly-check</code>.</li>
+  <li><strong>Daily at 02:00 UTC:</strong> <code>src/crons/cache-reconcile.ts</code> — scans last-24 h <code>semantic_cache_entries</code> with <code>response_r2_key</code>, verifies R2 object exists via <code>CACHE_BUCKET.head()</code>, emits <code>cache.reconciliation_drift</code> WAE metric for any missing objects. Lock key: <code>cache-reconcile</code> (2 h TTL).</li>
+</ul>
+<h3>Migration: KV → Upstash Redis</h3>
+<ol style="font-size:14px;color:var(--muted);line-height:1.9;padding-left:20px;margin-bottom:16px">
+  <li>Add Upstash Redis REST URL + token to Worker secrets (<code>wrangler secret put UPSTASH_REDIS_URL</code>).</li>
+  <li>Wrap all <code>env.KV.get / .put / .delete / .list</code> calls behind a thin adapter in <code>src/lib/kv-adapter.ts</code> that delegates to Upstash via <code>fetch</code> (no npm dep needed — the Upstash REST API is plain HTTP).</li>
+  <li>KV <code>expirationTtl</code> maps to Redis <code>EX</code> parameter; <code>KV.list({ prefix })</code> maps to <code>SCAN 0 MATCH prefix:*</code>.</li>
+  <li>Zero-downtime cutover: run both in parallel for one deploy, validate read parity, then drop KV binding.</li>
+</ol>
+<div class="warn-box">KV is eventually consistent with ~60 s global propagation. The cron lock and rate limiter inherit this tolerance. If strongly-consistent locking becomes critical before you migrate, add a Durable Object per-lock (Phase 6 item) — do not add it prematurely.</div>
+
+<h2>R2 — details &amp; migration path</h2>
+<p>R2 holds semantic cache response bodies (key <code>cache/{orgId}/{entryId}</code>). A cache entry is written once on <code>POST /v1/cache/store</code> (Class A op) and read on each cache hit (<code>POST /v1/cache/lookup</code>, Class B op). Evicted entries are deleted via <code>VECTORIZE.deleteByIds</code> + <code>CACHE_BUCKET.delete</code> (another Class A op). At 2 KB avg per entry and 5 M entries the 10 GB ceiling is reached; at ~33 k stores/day the 1 M Class A op/month ceiling is reached first.</p>
+<h3>Code paths that hit R2</h3>
+<ul style="font-size:14px;color:var(--muted);line-height:1.9;padding-left:20px;margin-bottom:16px">
+  <li><code>src/routes/cache.ts:187</code> — <code>c.env.CACHE_BUCKET.put(candidateR2Key, body.response, ...)</code> on store</li>
+  <li><code>src/routes/cache.ts:106–116</code> — <code>c.env.CACHE_BUCKET.get(entry.response_r2_key)</code> on cache hit; falls back to D1 <code>response_text</code> on R2 error</li>
+  <li><code>src/routes/cache.ts:100</code> — <code>c.env.CACHE_BUCKET.delete(key)</code> on eviction (delete-by-ids)</li>
+</ul>
+<h3>Migration: R2 free tier → R2 paid tier</h3>
+<p>R2 has no egress fees. Upgrading is a billing-only change — no code changes needed. Enable the Workers Paid plan ($5/mo) and R2 charges accrue per-GB and per-op beyond the included allowance. This is the recommended exit path: no architectural change, no migration risk.</p>
+
+<h2>Queues — details &amp; migration path</h2>
+<p>After T010 lands, <code>POST /v1/events</code> writes a message to the <code>cohrint-ingest</code> producer queue and immediately returns HTTP 202. The consumer worker reads batches of up to 100, upserts to D1, and updates the KV free-tier counter. Both the producer send and consumer ack count against the 1 M ops/month free limit, so effective ingest capacity is 500 k events/month (~15 k/day) before the ceiling is reached. The DLQ (<code>cohrint-ingest-dlq</code>) counts separately only when messages are dead-lettered.</p>
+<h3>Code paths that hit Queues</h3>
+<ul style="font-size:14px;color:var(--muted);line-height:1.9;padding-left:20px;margin-bottom:16px">
+  <li><code>src/routes/events.ts:215</code> — <code>c.env.INGEST_QUEUE.send({ type: 'event', orgId, event: body })</code> (post-T010)</li>
+  <li><code>src/consumers/events-ingest.ts</code> — consumer acks each message after successful D1 batch insert</li>
+  <li><code>src/consumers/events-ingest.ts</code> — <code>handleDlqBatch</code> receives dead-lettered messages, stores each to KV under <code>dlq:entry:{ts}:{id}</code> (7-day TTL)</li>
+  <li><code>src/routes/superadmin.ts</code> — <code>GET /v1/superadmin/ingest/dlq</code> lists recent DLQ entries from KV (superadmin-only, audit-logged)</li>
+</ul>
+<h3>Migration: Queues free tier → Queues paid tier</h3>
+<p>The first paid tier is $0.40/M operations — at 1 M events/mo the monthly cost is $0.80. No code changes required; billing activates automatically when the Workers Paid plan is active. For Kafka migration (Upstash), replace <code>INGEST_QUEUE.send()</code> with an HTTP POST to the Upstash Kafka REST endpoint and replace the consumer binding with a <code>scheduled</code> handler that calls <code>kafka.consume()</code>.</p>
+
+<h2>Superadmin endpoints</h2>
+<p>These endpoints require a <code>superadmin</code>-role API key. All calls are audit-logged.</p>
+<table class="api-table">
+<thead><tr><th>Endpoint</th><th>Description</th><th>Auth</th></tr></thead>
+<tbody>
+<tr>
+  <td><code>GET /v1/superadmin/ingest/dlq</code></td>
+  <td>Lists recent dead-letter queue entries from KV. Query param: <code>?limit=50</code> (max 200). Returns <code>{ count, entries[], generated_at }</code>. See <code>src/routes/superadmin.ts</code> and <code>dlq:entry:{ts}:{id}</code> KV keys (7-day TTL).</td>
+  <td>superadmin</td>
+</tr>
+<tr>
+  <td><code>POST /v1/superadmin/events/rescore</code></td>
+  <td>Clears scoring fields and re-queues events via the <code>cohrint-ingest</code> queue. Body: <code>{ org_id, from, to, fields_to_clear[] }</code>. Rate-limited to 1 request per 15 minutes per org. Returns <code>{ ok, queued, org_id, from, to, fields_to_clear }</code>.</td>
+  <td>superadmin</td>
+</tr>
+<tr>
+  <td><code>POST /v1/superadmin/rollup/backfill</code></td>
+  <td>Idempotently rebuilds <code>events_daily_rollup</code> from raw events in batches of 100. Returns <code>{ ok, processed }</code>. Safe to re-run — duplicate rows are upserted, not doubled.</td>
+  <td>superadmin</td>
+</tr>
+</tbody>
+</table>
+
+<h2>Workers AI — details &amp; migration path</h2>
+<p>Workers AI runs <code>@cf/baai/bge-small-en-v1.5</code> (384 dimensions) for semantic cache embeddings. Each model call consumes approximately 512 neurons. The free tier provides 10 k neurons/day, yielding ~19 embedding calls/day before cost begins. In practice the semantic cache is only active when <code>env.AI</code> and <code>env.VECTORIZE</code> are bound — on the free tier this can be throttled by simply not binding the AI resource during low-volume periods.</p>
+<h3>Code paths that hit Workers AI</h3>
+<ul style="font-size:14px;color:var(--muted);line-height:1.9;padding-left:20px;margin-bottom:16px">
+  <li><code>src/routes/cache.ts:35</code> — <code>embedText(ai, text)</code>: <code>ai.run('@cf/baai/bge-small-en-v1.5', { text })</code></li>
+  <li>Called from <code>cache/lookup</code> (line ~62) and <code>cache/store</code> (line ~180) — 2 AI calls per cache round-trip</li>
+</ul>
+<h3>Migration: Workers AI → OpenAI embeddings</h3>
+<ol style="font-size:14px;color:var(--muted);line-height:1.9;padding-left:20px;margin-bottom:16px">
+  <li>Replace <code>embedText</code> in <code>src/routes/cache.ts</code> with a <code>fetch</code> call to <code>https://api.openai.com/v1/embeddings</code> using <code>text-embedding-3-small</code> (1536 dims, $0.00002/1 k tokens).</li>
+  <li>Update Vectorize index dimensions from 384 to 1536 — requires creating a new index and backfilling all vectors (no in-place resize). Add <code>VECTORIZE_NEW</code> binding, dual-write during migration, then cut over.</li>
+  <li>Add <code>OPENAI_API_KEY</code> Worker secret.</li>
+</ol>
+<div class="warn-box">Changing embedding dimensions requires a full Vectorize re-index. Plan for ~1 h downtime for the semantic cache (cache misses fall through to LLM, no data loss) or implement dual-index shadow routing during migration.</div>
+
+<h2>Vectorize — details &amp; migration path</h2>
+<p>Vectorize stores one 384-dim vector per semantic cache entry with metadata <code>{ org_id, model, team_id? }</code>. The free tier supports 30 M stored vectors and 200 k queries/day. At current alpha volumes the stored-vector ceiling is effectively unreachable. The 200 k queries/day limit becomes binding at ~200 k cache lookups/day (one query per lookup).</p>
+<h3>Code paths that hit Vectorize</h3>
+<ul style="font-size:14px;color:var(--muted);line-height:1.9;padding-left:20px;margin-bottom:16px">
+  <li><code>src/routes/cache.ts:67</code> — <code>c.env.VECTORIZE.query(embedding, { topK: 1, filter: vectorizeFilter })</code></li>
+  <li><code>src/routes/cache.ts:199+</code> — <code>c.env.VECTORIZE.upsert([{ id, values, metadata }])</code> on store</li>
+  <li><code>src/routes/cache.ts:100</code> — <code>c.env.VECTORIZE.deleteByIds([top.id])</code> on eviction</li>
+</ul>
+<h3>Migration: Vectorize → Pinecone serverless</h3>
+<ol style="font-size:14px;color:var(--muted);line-height:1.9;padding-left:20px;margin-bottom:16px">
+  <li>Add Pinecone index (384 dims, cosine metric) and API key as a Worker secret.</li>
+  <li>Replace <code>c.env.VECTORIZE.query / .upsert / .deleteByIds</code> calls with a thin <code>PineconeClient</code> wrapper backed by <code>fetch</code> (no SDK dep needed). Metadata filter syntax is compatible.</li>
+  <li>Backfill: export all vectors from Vectorize via <code>wrangler vectorize get-vectors</code> and upsert to Pinecone in batches of 100.</li>
+</ol>
+
+<h2>WAE (Workers Analytics Engine) — details &amp; migration path</h2>
+<p>WAE receives one data point per ingest-path outcome via <code>src/lib/metrics.ts</code>. The free tier of 100 k data points/day corresponds to ~100 k events/day (one WAE write per event). A 1% latency sample for <code>/v1/events</code> and <code>/v1/cache/lookup</code> adds ~1 k points/day at 100 k events/day volume — negligible. To stay within the free tier at higher volumes, the <code>emit()</code> call should be sampled (e.g. 10% of ingest events once past 100 k/day).</p>
+<h3>Code paths that hit WAE</h3>
+<ul style="font-size:14px;color:var(--muted);line-height:1.9;padding-left:20px;margin-bottom:16px">
+  <li><code>src/lib/metrics.ts</code> — <code>env.METRICS.writeDataPoint({ indexes: [event, orgId], doubles: [...], blobs: [...] })</code></li>
+  <li>Called from <code>src/routes/events.ts</code> (accepted, duplicate, free_tier_rejected, d1_error), <code>src/routes/cache.ts</code> (cache.hit, cache.miss), <code>src/middleware/ratelimit.ts</code> (ratelimit.rejected)</li>
+</ul>
+<h3>Migration: WAE → Axiom</h3>
+<ol style="font-size:14px;color:var(--muted);line-height:1.9;padding-left:20px;margin-bottom:16px">
+  <li>Replace <code>env.METRICS.writeDataPoint()</code> in <code>src/lib/metrics.ts</code> with a <code>fetch</code> POST to <code>https://api.axiom.co/v1/datasets/{dataset}/ingest</code> with <code>Authorization: Bearer {AXIOM_TOKEN}</code>.</li>
+  <li>Axiom ingests NDJSON; map the WAE <code>{ indexes, doubles, blobs }</code> shape to a flat JSON object per data point.</li>
+  <li>Update dashboard WAE SQL queries to Axiom APL (Axiom Processing Language) — syntax is similar but not identical.</li>
+  <li>Add <code>AXIOM_TOKEN</code> and <code>AXIOM_DATASET</code> as Worker secrets; remove <code>[[analytics_engine_datasets]]</code> from <code>wrangler.toml</code>.</li>
+</ol>
+<div class="info-box">WAE paid tier ($0.25/1 M data points beyond free) is nearly free at any realistic event volume. Prefer WAE paid over migrating to Axiom unless you need long-term retention, dashboards, or alerting that WAE SQL does not support.</div>
+
+<h2>Growth trigger reference</h2>
+<p>Summary of the volume thresholds that require action, in expected order of encounter:</p>
+<table class="api-table">
+<thead><tr><th>Trigger volume</th><th>Service hitting ceiling</th><th>Recommended action</th></tr></thead>
+<tbody>
+<tr><td>~2 k cache lookups/day</td><td>Workers AI (neuron limit)</td><td>Enable AI Gateway sampling or migrate to OpenAI embeddings</td></tr>
+<tr><td>~15 k ingests/day</td><td>Cloudflare Queues (500 k ops/mo free)</td><td>Upgrade to Workers Paid plan ($5/mo includes Queues paid tier)</td></tr>
+<tr><td>~33 k cache stores/day</td><td>R2 Class A ops (1 M/mo)</td><td>Workers Paid plan — R2 paid tier activates automatically</td></tr>
+<tr><td>~100 k events/day</td><td>WAE (100 k data points/day)</td><td>Sample WAE writes at 10%; or upgrade to Workers Paid for $0.25/M</td></tr>
+<tr><td>~200 k cache lookups/day</td><td>Vectorize (200 k queries/day)</td><td>Workers Paid plan — Vectorize paid tier at $0.01/1 M queries</td></tr>
+<tr><td>~500 k events/day</td><td>KV write limit (1 k writes/day free)</td><td>Workers Paid plan — KV paid tier at $5/mo for 1 M writes/day</td></tr>
+<tr><td>~1 M events/mo cumulative</td><td>D1 storage (10 GB)</td><td>Workers Paid plan + D1 paid tier ($5/mo for 25 GB), or migrate to Neon</td></tr>
+</tbody>
+</table>
+<div class="info-box">All ceilings except Workers AI are addressed by a single $5/mo Workers Paid plan upgrade. Workers AI neurons require a separate AI Gateway billing change. Plan for the $5/mo upgrade at ~15 k ingests/day — it unlocks all other paid tiers simultaneously.</div>
 `
 
 };

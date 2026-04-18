@@ -103,6 +103,10 @@ import { teams }     from './routes/teams';
 import { cache }     from './routes/cache';
 import { prompts }   from './routes/prompts';
 import { runAnomalyDetection } from './lib/anomaly';
+import { createLogger } from './lib/logger';
+import { acquireLock } from './lib/cron-lock';
+import { handleIngestBatch, handleDlqBatch } from './consumers/events-ingest';
+import { runCacheReconcile } from './crons/cache-reconcile';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -150,7 +154,8 @@ app.notFound((c) => c.json({
 
 // ── Global error handler ──────────────────────────────────────────────────────
 app.onError((err, c) => {
-  console.error('[cohrint]', err);
+  const log = createLogger(c.get('requestId') ?? 'unknown');
+  log.error('unhandled error', { err: err instanceof Error ? err : new Error(String(err)) });
   const origin  = c.req.header('Origin') ?? '';
   const allowed = (c.env.ALLOWED_ORIGINS ?? '').split(',').map(s => s.trim()).filter(Boolean);
   const isAllowed = allowed.includes(origin) ||
@@ -166,60 +171,99 @@ app.onError((err, c) => {
   return c.json({ error: 'Internal server error' }, 500, headers);
 });
 
-// ── Export with scheduled handler for cron-based anomaly detection ────────────
+// ── Export with scheduled + queue handlers ────────────────────────────────────
 export default {
   fetch: app.fetch,
+  async queue(batch: MessageBatch, env: Bindings, ctx: ExecutionContext) {
+    if (batch.queue === 'cohrint-ingest-dlq') {
+      ctx.waitUntil(handleDlqBatch(batch as MessageBatch<never>, env))
+    } else {
+      ctx.waitUntil(handleIngestBatch(batch as MessageBatch<never>, env))
+    }
+  },
   async scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionContext) {
     ctx.waitUntil((async () => {
+      const cronId = crypto.randomUUID();
+      const log = createLogger(cronId);
+
       // ── Anomaly detection (every 10 min) ─────────────────────────────────
       try {
         const result = await runAnomalyDetection(env.DB, env.KV);
-        console.log(`[anomaly-cron] checked=${result.checked} anomalies=${result.anomalies} alerts=${result.alerts_sent}`);
+        log.info('anomaly-cron complete', { checked: result.checked, anomalies: result.anomalies, alerts_sent: result.alerts_sent });
       } catch (err) {
-        console.error('[anomaly-cron] Fatal error:', err);
+        log.error('anomaly-cron fatal', { err: err instanceof Error ? err : new Error(String(err)) });
       }
 
       // ── GitHub Copilot Metrics sync (daily — guarded by KV per-day key) ──
-      // syncCopilotMetrics internally skips orgs already synced today,
-      // so it's safe to attempt on every 10-min tick.
-      try {
-        const results = await syncCopilotMetrics(env);
-        const synced  = results.filter(r => !r.skipped && !r.error);
-        const errors  = results.filter(r => r.error);
-        if (synced.length > 0 || errors.length > 0) {
-          console.log(`[copilot-cron] synced=${synced.length} skipped=${results.filter(r => r.skipped).length} errors=${errors.length}`);
-          for (const e of errors) {
-            console.error(`[copilot-cron] ${e.github_org}: ${e.error}`);
+      const copilotLock = await acquireLock(env.KV, 'copilot-sync', 300);
+      if (!copilotLock) {
+        log.info('copilot-cron skipped (lock held by another instance)');
+      } else {
+        try {
+          const results = await syncCopilotMetrics(env);
+          const synced  = results.filter(r => !r.skipped && !r.error);
+          const errors  = results.filter(r => r.error);
+          if (synced.length > 0 || errors.length > 0) {
+            log.info('copilot-cron complete', { synced: synced.length, skipped: results.filter(r => r.skipped).length, errors: errors.length });
+            for (const e of errors) {
+              log.error('copilot-cron org error', { github_org: e.github_org, err: new Error(String(e.error)) });
+            }
           }
+        } catch (err) {
+          log.error('copilot-cron fatal', { err: err instanceof Error ? err : new Error(String(err)) });
+        } finally {
+          await copilotLock.release();
         }
-      } catch (err) {
-        console.error('[copilot-cron] Fatal error:', err);
       }
 
       // ── Datadog Metrics push (daily — guarded by KV per-day key) ─────────
-      // syncDatadogMetrics internally skips orgs already pushed today,
-      // so it's safe to call on every 10-min tick.
-      try {
-        const ddResults = await syncDatadogMetrics(env);
-        const ddSynced  = ddResults.filter(r => !r.skipped && !r.error);
-        const ddErrors  = ddResults.filter(r => r.error);
-        if (ddSynced.length > 0 || ddErrors.length > 0) {
-          console.log(`[datadog-cron] pushed=${ddSynced.length} skipped=${ddResults.filter(r => r.skipped).length} errors=${ddErrors.length}`);
-          for (const e of ddErrors) {
-            console.error(`[datadog-cron] org=${e.org_id}: ${e.error}`);
+      const datadogLock = await acquireLock(env.KV, 'datadog-sync', 300);
+      if (!datadogLock) {
+        log.info('datadog-cron skipped (lock held by another instance)');
+      } else {
+        try {
+          const ddResults = await syncDatadogMetrics(env);
+          const ddSynced  = ddResults.filter(r => !r.skipped && !r.error);
+          const ddErrors  = ddResults.filter(r => r.error);
+          if (ddSynced.length > 0 || ddErrors.length > 0) {
+            log.info('datadog-cron complete', { pushed: ddSynced.length, skipped: ddResults.filter(r => r.skipped).length, errors: ddErrors.length });
+            for (const e of ddErrors) {
+              log.error('datadog-cron org error', { org_id: e.org_id, err: new Error(String(e.error)) });
+            }
           }
+        } catch (err) {
+          log.error('datadog-cron fatal', { err: err instanceof Error ? err : new Error(String(err)) });
+        } finally {
+          await datadogLock.release();
         }
-      } catch (err) {
-        console.error('[datadog-cron] Fatal error:', err);
       }
 
       // ── Benchmark contributions (Sundays UTC only) ────────────────────────
-      // syncBenchmarkContributions checks day-of-week internally and is a
-      // no-op on non-Sunday ticks, so safe to call on every cron tick.
-      try {
-        await syncBenchmarkContributions(env);
-      } catch (err) {
-        console.error('[benchmark-cron] Fatal error:', err);
+      const benchmarkLock = await acquireLock(env.KV, 'benchmark-sync', 300);
+      if (!benchmarkLock) {
+        log.info('benchmark-cron skipped (lock held by another instance)');
+      } else {
+        try {
+          await syncBenchmarkContributions(env);
+        } catch (err) {
+          log.error('benchmark-cron fatal', { err: err instanceof Error ? err : new Error(String(err)) });
+        } finally {
+          await benchmarkLock.release();
+        }
+      }
+
+      // ── Cache reconciliation (daily 02:00 UTC — R2/D1 drift detection) ────
+      const cacheReconcileLock = await acquireLock(env.KV, 'cache-reconcile', 7200);
+      if (!cacheReconcileLock) {
+        log.info('cache-reconcile-cron skipped (lock held by another instance)');
+      } else {
+        try {
+          await runCacheReconcile(env);
+        } catch (err) {
+          log.error('cache-reconcile-cron fatal', { err: err instanceof Error ? err : new Error(String(err)) });
+        } finally {
+          await cacheReconcileLock.release();
+        }
       }
     })());
   },

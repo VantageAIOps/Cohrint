@@ -3,6 +3,7 @@ import { Bindings, Variables } from '../types';
 import { authMiddleware, hasRole } from '../middleware/auth';
 import { logAudit } from '../lib/audit';
 import { estimateCacheSavings } from '../lib/pricing';
+import { scopedDb } from '../lib/db';
 const analytics = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 analytics.use('*', authMiddleware);
@@ -51,11 +52,13 @@ analytics.get('/summary', async (c) => {
   const devArgs   = isPrivileged ? [] : [memberEmail];
 
   // Optional agent_name filter — e.g. ?agent=claude-code for integration status checks
+  // Agent-filtered requests fall back to raw events (rollup has no agent_name column)
   const agentFilter = c.req.query('agent') ?? null;
   const agentClause = agentFilter ? ' AND agent_name = ?' : '';
   const agentArgs   = agentFilter ? [agentFilter] : [];
 
-  // KV cache — 5 min TTL. Agent-filtered requests bypass cache (low-volume, targeted).
+  // KV cache — 2 min TTL (reduced from 5 min since rollup data is already aggregated).
+  // Agent-filtered requests bypass cache (low-volume, targeted).
   const cacheKey = `analytics:summary:${orgId}:${scopeTeam ?? 'all'}:${isPrivileged ? 'all' : (memberEmail ?? 'anon')}`;
   if (!agentFilter) {
     try {
@@ -64,38 +67,101 @@ analytics.get('/summary', async (c) => {
     } catch { /* KV unavailable — continue to DB */ }
   }
 
-  // events.created_at is INTEGER unixepoch — bind unix seconds, not ISO text.
   const today      = todayUnix();
   const month      = sinceUnix(30);
   const thirty     = Math.floor((Date.now() - 30 * 60_000) / 1000);
 
-  const [totals, session] = await c.env.DB.batch([
-    c.env.DB.prepare(`
-      SELECT
-        COALESCE(SUM(cost_usd), 0)     AS today_cost_usd,
-        COALESCE(SUM(total_tokens), 0) AS today_tokens,
-        COALESCE(COUNT(*), 0)          AS today_requests,
-        MAX(created_at)                AS last_event_at
-      FROM events WHERE org_id = ? AND created_at >= ?${clause}${agentClause}${devClause}
-    `).bind(orgId, today, ...args, ...agentArgs, ...devArgs),
-    c.env.DB.prepare(`
-      SELECT COALESCE(SUM(cost_usd), 0) AS session_cost_usd
-      FROM events WHERE org_id = ? AND created_at >= ?${clause}${agentClause}${devClause}
-    `).bind(orgId, thirty, ...args, ...agentArgs, ...devArgs),
-  ]);
+  const sdb = scopedDb(c.env.DB, orgId);
 
-  const mtd = await c.env.DB.prepare(`
-    SELECT COALESCE(SUM(cost_usd), 0) AS mtd_cost_usd
-    FROM events WHERE org_id = ? AND created_at >= ?${clause}${agentClause}${devClause}
-  `).bind(orgId, month, ...args, ...agentArgs, ...devArgs).first<{ mtd_cost_usd: number }>();
+  // Rollup team scope uses plain `team` column (no table alias needed — single table)
+  const rollupTeamClause = scopeTeam ? ' AND team = ?' : '';
+  const rollupTeamArgs   = scopeTeam ? [scopeTeam] : [];
+
+  // Use rollup for today + MTD aggregates (fast, pre-aggregated).
+  // Session (30-min window) stays on raw events — too short for daily rollup.
+  // Agent-filter fallback also uses raw events since rollup has no agent_name column.
+  let totals: D1Result;
+  let mtd: { mtd_cost_usd: number } | null;
+
+  if (agentFilter) {
+    // Agent-filtered path: raw events table
+    [totals] = await c.env.DB.batch([
+      sdb.prepare(`
+        SELECT
+          COALESCE(SUM(cost_usd), 0)     AS today_cost_usd,
+          COALESCE(SUM(total_tokens), 0) AS today_tokens,
+          COALESCE(COUNT(*), 0)          AS today_requests,
+          MAX(created_at)                AS last_event_at
+        FROM events WHERE {{ORG_SCOPE}} AND created_at >= ?${clause}${agentClause}${devClause}
+      `).bind(today, ...args, ...agentArgs, ...devArgs),
+    ]);
+    mtd = await sdb.prepare(`
+      SELECT COALESCE(SUM(cost_usd), 0) AS mtd_cost_usd
+      FROM events WHERE {{ORG_SCOPE}} AND created_at >= ?${clause}${agentClause}${devClause}
+    `).bind(month, ...args, ...agentArgs, ...devArgs).first<{ mtd_cost_usd: number }>();
+  } else {
+    // Normal path: use rollup for today + MTD
+    // Rollup has no developer_email or agent_name — privileged users only for rollup path.
+    // Non-privileged members fall back to raw events so dev-scoping is preserved.
+    if (!isPrivileged) {
+      // Fall back to raw events for member-scoped queries (rollup has no developer_email)
+      [totals] = await c.env.DB.batch([
+        sdb.prepare(`
+          SELECT
+            COALESCE(SUM(cost_usd), 0)     AS today_cost_usd,
+            COALESCE(SUM(total_tokens), 0) AS today_tokens,
+            COALESCE(COUNT(*), 0)          AS today_requests,
+            MAX(created_at)                AS last_event_at
+          FROM events WHERE {{ORG_SCOPE}} AND created_at >= ?${clause}${devClause}
+        `).bind(today, ...args, ...devArgs),
+      ]);
+      mtd = await sdb.prepare(`
+        SELECT COALESCE(SUM(cost_usd), 0) AS mtd_cost_usd
+        FROM events WHERE {{ORG_SCOPE}} AND created_at >= ?${clause}${devClause}
+      `).bind(month, ...args, ...devArgs).first<{ mtd_cost_usd: number }>();
+    } else {
+      // Privileged users: query rollup directly
+      [totals] = await c.env.DB.batch([
+        sdb.prepare(`
+          SELECT
+            COALESCE(SUM(cost_usd), 0)     AS today_cost_usd,
+            COALESCE(SUM(total_tokens), 0) AS today_tokens,
+            COALESCE(SUM(requests), 0)     AS today_requests,
+            NULL                           AS last_event_at
+          FROM events_daily_rollup WHERE {{ORG_SCOPE}} AND date_unix_day = ?${rollupTeamClause}
+        `).bind(today, ...rollupTeamArgs),
+      ]);
+      mtd = await sdb.prepare(`
+        SELECT COALESCE(SUM(cost_usd), 0) AS mtd_cost_usd
+        FROM events_daily_rollup WHERE {{ORG_SCOPE}} AND date_unix_day >= ?${rollupTeamClause}
+      `).bind(month, ...rollupTeamArgs).first<{ mtd_cost_usd: number }>();
+    }
+  }
+
+  // last_event_at for privileged rollup path: fetch from raw events (single cheap query)
+  let lastEventAt: number | null = null;
+  if (isPrivileged && !agentFilter) {
+    const lastRow = await sdb.prepare(`
+      SELECT MAX(created_at) AS last_event_at FROM events WHERE {{ORG_SCOPE}}${rollupTeamClause}
+    `).bind(...rollupTeamArgs).first<{ last_event_at: number | null }>();
+    lastEventAt = lastRow?.last_event_at ?? null;
+  } else {
+    lastEventAt = ((totals.results[0] as Record<string, number>)?.last_event_at as number) ?? null;
+  }
+
+  // Session (30-min window) always on raw events
+  const session = await sdb.prepare(`
+    SELECT COALESCE(SUM(cost_usd), 0) AS session_cost_usd
+    FROM events WHERE {{ORG_SCOPE}} AND created_at >= ?${clause}${agentClause}${devClause}
+  `).bind(thirty, ...args, ...agentArgs, ...devArgs).first<{ session_cost_usd: number }>();
 
   // Budget: per-team when scoped, org-wide otherwise
   let budgetUsd = 0;
   let orgPlan = 'free';
   if (scopeTeam) {
-    const tb = await c.env.DB.prepare(
-      'SELECT budget_usd FROM team_budgets WHERE org_id = ? AND team = ?'
-    ).bind(orgId, scopeTeam).first<{ budget_usd: number }>();
+    const tb = await sdb.prepare(
+      'SELECT budget_usd FROM team_budgets WHERE {{ORG_SCOPE}} AND team = ?'
+    ).bind(scopeTeam).first<{ budget_usd: number }>();
     budgetUsd = tb?.budget_usd ?? 0;
     const org = await c.env.DB.prepare('SELECT plan FROM orgs WHERE id = ?')
       .bind(orgId).first<{ plan: string }>();
@@ -109,7 +175,6 @@ analytics.get('/summary', async (c) => {
   }
 
   const t = (totals.results[0] ?? {}) as Record<string, number>;
-  const s = (session.results[0] as Record<string, number>) ?? {};
   const budgetPct = budgetUsd > 0
     ? Math.round(((mtd?.mtd_cost_usd ?? 0) / budgetUsd) * 100)
     : null; // null = no budget set; 0 = budget set but 0% used
@@ -132,13 +197,13 @@ analytics.get('/summary', async (c) => {
     today_cost_usd:              t?.today_cost_usd   ?? 0,
     today_tokens:                t?.today_tokens     ?? 0,
     today_requests:              t?.today_requests   ?? 0,
-    last_event_at:               t?.last_event_at    ?? null,
+    last_event_at:               lastEventAt,
     // Aliases used by SDK privacy tests and cross-platform clients
     total_cost_usd:              t?.today_cost_usd   ?? 0,
     total_tokens:                t?.today_tokens     ?? 0,
     total_events:                t?.today_requests   ?? 0,
     mtd_cost_usd:                mtd?.mtd_cost_usd   ?? 0,
-    session_cost_usd:            s?.session_cost_usd ?? 0,
+    session_cost_usd:            session?.session_cost_usd ?? 0,
     budget_pct:                  budgetPct,
     budget_usd:                  budgetUsd,
     plan:                        orgPlan,
@@ -149,7 +214,8 @@ analytics.get('/summary', async (c) => {
     days_until_budget_exhausted: daysUntilBudgetExhausted,
   };
   if (!agentFilter) {
-    try { await c.env.KV.put(cacheKey, JSON.stringify(result), { expirationTtl: 300 }); } catch { /* best-effort */ }
+    // 2 min TTL (was 5 min) — rollup data is already aggregated, slightly fresher
+    try { await c.env.KV.put(cacheKey, JSON.stringify(result), { expirationTtl: 120 }); } catch { /* best-effort */ }
   }
   logAudit(c, { event_type: 'data_access', event_name: 'data_access.analytics', resource_type: 'analytics', metadata: { endpoint: '/v1/analytics/summary' } });
   return c.json(result);
@@ -174,12 +240,46 @@ analytics.get('/kpis', async (c) => {
     if (cached) return c.json(JSON.parse(cached));
   } catch { /* KV unavailable */ }
 
-  const row = await c.env.DB.prepare(`
+  const sdb = scopedDb(c.env.DB, orgId);
+  const rollupTeamClause = scopeTeam ? ' AND team = ?' : '';
+  const rollupTeamArgs   = scopeTeam ? [scopeTeam] : [];
+
+  // Privileged users: use rollup for aggregate counts + latency avg.
+  // Non-privileged: fall back to raw events (rollup has no developer_email).
+  // Quality scores (hallucination, faithfulness, etc.) always come from raw events.
+  let rollupRow: Record<string, number> | null = null;
+  let rawRow: Record<string, number> | null = null;
+
+  if (isPrivileged) {
+    rollupRow = await sdb.prepare(`
+      SELECT
+        COALESCE(SUM(cost_usd), 0)                              AS total_cost_usd,
+        COALESCE(SUM(total_tokens), 0)                          AS total_tokens,
+        COALESCE(SUM(requests), 0)                              AS total_requests,
+        CAST(SUM(latency_ms_sum) AS REAL) / NULLIF(SUM(requests), 0) AS avg_latency_ms,
+        COALESCE(SUM(prompt_tokens), 0)                         AS total_prompt_tokens,
+        COALESCE(SUM(cache_tokens), 0)                          AS cache_tokens_total,
+        COALESCE(SUM(cache_hits), 0)                            AS duplicate_calls
+      FROM events_daily_rollup WHERE {{ORG_SCOPE}} AND date_unix_day >= ?${rollupTeamClause}
+    `).bind(since, ...rollupTeamArgs).first<Record<string, number>>();
+  } else {
+    rawRow = await sdb.prepare(`
+      SELECT
+        COALESCE(SUM(cost_usd), 0)                   AS total_cost_usd,
+        COALESCE(SUM(total_tokens), 0)               AS total_tokens,
+        COALESCE(COUNT(*), 0)                        AS total_requests,
+        COALESCE(AVG(latency_ms), 0)                 AS avg_latency_ms,
+        COALESCE(SUM(prompt_tokens), 0)              AS total_prompt_tokens,
+        COALESCE(SUM(cache_tokens), 0)               AS cache_tokens_total,
+        COALESCE(SUM(CASE WHEN cache_hit=1 THEN 1 ELSE 0 END), 0) AS duplicate_calls,
+        COALESCE(SUM(CASE WHEN cache_hit=1 THEN cost_usd ELSE 0 END), 0) AS wasted_cost_usd
+      FROM events WHERE {{ORG_SCOPE}} AND created_at >= ?${clause}${devClause}
+    `).bind(since, ...args, ...devArgs).first<Record<string, number>>();
+  }
+
+  // Quality scores always from raw events (rollup has no score columns)
+  const qualityRow = await sdb.prepare(`
     SELECT
-      COALESCE(SUM(cost_usd), 0)                   AS total_cost_usd,
-      COALESCE(SUM(total_tokens), 0)               AS total_tokens,
-      COALESCE(COUNT(*), 0)                        AS total_requests,
-      COALESCE(AVG(latency_ms), 0)                 AS avg_latency_ms,
       AVG(efficiency_score)                        AS efficiency_score,
       AVG(hallucination_score)                     AS avg_hallucination_score,
       AVG(faithfulness_score)                      AS avg_faithfulness_score,
@@ -187,19 +287,25 @@ analytics.get('/kpis', async (c) => {
       AVG(toxicity_score)                          AS avg_toxicity_score,
       COUNT(CASE WHEN hallucination_score IS NOT NULL THEN 1 END) AS scored_events,
       COALESCE(SUM(CASE WHEN is_streaming=1 THEN 1 ELSE 0 END), 0) AS streaming_requests,
-      COALESCE(SUM(prompt_tokens), 0)              AS total_prompt_tokens,
-      COALESCE(SUM(cache_tokens), 0)               AS cache_tokens_total,
-      COALESCE(SUM(CASE WHEN cache_hit=1 THEN 1 ELSE 0 END), 0)        AS duplicate_calls,
       COALESCE(SUM(CASE WHEN cache_hit=1 THEN cost_usd ELSE 0 END), 0) AS wasted_cost_usd
-    FROM events WHERE org_id = ? AND created_at >= ?${clause}${devClause}
-  `).bind(orgId, since, ...args, ...devArgs).first<Record<string, number>>();
+    FROM events WHERE {{ORG_SCOPE}} AND created_at >= ?${clause}${devClause}
+  `).bind(since, ...args, ...devArgs).first<Record<string, number>>();
+
+  const row = rollupRow ?? rawRow;
 
   // Compute cache savings per model (rate varies by model, can't be done in SQL alone)
-  const { results: cacheByModel } = await c.env.DB.prepare(`
-    SELECT model, COALESCE(SUM(cache_tokens), 0) AS cache_tokens, COALESCE(SUM(total_tokens), 0) AS tokens
-    FROM events WHERE org_id = ? AND created_at >= ?${clause}${devClause}
-    GROUP BY model
-  `).bind(orgId, since, ...args, ...devArgs).all<{ model: string; cache_tokens: number; tokens: number }>();
+  // Use rollup for privileged users, raw events for members
+  const { results: cacheByModel } = isPrivileged
+    ? await sdb.prepare(`
+        SELECT model, COALESCE(SUM(cache_tokens), 0) AS cache_tokens, COALESCE(SUM(total_tokens), 0) AS tokens
+        FROM events_daily_rollup WHERE {{ORG_SCOPE}} AND date_unix_day >= ?${rollupTeamClause}
+        GROUP BY model
+      `).bind(since, ...rollupTeamArgs).all<{ model: string; cache_tokens: number; tokens: number }>()
+    : await sdb.prepare(`
+        SELECT model, COALESCE(SUM(cache_tokens), 0) AS cache_tokens, COALESCE(SUM(total_tokens), 0) AS tokens
+        FROM events WHERE {{ORG_SCOPE}} AND created_at >= ?${clause}${devClause}
+        GROUP BY model
+      `).bind(since, ...args, ...devArgs).all<{ model: string; cache_tokens: number; tokens: number }>();
 
   const totalCacheTokens  = (row?.cache_tokens_total ?? 0) as number;
   const totalPromptTokens = (row?.total_prompt_tokens ?? 0) as number;
@@ -207,28 +313,30 @@ analytics.get('/kpis', async (c) => {
   // cache_hit_rate_pct: cached input tokens as a % of total input tokens (prompt tokens only, not output)
   const cacheHitRatePct   = totalPromptTokens > 0 ? Math.round((totalCacheTokens / totalPromptTokens) * 1000) / 10 : 0;
 
+  const totalRequests = (row?.total_requests ?? 0) as number;
+
   const kpisResult = {
     total_cost_usd:           (row?.total_cost_usd ?? 0) as number,
     total_tokens:             (row?.total_tokens ?? 0) as number,
-    total_requests:           (row?.total_requests ?? 0) as number,
+    total_requests:           totalRequests,
     avg_latency_ms:           (row?.avg_latency_ms ?? 0) as number,
     // null when no events have been scored — never substitute a fake default
-    efficiency_score:         row?.efficiency_score != null ? (row.efficiency_score as number) : null,
-    streaming_requests:       (row?.streaming_requests ?? 0) as number,
+    efficiency_score:         qualityRow?.efficiency_score != null ? (qualityRow.efficiency_score as number) : null,
+    streaming_requests:       (qualityRow?.streaming_requests ?? 0) as number,
     cache_tokens_total:       totalCacheTokens,
     duplicate_calls:          (row?.duplicate_calls ?? 0) as number,
-    wasted_cost_usd:          Math.round(((row?.wasted_cost_usd ?? 0) as number) * 1e6) / 1e6,
+    wasted_cost_usd:          Math.round(((qualityRow?.wasted_cost_usd ?? 0) as number) * 1e6) / 1e6,
     cache_savings_usd:        Math.round(cacheSavingsUsd * 1e6) / 1e6,
     cache_hit_rate_pct:       cacheHitRatePct,
     // Quality score aggregates — null when no events have been scored yet
     quality: {
-      avg_hallucination_score: row?.avg_hallucination_score != null ? Math.round((row.avg_hallucination_score as number) * 1000) / 1000 : null,
-      avg_faithfulness_score:  row?.avg_faithfulness_score  != null ? Math.round((row.avg_faithfulness_score  as number) * 1000) / 1000 : null,
-      avg_relevancy_score:     row?.avg_relevancy_score     != null ? Math.round((row.avg_relevancy_score     as number) * 1000) / 1000 : null,
-      avg_toxicity_score:      row?.avg_toxicity_score      != null ? Math.round((row.avg_toxicity_score      as number) * 1000) / 1000 : null,
-      scored_events:           (row?.scored_events ?? 0) as number,
-      coverage_pct:            (row?.total_requests ?? 0) > 0
-        ? Math.round(((row?.scored_events ?? 0) as number) / ((row?.total_requests as number)) * 1000) / 10
+      avg_hallucination_score: qualityRow?.avg_hallucination_score != null ? Math.round((qualityRow.avg_hallucination_score as number) * 1000) / 1000 : null,
+      avg_faithfulness_score:  qualityRow?.avg_faithfulness_score  != null ? Math.round((qualityRow.avg_faithfulness_score  as number) * 1000) / 1000 : null,
+      avg_relevancy_score:     qualityRow?.avg_relevancy_score     != null ? Math.round((qualityRow.avg_relevancy_score     as number) * 1000) / 1000 : null,
+      avg_toxicity_score:      qualityRow?.avg_toxicity_score      != null ? Math.round((qualityRow.avg_toxicity_score      as number) * 1000) / 1000 : null,
+      scored_events:           (qualityRow?.scored_events ?? 0) as number,
+      coverage_pct:            totalRequests > 0
+        ? Math.round(((qualityRow?.scored_events ?? 0) as number) / totalRequests * 1000) / 10
         : 0,
     },
   };
@@ -248,7 +356,8 @@ analytics.get('/timeseries', async (c) => {
   // Align to UTC midnight: show today + previous (period-1) days = exactly `period` calendar days
   const todayMidnightMs = Math.floor(Date.now() / 86_400_000) * 86_400_000;
   const sinceMs = todayMidnightMs - (period - 1) * 86_400_000;
-  const since = new Date(sinceMs).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+  // sinceUnixDay: unix timestamp of the earliest day midnight we want
+  const sinceUnixDay = Math.floor(sinceMs / 1000);
   const teamClause = scopeTeam ? ' AND team = ?' : '';
   const teamArgs   = scopeTeam ? [scopeTeam] : [];
   const devClause = isPrivileged ? '' : ' AND developer_email = ?';
@@ -260,19 +369,40 @@ analytics.get('/timeseries', async (c) => {
     if (cached) return c.json(JSON.parse(cached));
   } catch { /* KV unavailable */ }
 
-  // cross_platform_usage.created_at is a TEXT datetime ('YYYY-MM-DD HH:MM:SS' UTC)
-  // DATE(created_at) extracts the UTC date string directly — no unixepoch needed.
-  const { results } = await c.env.DB.prepare(`
-    SELECT
-      DATE(created_at)                          AS date,
-      SUM(cost_usd)                             AS cost_usd,
-      SUM(input_tokens + output_tokens)         AS tokens,
-      COUNT(*)                                  AS requests
-    FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ?${teamClause}${devClause}
-    GROUP BY date
-    ORDER BY date ASC
-  `).bind(orgId, since, ...teamArgs, ...devArgs).all();
+  const sdb = scopedDb(c.env.DB, orgId);
+
+  // Privileged users: use rollup (events_daily_rollup.date_unix_day is INTEGER unix midnight).
+  // date_unix_day → ISO date string via date(date_unix_day, 'unixepoch').
+  // Non-privileged: fall back to raw events (rollup has no developer_email).
+  let results: unknown[];
+  if (isPrivileged) {
+    const { results: rollupResults } = await sdb.prepare(`
+      SELECT
+        date(date_unix_day, 'unixepoch')          AS date,
+        SUM(cost_usd)                             AS cost_usd,
+        SUM(total_tokens)                         AS tokens,
+        SUM(requests)                             AS requests
+      FROM events_daily_rollup
+      WHERE {{ORG_SCOPE}} AND date_unix_day >= ?${teamClause}
+      GROUP BY date_unix_day
+      ORDER BY date_unix_day ASC
+    `).bind(sinceUnixDay, ...teamArgs).all();
+    results = rollupResults;
+  } else {
+    // Raw events — created_at is INTEGER unixepoch
+    const { results: rawResults } = await sdb.prepare(`
+      SELECT
+        date(created_at, 'unixepoch')             AS date,
+        SUM(cost_usd)                             AS cost_usd,
+        SUM(total_tokens)                         AS tokens,
+        COUNT(*)                                  AS requests
+      FROM events
+      WHERE {{ORG_SCOPE}} AND created_at >= ?${teamClause}${devClause}
+      GROUP BY date
+      ORDER BY date ASC
+    `).bind(sinceUnixDay, ...teamArgs, ...devArgs).all();
+    results = rawResults;
+  }
 
   const tsResult = { period, series: results };
   try { await c.env.KV.put(tsCacheKey, JSON.stringify(tsResult), { expirationTtl: 300 }); } catch { /* best-effort */ }
@@ -290,27 +420,49 @@ analytics.get('/models', async (c) => {
   const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
   const limit  = Math.min(Math.max(parseInt(c.req.query('limit')  ?? '25', 10) || 25, 1), 200);
   const offset = Math.max(parseInt(c.req.query('offset') ?? '0', 10) || 0, 0);
-  const todayMidnightMs = Math.floor(Date.now() / 86_400_000) * 86_400_000;
-  const sinceMs = todayMidnightMs - (period - 1) * 86_400_000;
-  const since = new Date(sinceMs).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+  const sinceUnixDay = sinceUnix(period);
   const teamClause = scopeTeam ? ' AND team = ?' : '';
   const teamArgs   = scopeTeam ? [scopeTeam] : [];
+  const { clause, args } = teamScope(scopeTeam);
   const devClause = isPrivileged ? '' : ' AND developer_email = ?';
   const devArgs   = isPrivileged ? [] : [memberEmail];
 
-  const { results } = await c.env.DB.prepare(`
-    SELECT
-      model, provider,
-      SUM(cost_usd)                     AS cost_usd,
-      SUM(input_tokens + output_tokens) AS tokens,
-      COUNT(*)                          AS requests,
-      AVG(latency_ms)                   AS avg_latency_ms
-    FROM cross_platform_usage
-    WHERE org_id = ? AND created_at >= ?${teamClause}${devClause}
-    GROUP BY model, provider
-    ORDER BY cost_usd DESC
-    LIMIT ? OFFSET ?
-  `).bind(orgId, since, ...teamArgs, ...devArgs, limit, offset).all();
+  const sdb = scopedDb(c.env.DB, orgId);
+
+  // Privileged users: use rollup for model breakdown.
+  // Non-privileged: fall back to raw events (rollup has no developer_email).
+  let results: unknown[];
+  if (isPrivileged) {
+    const { results: rollupResults } = await sdb.prepare(`
+      SELECT
+        model, provider,
+        SUM(cost_usd)                                                       AS cost_usd,
+        SUM(total_tokens)                                                   AS tokens,
+        SUM(requests)                                                       AS requests,
+        CAST(SUM(latency_ms_sum) AS REAL) / NULLIF(SUM(requests), 0)       AS avg_latency_ms
+      FROM events_daily_rollup
+      WHERE {{ORG_SCOPE}} AND date_unix_day >= ?${teamClause}
+      GROUP BY model, provider
+      ORDER BY cost_usd DESC
+      LIMIT ? OFFSET ?
+    `).bind(sinceUnixDay, ...teamArgs, limit, offset).all();
+    results = rollupResults;
+  } else {
+    const { results: rawResults } = await sdb.prepare(`
+      SELECT
+        model, provider,
+        SUM(cost_usd)                     AS cost_usd,
+        SUM(total_tokens)                 AS tokens,
+        COUNT(*)                          AS requests,
+        AVG(latency_ms)                   AS avg_latency_ms
+      FROM events
+      WHERE {{ORG_SCOPE}} AND created_at >= ?${clause}${devClause}
+      GROUP BY model, provider
+      ORDER BY cost_usd DESC
+      LIMIT ? OFFSET ?
+    `).bind(sinceUnixDay, ...args, ...devArgs, limit, offset).all();
+    results = rawResults;
+  }
 
   logAudit(c, { event_type: 'data_access', event_name: 'data_access.analytics', resource_type: 'analytics', metadata: { endpoint: '/v1/analytics/models' } });
   return c.json({ models: results, limit, offset });
@@ -322,10 +474,44 @@ analytics.get('/models', async (c) => {
 analytics.get('/teams', async (c) => {
   const orgId     = c.get('orgId');
   const scopeTeam = c.get('scopeTeam');
+  const role      = c.get('role');
+  const isPrivileged = hasRole(role, 'admin');
   const { clause, args } = teamScope(scopeTeam);
   const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
   const since  = sinceUnix(period);
 
+  // Privileged users: use rollup for team breakdown (faster full-table aggregation).
+  // Non-privileged: fall back to raw events (rollup has no developer_email).
+  // Both paths join team_budgets + budget_policies for budget_usd/budget_pct.
+  // NOTE: This query joins r (rollup), team_budgets(b), budget_policies(bp) — all three
+  // tables have org_id. Using `r.org_id = ?` avoids ambiguity in the WHERE clause.
+  if (isPrivileged) {
+    const teamFilter = scopeTeam ? ' AND r.team = ?' : '';
+    const teamFilterArgs = scopeTeam ? [scopeTeam] : [];
+    const { results } = await c.env.DB.prepare(`
+      SELECT
+        COALESCE(r.team, 'unassigned') AS team,
+        SUM(r.cost_usd)                AS cost_usd,
+        SUM(r.total_tokens)            AS tokens,
+        SUM(r.requests)                AS requests,
+        COALESCE(b.budget_usd, bp.monthly_limit_usd, 0) AS budget_usd,
+        CASE WHEN COALESCE(b.budget_usd, bp.monthly_limit_usd, 0) > 0
+          THEN ROUND(SUM(r.cost_usd) / COALESCE(b.budget_usd, bp.monthly_limit_usd) * 100, 1)
+          ELSE NULL
+        END AS budget_pct
+      FROM events_daily_rollup r
+      LEFT JOIN team_budgets b ON b.org_id = r.org_id AND b.team = r.team
+      LEFT JOIN budget_policies bp ON bp.org_id = r.org_id AND bp.scope = 'team' AND bp.scope_target = r.team
+      WHERE r.org_id = ? AND r.date_unix_day >= ?${teamFilter}
+      GROUP BY r.team
+      ORDER BY cost_usd DESC
+      LIMIT 20
+    `).bind(orgId, since, ...teamFilterArgs).all();
+    return c.json({ teams: results });
+  }
+
+  // Non-privileged fallback: raw events
+  // NOTE: Joins events(e), team_budgets(b), budget_policies(bp) — keep `e.org_id = ?`
   const { results } = await c.env.DB.prepare(`
     SELECT
       COALESCE(e.team, 'unassigned') AS team,
@@ -358,8 +544,11 @@ analytics.get('/business-units', async (c) => {
   const sinceIso   = sinceText(period);  // cross_platform_usage = TEXT
   const sinceEvts  = sinceUnix(period);  // events               = INTEGER
 
-  // UNION events + cross_platform_usage for complete picture
-  const { results } = await c.env.DB.prepare(`
+  const sdb = scopedDb(c.env.DB, orgId);
+
+  // UNION events + cross_platform_usage for complete picture.
+  // Both sides of the UNION have {{ORG_SCOPE}} — wrapper injects orgId at both positions.
+  const { results } = await sdb.prepare(`
     WITH all_usage AS (
       SELECT
         COALESCE(business_unit, cost_center, 'unassigned') AS business_unit,
@@ -371,7 +560,7 @@ analytics.get('/business-units', async (c) => {
         commits,
         pull_requests
       FROM cross_platform_usage
-      WHERE org_id = ? AND created_at >= ?
+      WHERE {{ORG_SCOPE}} AND created_at >= ?
       UNION ALL
       SELECT
         COALESCE(business_unit, 'unassigned') AS business_unit,
@@ -383,7 +572,7 @@ analytics.get('/business-units', async (c) => {
         0 AS commits,
         0 AS pull_requests
       FROM events
-      WHERE org_id = ? AND created_at >= ? AND cost_usd > 0
+      WHERE {{ORG_SCOPE}} AND created_at >= ? AND cost_usd > 0
     )
     SELECT
       business_unit,
@@ -398,18 +587,18 @@ analytics.get('/business-units', async (c) => {
     GROUP BY business_unit
     ORDER BY cost_usd DESC
     LIMIT 50
-  `).bind(orgId, sinceIso, orgId, sinceEvts).all();
+  `).bind(sinceIso, sinceEvts).all();
 
-  // Per-business-unit team breakdown
-  const { results: byTeam } = await c.env.DB.prepare(`
+  // Per-business-unit team breakdown — both UNION sides have {{ORG_SCOPE}}.
+  const { results: byTeam } = await sdb.prepare(`
     WITH all_usage AS (
       SELECT COALESCE(business_unit, cost_center, 'unassigned') AS business_unit,
              team, provider, cost_usd
-      FROM cross_platform_usage WHERE org_id = ? AND created_at >= ?
+      FROM cross_platform_usage WHERE {{ORG_SCOPE}} AND created_at >= ?
       UNION ALL
       SELECT COALESCE(business_unit, 'unassigned') AS business_unit,
              team, model AS provider, cost_usd
-      FROM events WHERE org_id = ? AND created_at >= ? AND cost_usd > 0
+      FROM events WHERE {{ORG_SCOPE}} AND created_at >= ? AND cost_usd > 0
     )
     SELECT business_unit,
            COALESCE(team, 'unassigned') AS team,
@@ -419,7 +608,7 @@ analytics.get('/business-units', async (c) => {
     GROUP BY business_unit, team, provider
     ORDER BY cost_usd DESC
     LIMIT 200
-  `).bind(orgId, sinceIso, orgId, sinceEvts).all();
+  `).bind(sinceIso, sinceEvts).all();
 
   return c.json({ business_units: results, by_team_provider: byTeam, period_days: period });
 });
@@ -437,7 +626,9 @@ analytics.get('/traces', async (c) => {
   const period = Math.min(parseInt(c.req.query('period') ?? '1', 10) || 1, 30);
   const since  = sinceUnix(period);
 
-  const { results } = await c.env.DB.prepare(`
+  const sdb = scopedDb(c.env.DB, orgId);
+
+  const { results } = await sdb.prepare(`
     SELECT
       trace_id,
       MIN(agent_name)      AS name,
@@ -447,11 +638,11 @@ analytics.get('/traces', async (c) => {
       MAX(CASE WHEN parent_event_id IS NULL THEN 1 ELSE 0 END) AS has_root,
       MIN(created_at)      AS started_at
     FROM events
-    WHERE org_id = ? AND trace_id IS NOT NULL AND created_at >= ?${clause}${devClause}
+    WHERE {{ORG_SCOPE}} AND trace_id IS NOT NULL AND created_at >= ?${clause}${devClause}
     GROUP BY trace_id
     ORDER BY started_at DESC
     LIMIT 100
-  `).bind(orgId, since, ...args, ...devArgs).all();
+  `).bind(since, ...args, ...devArgs).all();
 
   return c.json({ traces: results });
 });
@@ -468,7 +659,9 @@ analytics.get('/traces/:traceId', async (c) => {
   const devClause = isPrivileged ? '' : ' AND developer_email = ?';
   const devArgs   = isPrivileged ? [] : [memberEmail];
 
-  const { results } = await c.env.DB.prepare(`
+  const sdb = scopedDb(c.env.DB, orgId);
+
+  const { results } = await sdb.prepare(`
     SELECT
       event_id          AS id,
       parent_event_id   AS parent_id,
@@ -484,9 +677,9 @@ analytics.get('/traces/:traceId', async (c) => {
       latency_ms,
       created_at
     FROM events
-    WHERE org_id = ? AND trace_id = ?${clause}${devClause}
+    WHERE {{ORG_SCOPE}} AND trace_id = ?${clause}${devClause}
     ORDER BY created_at ASC
-  `).bind(orgId, traceId, ...args, ...devArgs).all();
+  `).bind(traceId, ...args, ...devArgs).all();
 
   if (!results.length) return c.json({ error: 'trace not found' }, 404);
   return c.json({ trace_id: traceId, spans: results });
@@ -507,27 +700,29 @@ analytics.get('/today', async (c) => {
   const todayStr  = new Date().toISOString().split('T')[0] + ' 00:00:00';
   const todayUnix = Math.floor(Date.now() / 86_400_000) * 86_400;
 
+  const sdb = scopedDb(c.env.DB, orgId);
+
   const [evRows, cpuRows] = await Promise.all([
-    c.env.DB.prepare(`
+    sdb.prepare(`
       SELECT
         CAST(strftime('%H', created_at, 'unixepoch') AS INTEGER) AS hour,
         SUM(cost_usd)                        AS cost_usd,
         SUM(prompt_tokens + completion_tokens) AS tokens,
         COUNT(*)                             AS requests
       FROM events
-      WHERE org_id = ? AND created_at >= ?${teamClause}${devClause}
+      WHERE {{ORG_SCOPE}} AND created_at >= ?${teamClause}${devClause}
       GROUP BY hour
-    `).bind(orgId, todayUnix, ...teamArgs, ...devArgs).all<{ hour: number; cost_usd: number; tokens: number; requests: number }>(),
-    c.env.DB.prepare(`
+    `).bind(todayUnix, ...teamArgs, ...devArgs).all<{ hour: number; cost_usd: number; tokens: number; requests: number }>(),
+    sdb.prepare(`
       SELECT
         CAST(strftime('%H', created_at) AS INTEGER) AS hour,
         SUM(cost_usd)                               AS cost_usd,
         SUM(input_tokens + output_tokens)           AS tokens,
         COUNT(*)                                    AS requests
       FROM cross_platform_usage
-      WHERE org_id = ? AND created_at >= ?${teamClause}${devClause}
+      WHERE {{ORG_SCOPE}} AND created_at >= ?${teamClause}${devClause}
       GROUP BY hour
-    `).bind(orgId, todayStr, ...teamArgs, ...devArgs).all<{ hour: number; cost_usd: number; tokens: number; requests: number }>(),
+    `).bind(todayStr, ...teamArgs, ...devArgs).all<{ hour: number; cost_usd: number; tokens: number; requests: number }>(),
   ]);
 
   // Merge both sources by hour
@@ -561,13 +756,35 @@ analytics.get('/cost', async (c) => {
   const since  = sinceUnix(period);
   const today  = todayUnix();
 
+  const sdb = scopedDb(c.env.DB, orgId);
+
+  // Privileged users: use rollup.
+  // Non-privileged: fall back to raw events (rollup has no developer_email).
+  if (isPrivileged) {
+    const rollupTeamClause = scopeTeam ? ' AND team = ?' : '';
+    const rollupTeamArgs   = scopeTeam ? [scopeTeam] : [];
+    const [total, todayRow] = await c.env.DB.batch([
+      sdb.prepare(
+        `SELECT COALESCE(SUM(cost_usd),0) AS cost FROM events_daily_rollup WHERE {{ORG_SCOPE}} AND date_unix_day>=?${rollupTeamClause}`
+      ).bind(since, ...rollupTeamArgs),
+      sdb.prepare(
+        `SELECT COALESCE(SUM(cost_usd),0) AS cost FROM events_daily_rollup WHERE {{ORG_SCOPE}} AND date_unix_day=?${rollupTeamClause}`
+      ).bind(today, ...rollupTeamArgs),
+    ]);
+    return c.json({
+      total_cost_usd: (total.results[0] as Record<string, number>)?.cost ?? 0,
+      today_cost_usd: (todayRow.results[0] as Record<string, number>)?.cost ?? 0,
+      period_days:    period,
+    });
+  }
+
   const [total, todayRow] = await c.env.DB.batch([
-    c.env.DB.prepare(
-      `SELECT COALESCE(SUM(cost_usd),0) AS cost FROM events WHERE org_id=? AND created_at>=?${clause}${devClause}`
-    ).bind(orgId, since, ...args, ...devArgs),
-    c.env.DB.prepare(
-      `SELECT COALESCE(SUM(cost_usd),0) AS cost FROM events WHERE org_id=? AND created_at>=?${clause}${devClause}`
-    ).bind(orgId, today, ...args, ...devArgs),
+    sdb.prepare(
+      `SELECT COALESCE(SUM(cost_usd),0) AS cost FROM events WHERE {{ORG_SCOPE}} AND created_at>=?${clause}${devClause}`
+    ).bind(since, ...args, ...devArgs),
+    sdb.prepare(
+      `SELECT COALESCE(SUM(cost_usd),0) AS cost FROM events WHERE {{ORG_SCOPE}} AND created_at>=?${clause}${devClause}`
+    ).bind(today, ...args, ...devArgs),
   ]);
 
   return c.json({

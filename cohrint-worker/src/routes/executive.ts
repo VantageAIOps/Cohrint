@@ -16,6 +16,7 @@
 import { Hono } from 'hono';
 import type { Bindings, Variables } from '../types';
 import { authMiddleware, executiveOnly } from '../middleware/auth';
+import { createLogger } from '../lib/logger';
 
 const executive = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -234,7 +235,7 @@ executive.get('/', async (c) => {
         spend = row?.s ?? 0;
       }
     } catch (e) {
-      console.error('[cohrint] executive policy spend lookup failed', p.scope, p.scope_target, e);
+      createLogger(c.get('requestId'), orgId).error('executive policy spend lookup failed', { scope: p.scope, scope_target: p.scope_target, err: e instanceof Error ? e : new Error(String(e)) });
     }
     return {
       ...p,

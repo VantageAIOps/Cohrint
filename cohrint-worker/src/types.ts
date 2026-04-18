@@ -8,6 +8,10 @@ export type Bindings = {
   KV:  KVNamespace;
   AI:  Ai;
   VECTORIZE: VectorizeIndex;
+  METRICS?: AnalyticsEngineDataset;
+  INGEST_QUEUE?: Queue;  // Cloudflare Queue for async event ingest (T010)
+  INGEST_DLQ?:   Queue;  // Dead-letter queue for failed ingest messages
+  CACHE_BUCKET?: R2Bucket; // R2 for semantic cache responses + audit logs (T013/T014)
   // Env vars
   ENVIRONMENT:         string;
   ALLOWED_ORIGINS:     string;
@@ -32,6 +36,7 @@ export type AccountType = 'individual' | 'team' | 'organization';
 export type OrgRole = 'owner' | 'superadmin' | 'ceo' | 'admin' | 'member' | 'viewer';
 
 export type Variables = {
+  requestId:   string;        // UUID injected by corsMiddleware; echoed as X-Request-Id
   orgId:       string;
   role:        OrgRole;       // role hierarchy: owner > superadmin > ceo > admin > member > viewer
   accountType: AccountType;   // individual | team | organization

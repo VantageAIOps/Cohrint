@@ -16,6 +16,7 @@
  */
 
 import { sendSlackMessage } from '../routes/alerts';
+import { createLogger } from './logger';
 
 // ── Stats helpers ────────────────────────────────────────────────────────────
 
@@ -203,9 +204,9 @@ export async function runAnomalyDetection(
       const alreadySent = await kv.get(throttleKey);
       if (alreadySent) continue;
 
-      // Send Slack alert
+      // Send Slack alert — pass kv so circuit breaker can short-circuit on repeated failures
       const payload = formatAnomalyAlert(result);
-      const sent = await sendSlackMessage(cfg.slack_url, payload);
+      const sent = await sendSlackMessage(cfg.slack_url, payload, kv);
 
       if (sent) {
         alertsSent++;
@@ -222,7 +223,7 @@ export async function runAnomalyDetection(
         });
       }
     } catch (err) {
-      console.error(`[anomaly] Error checking org ${cfg.org_id}:`, err);
+      createLogger(crypto.randomUUID(), cfg.org_id).error('anomaly check failed', { err: err instanceof Error ? err : new Error(String(err)) });
     }
   }
 

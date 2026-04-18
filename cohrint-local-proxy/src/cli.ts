@@ -311,7 +311,8 @@ async function pushScanResults(
           sdk_language: "local-scanner",
         }),
       });
-      if (res.ok) {
+      // Accept 201 (sync) and 202 (async/queued via INGEST_QUEUE) as success
+      if (res.ok || res.status === 202) {
         newIds.push(...batch.map((e) => e.event_id));
         console.log(`  Batch ${Math.floor(i / 500) + 1}: ${batch.length} turns → ${res.status}`);
       } else {

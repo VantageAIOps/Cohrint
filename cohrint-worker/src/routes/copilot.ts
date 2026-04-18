@@ -23,6 +23,7 @@
 import { Hono } from 'hono';
 import type { Bindings, Variables } from '../types';
 import { authMiddleware, hasRole } from '../middleware/auth';
+import { withBreaker } from '../lib/circuit';
 
 const copilot = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -258,19 +259,23 @@ export async function syncCopilotMetricsForOrg(
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
 
   let metrics: CopilotDayMetric[];
-  try {
-    metrics = await fetchCopilotMetrics(githubOrg, token, thirtyDaysAgo);
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+  // Wrap GitHub API call with circuit breaker — null means breaker is open
+  const metricsResult = await withBreaker('copilot', env.KV, () => fetchCopilotMetrics(githubOrg, token, thirtyDaysAgo));
+  if (metricsResult === null) {
+    // Circuit open or fetch failed — record error and skip
+    const msg = 'GitHub Copilot API unavailable (circuit breaker open)';
     await env.DB.prepare(
       `UPDATE copilot_connections
        SET status = 'error', last_error = ?, updated_at = datetime('now')
        WHERE org_id = ? AND github_org = ?`,
-    ).bind(msg.slice(0, 500), orgId, githubOrg).run();
+    ).bind(msg, orgId, githubOrg).run();
     return { github_org: githubOrg, days_synced: 0, rows_upserted: 0, skipped: false, error: msg };
   }
+  metrics = metricsResult;
 
-  const seats      = await fetchCopilotSeats(githubOrg, token);
+  // fetchCopilotSeats is best-effort; circuit breaker prevents hammering on outage
+  const seatsResult = await withBreaker('copilot', env.KV, () => fetchCopilotSeats(githubOrg, token));
+  const seats      = seatsResult ?? [];
   const loginEmail = new Map<string, string>();
   for (const s of seats) {
     if (s.assignee.email) loginEmail.set(s.assignee.login, s.assignee.email);
@@ -337,13 +342,13 @@ export async function syncCopilotMetricsForOrg(
                 developer_id, developer_email,
                 model, cost_usd,
                 input_tokens, output_tokens, cached_tokens, total_requests,
-                period_start, period_end, raw_data, synced_at, created_at)
+                period_start, period_end, raw_data, synced_at, created_at, created_at_unix)
              VALUES
                (lower(hex(randomblob(16))), ?, 'github-copilot', 'coding_assistant', 'billing_api',
                 ?, ?,
                 ?, ?,
                 0, 0, 0, 1,
-                ?, ?, ?, datetime('now'), datetime('now'))`,
+                ?, ?, ?, datetime('now'), datetime('now'), CAST(strftime('%s', 'now') AS INTEGER))`,
           ).bind(
             orgId, developerId, email,
             modelName, costPerSeat,
@@ -367,13 +372,13 @@ export async function syncCopilotMetricsForOrg(
               developer_id, developer_email,
               model, cost_usd,
               input_tokens, output_tokens, cached_tokens, total_requests,
-              period_start, period_end, raw_data, synced_at, created_at)
+              period_start, period_end, raw_data, synced_at, created_at, created_at_unix)
            VALUES
              (lower(hex(randomblob(16))), ?, 'github-copilot', 'coding_assistant', 'billing_api',
               ?, NULL,
               ?, ?,
               0, 0, 0, ?,
-              ?, ?, ?, datetime('now'), datetime('now'))`,
+              ?, ?, ?, datetime('now'), datetime('now'), CAST(strftime('%s', 'now') AS INTEGER))`,
         ).bind(
           orgId, developerId,
           modelName, activeUsers * SEAT_USD_PER_DAY,
