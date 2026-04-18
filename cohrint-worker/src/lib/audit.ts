@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import type { Bindings, Variables } from '../types';
 import { createLogger } from './logger';
+import { R2Guard } from './r2-guard';
 
 export interface AuditEvent {
   event_type: 'auth' | 'data_access' | 'admin_action';
@@ -28,6 +29,7 @@ const INSERT_SQL = `
  */
 function writeAuditToR2(
   bucket: R2Bucket | undefined,
+  kv: KVNamespace | undefined,
   ctx: ExecutionContext,
   orgId: string,
   actorId: string,
@@ -36,7 +38,7 @@ function writeAuditToR2(
   event: AuditEvent,
   detail: string,
 ): void {
-  if (!bucket) return;
+  if (!bucket || !kv) return;
 
   // Build a time-sortable key using date + timestamp-derived suffix
   const now = new Date();
@@ -57,14 +59,25 @@ function writeAuditToR2(
     written_at: now.toISOString(),
   });
 
-  ctx.waitUntil(
-    bucket.put(r2Key, payload, {
-      httpMetadata: { contentType: 'application/json' },
-    }).catch((err: unknown) => {
+  ctx.waitUntil((async () => {
+    try {
+      const guard = new R2Guard(kv);
+      const bytes = new TextEncoder().encode(payload).length;
+      const allowed = await guard.canWrite(bytes);
+      if (!allowed) {
+        const log = createLogger('audit-r2', orgId);
+        log.warn('audit: R2 monthly free-tier limit reached — skipping R2 backup');
+        return;
+      }
+      await bucket.put(r2Key, payload, {
+        httpMetadata: { contentType: 'application/json' },
+      });
+      guard.recordWrite(ctx, bytes);
+    } catch (err) {
       const log = createLogger('audit-r2', orgId);
       log.warn('audit: R2 write failed (non-fatal)', { r2Key, err: err instanceof Error ? err : new Error(String(err)) });
-    }),
-  );
+    }
+  })());
 }
 
 // ── logAudit ──────────────────────────────────────────────────────────────────
@@ -109,7 +122,7 @@ export function logAudit(
   );
 
   // T014 — dual-write to R2 (non-fatal)
-  writeAuditToR2(c.env.CACHE_BUCKET, c.executionCtx, orgId, actorId, role, ip, event, detail);
+  writeAuditToR2(c.env.CACHE_BUCKET, c.env.KV, c.executionCtx, orgId, actorId, role, ip, event, detail);
 }
 
 // ── logAuditRaw ───────────────────────────────────────────────────────────────
@@ -128,6 +141,7 @@ export function logAuditRaw(
   actorRole: string,
   event: AuditEvent,
   bucket?: R2Bucket,
+  kv?: KVNamespace,
 ): void {
   const detail = JSON.stringify({
     ...(event.resource_id ? { resource_id: event.resource_id } : {}),
@@ -142,6 +156,6 @@ export function logAuditRaw(
       .catch(() => {}),
   );
 
-  // T014 — dual-write to R2 (non-fatal)
-  writeAuditToR2(bucket, ctx, orgId, actorId, actorRole, ip, event, detail);
+  // T014 — dual-write to R2 (non-fatal, guard requires KV)
+  writeAuditToR2(bucket, kv, ctx, orgId, actorId, actorRole, ip, event, detail);
 }

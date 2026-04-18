@@ -18,6 +18,7 @@ import { authMiddleware, adminOnly } from '../middleware/auth';
 import { createLogger } from '../lib/logger';
 import { emitMetric } from '../lib/metrics';
 import { scopedDb } from '../lib/db';
+import { R2Guard } from '../lib/r2-guard';
 
 const EMBEDDING_MODEL = '@cf/baai/bge-small-en-v1.5' as const;
 
@@ -191,15 +192,24 @@ cache.post('/store', async (c) => {
   let r2Key: string | null = null;
   const candidateR2Key = `cache/${orgId}/${id}`;
   if (c.env.CACHE_BUCKET) {
-    try {
-      await c.env.CACHE_BUCKET.put(candidateR2Key, body.response, {
-        httpMetadata: { contentType: 'text/plain' },
-      });
-      r2Key = candidateR2Key;
-    } catch (err) {
+    const guard = new R2Guard(c.env.KV);
+    const estimatedBytes = new TextEncoder().encode(body.response).length;
+    const allowed = await guard.canWrite(estimatedBytes);
+    if (!allowed) {
       const log = createLogger(c.get('requestId') ?? 'cache', orgId);
-      log.warn('cache: R2 put failed, storing response in D1 only', { err: err instanceof Error ? err : new Error(String(err)) });
-      // r2Key stays null — D1 response_text is the fallback
+      log.warn('cache: R2 monthly free-tier limit reached — storing response in D1 only');
+    } else {
+      try {
+        await c.env.CACHE_BUCKET.put(candidateR2Key, body.response, {
+          httpMetadata: { contentType: 'text/plain' },
+        });
+        r2Key = candidateR2Key;
+        guard.recordWrite(c.executionCtx, estimatedBytes);
+      } catch (err) {
+        const log = createLogger(c.get('requestId') ?? 'cache', orgId);
+        log.warn('cache: R2 put failed, storing response in D1 only', { err: err instanceof Error ? err : new Error(String(err)) });
+        // r2Key stays null — D1 response_text is the fallback
+      }
     }
   }
 

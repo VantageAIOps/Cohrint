@@ -1,6 +1,6 @@
 {
   "name": "cohrint",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "LLM cost tracking and AI API monitoring SDK for TypeScript and JavaScript — track OpenAI, Anthropic, Google and Mistral spending",
   "keywords": [
     "ai",
