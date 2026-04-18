@@ -290,7 +290,7 @@ document.getElementById('inp-email').addEventListener('keydown', e => {
   const autoKey = new URLSearchParams(window.location.search).get('api_key') || '';
   if (autoKey && (autoKey.startsWith('crt_') || autoKey.startsWith('vnt_'))) {
     document.getElementById('inp-key').value = autoKey;
-    setTimeout(doSignin, 100);
+    setTimeout(doSignIn, 100);
   }
 })();
 
