@@ -276,6 +276,110 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
 }
 #offlineBanner.visible { display: block; }
 
+/* ── Upgrade banner ── */
+#upgrade-banner {
+  display: none;
+  position: relative;
+  background: linear-gradient(90deg, rgba(52,211,153,.12), rgba(96,165,250,.08));
+  border-bottom: 1px solid rgba(52,211,153,.25);
+  padding: 9px 20px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+#upgrade-banner.visible { display: flex; }
+#upgrade-banner .upg-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent-green); flex-shrink: 0;
+  box-shadow: 0 0 6px var(--accent-green);
+  animation: pulse 2s infinite;
+}
+#upgrade-banner .upg-msg { flex: 1; }
+#upgrade-banner .upg-version {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--accent-green); font-weight: 600;
+}
+#upgrade-banner .upg-btn {
+  padding: 5px 14px; border-radius: 6px; cursor: pointer;
+  font-size: 12px; font-weight: 600; border: none;
+  background: var(--accent-green); color: #000;
+  transition: background .15s;
+}
+#upgrade-banner .upg-btn:hover { background: #10b981; }
+#upgrade-banner .upg-dismiss {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-muted); font-size: 16px; line-height: 1;
+  padding: 0 4px;
+}
+#upgrade-banner .upg-dismiss:hover { color: var(--text-secondary); }
+
+/* ── Upgrade modal ── */
+#upgrade-modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,.6);
+  display: none; align-items: center; justify-content: center;
+  z-index: 10000;
+}
+#upgrade-modal.visible { display: flex; }
+#upgrade-modal .upg-modal-card {
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 14px; width: 520px; max-width: calc(100vw - 32px);
+  max-height: 80vh; display: flex; flex-direction: column;
+  box-shadow: 0 24px 60px rgba(0,0,0,.4);
+}
+#upgrade-modal .upg-modal-head {
+  padding: 20px 24px 16px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+#upgrade-modal .upg-modal-title {
+  font-size: 16px; font-weight: 600; color: var(--text-primary);
+}
+#upgrade-modal .upg-modal-close {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-muted); font-size: 20px; line-height: 1;
+}
+#upgrade-modal .upg-modal-close:hover { color: var(--text-primary); }
+#upgrade-modal .upg-modal-body {
+  overflow-y: auto; padding: 20px 24px; flex: 1;
+}
+#upgrade-modal .upg-changelog { display: flex; flex-direction: column; gap: 14px; }
+#upgrade-modal .upg-entry { padding: 14px; border-radius: 8px; background: var(--bg-card); }
+#upgrade-modal .upg-entry-head {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 6px;
+}
+#upgrade-modal .upg-entry-version {
+  font-family: var(--font-mono); font-size: 13px; font-weight: 600;
+  color: var(--accent-green);
+}
+#upgrade-modal .upg-entry-date {
+  font-size: 11px; color: var(--text-muted);
+}
+#upgrade-modal .upg-entry-latest {
+  font-size: 10px; background: var(--accent-green-dim); color: var(--accent-green);
+  padding: 1px 7px; border-radius: 10px; font-weight: 600;
+}
+#upgrade-modal .upg-entry-summary {
+  font-size: 13px; color: var(--text-secondary); line-height: 1.5;
+}
+#upgrade-modal .upg-modal-foot {
+  padding: 16px 24px; border-top: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px; justify-content: flex-end;
+}
+#upgrade-modal .upg-confirm-btn {
+  padding: 8px 20px; border-radius: 8px; cursor: pointer;
+  font-size: 13px; font-weight: 600; border: none;
+  background: var(--accent-green); color: #000; transition: background .15s;
+}
+#upgrade-modal .upg-confirm-btn:hover { background: #10b981; }
+#upgrade-modal .upg-confirm-btn:disabled { opacity: .5; cursor: default; }
+#upgrade-modal .upg-cancel-btn {
+  padding: 8px 16px; border-radius: 8px; cursor: pointer;
+  font-size: 13px; border: 1px solid var(--border); background: none;
+  color: var(--text-secondary); transition: all .15s;
+}
+#upgrade-modal .upg-cancel-btn:hover { border-color: var(--border-active); color: var(--text-primary); }
+
 #theme-toggle {
   background: none; border: 1px solid var(--border); border-radius: 6px;
   padding: 4px 10px; cursor: pointer; font-size: 14px;
@@ -701,7 +805,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
       <div>
         <div class="logo-text">Cohrint</div>
       </div>
-      <div class="logo-badge">BETA</div>
+      <div class="logo-badge" id="logo-role-badge">BETA</div>
     </div>
 
     <div class="sidebar-section">
@@ -766,6 +870,13 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
   <div id="main" class="main">
     <!-- Demo banner (shown only for demo org session) -->
     <div id="demo-banner" style="display:none;background:#3b4ef8;color:#fff;font-size:12px;font-family:monospace;padding:8px 20px;text-align:center;letter-spacing:.02em;flex-shrink:0"></div>
+    <!-- Upgrade banner (shown when a newer version is available) -->
+    <div id="upgrade-banner">
+      <div class="upg-dot"></div>
+      <div class="upg-msg">New version available: <span id="upg-latest" class="upg-version"></span> — see what's new</div>
+      <button class="upg-btn" onclick="openUpgradeModal()">View &amp; Upgrade</button>
+      <button class="upg-dismiss" onclick="dismissUpgradeBanner()" title="Dismiss">&#xd7;</button>
+    </div>
     <!-- Top bar -->
     <div class="topbar">
       <div class="topbar-left">
@@ -1918,7 +2029,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
           </div>
           <div>
             <div id="opt-tokens-saved" style="font-size:36px;font-weight:700;color:#f472b6">—</div>
-            <div style="font-size:13px;color:var(--text-secondary)">tokens optimized</div>
+            <div id="opt-tokens-label" style="font-size:13px;color:var(--text-secondary)">tokens optimized</div>
           </div>
         </div>
         <div id="opt-badges" style="display:flex;gap:8px;flex-wrap:wrap"></div>
@@ -2312,6 +2423,17 @@ function applyRoleUI(role) {
   // Role badge on executive view
   var roleBadge = document.getElementById('exec-role-badge');
   if (roleBadge) roleBadge.textContent = role.toUpperCase();
+
+  // Logo role badge (replaces BETA)
+  var logoBadge = document.getElementById('logo-role-badge');
+  if (logoBadge) {
+    logoBadge.textContent = role.toUpperCase();
+    var roleColors = { owner: ['#a3e635','rgba(163,230,53,.15)'], admin: ['#38bdf8','rgba(56,189,248,.15)'], superadmin: ['#c084fc','rgba(192,132,252,.15)'], ceo: ['#f59e0b','rgba(245,158,11,.15)'], member: ['#34d399','rgba(52,211,153,.12)'] };
+    var rc = roleColors[role] || roleColors['member'];
+    logoBadge.style.color = rc[0];
+    logoBadge.style.background = rc[1];
+    logoBadge.style.borderColor = rc[0] + '40';
+  }
 
   // Settings tab: admin+ only
   var settingsBtn = document.getElementById('sb-settings');
@@ -5316,6 +5438,100 @@ document.addEventListener('click', function(e) {
    Init
    ═══════════════════════════════════════════════════════════════════════════ */
 
+// ── Version upgrade banner ────────────────────────────────────────────────────
+var _upgradeData = null;
+
+function checkUpgradeAvailable() {
+  var dismissed = sessionStorage.getItem('upgrade_dismissed');
+  apiFetch('/v1/admin/versions').then(function(data) {
+    _upgradeData = data;
+    if (!data.can_upgrade || dismissed === data.latest_version) return;
+    var el = document.getElementById('upg-latest');
+    if (el) el.textContent = data.latest_version;
+    var banner = document.getElementById('upgrade-banner');
+    if (banner) banner.classList.add('visible');
+  }).catch(function() {});
+}
+
+function dismissUpgradeBanner() {
+  if (_upgradeData) sessionStorage.setItem('upgrade_dismissed', _upgradeData.latest_version);
+  var banner = document.getElementById('upgrade-banner');
+  if (banner) banner.classList.remove('visible');
+}
+
+function _makeChangelogEntry(entry, latestVersion, currentVersion) {
+  var div = document.createElement('div');
+  div.className = 'upg-entry';
+
+  var head = document.createElement('div');
+  head.className = 'upg-entry-head';
+
+  var vspan = document.createElement('span');
+  vspan.className = 'upg-entry-version';
+  vspan.textContent = entry.version;
+  head.appendChild(vspan);
+
+  if (entry.version === latestVersion) {
+    var badge = document.createElement('span');
+    badge.className = 'upg-entry-latest';
+    badge.textContent = 'LATEST';
+    head.appendChild(badge);
+  } else if (entry.version === currentVersion) {
+    var here = document.createElement('span');
+    here.style.cssText = 'font-size:10px;color:var(--text-muted)';
+    here.textContent = 'YOU ARE HERE';
+    head.appendChild(here);
+  }
+
+  var date = document.createElement('span');
+  date.className = 'upg-entry-date';
+  date.textContent = entry.date;
+  head.appendChild(date);
+
+  var summary = document.createElement('div');
+  summary.className = 'upg-entry-summary';
+  summary.textContent = entry.summary;
+
+  div.appendChild(head);
+  div.appendChild(summary);
+  return div;
+}
+
+function openUpgradeModal() {
+  if (!_upgradeData) return;
+  var list = document.getElementById('upg-changelog-list');
+  if (list) {
+    while (list.firstChild) list.removeChild(list.firstChild);
+    (_upgradeData.changelog || []).forEach(function(entry) {
+      list.appendChild(_makeChangelogEntry(entry, _upgradeData.latest_version, _upgradeData.current_version));
+    });
+  }
+  var btn = document.getElementById('upg-confirm-btn');
+  if (btn) { btn.disabled = false; btn.textContent = 'Upgrade to ' + _upgradeData.latest_version; }
+  document.getElementById('upgrade-modal').classList.add('visible');
+}
+
+function closeUpgradeModal() {
+  document.getElementById('upgrade-modal').classList.remove('visible');
+}
+
+function confirmUpgrade() {
+  var btn = document.getElementById('upg-confirm-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Upgrading\u2026'; }
+  apiFetch('/v1/admin/versions/upgrade', { method: 'POST' }).then(function(data) {
+    if (btn) btn.textContent = '\u2713 Upgraded to ' + data.version;
+    dismissUpgradeBanner();
+    setTimeout(closeUpgradeModal, 800);
+    if (_upgradeData) _upgradeData.can_upgrade = false;
+  }).catch(function() {
+    if (btn) { btn.disabled = false; btn.textContent = 'Retry upgrade'; }
+  });
+}
+
+document.getElementById('upgrade-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeUpgradeModal();
+});
+
 (function init() {
   // Apply theme toggle label
   var theme = (typeof cohrintTheme !== 'undefined') ? cohrintTheme.get() : 'dark';
@@ -5331,6 +5547,7 @@ document.addEventListener('click', function(e) {
     if (!ok) return;
     loadConnectedTools();
     loadOverview();
+    checkUpgradeAvailable();
   });
 })();
 
@@ -5452,10 +5669,13 @@ function loadOptimization() {
       document.getElementById('opt-period').textContent = data.period || '';
       document.getElementById('opt-avg-factor').textContent = data.avg_improvement_factor.toFixed(1) + 'x';
       document.getElementById('opt-total-saved').textContent = '$' + (data.total_cost_saved_usd || 0).toFixed(2);
-      var t = data.total_tokens_saved || 0;
+      var usingCacheTokens = !data.total_tokens_saved && data.total_cache_tokens > 0;
+      var t = data.total_tokens_saved || data.total_cache_tokens || 0;
       document.getElementById('opt-tokens-saved').textContent =
         t >= 1000000 ? (t / 1000000).toFixed(1) + 'M' :
         t >= 1000   ? (t / 1000).toFixed(0) + 'K' : String(t);
+      var tokensLabel = document.getElementById('opt-tokens-label');
+      if (tokensLabel) tokensLabel.textContent = usingCacheTokens ? 'tokens cached' : 'tokens optimized';
 
       // Badges — only numeric data, no user strings
       var badges = document.getElementById('opt-badges');
@@ -5645,6 +5865,23 @@ function loadOptimization() {
   document.addEventListener('click', hideTip);
 })();
 </script>
+  <!-- Upgrade modal -->
+  <div id="upgrade-modal">
+    <div class="upg-modal-card">
+      <div class="upg-modal-head">
+        <div class="upg-modal-title">What's new in Cohrint</div>
+        <button class="upg-modal-close" onclick="closeUpgradeModal()">&#xd7;</button>
+      </div>
+      <div class="upg-modal-body">
+        <div class="upg-changelog" id="upg-changelog-list"></div>
+      </div>
+      <div class="upg-modal-foot">
+        <button class="upg-cancel-btn" onclick="closeUpgradeModal()">Maybe later</button>
+        <button class="upg-confirm-btn" id="upg-confirm-btn" onclick="confirmUpgrade()">Upgrade to <span id="upg-confirm-version"></span></button>
+      </div>
+    </div>
+  </div>
+
   <link rel="stylesheet" href="/widget/chatbot.css">
   <script>window.COHRINT_CHATBOT_URL = "https://cohrint-chatbot.aman-lpucse.workers.dev"; window.VEGA_CHATBOT_URL = window.COHRINT_CHATBOT_URL;</script>
   <script src="/widget/chatbot.js"></script>

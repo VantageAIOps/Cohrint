@@ -87,6 +87,16 @@ max_batch_size     = 50
 max_batch_timeout  = 10
 max_retries        = 1
 
+# ── Staging environment (main branch → main.cohrint.com) ─────────────────────
+# Deploy: wrangler deploy --env staging
+# To expose on api-staging.cohrint.com, add a custom domain in Cloudflare dashboard
+# and configure DNS before enabling [[env.staging.routes]].
+[env.staging]
+name = "cohrint-api-staging"
+[env.staging.vars]
+ENVIRONMENT     = "staging"
+ALLOWED_ORIGINS = "https://main.cohrint.com,https://*.cohrint.pages.dev,http://localhost:*"
+
 # ── Preview environment ───────────────────────────────────────────────────────
 [env.preview]
 name = "cohrint-api-preview"

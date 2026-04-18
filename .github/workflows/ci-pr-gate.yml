@@ -18,7 +18,7 @@ env:
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, production]
     types: [opened, synchronize, reopened]
     # Skip for docs-only PRs — no backend/frontend code changed, no gate needed.
     paths-ignore:

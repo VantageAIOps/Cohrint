@@ -6,16 +6,23 @@ env:
 on:
   push:
     branches:
-      - main
+      - main        # → staging worker (cohrint-api-staging)
+      - production  # → production worker (cohrint-api, api.cohrint.com)
     paths:
       - 'cohrint-worker/**'
       - '.github/workflows/deploy-worker.yml'
-  workflow_dispatch:  # manual trigger from GitHub Actions UI
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: false
+        default: 'production'
+        type: choice
+        options: [production, staging]
 
-# Only one worker deploy at a time. Rapid merges would otherwise queue two
-# deploys that both run to completion, doubling billed minutes.
+# Only one worker deploy per environment at a time.
 concurrency:
-  group: deploy-worker
+  group: deploy-worker-${{ github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -63,16 +70,40 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Determine target environment
+        id: env
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_ENV: ${{ inputs.environment }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            TARGET="${INPUT_ENV:-production}"
+          elif [ "$REF_NAME" = "production" ]; then
+            TARGET="production"
+          else
+            TARGET="staging"
+          fi
+          echo "target=${TARGET}" >> $GITHUB_OUTPUT
+          echo "Deploying to: ${TARGET}"
+
       - name: Deploy Worker (with retry)
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DEPLOY_TARGET: ${{ steps.env.outputs.target }}
         run: |
+          if [ "$DEPLOY_TARGET" = "production" ]; then
+            DEPLOY_CMD="npm run deploy"
+          else
+            DEPLOY_CMD="npx wrangler deploy --env staging"
+          fi
+
           MAX_ATTEMPTS=4
           DELAY=30
           for attempt in $(seq 1 $MAX_ATTEMPTS); do
-            echo "▶ Deploy attempt $attempt / $MAX_ATTEMPTS"
-            if npm run deploy; then
+            echo "▶ Deploy attempt $attempt / $MAX_ATTEMPTS (${DEPLOY_TARGET})"
+            if eval "$DEPLOY_CMD"; then
               echo "✅ Worker deploy succeeded on attempt $attempt"
               exit 0
             fi
@@ -86,9 +117,17 @@ jobs:
           exit 1
 
       - name: Confirm deployment
-        run: echo "✅ cohrint-api deployed — https://api.cohrint.com"
+        env:
+          DEPLOY_TARGET: ${{ steps.env.outputs.target }}
+        run: |
+          if [ "$DEPLOY_TARGET" = "production" ]; then
+            echo "✅ cohrint-api deployed — https://api.cohrint.com"
+          else
+            echo "✅ cohrint-api-staging deployed"
+          fi
 
-      - name: Verify API health post-deploy
+      - name: Verify API health post-deploy (production only)
+        if: steps.env.outputs.target == 'production'
         run: |
           sleep 20
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
