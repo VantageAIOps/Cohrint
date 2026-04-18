@@ -72,6 +72,8 @@
  *   GET  /v1/prompts/:id/versions/:vid  (auth — full version content)
  *   POST /v1/prompts/usage              (auth — attribute event to version)
  *   GET  /v1/prompts/analytics/comparison (auth — cost delta across versions)
+ *   GET  /v1/admin/versions               (admin — current + latest version, changelog)
+ *   POST /v1/admin/versions/upgrade       (admin — opt-in upgrade to latest version)
  *
  * Cron Triggers:
  *   Every 10 min  — anomaly detection (Z-score cost spike alerts)
@@ -102,6 +104,7 @@ import { executive } from './routes/executive';
 import { teams }     from './routes/teams';
 import { cache }     from './routes/cache';
 import { prompts }   from './routes/prompts';
+import { versions }  from './routes/versions';
 import { runAnomalyDetection } from './lib/anomaly';
 import { createLogger } from './lib/logger';
 import { acquireLock } from './lib/cron-lock';
@@ -130,6 +133,7 @@ app.route('/v1/events',     events);
 app.route('/v1/analytics',  analytics);
 app.route('/v1/stream',     stream);
 app.route('/v1/alerts',     alerts);
+app.route('/v1/admin/versions',     versions);   // more-specific prefix first — avoids admin shadowing
 app.route('/v1/admin',      admin);
 app.route('/v1/superadmin', superadmin);
 app.route('/v1/platform',   platform);
