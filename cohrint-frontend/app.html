@@ -1175,8 +1175,8 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
           <h2 style="margin:0;font-size:18px;">Agent Traces</h2>
           <select id="tracesPeriodSel" onchange="loadTraces()" style="background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);padding:6px 10px;border-radius:6px;cursor:pointer;">
             <option value="1">Today</option>
-            <option value="7" selected>Last 7 days</option>
-            <option value="30">Last 30 days</option>
+            <option value="7">Last 7 days</option>
+            <option value="30" selected>Last 30 days</option>
           </select>
         </div>
         <div id="tracesTable" style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
@@ -4779,7 +4779,7 @@ function _silentAuditRefresh() {
   var type = document.getElementById('auditTypeFilter').value;
   var from = document.getElementById('auditDateFrom').value;
   var to   = document.getElementById('auditDateTo').value;
-  var qs = '?limit=' + auditLimit + '&offset=0';
+  var qs = '?limit=' + auditLimit + '&offset=0&_t=' + Date.now();
   if (type) qs += '&event_type=' + encodeURIComponent(type);
   if (from) qs += '&from=' + encodeURIComponent(from);
   if (to)   qs += '&to=' + encodeURIComponent(to);
@@ -4802,7 +4802,7 @@ function fetchAuditPage() {
   var type = document.getElementById('auditTypeFilter').value;
   var from = document.getElementById('auditDateFrom').value;
   var to   = document.getElementById('auditDateTo').value;
-  var qs   = '?limit=' + auditLimit + '&offset=' + auditOffset;
+  var qs   = '?limit=' + auditLimit + '&offset=' + auditOffset + '&_t=' + Date.now();
   if (type) qs += '&event_type=' + encodeURIComponent(type);
   if (from) qs += '&from='       + encodeURIComponent(from);
   if (to)   qs += '&to='         + encodeURIComponent(to);
@@ -5562,12 +5562,30 @@ document.addEventListener('DOMContentLoaded', function() {
 
   document.getElementById('settingsApiBase').value = API_BASE;
 
-  initKeyAuth().then(function(ok) {
-    if (!ok) return;
-    loadConnectedTools();
-    loadOverview();
-    checkUpgradeAvailable();
-  });
+  function _bootApp() {
+    initKeyAuth().then(function(ok) {
+      if (!ok) return;
+      loadConnectedTools();
+      loadOverview();
+      checkUpgradeAvailable();
+    });
+  }
+
+  // If ?api_key= is present, create a fresh session with that key before
+  // loading the app — otherwise the existing personal session cookie wins.
+  var _urlKey = new URLSearchParams(window.location.search).get('api_key') || '';
+  if (_urlKey && (_urlKey.startsWith('crt_') || _urlKey.startsWith('vnt_'))) {
+    var _cleanUrl = new URL(window.location.href);
+    _cleanUrl.searchParams.delete('api_key');
+    window.history.replaceState({}, '', _cleanUrl.toString());
+    fetch(API_BASE + '/v1/auth/session', {
+      method: 'POST', credentials: 'include',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({api_key: _urlKey})
+    }).then(function() { _bootApp(); }).catch(function() { _bootApp(); });
+  } else {
+    _bootApp();
+  }
 })();
 
 // Close modals on overlay click or Escape key
