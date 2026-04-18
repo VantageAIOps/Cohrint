@@ -496,6 +496,42 @@ nav.scrolled{background:rgba(8,12,15,.97);box-shadow:0 1px 0 rgba(255,255,255,.0
 
 /* CTA GLOW 2 */
 .cta-glow-2{left:30%;top:30%;background:radial-gradient(ellipse,rgba(0,152,255,.06) 0%,transparent 70%);width:400px;height:200px;animation:auroraFloat 7s ease-in-out infinite 2s}
+
+/* 1. PARTICLE NETWORK CANVAS */
+#hero-canvas{position:absolute;inset:0;z-index:0;pointer-events:none;width:100%;height:100%}
+
+/* 2. SCAN LINE */
+.hero-scan{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:1}
+.hero-scan::after{content:'';position:absolute;left:0;right:0;height:120px;background:linear-gradient(180deg,transparent,rgba(0,212,161,.03) 50%,transparent);top:-120px;animation:scanLine 7s ease-in-out infinite}
+@keyframes scanLine{0%{top:-120px;opacity:0}10%{opacity:1}90%{opacity:1}100%{top:100%;opacity:0}}
+
+/* 3. RADAR PULSE RINGS */
+.nav-logo{position:relative}
+.logo-dot{position:relative;z-index:1}
+.logo-dot::before,.logo-dot::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:1px solid rgba(0,212,161,.5);animation:radarRing 2.8s ease-out infinite;pointer-events:none}
+.logo-dot::after{animation-delay:1.4s}
+@keyframes radarRing{0%{transform:scale(1);opacity:.6}100%{transform:scale(4);opacity:0}}
+
+/* 4. SPOTLIGHT GLOW ON CARDS */
+.feat-card::before{content:'';position:absolute;inset:0;border-radius:inherit;background:radial-gradient(280px circle at var(--mx,-999px) var(--my,-999px),rgba(0,212,161,.07),transparent 60%);pointer-events:none;z-index:0;opacity:0;transition:opacity .3s}
+.feat-card:hover::before{opacity:1}
+.int-card::before{content:'';position:absolute;inset:0;border-radius:inherit;background:radial-gradient(200px circle at var(--mx,-999px) var(--my,-999px),rgba(0,212,161,.07),transparent 60%);pointer-events:none;z-index:0;opacity:0;transition:opacity .3s;overflow:hidden}
+.int-card:hover::before{opacity:1}
+.int-card{position:relative;overflow:hidden}
+
+/* 6. NEON PULSING GLOW ON FEATURED PLAN */
+@keyframes neonPulse{0%,100%{box-shadow:0 0 0 1px rgba(0,212,161,.5),0 0 24px rgba(0,212,161,.15),0 0 48px rgba(0,212,161,.06),inset 0 0 24px rgba(0,212,161,.03)}50%{box-shadow:0 0 0 1px rgba(56,189,248,.5),0 0 32px rgba(56,189,248,.2),0 0 64px rgba(56,189,248,.08),inset 0 0 24px rgba(56,189,248,.04)}}
+.plan.featured{animation:neonPulse 2.5s ease-in-out infinite}
+
+/* 7. GLITCH FLASH ON SECTION TITLE HOVER */
+@keyframes glitchFlash{0%,100%{filter:none;transform:none}15%{filter:hue-rotate(90deg) saturate(3);transform:skewX(-2deg) translate(2px,0)}30%{filter:none;transform:translate(-1px,0)}50%{filter:hue-rotate(-60deg) saturate(2);transform:skewX(1deg)}65%{filter:none;transform:none}80%{filter:hue-rotate(30deg);transform:translate(1px,-1px)}100%{filter:none;transform:none}}
+.sec-title:hover{animation:glitchFlash .35s steps(1) 1;cursor:default}
+
+/* 8. STATS STRIP NEON SWEEP */
+.stats-strip{position:relative;overflow:hidden}
+.stats-strip::after{content:'';position:absolute;top:0;left:-100%;width:40%;height:100%;background:linear-gradient(90deg,transparent,rgba(0,212,161,.04),transparent);animation:statsSweep 4.5s ease-in-out infinite;pointer-events:none}
+@keyframes statsSweep{0%{left:-40%}100%{left:140%}}
+.stat-num{text-shadow:0 0 30px rgba(0,212,161,.25)}
 </style>
 </head>
 <body>
@@ -531,7 +567,9 @@ nav.scrolled{background:rgba(8,12,15,.97);box-shadow:0 1px 0 rgba(255,255,255,.0
 
 <!-- HERO -->
 <div class="hero">
+  <canvas id="hero-canvas"></canvas>
   <div class="hero-aurora"><div class="aurora-orb aurora-orb-1"></div><div class="aurora-orb aurora-orb-2"></div><div class="aurora-orb aurora-orb-3"></div></div>
+  <div class="hero-scan"></div>
   <div class="hero-grid"></div>
   <div class="hero-glow"></div>
   <div class="hero-badge">AI Spend Intelligence for Engineering Teams</div>
@@ -1429,6 +1467,57 @@ if ('serviceWorker' in navigator) {
       navEl.classList.remove('scrolled');
     }
   }, { passive: true });
+})();
+
+// ── Spotlight cards ───────────────────────────────────────────────────────────
+document.querySelectorAll('.feat-card,.int-card').forEach(function(c){
+  c.addEventListener('mousemove',function(e){
+    var r=c.getBoundingClientRect();
+    c.style.setProperty('--mx',(e.clientX-r.left)+'px');
+    c.style.setProperty('--my',(e.clientY-r.top)+'px');
+  });
+});
+
+// ── 3D card tilt ─────────────────────────────────────────────────────────────
+document.querySelectorAll('.feat-card,.int-card').forEach(function(c){
+  c.addEventListener('mousemove',function(e){
+    var r=c.getBoundingClientRect();
+    var x=(e.clientX-r.left)/r.width-.5;
+    var y=(e.clientY-r.top)/r.height-.5;
+    c.style.transform='perspective(700px) rotateY('+(x*7)+'deg) rotateX('+(-y*7)+'deg) scale(1.02)';
+  });
+  c.addEventListener('mouseleave',function(){c.style.transform='';});
+});
+
+// ── Particle network ──────────────────────────────────────────────────────────
+(function(){
+  var canvas=document.getElementById('hero-canvas');
+  if(!canvas)return;
+  var ctx=canvas.getContext('2d');
+  var hero=canvas.closest('.hero')||canvas.parentElement;
+  var pts=[];
+  var N=55,DIST=130;
+  function resize(){canvas.width=hero.offsetWidth;canvas.height=hero.offsetHeight}
+  resize();
+  window.addEventListener('resize',resize,{passive:true});
+  for(var i=0;i<N;i++) pts.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,vx:(Math.random()-.5)*.35,vy:(Math.random()-.5)*.35,r:Math.random()*1.2+.4,o:Math.random()*.35+.08});
+  function frame(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    for(var i=0;i<pts.length;i++){
+      for(var j=i+1;j<pts.length;j++){
+        var dx=pts[i].x-pts[j].x,dy=pts[i].y-pts[j].y,d=Math.sqrt(dx*dx+dy*dy);
+        if(d<DIST){ctx.strokeStyle='rgba(0,212,161,'+((.13*(1-d/DIST)).toFixed(3))+')';ctx.lineWidth=.6;ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.lineTo(pts[j].x,pts[j].y);ctx.stroke();}
+      }
+    }
+    pts.forEach(function(p){
+      ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle='rgba(0,212,161,'+p.o+')';ctx.fill();
+      p.x+=p.vx;p.y+=p.vy;
+      if(p.x<0||p.x>canvas.width)p.vx*=-1;
+      if(p.y<0||p.y>canvas.height)p.vy*=-1;
+    });
+    requestAnimationFrame(frame);
+  }
+  frame();
 })();
 </script>
 </body>
