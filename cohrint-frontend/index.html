@@ -454,9 +454,52 @@ footer a:hover{color:var(--text)}
 }
 [data-theme="light"] #card-insight-tip strong{color:#4f46e5}
 [data-theme="light"] #card-insight-tip p{color:rgba(0,0,0,.7)}
+
+/* SCROLL PROGRESS BAR */
+#scroll-progress{position:fixed;top:0;left:0;width:0;height:2px;background:linear-gradient(90deg,#00d4a1,#0098ff);z-index:9999;pointer-events:none;transition:width .1s linear}
+
+/* NAV SCROLLED */
+nav.scrolled{background:rgba(8,12,15,.97);box-shadow:0 1px 0 rgba(255,255,255,.07)}
+
+/* AURORA ORBS */
+.hero-aurora{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0}
+@keyframes auroraFloat{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(30px,-20px) scale(1.05)}66%{transform:translate(-20px,15px) scale(.97)}}
+.aurora-orb{position:absolute;border-radius:50%;filter:blur(80px);opacity:.12}
+.aurora-orb-1{width:560px;height:320px;background:#00d4a1;top:10%;left:15%;animation:auroraFloat 8s ease-in-out infinite}
+.aurora-orb-2{width:480px;height:280px;background:#0098ff;top:20%;right:10%;animation:auroraFloat 10s ease-in-out infinite 3s}
+.aurora-orb-3{width:420px;height:260px;background:#a78bfa;bottom:15%;left:35%;animation:auroraFloat 12s ease-in-out infinite 5s}
+
+/* HERO BADGE SHIMMER */
+.hero-badge{overflow:hidden;position:relative}
+.hero-badge::after{content:'';position:absolute;top:0;left:-120%;width:60%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent);animation:badgeShimmer 3s ease-in-out infinite}
+@keyframes badgeShimmer{0%{left:-120%}60%,100%{left:150%}}
+
+/* HERO EM GRADIENT TEXT */
+@keyframes gradientShift{0%,100%{background-position:0%}50%{background-position:100%}}
+.hero h1 em{background:linear-gradient(90deg,#00d4a1,#38bdf8,#00d4a1);background-size:200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:gradientShift 4s ease infinite;font-style:italic}
+
+/* SECTION TITLE EM */
+.sec-title em{font-style:italic;color:transparent;background:linear-gradient(135deg,var(--accent),#38bdf8);background-clip:text;-webkit-background-clip:text}
+
+/* FLOATING STAT PILLS */
+@keyframes floatPill{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.hero-float-stat{position:absolute;bottom:80px;background:rgba(13,19,24,.9);border:1px solid rgba(0,212,161,.25);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-radius:100px;padding:8px 18px;font-family:var(--mono);font-size:12px;color:var(--accent);white-space:nowrap;pointer-events:none}
+.hero-float-stat-1{left:60px;animation:floatPill 4s ease-in-out infinite}
+.hero-float-stat-2{right:60px;animation:floatPill 5s ease-in-out infinite 1.2s}
+@media(max-width:768px){.hero-float-stat{display:none}}
+
+/* FEATURE CARD GLOW HOVER */
+.feat-card:hover{background:var(--bg3);box-shadow:0 0 0 1px rgba(0,212,161,.2),0 8px 32px rgba(0,212,161,.06)}
+
+/* INTEGRATION CARD GLOW HOVER */
+.int-card:hover{border-color:var(--border2);background:var(--bg3);box-shadow:0 0 0 1px rgba(0,212,161,.2),0 4px 16px rgba(0,212,161,.06)}
+
+/* CTA GLOW 2 */
+.cta-glow-2{left:30%;top:30%;background:radial-gradient(ellipse,rgba(0,152,255,.06) 0%,transparent 70%);width:400px;height:200px;animation:auroraFloat 7s ease-in-out infinite 2s}
 </style>
 </head>
 <body>
+<div id="scroll-progress"></div>
 
 <nav>
   <a href="#" class="nav-logo"><span class="logo-dot"></span>COHRINT</a>
@@ -488,6 +531,7 @@ footer a:hover{color:var(--text)}
 
 <!-- HERO -->
 <div class="hero">
+  <div class="hero-aurora"><div class="aurora-orb aurora-orb-1"></div><div class="aurora-orb aurora-orb-2"></div><div class="aurora-orb aurora-orb-3"></div></div>
   <div class="hero-grid"></div>
   <div class="hero-glow"></div>
   <div class="hero-badge">AI Spend Intelligence for Engineering Teams</div>
@@ -518,6 +562,8 @@ footer a:hover{color:var(--text)}
     <button class="copy-btn" onclick="copyInstall('npx cohrint-cli', this)">copy</button>
   </div>
   <p style="font-size:11px;color:var(--dim);margin-top:12px;font-family:var(--mono);animation:fadeUp .7s .5s ease both">↗ Open source · Free forever · No credit card</p>
+  <div class="hero-float-stat hero-float-stat-1">40% avg tokens saved</div>
+  <div class="hero-float-stat hero-float-stat-2">$4,821 MTD tracked</div>
 </div>
 
 <!-- TICKER -->
@@ -1015,6 +1061,7 @@ response = client.chat.completions.<span class="c-func">create</span>(
 <!-- CTA -->
 <div class="cta-section">
   <div class="cta-glow"></div>
+  <div class="cta-glow cta-glow-2"></div>
   <h2>Stop guessing.<br>Start <em>measuring.</em></h2>
   <p class="cta-mono">// one line of code · full visibility in 60 seconds · free forever</p>
   <a href="/signup.html" class="btn-primary" style="font-size:14px;padding:16px 44px">Create free account →</a>
@@ -1101,39 +1148,68 @@ function demoTab(id, el) {
   el.classList.add('active');
 }
 
-// ── Scroll reveal ─────────────────────────────────────────────────────────────
+// ── Scroll reveal (improved — stagger per section) ────────────────────────────
 const obs = new IntersectionObserver(entries => {
-  entries.forEach(e => { if(e.isIntersecting) { e.target.style.opacity="1"; e.target.style.transform="translateY(0)"; }});
-}, { threshold: 0.08 });
-document.querySelectorAll(".reveal").forEach((el,i) => {
-  el.style.opacity="0"; el.style.transform="translateY(18px)";
-  el.style.transition=`opacity 0.5s ${i*0.06}s ease, transform 0.5s ${i*0.06}s ease`;
-  obs.observe(el);
+  entries.forEach(e => { if(e.isIntersecting) { e.target.style.opacity="1"; e.target.style.transform="translateY(0)"; obs.unobserve(e.target); }});
+}, { threshold: 0.1 });
+document.querySelectorAll("section, .stats-strip, .compare-wrap").forEach(section => {
+  const revealEls = section.querySelectorAll(".reveal");
+  revealEls.forEach((el, i) => {
+    el.style.opacity="0"; el.style.transform="translateY(20px)";
+    el.style.transition=`opacity 0.55s ${i*0.07}s ease, transform 0.55s ${i*0.07}s ease`;
+    obs.observe(el);
+  });
+});
+// also catch any .reveal not inside section
+document.querySelectorAll(".reveal").forEach(el => {
+  if (el.style.opacity === "") {
+    el.style.opacity="0"; el.style.transform="translateY(20px)";
+    el.style.transition="opacity 0.55s ease, transform 0.55s ease";
+    obs.observe(el);
+  }
 });
 
 // ── Animated stat counters ────────────────────────────────────────────────────
-function animateCount(el, target, suffix, decimals=0) {
+function animateCount(el, target, prefix, suffix, decimals) {
+  decimals = decimals || 0;
   const start = performance.now();
-  const duration = 1800;
-  const update = (now) => {
-    const progress = Math.min((now - start) / duration, 1);
-    const ease = 1 - Math.pow(1 - progress, 3);
-    const val = (target * ease).toFixed(decimals);
-    el.innerHTML = suffix === '$' ? `<span>${suffix}</span>${val}` : `${val}<span>${suffix}</span>`;
+  const duration = 1600;
+  // Build structure once with safe DOM methods
+  el.textContent = '';
+  var prefixSpan = null, numNode = document.createTextNode(''), suffixSpan = null;
+  if (prefix) { prefixSpan = document.createElement('span'); prefixSpan.textContent = prefix; el.appendChild(prefixSpan); }
+  el.appendChild(numNode);
+  if (suffix) { suffixSpan = document.createElement('span'); suffixSpan.textContent = suffix; el.appendChild(suffixSpan); }
+  const update = function(now) {
+    var progress = Math.min((now - start) / duration, 1);
+    var ease = 1 - Math.pow(1 - progress, 3);
+    numNode.textContent = (target * ease).toFixed(decimals);
     if (progress < 1) requestAnimationFrame(update);
   };
   requestAnimationFrame(update);
 }
+var statAnimated = false;
 const statObs = new IntersectionObserver(entries => {
   entries.forEach(e => {
-    if (e.isIntersecting) {
-      const nums = e.target.querySelectorAll('.stat-num');
-      nums.forEach(n => {
-        const txt = n.textContent;
-        if (txt.includes('34')) animateCount(n, 34, '%');
-        else if (txt.includes('8')) animateCount(n, 8, '×');
-        else if (txt.includes('67')) animateCount(n, 67, '%');
-        else if (txt.includes('$0')) { n.innerHTML = '<span>$</span>0'; }
+    if (e.isIntersecting && !statAnimated) {
+      statAnimated = true;
+      var items = e.target.querySelectorAll('.stat-item');
+      items.forEach(item => {
+        var n = item.querySelector('.stat-num');
+        if (!n) return;
+        var txt = n.textContent.replace(/\s/g,'');
+        // Match actual stat values: "3", "40%", "22", "$0"
+        if (txt.indexOf('$0') !== -1) {
+          n.textContent = '';
+          var ps = document.createElement('span'); ps.textContent = '$'; n.appendChild(ps);
+          n.appendChild(document.createTextNode('0'));
+        } else if (txt.indexOf('40') !== -1) {
+          animateCount(n, 40, '', '%', 0);
+        } else if (txt.indexOf('22') !== -1) {
+          animateCount(n, 22, '', '', 0);
+        } else if (txt === '3') {
+          animateCount(n, 3, '', '', 0);
+        }
       });
       statObs.unobserve(e.target);
     }
@@ -1329,6 +1405,30 @@ if ('serviceWorker' in navigator) {
   });
 
   document.addEventListener('click', hideTip);
+})();
+
+// ── Scroll progress bar ───────────────────────────────────────────────────────
+(function() {
+  var bar = document.getElementById('scroll-progress');
+  if (!bar) return;
+  window.addEventListener('scroll', function() {
+    var scrolled = window.scrollY || document.documentElement.scrollTop;
+    var total = document.documentElement.scrollHeight - window.innerHeight;
+    bar.style.width = (total > 0 ? (scrolled / total) * 100 : 0) + '%';
+  }, { passive: true });
+})();
+
+// ── Nav scroll class ──────────────────────────────────────────────────────────
+(function() {
+  var navEl = document.querySelector('nav');
+  if (!navEl) return;
+  window.addEventListener('scroll', function() {
+    if ((window.scrollY || document.documentElement.scrollTop) > 20) {
+      navEl.classList.add('scrolled');
+    } else {
+      navEl.classList.remove('scrolled');
+    }
+  }, { passive: true });
 })();
 </script>
 </body>
