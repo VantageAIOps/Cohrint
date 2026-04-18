@@ -52,7 +52,7 @@ dataset  = "cohrint_metrics"
 # ── Environment variables (non-secret) ───────────────────────────────────────
 [vars]
 ENVIRONMENT        = "production"
-ALLOWED_ORIGINS    = "https://cohrint.com,https://www.cohrint.com,https://cohrint.pages.dev"
+ALLOWED_ORIGINS    = "https://cohrint.com,https://www.cohrint.com,https://cohrint.pages.dev,https://app.vantageaiops.com"
 RATE_LIMIT_RPM     = "1000"
 
 # ── Cron Triggers — anomaly detection every 10 minutes ──────────────────

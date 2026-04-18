@@ -299,7 +299,7 @@ def main():
     seed_agent_traces(admin_key, count=5)
 
     print("\n✓ Enrichment complete")
-    print(f"  Dashboard: https://cohrint.com/?api_key={admin_key}")
+    print(f"  Dashboard: https://app.vantageaiops.com/?api_key={admin_key}")
 
 
 if __name__ == "__main__":
