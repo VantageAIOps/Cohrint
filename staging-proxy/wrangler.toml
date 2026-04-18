@@ -1,0 +1,7 @@
+name = "cohrint-staging-proxy"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+routes = [
+  { pattern = "app.vantageaiops.com/*", zone_name = "vantageaiops.com" }
+]
