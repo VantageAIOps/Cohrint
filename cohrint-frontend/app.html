@@ -795,7 +795,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
         <span class="icon">&#9654;</span> Cross-Platform
       </button>
       <button class="sb-item" onclick="nav('models', this)">
-        <span class="icon">&#11041;</span> Model Pricing
+        <span class="icon">&#11041;</span> Compare Models
       </button>
       <button class="sb-item" onclick="nav('traces', this)">
         <span class="icon">&#9900;</span> Agent Traces
@@ -1056,9 +1056,9 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
         </div>
 
         <div class="chart-row-equal">
-          <div class="card" data-insight="Detailed breakdown of spend, tokens, and requests per model. Helps identify cheaper alternatives.">
+          <div class="card" data-insight="Real spend breakdown from your actual API usage — cost, tokens, and requests per model over the selected period.">
             <div class="card-header">
-              <div class="card-title">Cost by Model</div>
+              <div class="card-title">Actual Spend by Model</div>
             </div>
             <table class="tool-table">
               <thead>
@@ -1100,7 +1100,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
       <div id="view-models" class="view">
         <div class="card">
           <div class="card-header">
-            <div class="card-title">Usage Profile</div>
+            <div class="card-title">Cost Calculator</div>
           </div>
           <div class="usage-inputs">
             <div class="form-group">
@@ -1143,7 +1143,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
 
         <div class="card" data-insight="Full pricing table across all providers. Filter by tier — Frontier, Mid, or Fast — to narrow down options.">
           <div class="card-header">
-            <div class="card-title">All Models</div>
+            <div class="card-title">Pricing Rates</div>
             <div class="model-filters">
               <button class="filter-btn active" onclick="filterModels('all', this)">All</button>
               <button class="filter-btn" onclick="filterModels('frontier', this)">Frontier</button>
