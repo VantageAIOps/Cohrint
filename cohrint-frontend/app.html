@@ -805,7 +805,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
       <div>
         <div class="logo-text">Cohrint</div>
       </div>
-      <div class="logo-badge">BETA</div>
+      <div class="logo-badge" id="logo-role-badge">BETA</div>
     </div>
 
     <div class="sidebar-section">
@@ -2029,7 +2029,7 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
           </div>
           <div>
             <div id="opt-tokens-saved" style="font-size:36px;font-weight:700;color:#f472b6">—</div>
-            <div style="font-size:13px;color:var(--text-secondary)">tokens optimized</div>
+            <div id="opt-tokens-label" style="font-size:13px;color:var(--text-secondary)">tokens optimized</div>
           </div>
         </div>
         <div id="opt-badges" style="display:flex;gap:8px;flex-wrap:wrap"></div>
@@ -2423,6 +2423,17 @@ function applyRoleUI(role) {
   // Role badge on executive view
   var roleBadge = document.getElementById('exec-role-badge');
   if (roleBadge) roleBadge.textContent = role.toUpperCase();
+
+  // Logo role badge (replaces BETA)
+  var logoBadge = document.getElementById('logo-role-badge');
+  if (logoBadge) {
+    logoBadge.textContent = role.toUpperCase();
+    var roleColors = { owner: ['#a3e635','rgba(163,230,53,.15)'], admin: ['#38bdf8','rgba(56,189,248,.15)'], superadmin: ['#c084fc','rgba(192,132,252,.15)'], ceo: ['#f59e0b','rgba(245,158,11,.15)'], member: ['#34d399','rgba(52,211,153,.12)'] };
+    var rc = roleColors[role] || roleColors['member'];
+    logoBadge.style.color = rc[0];
+    logoBadge.style.background = rc[1];
+    logoBadge.style.borderColor = rc[0] + '40';
+  }
 
   // Settings tab: admin+ only
   var settingsBtn = document.getElementById('sb-settings');
@@ -5658,10 +5669,13 @@ function loadOptimization() {
       document.getElementById('opt-period').textContent = data.period || '';
       document.getElementById('opt-avg-factor').textContent = data.avg_improvement_factor.toFixed(1) + 'x';
       document.getElementById('opt-total-saved').textContent = '$' + (data.total_cost_saved_usd || 0).toFixed(2);
-      var t = data.total_tokens_saved || 0;
+      var usingCacheTokens = !data.total_tokens_saved && data.total_cache_tokens > 0;
+      var t = data.total_tokens_saved || data.total_cache_tokens || 0;
       document.getElementById('opt-tokens-saved').textContent =
         t >= 1000000 ? (t / 1000000).toFixed(1) + 'M' :
         t >= 1000   ? (t / 1000).toFixed(0) + 'K' : String(t);
+      var tokensLabel = document.getElementById('opt-tokens-label');
+      if (tokensLabel) tokensLabel.textContent = usingCacheTokens ? 'tokens cached' : 'tokens optimized';
 
       // Badges — only numeric data, no user strings
       var badges = document.getElementById('opt-badges');

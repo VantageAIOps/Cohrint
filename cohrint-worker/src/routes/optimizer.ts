@@ -236,18 +236,20 @@ optimizer.get('/impact', async (c) => {
     tokens_saved: number | null;
   }>();
 
-  // Cache events: also compute avg tokens per event for rate calculation
+  // Cache events: aggregate tokens + compute cost saved (cache reads cost ~10% vs full input)
   const cacheAgg = await db.prepare(`
     SELECT
       COUNT(*) AS event_count,
       COALESCE(SUM(cache_tokens), 0) AS total_cache_tokens,
-      COALESCE(SUM(prompt_tokens), 0) AS total_prompt_tokens
+      COALESCE(SUM(prompt_tokens), 0) AS total_prompt_tokens,
+      COALESCE(SUM(CAST(cache_tokens AS REAL) / NULLIF(total_tokens, 0) * cost_usd * 0.9), 0) AS cost_saved_usd
     FROM events
-    WHERE org_id = ?${teamClause} AND cache_tokens > 0
+    WHERE org_id = ?${teamClause} AND cache_tokens > 0 AND total_tokens > 0
   `).bind(...baseArgs).first<{
     event_count: number;
     total_cache_tokens: number;
     total_prompt_tokens: number;
+    cost_saved_usd: number;
   }>();
 
   // Per-developer breakdown joined to org_members via user_id = org_members.id
@@ -304,37 +306,41 @@ optimizer.get('/impact', async (c) => {
   });
 
   // Use DB-aggregated avg directly (correct weighted average, not average-of-averages)
-  const avgFactor = compressAgg?.avg_factor != null
+  const compressAvgFactor = compressAgg?.avg_factor != null
     ? Math.round(compressAgg.avg_factor * 10) / 10
     : 1.0;
 
-  // cache avg_factor: tokens served from cache vs tokens that would have been computed
-  // Use null (no data) rather than a hardcoded guess when there are no cache events
+  // cache avg_factor: (cache_tokens + prompt_tokens) / prompt_tokens — effective throughput multiplier
   const cacheAvgFactor = (cacheAgg?.total_prompt_tokens ?? 0) > 0
     ? Math.round(((cacheAgg!.total_cache_tokens + cacheAgg!.total_prompt_tokens) / cacheAgg!.total_prompt_tokens) * 10) / 10
     : null;
+
+  const cacheCostSaved = Math.round((cacheAgg?.cost_saved_usd ?? 0) * 10000) / 10000;
+
+  // Overall factor: compress when available, else cache (real savings), else 1.0 (empty state)
+  const overallFactor = compressAvgFactor > 1.05
+    ? compressAvgFactor
+    : (cacheAvgFactor != null && cacheAvgFactor > 1.05 ? cacheAvgFactor : 1.0);
 
   const now = new Date();
   const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   return c.json({
     period,
-    avg_improvement_factor: avgFactor,
+    avg_improvement_factor: Math.round(overallFactor * 10) / 10,
     total_tokens_saved: compressAgg?.tokens_saved ?? 0,
-    total_cost_saved_usd: 0,
+    total_cache_tokens: cacheAgg?.total_cache_tokens ?? 0,
+    total_cost_saved_usd: cacheCostSaved,
     by_type: {
       compress: {
-        avg_factor:
-          compressAgg?.avg_factor != null
-            ? Math.round(compressAgg.avg_factor * 10) / 10
-            : 1.0,
+        avg_factor: compressAvgFactor,
         event_count: compressAgg?.event_count ?? 0,
         cost_saved_usd: 0,
       },
       cache: {
         avg_factor: cacheAvgFactor,
         event_count: cacheAgg?.event_count ?? 0,
-        cost_saved_usd: 0,
+        cost_saved_usd: cacheCostSaved,
       },
       model_switch: { avg_factor: 1.0, event_count: 0, cost_saved_usd: 0 },
     },
