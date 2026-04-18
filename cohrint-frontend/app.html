@@ -1576,50 +1576,17 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
 
           <!-- ── Claude Code Integration ── -->
           <div class="card" id="claudeCodeCard">
-            <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+            <div class="card-header">
               <div class="card-title" style="display:flex;align-items:center;gap:8px;">
                 <span style="font-size:18px;">⚡</span> Claude Code
               </div>
-              <span id="claudeCodeStatusBadge" style="display:none;font-size:10px;font-family:var(--font-mono);font-weight:600;padding:3px 8px;border-radius:10px;"></span>
             </div>
             <p style="font-size:12px;color:var(--text-secondary);margin-bottom:14px;">
-              Install the Stop hook to track token usage and cost from every Claude Code session automatically.
+              Connect Claude Code to automatically track token usage and cost after every session.
             </p>
-
-            <!-- Active state -->
-            <div id="claudeCodeActive" style="display:none;">
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;font-size:12px;font-family:var(--font-mono);">
-                <div>
-                  <div style="color:var(--text-muted);margin-bottom:2px;">Last event</div>
-                  <div id="claudeCodeLastEvent" style="color:var(--text-secondary);"></div>
-                </div>
-                <div>
-                  <div style="color:var(--text-muted);margin-bottom:2px;">Events (7d)</div>
-                  <div id="claudeCodeEventCount" style="color:var(--text-primary);font-weight:600;"></div>
-                </div>
-              </div>
-              <button class="btn btn-sm" style="background:var(--bg-input);border:1px solid var(--border);color:var(--text-secondary);" onclick="showClaudeCodeSetup()">View setup instructions</button>
-            </div>
-
-            <!-- Setup state -->
-            <div id="claudeCodeSetup">
-              <div style="margin-bottom:12px;">
-                <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;font-family:var(--font-mono);">Run once in your terminal:</div>
-                <div style="background:var(--bg-input);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-family:var(--font-mono);font-size:12px;color:var(--accent-green);display:flex;align-items:center;justify-content:space-between;gap:8px;">
-                  <span>npx cohrint-mcp setup</span>
-                  <button onclick="copyClaudeSetupCmd(this)" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:11px;padding:0;white-space:nowrap;">Copy</button>
-                </div>
-              </div>
-              <div style="margin-bottom:12px;font-size:11px;color:var(--text-muted);line-height:1.6;">
-                The setup command installs <code style="font-family:var(--font-mono);color:var(--accent-blue);">cohrint-track.js</code> into
-                <code style="font-family:var(--font-mono);color:var(--accent-blue);">~/.claude/hooks/</code> and registers it as a Stop hook.
-                Costs are tracked automatically after each session.
-              </div>
-              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                <button class="btn btn-primary" onclick="checkClaudeCodeSetup()" id="claudeCodeCheckBtn">Check Setup</button>
-                <div id="claudeCodeCheckStatus" style="font-size:11px;font-family:var(--font-mono);color:var(--text-muted);"></div>
-              </div>
-            </div>
+            <a href="/docs#claude-code" target="_blank" class="btn btn-primary btn-sm" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+              View setup guide →
+            </a>
           </div>
           <!-- ── Team Management (org accounts only) ── -->
           <div class="card" id="teamMgmtCard" style="display:none;">
@@ -4377,7 +4344,6 @@ function loadSettings() {
   document.getElementById('privacyMode').value = localStorage.getItem('cohrint_privacy') || 'strict';
   loadBenchmarkOptIn();
   loadCopilotStatus();
-  loadClaudeCodeStatus();
   loadTeamMgmt();
 }
 
@@ -4598,92 +4564,6 @@ function disconnectCopilot() {
   });
 }
 
-/* ── Claude Code Integration ── */
-
-var _claudeCodeStatusLoading = false;
-function loadClaudeCodeStatus() {
-  if (_claudeCodeStatusLoading) return Promise.resolve();
-  _claudeCodeStatusLoading = true;
-  // Filter to claude-code agent_name so events from other sources (SDK, Copilot, etc.)
-  // don't produce a false "ACTIVE" state for the Claude Code hook.
-  return apiFetch('/v1/analytics/summary?agent=claude-code').then(function(data) {
-    var total = (data && data.today_requests) || 0;
-    if (total > 0) {
-      renderClaudeCodeActive(data);
-    } else {
-      renderClaudeCodeSetup();
-    }
-  }).catch(function() {
-    renderClaudeCodeSetup();
-  }).finally(function() {
-    _claudeCodeStatusLoading = false;
-  });
-}
-
-function renderClaudeCodeActive(data) {
-  document.getElementById('claudeCodeActive').style.display = '';
-  document.getElementById('claudeCodeSetup').style.display = 'none';
-
-  var badge = document.getElementById('claudeCodeStatusBadge');
-  badge.style.display = '';
-  badge.textContent = 'ACTIVE';
-  badge.style.background = 'rgba(52,211,153,0.12)';
-  badge.style.color = 'var(--accent-green)';
-
-  var lastEvent = data.last_event_at;
-  document.getElementById('claudeCodeLastEvent').textContent = lastEvent
-    ? new Date(lastEvent).toLocaleString()
-    : 'Unknown';
-  document.getElementById('claudeCodeEventCount').textContent = (data.today_requests || 0).toLocaleString();
-}
-
-function renderClaudeCodeSetup() {
-  document.getElementById('claudeCodeActive').style.display = 'none';
-  document.getElementById('claudeCodeSetup').style.display = '';
-  document.getElementById('claudeCodeStatusBadge').style.display = 'none';
-}
-
-function showClaudeCodeSetup() {
-  document.getElementById('claudeCodeActive').style.display = 'none';
-  document.getElementById('claudeCodeSetup').style.display = '';
-}
-
-function checkClaudeCodeSetup() {
-  var btn = document.getElementById('claudeCodeCheckBtn');
-  var statusEl = document.getElementById('claudeCodeCheckStatus');
-  btn.disabled = true;
-  btn.textContent = 'Checking…';
-  statusEl.style.color = 'var(--text-muted)';
-  statusEl.textContent = 'Looking for recent events…';
-
-  apiFetch('/v1/analytics/summary?agent=claude-code').then(function(data) {
-    var total = (data && data.today_requests) || 0;
-    if (total > 0) {
-      statusEl.style.color = 'var(--accent-green)';
-      statusEl.textContent = 'Events detected! Hook is working.';
-      renderClaudeCodeActive(data);
-    } else {
-      statusEl.style.color = 'var(--accent-amber)';
-      statusEl.textContent = 'No events yet. Run a Claude Code session first.';
-    }
-  }).catch(function() {
-    statusEl.style.color = 'var(--accent-red)';
-    statusEl.textContent = 'Could not reach API. Check your connection.';
-  }).finally(function() {
-    btn.disabled = false;
-    btn.textContent = 'Check Setup';
-  });
-}
-
-function copyClaudeSetupCmd(btn) {
-  navigator.clipboard.writeText('npx cohrint-mcp setup').then(function() {
-    var orig = btn.textContent;
-    btn.textContent = 'Copied!';
-    setTimeout(function() { btn.textContent = orig; }, 2000);
-  }).catch(function() {
-    btn.textContent = 'Failed';
-  });
-}
 
 function saveApiBase() {
   var val = document.getElementById('settingsApiBase').value.trim();
