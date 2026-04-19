@@ -207,15 +207,23 @@ const SAFE_PASS_ENV = new Set([
 ]);
 
 function buildSafeEnv(extra?: Record<string, string>): Record<string, string> {
-  const passEnv = (process.env.VANTAGE_PASS_ENV ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter((k) => k && SAFE_PASS_ENV.has(k));
-  const env = Object.fromEntries(
-    Object.entries(process.env).filter(
-      ([k]) => !BLOCKED_ENV.includes(k) || passEnv.includes(k)
-    )
-  ) as Record<string, string>;
+  // VANTAGE_PASS_ENV is a comma-separated list of additional env var names to
+  // forward beyond the SAFE_PASS_ENV defaults. BLOCKED_ENV vars are stripped
+  // regardless (they can be used for code injection via dynamic linkers).
+  const extraAllowed = new Set(
+    (process.env.VANTAGE_PASS_ENV ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter((k) => k.length > 0 && !BLOCKED_ENV.includes(k))
+  );
+  const env: Record<string, string> = {};
+  for (const [k, v] of Object.entries(process.env)) {
+    if (v === undefined) continue; // strip undefined values — cast-safe
+    if (BLOCKED_ENV.includes(k)) continue;
+    if (SAFE_PASS_ENV.has(k) || extraAllowed.has(k)) {
+      env[k] = v;
+    }
+  }
   return { ...env, ...extra };
 }
 
@@ -484,10 +492,20 @@ export function runAgentBuffered(
     }
 
     let truncationWarned = false;
+    let capturedCostUsd: number | undefined;
 
     function flushLine(line: string) {
       const { text, sessionId } = parseStreamLine(line);
       if (sessionId) capturedSessionId = sessionId;
+      // Also capture cost from the result line (mirrors runAgent behaviour).
+      if (line.trim()) {
+        try {
+          const obj = JSON.parse(line) as Record<string, unknown>;
+          if (obj["type"] === "result" && typeof obj["total_cost_usd"] === "number") {
+            capturedCostUsd = obj["total_cost_usd"] as number;
+          }
+        } catch {}
+      }
       if (!text) return;
       const buf = Buffer.from(text);
       textBytes += buf.length;
@@ -546,6 +564,7 @@ export function runAgentBuffered(
           stdout,
           durationMs,
           sessionId: capturedSessionId,
+          costUsd: capturedCostUsd,
           permissionDenials: [],
         });
       }

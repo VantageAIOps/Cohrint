@@ -4,6 +4,7 @@ import { VERSION } from "./_version.js";
 import {
   loadConfig,
   configExists,
+  DEFAULT_CONFIG,
   type VantageConfig,
 } from "./config.js";
 import { runSetup } from "./setup.js";
@@ -84,7 +85,7 @@ async function showDashboardSummary(config: VantageConfig): Promise<void> {
     return;
   }
   try {
-    const base = config.vantageApiBase || "https://api.cohrint.com";
+    const base = config.vantageApiBase || DEFAULT_CONFIG.vantageApiBase;
     const headers: Record<string, string> = {
       Authorization: `Bearer ${config.vantageApiKey}`,
       "Content-Type": "application/json",
@@ -167,7 +168,7 @@ async function showBudgetStatus(config: VantageConfig): Promise<void> {
     return;
   }
   try {
-    const base = config.vantageApiBase || "https://api.cohrint.com";
+    const base = config.vantageApiBase || DEFAULT_CONFIG.vantageApiBase;
     const res = await fetch(`${base}/v1/analytics/summary`, {
       headers: { Authorization: `Bearer ${config.vantageApiKey}` },
       signal: AbortSignal.timeout(10000),
@@ -365,11 +366,9 @@ async function executeWithPermissions(
   allowedTools: Set<string>,
   rl: ReturnType<typeof createInterface>
 ): Promise<{ sessionId?: string; costUsd?: number }> {
-  const oneTimeTools: string[] = [];
   let currentFlags = [...extraFlags];
-  const allAllowed = [...allowedTools, ...oneTimeTools];
-  if (allAllowed.length > 0) {
-    currentFlags = [...currentFlags, "--allowedTools", allAllowed.join(",")];
+  if (allowedTools.size > 0) {
+    currentFlags = [...currentFlags, "--allowedTools", [...allowedTools].join(",")];
   }
 
   const result = await executePrompt(
@@ -418,14 +417,19 @@ async function executeWithPermissions(
 function waitForCost(): Promise<CostData | null> {
   return new Promise((resolve) => {
     let settled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const handler = (data: CostData) => {
       if (!settled) {
         settled = true;
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
         resolve(data);
       }
     };
     bus.once("cost:calculated", handler);
-    setTimeout(() => {
+    timer = setTimeout(() => {
       if (!settled) {
         settled = true;
         bus.off("cost:calculated", handler);
@@ -585,7 +589,10 @@ async function startRepl(
           return;
         }
         if (line === "/setup") {
-          rl.close();
+          // Pause line events during setup so the new readline in runSetup
+          // can own stdin. Remove our listener temporarily — we'll re-add it
+          // if setup succeeds and we return to the REPL prompt.
+          rl.removeListener("line", onLineReceived);
           try {
             const newConfig = await runSetup();
             Object.assign(config, newConfig);
@@ -600,13 +607,19 @@ async function startRepl(
             });
             if (config.tracking.enabled) tracker.start();
             const newAgent = getAgent(config.defaultAgent);
-            if (newAgent) currentAgent = newAgent;
-            console.log(green("  Config reloaded. REPL restarting...\n"));
+            if (newAgent) {
+              currentAgent = newAgent;
+              _activeAgentName = newAgent.name;
+            }
+            console.log(green("  Config reloaded.\n"));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             console.error(red(`  Setup failed: ${msg}`));
           }
-          await startRepl(config);
+          // Re-attach the line listener and resume the prompt in-place,
+          // avoiding a recursive startRepl call and duplicate signal handlers.
+          rl.on("line", onLineReceived);
+          prompt();
           return;
         }
         if (line === "/status") {
@@ -772,10 +785,13 @@ async function startRepl(
   rl.on("SIGINT", () => {
     shutdown().catch(() => process.exit(1));
   });
-  process.on("SIGTERM", () => {
+  // Use once() so that re-entering this function (e.g. future refactors)
+  // does not stack duplicate listeners. These are process-level signals that
+  // should only be handled once per process lifetime.
+  process.once("SIGTERM", () => {
     shutdown().catch(() => process.exit(1));
   });
-  process.on("SIGHUP", () => {
+  process.once("SIGHUP", () => {
     shutdown().catch(() => process.exit(1));
   });
 
@@ -943,9 +959,16 @@ async function main(): Promise<void> {
 }
 
 function isNewerVersion(latest: string, current: string): boolean {
-  const parse = (v: string) => v.split(".").map(Number);
-  const [lMaj, lMin, lPat] = parse(latest);
-  const [cMaj, cMin, cPat] = parse(current);
+  // Strip any pre-release suffix (e.g., "2.2.5-beta.1" → "2.2.5") before
+  // comparing. Non-numeric parts cause Number() to return NaN and silently
+  // break all comparisons.
+  const clean = (v: string) => v.split("-")[0];
+  const parse = (v: string) => clean(v).split(".").map(Number);
+  const parts = [parse(latest), parse(current)];
+  // Bail out if either version failed to parse.
+  if (parts.some((p) => p.some((n) => !Number.isFinite(n)))) return false;
+  const [lMaj, lMin, lPat] = parts[0];
+  const [cMaj, cMin, cPat] = parts[1];
   if (lMaj !== cMaj) return lMaj > cMaj;
   if (lMin !== cMin) return lMin > cMin;
   return lPat > cPat;
@@ -961,10 +984,10 @@ async function checkForUpdate(): Promise<void> {
     const data = await res.json().catch(() => null);
     if (!data || typeof data !== "object") return;
     const version = (data as Record<string, unknown>).version;
-    if (!version) return;
-    if (isNewerVersion(version as string, current)) {
+    if (typeof version !== "string" || !version) return;
+    if (isNewerVersion(version, current)) {
       console.error(
-        yellow(`\n  Update available: cohrint-cli ${current} → ${version as string}`)
+        yellow(`\n  Update available: cohrint-cli ${current} → ${version}`)
       );
       console.error(dim(`  Run: npm install -g cohrint-cli\n`));
     }

@@ -1,9 +1,11 @@
 import { randomUUID } from "crypto";
-import { bus } from "./event-bus.js";
+import { bus, type VantageEventMap } from "./event-bus.js";
 import { countTokens } from "./optimizer.js";
 import { calculateCost } from "./pricing.js";
 import { getAgent } from "./agents/registry.js";
 import { VERSION } from "./_version.js";
+
+const DEFAULT_API_BASE = "https://api.cohrint.com";
 
 export interface TrackerConfig {
   apiKey: string;
@@ -27,7 +29,10 @@ interface TrackingEvent {
   agent_name: string;
   team: string;
   session_id?: string;
+  _retries?: number; // internal retry counter — not sent to the API
 }
+
+const MAX_RETRIES = 5; // drop an event after this many failed flushes
 
 export class Tracker {
   private queue: TrackingEvent[] = [];
@@ -45,8 +50,16 @@ export class Tracker {
   // in session mode all intermediate prompts' savings were dropped.
   private pendingSavedTokens = 0;
 
+  // Bound listener references so they can be removed when stop() is called.
+  private readonly _onOptimized: (data: VantageEventMap["prompt:optimized"]) => void;
+  private readonly _onSubmitted: (data: VantageEventMap["prompt:submitted"]) => void;
+  private readonly _onCompleted: (data: VantageEventMap["agent:completed"]) => void;
+
   constructor(config: TrackerConfig) {
     this.config = config;
+    this._onOptimized = (data) => { this.pendingSavedTokens += data.savedTokens; };
+    this._onSubmitted = (data) => { this.promptTexts.push(data.prompt); };
+    this._onCompleted = (data) => { this._handleCompleted(data); };
     this.setupListeners();
   }
 
@@ -62,68 +75,64 @@ export class Tracker {
   }
 
   private setupListeners(): void {
-    bus.on("prompt:optimized", (data) => {
-      this.pendingSavedTokens += data.savedTokens;
-    });
+    bus.on("prompt:optimized", this._onOptimized);
+    bus.on("prompt:submitted", this._onSubmitted);
+    bus.on("agent:completed", this._onCompleted);
+  }
 
-    bus.on("prompt:submitted", (data) => {
-      this.promptTexts.push(data.prompt);
-    });
+  private _handleCompleted(data: VantageEventMap["agent:completed"]): void {
+    const agent = getAgent(data.agent);
+    if (!agent && this.config?.debug) {
+      console.warn(`[vantage] Unknown agent: ${data.agent} — skipping cost calculation`);
+    }
+    const model = agent?.defaultModel ?? "unknown";
+    const outputTokens = countTokens(data.outputText);
 
-    bus.on("agent:completed", (data) => {
-      const agent = getAgent(data.agent);
-      if (!agent && this.config?.debug) {
-        console.warn(`[vantage] Unknown agent: ${data.agent} — skipping cost calculation`);
-      }
-      const model = agent?.defaultModel ?? "unknown";
-      const outputTokens = countTokens(data.outputText);
-
-      if (outputTokens === 0 && data.exitCode !== 0) {
-        this.promptTexts = [];
-        this.pendingSavedTokens = 0;
-        return;
-      }
-
-      const inputTokens =
-        this.promptTexts.length > 0
-          ? this.promptTexts.reduce((sum, t) => sum + countTokens(t), 0)
-          : Math.ceil(outputTokens * 0.25);
+    if (outputTokens === 0 && data.exitCode !== 0) {
       this.promptTexts = [];
-
-      const costUsd = calculateCost(model, inputTokens, outputTokens);
-      const savedTokens = this.pendingSavedTokens;
       this.pendingSavedTokens = 0;
-      const savedCost = savedTokens > 0 ? calculateCost(model, savedTokens, 0) : 0;
+      return;
+    }
 
-      const sessionId = data.sessionId;
+    const inputTokens =
+      this.promptTexts.length > 0
+        ? this.promptTexts.reduce((sum, t) => sum + countTokens(t), 0)
+        : Math.ceil(outputTokens * 0.25);
+    this.promptTexts = [];
 
-      bus.emit("cost:calculated", {
-        agent: data.agent,
-        model,
-        inputTokens,
-        outputTokens,
-        costUsd,
-        savedUsd: savedCost,
-        sessionId,
-      });
+    const costUsd = calculateCost(model, inputTokens, outputTokens);
+    const savedTokens = this.pendingSavedTokens;
+    this.pendingSavedTokens = 0;
+    const savedCost = savedTokens > 0 ? calculateCost(model, savedTokens, 0) : 0;
 
-      const event: TrackingEvent = {
-        event_id: randomUUID(),
-        provider: this.resolveProvider(data.agent),
-        model,
-        prompt_tokens: inputTokens,
-        completion_tokens: outputTokens,
-        total_tokens: inputTokens + outputTokens,
-        total_cost_usd: costUsd,
-        latency_ms: data.durationMs,
-        environment: "production",
-        agent_name: data.agent,
-        team: "",
-        session_id: sessionId,
-      };
+    const sessionId = data.sessionId;
 
-      this.enqueue(event);
+    bus.emit("cost:calculated", {
+      agent: data.agent,
+      model,
+      inputTokens,
+      outputTokens,
+      costUsd,
+      savedUsd: savedCost,
+      sessionId,
     });
+
+    const event: TrackingEvent = {
+      event_id: randomUUID(),
+      provider: this.resolveProvider(data.agent),
+      model,
+      prompt_tokens: inputTokens,
+      completion_tokens: outputTokens,
+      total_tokens: inputTokens + outputTokens,
+      total_cost_usd: costUsd,
+      latency_ms: data.durationMs,
+      environment: "production",
+      agent_name: data.agent,
+      team: "",
+      session_id: sessionId,
+    };
+
+    this.enqueue(event);
   }
 
   private enqueue(event: TrackingEvent): void {
@@ -156,8 +165,11 @@ export class Tracker {
     }
 
     const batch = this.queue.splice(0, this.queue.length);
-    const base = this.config.apiBase || "https://api.cohrint.com";
+    const base = this.config.apiBase || DEFAULT_API_BASE;
     const url = `${base}/v1/events/batch`;
+
+    // Strip internal bookkeeping fields before sending.
+    const wireEvents = batch.map(({ _retries: _r, ...e }) => e);
 
     try {
       const response = await fetch(url, {
@@ -167,7 +179,7 @@ export class Tracker {
           Authorization: `Bearer ${this.config.apiKey}`,
         },
         body: JSON.stringify({
-          events: batch,
+          events: wireEvents,
           sdk_version: `cohrint-cli-${VERSION}`,
           sdk_language: "typescript",
         }),
@@ -189,7 +201,13 @@ export class Tracker {
         console.error(`  [vantage] Dashboard sync failed: HTTP ${response.status}`);
         const unsent = batch.filter((e) => !this.sentIds.has(e.event_id));
         if (response.status >= 500 || response.status === 429 || response.status === 408) {
-          this.queue.unshift(...unsent);
+          const retryable = unsent
+            .map((e) => ({ ...e, _retries: (e._retries ?? 0) + 1 }))
+            .filter((e) => e._retries <= MAX_RETRIES);
+          if (retryable.length < unsent.length && this.config.debug) {
+            console.warn(`[vantage] Dropping ${unsent.length - retryable.length} events: exceeded ${MAX_RETRIES} retries`);
+          }
+          this.queue.unshift(...retryable);
         } else if (response.status >= 400) {
           console.warn(`[vantage] Dropping ${unsent.length} events: HTTP ${response.status}`);
         }
@@ -200,7 +218,10 @@ export class Tracker {
         console.error("[vantage] Failed to send events:", err);
       }
       const unsent = batch.filter((e) => !this.sentIds.has(e.event_id));
-      this.queue.unshift(...unsent);
+      const retryable = unsent
+        .map((e) => ({ ...e, _retries: (e._retries ?? 0) + 1 }))
+        .filter((e) => e._retries <= MAX_RETRIES);
+      this.queue.unshift(...retryable);
     }
   }
 
@@ -224,5 +245,9 @@ export class Tracker {
       clearInterval(this.timer);
       this.timer = null;
     }
+    // Remove bus listeners so a replaced Tracker does not double-count events.
+    bus.off("prompt:optimized", this._onOptimized);
+    bus.off("prompt:submitted", this._onSubmitted);
+    bus.off("agent:completed", this._onCompleted);
   }
 }

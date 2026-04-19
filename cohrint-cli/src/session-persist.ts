@@ -65,7 +65,20 @@ export function migrateOldSessions(): void {
   if (!existsSync(oldFile)) return;
   try {
     const raw = readFileSync(oldFile, "utf-8");
-    const oldIds = JSON.parse(raw) as Record<string, string>;
+    const parsed = JSON.parse(raw);
+    // Validate: must be a plain object mapping strings to strings.
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      Array.isArray(parsed)
+    ) {
+      unlinkSync(oldFile);
+      return;
+    }
+    const oldIds: Record<string, string> = {};
+    for (const [k, v] of Object.entries(parsed)) {
+      if (typeof v === "string") oldIds[k] = v;
+    }
     const current = loadState();
     current.sessionIds = { ...current.sessionIds, ...oldIds };
     saveState(current);
