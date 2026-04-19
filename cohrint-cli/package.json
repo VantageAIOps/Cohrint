@@ -1,6 +1,6 @@
 {
   "name": "cohrint-cli",
-  "version": "2.2.4",
+  "version": "2.2.5",
   "description": "Cohrint CLI — AI cost tracking and optimization tool",
   "type": "module",
   "main": "dist/index.js",

@@ -18,7 +18,7 @@ export async function runSetup(): Promise<VantageConfig> {
   });
 
   console.log("");
-  console.log(bold(cyan("  Welcome to VantageAI CLI")));
+  console.log(bold(cyan("  Welcome to Cohrint CLI")));
   console.log(dim("  Let's set up your configuration.\n"));
   console.log(bold("  Detecting AI agents...\n"));
 
@@ -58,7 +58,7 @@ export async function runSetup(): Promise<VantageConfig> {
 
   const apiKey = await ask(
     rl,
-    "  VantageAI API key (Enter to skip): "
+    "  Cohrint API key (Enter to skip): "
   );
 
   console.log("");
@@ -87,7 +87,7 @@ export async function runSetup(): Promise<VantageConfig> {
 
   console.log("");
   console.log(green("  Configuration saved to ~/.vantage/config.json"));
-  console.log(dim(`  Run 'vantage' to start the REPL, or 'vantage "your prompt"' for one-shot mode.\n`));
+  console.log(dim(`  Run 'cohrint' to start the REPL, or 'cohrint "your prompt"' for one-shot mode.\n`));
 
   return config;
 }

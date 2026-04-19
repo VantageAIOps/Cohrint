@@ -168,7 +168,7 @@ export class Tracker {
         },
         body: JSON.stringify({
           events: batch,
-          sdk_version: `vantage-cli-${VERSION}`,
+          sdk_version: `cohrint-cli-${VERSION}`,
           sdk_language: "typescript",
         }),
         signal: AbortSignal.timeout(15000),

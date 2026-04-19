@@ -30,7 +30,7 @@ export function cyan(text: string): string {
 
 export function printBanner(): void {
   console.log("");
-  console.log(bold(cyan("  VantageAI CLI")));
+  console.log(bold(cyan("  Cohrint CLI")));
   console.log(dim("  Optimize prompts. Track costs. Use any AI agent."));
   console.log(dim("  Type /help for commands, /quit to exit."));
   console.log("");
@@ -144,7 +144,7 @@ export function printTip(tip: string): void {
 }
 
 export function promptLine(agentName: string): string {
-  return isTTY ? `${cyan("vantage")} ${dim(`[${agentName}]`)} ${dim(">")} ` : "> ";
+  return isTTY ? `${cyan("cohrint")} ${dim(`[${agentName}]`)} ${dim(">")} ` : "> ";
 }
 
 export interface Spinner {

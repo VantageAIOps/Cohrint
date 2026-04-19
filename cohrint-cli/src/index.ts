@@ -784,7 +784,7 @@ async function startRepl(
 
 function printHelp(): void {
   console.log("");
-  console.log(bold("  VantageAI Commands"));
+  console.log(bold("  Cohrint Commands"));
   console.log(dim("  " + "-".repeat(50)));
   console.log(`  ${cyan("/cost")}               Show cost summary`);
   console.log(`  ${cyan("/agents")}             List available agents`);
@@ -954,7 +954,7 @@ function isNewerVersion(latest: string, current: string): boolean {
 async function checkForUpdate(): Promise<void> {
   try {
     const current = VERSION;
-    const res = await fetch("https://registry.npmjs.org/vantageai-cli/latest", {
+    const res = await fetch("https://registry.npmjs.org/cohrint-cli/latest", {
       signal: AbortSignal.timeout(2000),
     });
     if (!res.ok) return;
@@ -964,9 +964,9 @@ async function checkForUpdate(): Promise<void> {
     if (!version) return;
     if (isNewerVersion(version as string, current)) {
       console.error(
-        yellow(`\n  Update available: vantageai-cli ${current} → ${version as string}`)
+        yellow(`\n  Update available: cohrint-cli ${current} → ${version as string}`)
       );
-      console.error(dim(`  Run: npm install -g vantageai-cli\n`));
+      console.error(dim(`  Run: npm install -g cohrint-cli\n`));
     }
   } catch {}
 }
