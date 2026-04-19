@@ -1,0 +1,38 @@
+import { execSync } from "child_process";
+import type { AgentAdapter, SpawnArgs } from "./registry.js";
+import type { AgentConfig } from "../config.js";
+
+export const geminiAdapter: AgentAdapter = {
+  name: "gemini",
+  displayName: "Gemini CLI",
+  binary: "gemini",
+  defaultModel: "gemini-2.0-flash",
+  provider: "google",
+  interactiveArgs: [],
+  exitCommand: "/quit",
+  supportsContinue: true,
+  async detect() {
+    try {
+      execSync("which gemini", { stdio: "ignore", timeout: 5000 });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  buildCommand(prompt: string, config?: AgentConfig): SpawnArgs {
+    const cmd = config?.command || "gemini";
+    const baseArgs = config?.args ?? ["-p"];
+    return {
+      command: cmd,
+      args: [...baseArgs, prompt],
+    };
+  },
+  buildContinueCommand(prompt: string, config?: AgentConfig, _sessionId?: string): SpawnArgs {
+    const cmd = config?.command || "gemini";
+    const extraArgs = config?.args?.filter((a) => a !== "-p") ?? [];
+    return {
+      command: cmd,
+      args: ["--continue", ...extraArgs, "-p", prompt],
+    };
+  },
+};
