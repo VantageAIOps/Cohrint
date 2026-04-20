@@ -185,6 +185,32 @@ export function parseIntBounded(
   return n;
 }
 
+/**
+ * Read and parse a JSON response body with a size cap. Node's fetch buffers
+ * the whole body before JSON.parse, so a compromised or hijacked API endpoint
+ * could OOM the CLI by serving a multi-gigabyte blob. Returns null on oversize,
+ * non-JSON, or fetch failure — callers should treat null as "no data".
+ */
+const MAX_JSON_RESPONSE_BYTES = 2 * 1024 * 1024;
+export async function safeFetchJson(
+  res: Response,
+  maxBytes: number = MAX_JSON_RESPONSE_BYTES
+): Promise<unknown | null> {
+  try {
+    const buf = await res.arrayBuffer();
+    if (buf.byteLength > maxBytes) {
+      _warn(
+        `API response too large (${buf.byteLength} bytes > ${maxBytes}) — discarding`
+      );
+      return null;
+    }
+    if (buf.byteLength === 0) return null;
+    return JSON.parse(Buffer.from(buf).toString("utf-8"));
+  } catch {
+    return null;
+  }
+}
+
 export function assertHttpsApiBase(base: string): boolean {
   if (!base) return false;
   if (base.startsWith("https://")) return true;

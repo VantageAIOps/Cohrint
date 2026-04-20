@@ -8,6 +8,17 @@ const MAX_OUTPUT_BYTES = 5 * 1024 * 1024;
 const TOOL_BULLET = "⏺";
 const RESULT_PREFIX = "⎿";
 
+// Strip terminal control chars from agent output before writing to stdout.
+// Preserves \t \n \r but blocks ESC (\x1b), which prevents a compromised
+// or prompt-injected agent from emitting CSI color bombs, OSC 8 fake
+// hyperlinks, or — most importantly — OSC 52 clipboard writes
+// (\x1b]52;c;<base64>\x07) that many modern terminal emulators honor.
+// Also strips DEL, BS, NUL, and C1 control chars.
+const CONTROL_STRIP_RX = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/g;
+function sanitizeDisplay(s: string): string {
+  return s.replace(CONTROL_STRIP_RX, "");
+}
+
 function formatToolInput(name: string, input: Record<string, unknown>): string {
   const MAX = 70;
   const s = (v: unknown) => (typeof v === "string" ? v : JSON.stringify(v));
@@ -85,11 +96,17 @@ class ClaudeStreamRenderer {
 
       if (obj["type"] === "message_delta") {
         const usage = obj["usage"] as Record<string, unknown> | undefined;
-        const outputTokens =
-          typeof usage?.["output_tokens"] === "number"
-            ? (usage["output_tokens"] as number)
-            : undefined;
-        if (outputTokens !== undefined) return { outputTokens };
+        const raw = usage?.["output_tokens"];
+        // Agent JSON is untrusted — Infinity/NaN/negative would propagate
+        // into cost math if any downstream caller picked this up.
+        if (
+          typeof raw === "number" &&
+          Number.isFinite(raw) &&
+          raw >= 0 &&
+          raw <= 100_000_000
+        ) {
+          return { outputTokens: raw };
+        }
         return {};
       }
 
@@ -512,7 +529,8 @@ export function runAgent(
         if (totalBytes <= MAX_OUTPUT_BYTES) chunks.push(tbuf);
       }
       if (totalBytes <= MAX_OUTPUT_BYTES) {
-        const ok = process.stdout.write(display);
+        const safe = sanitizeDisplay(display);
+        const ok = process.stdout.write(safe);
         if (!ok) {
           child.stdout?.pause();
           process.stdout.once("drain", () => child.stdout?.resume());
@@ -722,7 +740,7 @@ export function runAgentBuffered(
         } catch {}
       }
       if (!text) return;
-      const buf = Buffer.from(text);
+      const buf = Buffer.from(sanitizeDisplay(text));
       textBytes += buf.length;
       if (textBytes <= MAX_OUTPUT_BYTES) {
         textChunks.push(buf);

@@ -6,6 +6,9 @@ import {
   existsSync,
   renameSync,
   chmodSync,
+  openSync,
+  closeSync,
+  statSync,
 } from "fs";
 import { join } from "path";
 import { homedir } from "os";
@@ -18,6 +21,9 @@ export interface PersistedState {
 
 const ALLOWED_TOOL_RX = /^[A-Za-z_][A-Za-z0-9_():,*\s/\-.]{0,256}$/;
 const MAX_TOOLS = 128;
+const LOCK_TIMEOUT_MS = 3_000;
+const LOCK_STALE_MS = 60_000;
+const LOCK_RETRY_MS = 25;
 
 function getVantageDir(): string {
   return join(homedir(), ".vantage");
@@ -25,6 +31,61 @@ function getVantageDir(): string {
 
 function getStatePath(): string {
   return join(getVantageDir(), "session.json");
+}
+
+function getLockPath(): string {
+  return join(getVantageDir(), "session.lock");
+}
+
+function sleepSync(ms: number): void {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    // busy-wait; lock waits are capped at LOCK_TIMEOUT_MS (3s) so this is bounded.
+  }
+}
+
+// Advisory lock to serialize read-modify-write on session.json across concurrent
+// CLI instances. Without this, two `cohrint` processes racing to persist their
+// session IDs could silently stomp each other (last-writer-wins).
+function acquireLock(): number | null {
+  const dir = getVantageDir();
+  mkdirSync(dir, { recursive: true });
+  const lockPath = getLockPath();
+  const deadline = Date.now() + LOCK_TIMEOUT_MS;
+  while (true) {
+    try {
+      const fd = openSync(lockPath, "wx", 0o600);
+      return fd;
+    } catch (err: unknown) {
+      const code = (err as { code?: string } | null)?.code;
+      if (code !== "EEXIST") return null;
+      // Reap stale locks (process crashed before releasing).
+      try {
+        const st = statSync(lockPath);
+        if (Date.now() - st.mtimeMs > LOCK_STALE_MS) {
+          try { unlinkSync(lockPath); } catch {}
+          continue;
+        }
+      } catch {}
+      if (Date.now() >= deadline) return null;
+      sleepSync(LOCK_RETRY_MS);
+    }
+  }
+}
+
+function releaseLock(fd: number | null): void {
+  if (fd === null) return;
+  try { closeSync(fd); } catch {}
+  try { unlinkSync(getLockPath()); } catch {}
+}
+
+export function withStateLock<T>(fn: () => T): T {
+  const fd = acquireLock();
+  try {
+    return fn();
+  } finally {
+    releaseLock(fd);
+  }
 }
 
 export function saveState(state: PersistedState): void {
@@ -103,9 +164,11 @@ export function migrateOldSessions(): void {
     for (const [k, v] of Object.entries(parsed)) {
       if (typeof v === "string") oldIds[k] = v;
     }
-    const current = loadState();
-    current.sessionIds = { ...current.sessionIds, ...oldIds };
-    saveState(current);
+    withStateLock(() => {
+      const current = loadState();
+      current.sessionIds = { ...current.sessionIds, ...oldIds };
+      saveState(current);
+    });
     unlinkSync(oldFile);
   } catch {}
 }

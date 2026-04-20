@@ -38,6 +38,7 @@ import {
   saveState,
   clearState,
   migrateOldSessions,
+  withStateLock,
 } from "./session-persist.js";
 import { checkCostAnomaly } from "./anomaly.js";
 import {
@@ -51,6 +52,7 @@ import {
   sanitizeSystemFlag,
   parseIntBounded,
   assertHttpsApiBase,
+  safeFetchJson,
 } from "./sanitize.js";
 
 const COST_TIMEOUT_MS = 5000;
@@ -110,10 +112,8 @@ async function showDashboardSummary(config: VantageConfig): Promise<void> {
         signal: AbortSignal.timeout(10000),
       }),
     ]);
-    const summary = summaryRes.ok
-      ? await summaryRes.json().catch(() => null)
-      : null;
-    const kpis = kpisRes.ok ? await kpisRes.json().catch(() => null) : null;
+    const summary = summaryRes.ok ? await safeFetchJson(summaryRes) : null;
+    const kpis = kpisRes.ok ? await safeFetchJson(kpisRes) : null;
 
     console.log("");
     console.log(bold(cyan("  Dashboard Summary")));
@@ -188,7 +188,7 @@ async function showBudgetStatus(config: VantageConfig): Promise<void> {
       signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json().catch(() => null);
+    const data = await safeFetchJson(res);
     if (!data) throw new Error("Invalid JSON response from API");
     const d = data as Record<string, unknown>;
     const budgetUsd = Number(d.budget_usd ?? 0);
@@ -592,7 +592,15 @@ async function startRepl(
   function persistState() {
     const ids: Record<string, string> = {};
     for (const [k, v] of agentSessionIds) ids[k] = v;
-    saveState({ sessionIds: ids, allowedTools: [...allowedTools] });
+    // Merge under lock with on-disk state so a racing CLI instance's writes
+    // aren't silently clobbered. Unknown agents from other processes are
+    // preserved; only agents touched by THIS process are overwritten.
+    withStateLock(() => {
+      const onDisk = loadState();
+      const mergedIds: Record<string, string> = { ...onDisk.sessionIds, ...ids };
+      const mergedTools = new Set<string>([...onDisk.allowedTools, ...allowedTools]);
+      saveState({ sessionIds: mergedIds, allowedTools: [...mergedTools] });
+    });
   }
 
   const rl = createInterface({
@@ -1214,7 +1222,7 @@ async function checkForUpdate(): Promise<void> {
       signal: AbortSignal.timeout(2000),
     });
     if (!res.ok) return;
-    const data = await res.json().catch(() => null);
+    const data = await safeFetchJson(res, 256 * 1024);
     if (!data || typeof data !== "object") return;
     const version = (data as Record<string, unknown>).version;
     if (typeof version !== "string" || !version) return;
