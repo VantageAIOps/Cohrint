@@ -274,6 +274,8 @@ interface ExecuteResult {
   permissionDenials: PermissionDenial[];
   staleSession?: boolean;
   notLoggedIn?: boolean;
+  exitCode?: number;
+  crashed?: boolean;
 }
 
 function printNotLoggedIn(agent: (typeof ALL_AGENTS)[0]): void {
@@ -344,12 +346,14 @@ async function executePrompt(
       permissionDenials: result.permissionDenials,
       staleSession: result.staleSession,
       notLoggedIn: result.notLoggedIn,
+      exitCode: result.exitCode,
+      crashed: result.exitCode !== 0,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(red(`  Error running ${agent.displayName}: ${message}`));
     console.error(dim(`  Make sure '${agent.binary}' is installed and in your PATH.`));
-    return { permissionDenials: [] };
+    return { permissionDenials: [], crashed: true, exitCode: 1 };
   }
 }
 
@@ -425,7 +429,7 @@ async function executeWithPermissions(
   allowedTools: Set<string>,
   rl: ReturnType<typeof createInterface>,
   clearSession?: () => void
-): Promise<{ sessionId?: string; costUsd?: number; notLoggedIn?: boolean }> {
+): Promise<{ sessionId?: string; costUsd?: number; notLoggedIn?: boolean; exitCode?: number; crashed?: boolean }> {
   let currentFlags = [...extraFlags];
   if (allowedTools.size > 0) {
     currentFlags = [...currentFlags, "--allowedTools", [...allowedTools].join(",")];
@@ -492,11 +496,21 @@ async function executeWithPermissions(
         retryFlags,
         timeoutMs
       );
-      return { sessionId: retryResult.sessionId, costUsd: retryResult.costUsd };
+      return {
+        sessionId: retryResult.sessionId,
+        costUsd: retryResult.costUsd,
+        exitCode: retryResult.exitCode,
+        crashed: retryResult.crashed,
+      };
     }
   }
 
-  return { sessionId: result.sessionId, costUsd: result.costUsd };
+  return {
+    sessionId: result.sessionId,
+    costUsd: result.costUsd,
+    exitCode: result.exitCode,
+    crashed: result.crashed,
+  };
 }
 
 function waitForCost(): Promise<CostData | null> {
@@ -1107,7 +1121,12 @@ async function main(): Promise<void> {
       }
     } catch {}
     await tracker.flush().catch(() => {});
-    process.exit(oneShot.permissionDenials.length > 0 ? 2 : 0);
+    // Exit codes: permission denials = 2; agent crashed = the agent's
+    // own exit code (or 1 if we couldn't spawn). Silent success-on-crash
+    // would break CI pipelines that chain on `cohrint && deploy`.
+    if (oneShot.permissionDenials.length > 0) process.exit(2);
+    if (oneShot.crashed) process.exit(oneShot.exitCode || 1);
+    process.exit(0);
   }
 
   if (!process.stdin.isTTY) {
@@ -1156,7 +1175,9 @@ async function main(): Promise<void> {
       }
     } catch {}
     await tracker.flush().catch(() => {});
-    process.exit(stdinRun.permissionDenials.length > 0 ? 2 : 0);
+    if (stdinRun.permissionDenials.length > 0) process.exit(2);
+    if (stdinRun.crashed) process.exit(stdinRun.exitCode || 1);
+    process.exit(0);
   }
 
   await startRepl(config, flags);

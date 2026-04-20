@@ -11,6 +11,44 @@ function ask(rl: ReturnType<typeof createInterface>, question: string): Promise<
   });
 }
 
+// Accept the Cohrint key format (crt_<hex>) or legacy long random tokens.
+// Refuse anything that looks like a paste of an unrelated provider's key
+// or a multi-line smear.
+const API_KEY_RX = /^(crt|vnt|sk)_[A-Za-z0-9_-]{16,256}$/;
+
+function isPlausibleApiKey(v: string): boolean {
+  if (!v) return false;
+  if (v.includes("\n") || v.includes("\r")) return false;
+  if (v.length < 8 || v.length > 512) return false;
+  return API_KEY_RX.test(v);
+}
+
+// Masked-input helper: suppresses the readline echo while the user types
+// a secret. Screen recordings and shoulder-surfers see a prompt but no key.
+function askMasked(
+  rl: ReturnType<typeof createInterface>,
+  question: string
+): Promise<string> {
+  return new Promise((resolve) => {
+    const rlAny = rl as unknown as { _writeToOutput?: (s: string) => void };
+    const originalWrite = rlAny._writeToOutput;
+    let hideEcho = false;
+    rlAny._writeToOutput = (s: string) => {
+      if (!hideEcho || s === "\n" || s === "\r\n") {
+        process.stdout.write(s);
+      } else {
+        process.stdout.write("*");
+      }
+    };
+    rl.question(question, (answer) => {
+      rlAny._writeToOutput = originalWrite;
+      process.stdout.write("\n");
+      resolve(answer.trim());
+    });
+    hideEcho = true;
+  });
+}
+
 export async function runSetup(
   existingRl?: ReturnType<typeof createInterface>
 ): Promise<VantageConfig> {
@@ -63,10 +101,22 @@ export async function runSetup(
       }
     }
 
-    const apiKey = await ask(
-      rl,
-      "  Cohrint API key (Enter to skip): "
-    );
+    let apiKey = "";
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const entered = await askMasked(
+        rl,
+        "  Cohrint API key (Enter to skip): "
+      );
+      if (!entered) {
+        apiKey = "";
+        break;
+      }
+      if (isPlausibleApiKey(entered)) {
+        apiKey = entered;
+        break;
+      }
+      console.log(red("  That doesn't look like a Cohrint API key (expected crt_...) — try again."));
+    }
 
     console.log("");
     console.log(dim("  Privacy levels:"));

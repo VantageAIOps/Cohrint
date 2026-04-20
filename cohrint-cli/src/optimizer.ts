@@ -84,13 +84,27 @@ const VERBOSE_REWRITES: [RegExp, string][] = [
 const FILLER_WORDS_RE =
   /\b(just|really|very|quite|basically|actually|simply|honestly|literally|definitely|certainly|absolutely|obviously|clearly|essentially|practically|virtually|merely|somewhat|rather|fairly|pretty much)\b/gi;
 
+// Cap input to ~256KB — the function is a heuristic estimator used for
+// tracking and comparison only, so a full scan of a 5MB agent stdout is
+// wasted work AND blocks the event loop. Extrapolate from the sample.
+const TOKEN_COUNT_SAMPLE_BYTES = 256 * 1024;
+
 export function countTokens(text: string): number {
-  if (!text || text.trim().length === 0) return 0;
-  const trimmed = text.trim();
+  if (!text || text.length === 0) return 0;
+  const fullLen = text.length;
+  const sample = fullLen > TOKEN_COUNT_SAMPLE_BYTES
+    ? text.slice(0, TOKEN_COUNT_SAMPLE_BYTES)
+    : text;
+  const trimmed = sample.trim();
+  if (trimmed.length === 0) return 0;
   const codeChars = (trimmed.match(/[{}()\[\];=<>|&!~^%]/g) || []).length;
   const isCodeHeavy = codeChars > trimmed.length * 0.05;
   const charsPerToken = isCodeHeavy ? 3 : 4;
-  return Math.ceil(trimmed.length / charsPerToken);
+  const sampleTokens = Math.ceil(trimmed.length / charsPerToken);
+  // Extrapolate when we truncated.
+  if (fullLen <= TOKEN_COUNT_SAMPLE_BYTES) return sampleTokens;
+  const ratio = fullLen / sample.length;
+  return Math.ceil(sampleTokens * ratio);
 }
 
 interface TextSegment {
