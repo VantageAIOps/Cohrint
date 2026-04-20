@@ -97,7 +97,7 @@ function showInlineTip(): void {
 
 async function showDashboardSummary(config: VantageConfig): Promise<void> {
   if (!config.vantageApiKey) {
-    console.log(yellow("  No API key configured. Run setup or set VANTAGE_API_KEY."));
+    console.log(yellow("  No Cohrint API key configured. Run /setup to add one."));
     return;
   }
   const base = config.vantageApiBase || DEFAULT_CONFIG.vantageApiBase;
