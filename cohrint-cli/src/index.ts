@@ -32,7 +32,7 @@ import { calculateCost } from "./pricing.js";
 import { bus } from "./event-bus.js";
 import { Tracker } from "./tracker.js";
 import { initSession, getSession } from "./session.js";
-import { runAgent, runAgentBuffered, type PermissionDenial } from "./runner.js";
+import { runAgent, runAgentBuffered, cancelActiveAgent, hasActiveAgent, type PermissionDenial } from "./runner.js";
 import {
   loadState,
   saveState,
@@ -258,6 +258,15 @@ interface ExecuteResult {
   sessionId?: string;
   costUsd?: number;
   permissionDenials: PermissionDenial[];
+  staleSession?: boolean;
+  notLoggedIn?: boolean;
+}
+
+function printNotLoggedIn(agent: (typeof ALL_AGENTS)[0]): void {
+  console.log("");
+  console.log(yellow(`  ⚠ ${agent.displayName} is not logged in.`));
+  console.log(dim(`    Run '${agent.binary}' in a separate terminal to authenticate, then retry.`));
+  console.log("");
 }
 
 async function executePrompt(
@@ -319,6 +328,8 @@ async function executePrompt(
       sessionId: result.sessionId,
       costUsd: result.costUsd,
       permissionDenials: result.permissionDenials,
+      staleSession: result.staleSession,
+      notLoggedIn: result.notLoggedIn,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -364,8 +375,9 @@ async function executeWithPermissions(
   extraFlags: string[],
   timeoutMs: number | undefined,
   allowedTools: Set<string>,
-  rl: ReturnType<typeof createInterface>
-): Promise<{ sessionId?: string; costUsd?: number }> {
+  rl: ReturnType<typeof createInterface>,
+  clearSession?: () => void
+): Promise<{ sessionId?: string; costUsd?: number; notLoggedIn?: boolean }> {
   let currentFlags = [...extraFlags];
   if (allowedTools.size > 0) {
     currentFlags = [...currentFlags, "--allowedTools", [...allowedTools].join(",")];
@@ -382,6 +394,25 @@ async function executeWithPermissions(
     currentFlags,
     timeoutMs
   );
+
+  if (result.notLoggedIn) {
+    printNotLoggedIn(agent);
+    return { notLoggedIn: true };
+  }
+
+  if (result.staleSession && continueConversation) {
+    clearSession?.();
+    console.log(dim("  Session expired — starting fresh"));
+    const retryResult = await executePrompt(
+      prompt, agent, config, stream, false, undefined,
+      noOptimize, currentFlags, timeoutMs
+    );
+    if (retryResult.notLoggedIn) {
+      printNotLoggedIn(agent);
+      return { notLoggedIn: true };
+    }
+    return { sessionId: retryResult.sessionId, costUsd: retryResult.costUsd };
+  }
 
   if (result.permissionDenials.length > 0) {
     const retryTools = [...allowedTools];
@@ -543,6 +574,11 @@ async function startRepl(
           prompt();
           return;
         }
+        if (line === "/login") {
+          printNotLoggedIn(currentAgent);
+          prompt();
+          return;
+        }
         if (line === "/cost") {
           const session = getSession();
           printSessionSummary(session);
@@ -670,7 +706,7 @@ async function startRepl(
           if (agent && agentPrompt) {
             const costPromise2 = waitForCost();
             const count2 = agentPromptCount.get(agent.name) ?? 0;
-            const { sessionId: sid2 } = await executeWithPermissions(
+            const { sessionId: sid2, notLoggedIn: notLoggedIn2 } = await executeWithPermissions(
               agentPrompt,
               agent,
               config,
@@ -681,8 +717,13 @@ async function startRepl(
               [],
               undefined,
               allowedTools,
-              rl
+              rl,
+              () => { agentSessionIds.delete(agent.name); persistState(); }
             );
+            if (notLoggedIn2) {
+              prompt();
+              return;
+            }
             agentPromptCount.set(agent.name, count2 + 1);
             if (sid2) {
               agentSessionIds.set(agent.name, sid2);
@@ -710,21 +751,32 @@ async function startRepl(
           return;
         }
 
-        const switchMatch = line.match(/^\/(\w+)$/);
+        const switchMatch = line.match(/^\/([\w-]+)$/);
         if (switchMatch) {
           const agent = getAgent(switchMatch[1]);
           if (agent) {
             currentAgent = agent;
             _activeAgentName = agent.name;
             console.log(green(`  Switched to ${agent.displayName}`));
+          } else {
+            console.log(red(`  Unknown command: /${switchMatch[1]}`));
+            console.log(dim(`  Type /help for commands, or /<agent> to switch agents.`));
           }
+          prompt();
+          return;
+        }
+
+        if (line.startsWith("/")) {
+          const cmdName = line.slice(1).split(/\s/)[0];
+          console.log(red(`  Unknown command: /${cmdName}`));
+          console.log(dim(`  Type /help for commands.`));
           prompt();
           return;
         }
 
         const costPromise = waitForCost();
         const count = agentPromptCount.get(currentAgent.name) ?? 0;
-        const { sessionId: sid } = await executeWithPermissions(
+        const { sessionId: sid, notLoggedIn: notLoggedInDefault } = await executeWithPermissions(
           line,
           currentAgent,
           config,
@@ -735,8 +787,13 @@ async function startRepl(
           [],
           undefined,
           allowedTools,
-          rl
+          rl,
+          () => { agentSessionIds.delete(currentAgent.name); persistState(); }
         );
+        if (notLoggedInDefault) {
+          prompt();
+          return;
+        }
         agentPromptCount.set(currentAgent.name, count + 1);
         if (sid) {
           agentSessionIds.set(currentAgent.name, sid);
@@ -782,8 +839,22 @@ async function startRepl(
   };
 
   rl.on("line", onLineReceived);
+  let sigintGraceTimer: NodeJS.Timeout | null = null;
   rl.on("SIGINT", () => {
-    shutdown().catch(() => process.exit(1));
+    if (hasActiveAgent()) {
+      cancelActiveAgent();
+      console.log(dim("\n  ⏹ Interrupted. Press Ctrl-C again or type /quit to exit."));
+      return;
+    }
+    if (sigintGraceTimer) {
+      clearTimeout(sigintGraceTimer);
+      sigintGraceTimer = null;
+      shutdown().catch(() => process.exit(1));
+      return;
+    }
+    console.log(dim("  (Press Ctrl-C again to exit, or type /quit)"));
+    sigintGraceTimer = setTimeout(() => { sigintGraceTimer = null; }, 2000);
+    try { rl.prompt(true); } catch {}
   });
   // Use once() so that re-entering this function (e.g. future refactors)
   // does not stack duplicate listeners. These are process-level signals that
@@ -811,6 +882,7 @@ function printHelp(): void {
   console.log(`  ${cyan("/tips")}               Show cost-saving recommendations`);
   console.log(`  ${cyan("/status")}             Show current agent, cost, allowed tools`);
   console.log(`  ${cyan("/reset")}              Clear session & allowed tools`);
+  console.log(`  ${cyan("/login")}              Show agent login instructions`);
   console.log(`  ${cyan("/setup")}              Run setup wizard`);
   console.log(`  ${cyan("/help")}               Show this help`);
   console.log(`  ${cyan("/quit")}               Exit`);
@@ -851,7 +923,41 @@ async function readStdin(): Promise<string> {
 
 let tracker: Tracker | null = null;
 
+function printCliHelp(): void {
+  console.log("");
+  console.log(bold("  cohrint") + dim(" — unified CLI for Claude, Codex, and Gemini"));
+  console.log("");
+  console.log("  " + bold("Usage:"));
+  console.log("    cohrint [--agent <name>] [--model <m>] [--timeout <ms>] [--no-optimize] [--debug] [prompt...]");
+  console.log("    cohrint                    " + dim("# launch interactive REPL"));
+  console.log("    echo 'hi' | cohrint        " + dim("# pipe stdin as prompt"));
+  console.log("");
+  console.log("  " + bold("Flags:"));
+  console.log("    --agent <name>      Agent to use (claude, codex, gemini, ...)");
+  console.log("    --model <name>      Override model (forwarded to agent)");
+  console.log("    --system <text>     System prompt (forwarded to agent)");
+  console.log("    --timeout <ms>      Kill agent after N milliseconds");
+  console.log("    --no-optimize       Skip prompt optimization");
+  console.log("    --debug             Emit [vantage] diagnostic output");
+  console.log("    --paste-delay <ms>  Delay between pasted lines in REPL");
+  console.log("    --version, -v       Print version and exit");
+  console.log("    --help, -h          Show this help and exit");
+  console.log("");
+  console.log("  " + bold("REPL commands:") + " /help, /cost, /agents, /default, /summary, /budget, /tips, /status, /reset, /login, /setup, /quit");
+  console.log("");
+}
+
 async function main(): Promise<void> {
+  const rawArgs = process.argv.slice(2);
+  if (rawArgs.includes("--version") || rawArgs.includes("-v")) {
+    console.log(VERSION);
+    process.exit(0);
+  }
+  if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
+    printCliHelp();
+    process.exit(0);
+  }
+
   const { flags, agentFlags, prompt: cliPrompt } = parseArgs();
 
   let config: VantageConfig;
@@ -893,7 +999,7 @@ async function main(): Promise<void> {
 
   if (cliPrompt) {
     const costPromise = waitForCost();
-    await executePrompt(
+    const oneShot = await executePrompt(
       cliPrompt,
       agent,
       config,
@@ -904,6 +1010,11 @@ async function main(): Promise<void> {
       extraAgentFlags,
       timeoutMs
     );
+    if (oneShot.notLoggedIn) {
+      printNotLoggedIn(agent);
+      await tracker.flush().catch(() => {});
+      process.exit(1);
+    }
     try {
       const cost = await Promise.race([
         costPromise,
@@ -927,7 +1038,7 @@ async function main(): Promise<void> {
       process.exit(0);
     }
     const costPromise = waitForCost();
-    await executePrompt(
+    const stdinRun = await executePrompt(
       stdinPrompt,
       agent,
       config,
@@ -938,6 +1049,11 @@ async function main(): Promise<void> {
       extraAgentFlags,
       timeoutMs
     );
+    if (stdinRun.notLoggedIn) {
+      printNotLoggedIn(agent);
+      await tracker.flush().catch(() => {});
+      process.exit(1);
+    }
     try {
       const cost = await Promise.race([
         costPromise,

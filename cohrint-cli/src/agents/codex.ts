@@ -24,16 +24,16 @@ export const codexAdapter: AgentAdapter = {
     const baseArgs = config?.args ?? [];
     return {
       command: cmd,
-      args: [...baseArgs, prompt],
+      args: ["exec", ...baseArgs, prompt],
     };
   },
   buildContinueCommand(prompt: string, config?: AgentConfig, sessionId?: string): SpawnArgs {
     const cmd = config?.command || "codex";
     const extraArgs = config?.args ?? [];
-    const resumeArgs = sessionId ? ["--session", sessionId] : ["--continue"];
+    const resumeArgs = sessionId ? ["resume", sessionId] : ["resume", "--last"];
     return {
       command: cmd,
-      args: [...resumeArgs, ...extraArgs, prompt],
+      args: ["exec", ...resumeArgs, ...extraArgs, prompt],
     };
   },
 };

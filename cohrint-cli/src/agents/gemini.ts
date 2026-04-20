@@ -32,7 +32,7 @@ export const geminiAdapter: AgentAdapter = {
     const extraArgs = config?.args?.filter((a) => a !== "-p") ?? [];
     return {
       command: cmd,
-      args: ["--continue", ...extraArgs, "-p", prompt],
+      args: ["--resume", "latest", ...extraArgs, "-p", prompt],
     };
   },
 };

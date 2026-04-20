@@ -190,6 +190,61 @@ function parseStreamLine(line: string): ParsedLine {
 }
 
 const DEFAULT_TIMEOUT_MS = Number(process.env.VANTAGE_TIMEOUT) || 300_000;
+
+type ActiveChild = ReturnType<typeof spawn>;
+let _activeChild: ActiveChild | null = null;
+const _cancelHooks = new Set<() => void>();
+
+function signalChildTree(c: ActiveChild, sig: NodeJS.Signals): void {
+  if (!c.pid) return;
+  let signalled = false;
+  if (process.platform !== "win32") {
+    try { process.kill(-c.pid, sig); signalled = true; } catch {}
+  }
+  if (!signalled) {
+    try { c.kill(sig); } catch {}
+  }
+}
+
+function registerCancelHook(fn: () => void): () => void {
+  _cancelHooks.add(fn);
+  return () => {
+    _cancelHooks.delete(fn);
+  };
+}
+
+export function cancelActiveAgent(): boolean {
+  const c = _activeChild;
+  const hadWork = !!c || _cancelHooks.size > 0;
+  if (c && !c.killed && c.exitCode === null) {
+    try {
+      signalChildTree(c, "SIGINT");
+      const sigterm = setTimeout(() => {
+        if (!c.killed && c.exitCode === null) signalChildTree(c, "SIGTERM");
+      }, 400);
+      const sigkill = setTimeout(() => {
+        if (!c.killed && c.exitCode === null) signalChildTree(c, "SIGKILL");
+      }, 1200);
+      sigterm.unref?.();
+      sigkill.unref?.();
+    } catch {}
+  }
+  // Fire cancel hooks BEFORE clearing — each hook stops its spinner and
+  // resolves its promise synchronously so the REPL unblocks even if the
+  // child takes a while to actually die.
+  const hooks = [..._cancelHooks];
+  _cancelHooks.clear();
+  for (const h of hooks) {
+    try { h(); } catch {}
+  }
+  _activeChild = null;
+  return hadWork;
+}
+
+export function hasActiveAgent(): boolean {
+  const c = _activeChild;
+  return !!((c && !c.killed && c.exitCode === null) || _cancelHooks.size > 0);
+}
 const BLOCKED_ENV = [
   "LD_PRELOAD",
   "LD_LIBRARY_PATH",
@@ -204,6 +259,32 @@ const SAFE_PASS_ENV = new Set([
   "LANG",
   "COLORTERM",
   "TERM_PROGRAM",
+  "USER",
+  "LOGNAME",
+  "PWD",
+  "TMPDIR",
+  "TMP",
+  "TEMP",
+  "XDG_CONFIG_HOME",
+  "XDG_DATA_HOME",
+  "XDG_CACHE_HOME",
+  "XDG_RUNTIME_DIR",
+  "LC_ALL",
+  "LC_CTYPE",
+  "LC_MESSAGES",
+  "TZ",
+  "SSH_AUTH_SOCK",
+  "ANTHROPIC_API_KEY",
+  "ANTHROPIC_AUTH_TOKEN",
+  "CLAUDE_CODE_OAUTH_TOKEN",
+  "OPENAI_API_KEY",
+  "OPENAI_API_BASE",
+  "GOOGLE_API_KEY",
+  "GEMINI_API_KEY",
+  "NODE_EXTRA_CA_CERTS",
+  "HTTPS_PROXY",
+  "HTTP_PROXY",
+  "NO_PROXY",
 ]);
 
 function buildSafeEnv(extra?: Record<string, string>): Record<string, string> {
@@ -246,7 +327,11 @@ export interface RunResult {
   sessionId?: string;
   costUsd?: number;
   permissionDenials: PermissionDenial[];
+  staleSession?: boolean;
+  notLoggedIn?: boolean;
 }
+
+const NOT_LOGGED_IN_RE = /Not logged in|Please run \/login|Please run `\/login`/i;
 
 export function runAgent(
   spawnArgs: SpawnArgs,
@@ -259,15 +344,19 @@ export function runAgent(
     let totalBytes = 0;
     let timedOut = false;
     let capturedSessionId: string | undefined;
+    let staleSessionDetected = false;
+    let notLoggedInDetected = false;
     let lineBuffer = "";
     let child: ReturnType<typeof spawn>;
 
     try {
-      const stdinMode = process.stdin.isTTY ? "inherit" : "pipe";
+      const stdinMode = process.stdin.isTTY ? "ignore" : "pipe";
       child = spawn(spawnArgs.command, spawnArgs.args, {
-        stdio: [stdinMode, "pipe", "inherit"],
+        stdio: [stdinMode, "pipe", "pipe"],
         env: buildSafeEnv(spawnArgs.env),
+        detached: process.platform !== "win32",
       });
+      _activeChild = child;
       if (!process.stdin.isTTY) {
         if (process.stdin.readableEnded || process.stdin.destroyed) {
           child.stdin?.end();
@@ -278,7 +367,20 @@ export function runAgent(
           });
         }
       }
+      child.stderr?.on("data", (chunk: Buffer) => {
+        const text = chunk.toString("utf-8");
+        if (text.includes("No conversation found with session ID")) {
+          staleSessionDetected = true;
+          return;
+        }
+        if (NOT_LOGGED_IN_RE.test(text)) {
+          notLoggedInDetected = true;
+          return;
+        }
+        process.stderr.write(chunk);
+      });
     } catch (err) {
+      _activeChild = null;
       const msg = err instanceof Error ? err.message : String(err);
       reject(new Error(`Failed to start '${spawnArgs.command}': ${msg}`));
       return;
@@ -320,7 +422,40 @@ export function runAgent(
     let capturedCostUsd: number | undefined;
     const capturedDenials: PermissionDenial[] = [];
 
+    let settled = false;
+    const unregisterCancel = registerCancelHook(() => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      stopSpinner();
+      try { child.stdout?.removeAllListeners("data"); } catch {}
+      try { child.stderr?.removeAllListeners("data"); } catch {}
+      const durationMs = Date.now() - start;
+      const stdout = Buffer.concat(chunks).toString("utf-8");
+      bus.emit("agent:completed", {
+        agent: agentName,
+        exitCode: 130,
+        outputText: stdout,
+        durationMs,
+        sessionId: capturedSessionId ?? undefined,
+      });
+      resolve({
+        exitCode: 130,
+        stdout,
+        durationMs,
+        sessionId: capturedSessionId,
+        costUsd: capturedCostUsd,
+        permissionDenials: capturedDenials,
+        staleSession: staleSessionDetected || undefined,
+        notLoggedIn: notLoggedInDetected || undefined,
+      });
+    });
+
     function flushLine(line: string) {
+      if (NOT_LOGGED_IN_RE.test(line)) {
+        notLoggedInDetected = true;
+        return;
+      }
       const { display, tokenText, sessionId } = renderer.process(line);
       if (sessionId) capturedSessionId = sessionId;
 
@@ -375,6 +510,10 @@ export function runAgent(
     child.on("error", (err: NodeJS.ErrnoException) => {
       clearTimeout(timer);
       stopSpinner();
+      if (_activeChild === child) _activeChild = null;
+      unregisterCancel();
+      if (settled) return;
+      settled = true;
       if (err.code === "ENOENT") {
         reject(
           new Error(`'${spawnArgs.command}' not found. Install it or check your PATH.`)
@@ -387,6 +526,10 @@ export function runAgent(
     child.on("close", (code: number | null) => {
       clearTimeout(timer);
       stopSpinner();
+      if (_activeChild === child) _activeChild = null;
+      unregisterCancel();
+      if (settled) return;
+      settled = true;
       if (lineBuffer.trim()) flushLine(lineBuffer);
       const durationMs = Date.now() - start;
       const stdout = Buffer.concat(chunks).toString("utf-8");
@@ -410,6 +553,8 @@ export function runAgent(
           sessionId: capturedSessionId,
           costUsd: capturedCostUsd,
           permissionDenials: capturedDenials,
+          staleSession: staleSessionDetected || undefined,
+          notLoggedIn: notLoggedInDetected || undefined,
         });
       }
     });
@@ -423,6 +568,8 @@ export interface BufferedRunResult {
   sessionId?: string;
   costUsd?: number;
   permissionDenials: PermissionDenial[];
+  staleSession?: boolean;
+  notLoggedIn?: boolean;
 }
 
 export function runAgentBuffered(
@@ -440,11 +587,13 @@ export function runAgentBuffered(
     let child: ReturnType<typeof spawn>;
 
     try {
-      const stdinMode = process.stdin.isTTY ? "inherit" : "pipe";
+      const stdinMode = process.stdin.isTTY ? "ignore" : "pipe";
       child = spawn(spawnArgs.command, spawnArgs.args, {
         stdio: [stdinMode, "pipe", "pipe"],
         env: buildSafeEnv(spawnArgs.env),
+        detached: process.platform !== "win32",
       });
+      _activeChild = child;
       if (!process.stdin.isTTY) {
         if (process.stdin.readableEnded || process.stdin.destroyed) {
           child.stdin?.end();
@@ -456,6 +605,7 @@ export function runAgentBuffered(
         }
       }
     } catch (err) {
+      _activeChild = null;
       const msg = err instanceof Error ? err.message : String(err);
       reject(new Error(`Failed to start '${spawnArgs.command}': ${msg}`));
       return;
@@ -493,8 +643,43 @@ export function runAgentBuffered(
 
     let truncationWarned = false;
     let capturedCostUsd: number | undefined;
+    let staleSessionDetectedBuf = false;
+    let notLoggedInDetectedBuf = false;
+
+    let settled = false;
+    const unregisterCancel = registerCancelHook(() => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      stopSpinner();
+      try { child.stdout?.removeAllListeners("data"); } catch {}
+      try { child.stderr?.removeAllListeners("data"); } catch {}
+      const durationMs = Date.now() - start;
+      const stdout = Buffer.concat(textChunks).toString("utf-8");
+      bus.emit("agent:completed", {
+        agent: agentName,
+        exitCode: 130,
+        outputText: stdout,
+        durationMs,
+        sessionId: capturedSessionId ?? undefined,
+      });
+      resolve({
+        exitCode: 130,
+        stdout,
+        durationMs,
+        sessionId: capturedSessionId,
+        costUsd: capturedCostUsd,
+        permissionDenials: [],
+        staleSession: staleSessionDetectedBuf || undefined,
+        notLoggedIn: notLoggedInDetectedBuf || undefined,
+      });
+    });
 
     function flushLine(line: string) {
+      if (NOT_LOGGED_IN_RE.test(line)) {
+        notLoggedInDetectedBuf = true;
+        return;
+      }
       const { text, sessionId } = parseStreamLine(line);
       if (sessionId) capturedSessionId = sessionId;
       // Also capture cost from the result line (mirrors runAgent behaviour).
@@ -526,11 +711,19 @@ export function runAgentBuffered(
       for (const line of lines) flushLine(line);
     });
 
-    child.stderr?.on("data", (_chunk: Buffer) => {});
+    child.stderr?.on("data", (chunk: Buffer) => {
+      const text = chunk.toString("utf-8");
+      if (text.includes("No conversation found with session ID")) staleSessionDetectedBuf = true;
+      if (NOT_LOGGED_IN_RE.test(text)) notLoggedInDetectedBuf = true;
+    });
 
     child.on("error", (err: NodeJS.ErrnoException) => {
       clearTimeout(timer);
       stopSpinner();
+      if (_activeChild === child) _activeChild = null;
+      unregisterCancel();
+      if (settled) return;
+      settled = true;
       if (err.code === "ENOENT") {
         reject(
           new Error(`'${spawnArgs.command}' not found. Install it or check your PATH.`)
@@ -543,6 +736,10 @@ export function runAgentBuffered(
     child.on("close", (code: number | null) => {
       clearTimeout(timer);
       stopSpinner();
+      if (_activeChild === child) _activeChild = null;
+      unregisterCancel();
+      if (settled) return;
+      settled = true;
       if (lineBuffer.trim()) flushLine(lineBuffer);
       const durationMs = Date.now() - start;
       const stdout = Buffer.concat(textChunks).toString("utf-8");
@@ -566,6 +763,8 @@ export function runAgentBuffered(
           sessionId: capturedSessionId,
           costUsd: capturedCostUsd,
           permissionDenials: [],
+          staleSession: staleSessionDetectedBuf || undefined,
+          notLoggedIn: notLoggedInDetectedBuf || undefined,
         });
       }
     });
