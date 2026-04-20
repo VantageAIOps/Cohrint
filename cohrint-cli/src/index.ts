@@ -339,10 +339,24 @@ async function executePrompt(
   }
 }
 
+let _permissionResolver: ((line: string) => void) | null = null;
+
+function _isAwaitingPermission(): boolean {
+  return _permissionResolver !== null;
+}
+
+function _feedPermissionInput(line: string): void {
+  const r = _permissionResolver;
+  if (r) {
+    _permissionResolver = null;
+    r(line);
+  }
+}
+
 async function askToolPermission(
   toolName: string,
   toolInput: Record<string, unknown>,
-  rl: ReturnType<typeof createInterface>
+  _rl: ReturnType<typeof createInterface>
 ): Promise<"yes" | "always" | "no"> {
   const preview = Object.entries(toolInput)
     .map(
@@ -355,12 +369,12 @@ async function askToolPermission(
       yellow(`\n  ⚠ Claude wants to use ${toolName}(${preview})\n`)
     );
     process.stdout.write(`    ${dim("[y]es once  [a]lways  [n]o")}: `);
-    rl.once("line", (line) => {
+    _permissionResolver = (line: string) => {
       const answer = line.trim().toLowerCase();
       if (answer === "a" || answer === "always") resolve("always");
       else if (answer === "n" || answer === "no") resolve("no");
       else resolve("yes");
-    });
+    };
   });
 }
 
@@ -383,7 +397,7 @@ async function executeWithPermissions(
     currentFlags = [...currentFlags, "--allowedTools", [...allowedTools].join(",")];
   }
 
-  const result = await executePrompt(
+  let result = await executePrompt(
     prompt,
     agent,
     config,
@@ -400,40 +414,46 @@ async function executeWithPermissions(
     return { notLoggedIn: true };
   }
 
-  if (result.staleSession && continueConversation) {
+  let useContinue = continueConversation;
+  let useSessionId = sessionId;
+  if (result.staleSession && useContinue) {
     clearSession?.();
     console.log(dim("  Session expired — starting fresh"));
-    const retryResult = await executePrompt(
-      prompt, agent, config, stream, false, undefined,
+    useContinue = false;
+    useSessionId = undefined;
+    result = await executePrompt(
+      prompt, agent, config, stream, useContinue, useSessionId,
       noOptimize, currentFlags, timeoutMs
     );
-    if (retryResult.notLoggedIn) {
+    if (result.notLoggedIn) {
       printNotLoggedIn(agent);
       return { notLoggedIn: true };
     }
-    return { sessionId: retryResult.sessionId, costUsd: retryResult.costUsd };
   }
 
   if (result.permissionDenials.length > 0) {
-    const retryTools = [...allowedTools];
+    const retryTools = new Set<string>(allowedTools);
+    let grantedNew = false;
     for (const denial of result.permissionDenials) {
       const answer = await askToolPermission(denial.toolName, denial.toolInput, rl);
       if (answer === "always") {
+        if (!allowedTools.has(denial.toolName)) grantedNew = true;
         allowedTools.add(denial.toolName);
-        retryTools.push(denial.toolName);
+        retryTools.add(denial.toolName);
       } else if (answer === "yes") {
-        retryTools.push(denial.toolName);
+        if (!retryTools.has(denial.toolName)) grantedNew = true;
+        retryTools.add(denial.toolName);
       }
     }
-    if (retryTools.length > 0) {
-      const retryFlags = [...extraFlags, "--allowedTools", retryTools.join(",")];
+    if (grantedNew) {
+      const retryFlags = [...extraFlags, "--allowedTools", [...retryTools].join(",")];
       const retryResult = await executePrompt(
         prompt,
         agent,
         config,
         stream,
-        continueConversation,
-        sessionId,
+        useContinue,
+        useSessionId,
         noOptimize,
         retryFlags,
         timeoutMs
@@ -546,6 +566,10 @@ async function startRepl(
   let handleLine: ((input: string) => void) | null = null;
 
   function onLineReceived(raw: string) {
+    if (_isAwaitingPermission()) {
+      _feedPermissionInput(raw);
+      return;
+    }
     pasteBuffer.push(raw);
     if (pasteTimer) clearTimeout(pasteTimer);
     pasteTimer = setTimeout(() => {
@@ -1015,6 +1039,16 @@ async function main(): Promise<void> {
       await tracker.flush().catch(() => {});
       process.exit(1);
     }
+    if (oneShot.permissionDenials.length > 0) {
+      console.error(
+        yellow(
+          `\n  ⚠ ${oneShot.permissionDenials.length} tool call(s) denied. Re-run with --allowedTools or use REPL for interactive approval.`
+        )
+      );
+      for (const d of oneShot.permissionDenials) {
+        console.error(dim(`    - ${d.toolName}`));
+      }
+    }
     try {
       const cost = await Promise.race([
         costPromise,
@@ -1029,7 +1063,7 @@ async function main(): Promise<void> {
       }
     } catch {}
     await tracker.flush().catch(() => {});
-    process.exit(0);
+    process.exit(oneShot.permissionDenials.length > 0 ? 2 : 0);
   }
 
   if (!process.stdin.isTTY) {
@@ -1054,6 +1088,16 @@ async function main(): Promise<void> {
       await tracker.flush().catch(() => {});
       process.exit(1);
     }
+    if (stdinRun.permissionDenials.length > 0) {
+      console.error(
+        yellow(
+          `\n  ⚠ ${stdinRun.permissionDenials.length} tool call(s) denied. Re-run with --allowedTools or use REPL for interactive approval.`
+        )
+      );
+      for (const d of stdinRun.permissionDenials) {
+        console.error(dim(`    - ${d.toolName}`));
+      }
+    }
     try {
       const cost = await Promise.race([
         costPromise,
@@ -1068,7 +1112,7 @@ async function main(): Promise<void> {
       }
     } catch {}
     await tracker.flush().catch(() => {});
-    process.exit(0);
+    process.exit(stdinRun.permissionDenials.length > 0 ? 2 : 0);
   }
 
   await startRepl(config, flags);
