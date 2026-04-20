@@ -3,6 +3,7 @@ import { createInterface } from "readline";
 import { VERSION } from "./_version.js";
 import {
   loadConfig,
+  saveConfig,
   configExists,
   DEFAULT_CONFIG,
   type VantageConfig,
@@ -800,9 +801,35 @@ async function startRepl(
           prompt();
           return;
         }
+        if (line === "/optimize" || line.startsWith("/optimize ")) {
+          const arg = line.slice(9).trim().toLowerCase();
+          if (arg === "on" || arg === "off") {
+            config.optimization.enabled = arg === "on";
+            try {
+              saveConfig(config);
+              console.log(green(`  Prompt optimization ${arg}.`));
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err);
+              console.log(red(`  Failed to save config: ${msg}`));
+            }
+          } else if (arg === "" || arg === "status") {
+            const state = config.optimization.enabled ? green("on") : yellow("off");
+            console.log(`  Prompt optimization is ${state}.`);
+            console.log(dim("  Usage: /optimize on | /optimize off"));
+          } else {
+            console.log(red(`  Unknown argument: ${arg.slice(0, 32)}`));
+            console.log(dim("  Usage: /optimize on | /optimize off"));
+          }
+          prompt();
+          return;
+        }
 
+        // Only treat `/<name> <prompt>` as an agent dispatch if <name> is a
+        // registered agent. Otherwise typos like `/optimize on` or `/hepl me`
+        // used to be misattributed as "Unknown agent: optimize" — fall
+        // through to the standard "/ unknown command" handler below instead.
         const agentPrefixMatch = line.match(/^\/(\w+)\s+([\s\S]+)$/);
-        if (agentPrefixMatch) {
+        if (agentPrefixMatch && getAgent(agentPrefixMatch[1])) {
           const [, agentName, rawAgentPrompt] = agentPrefixMatch;
           const agentPrompt = rawAgentPrompt.trim();
           const agent = getAgent(agentName);
@@ -847,8 +874,6 @@ async function startRepl(
                 showInlineTip();
               }
             } catch {}
-          } else if (!agent) {
-            console.log(red(`  Unknown agent: ${agentName}`));
           }
           prompt();
           return;
@@ -986,6 +1011,7 @@ function printHelp(): void {
   console.log(`  ${cyan("/summary")}            Dashboard summary (spend, tokens, budget)`);
   console.log(`  ${cyan("/budget")}             Check budget status and alerts`);
   console.log(`  ${cyan("/tips")}               Show cost-saving recommendations`);
+  console.log(`  ${cyan("/optimize on|off")}    Toggle prompt optimization`);
   console.log(`  ${cyan("/status")}             Show current agent, cost, allowed tools`);
   console.log(`  ${cyan("/reset")}              Clear session & allowed tools`);
   console.log(`  ${cyan("/login")}              Show agent login instructions`);
@@ -1054,7 +1080,7 @@ function printCliHelp(): void {
   console.log("    --version, -v       Print version and exit");
   console.log("    --help, -h          Show this help and exit");
   console.log("");
-  console.log("  " + bold("REPL commands:") + " /help, /cost, /agents, /default, /summary, /budget, /tips, /status, /reset, /login, /setup, /quit");
+  console.log("  " + bold("REPL commands:") + " /help, /cost, /agents, /default, /summary, /budget, /tips, /optimize, /status, /reset, /login, /setup, /quit");
   console.log("");
 }
 
