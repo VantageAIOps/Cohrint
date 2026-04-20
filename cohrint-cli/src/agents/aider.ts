@@ -1,7 +1,7 @@
-import { execSync } from "child_process";
 import type { AgentAdapter, SpawnArgs } from "./registry.js";
 import type { AgentConfig } from "../config.js";
 import { sanitizeAgentCommand, sanitizeAgentArgs } from "../sanitize.js";
+import { detectBinary } from "./registry.js";
 
 export const aiderAdapter: AgentAdapter = {
   name: "aider",
@@ -15,12 +15,7 @@ export const aiderAdapter: AgentAdapter = {
   // Each invocation automatically continues from the current git/file state.
   supportsContinue: false,
   async detect() {
-    try {
-      execSync("which aider", { stdio: "ignore", timeout: 5000 });
-      return true;
-    } catch {
-      return false;
-    }
+    return detectBinary("aider");
   },
   buildCommand(prompt: string, config?: AgentConfig): SpawnArgs {
     const cmd = sanitizeAgentCommand(config?.command, "aider");

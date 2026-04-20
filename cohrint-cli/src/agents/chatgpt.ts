@@ -1,7 +1,7 @@
-import { execSync } from "child_process";
 import type { AgentAdapter, SpawnArgs } from "./registry.js";
 import type { AgentConfig } from "../config.js";
 import { sanitizeAgentCommand, sanitizeAgentArgs } from "../sanitize.js";
+import { detectBinary } from "./registry.js";
 
 export const chatgptAdapter: AgentAdapter = {
   name: "chatgpt",
@@ -13,12 +13,7 @@ export const chatgptAdapter: AgentAdapter = {
   exitCommand: "/quit",
   supportsContinue: true,
   async detect() {
-    try {
-      execSync("which chatgpt-cli", { stdio: "ignore", timeout: 5000 });
-      return true;
-    } catch {
-      return false;
-    }
+    return detectBinary("chatgpt-cli");
   },
   buildCommand(prompt: string, config?: AgentConfig): SpawnArgs {
     const cmd = sanitizeAgentCommand(config?.command, "chatgpt-cli");

@@ -58,6 +58,14 @@ import {
 const COST_TIMEOUT_MS = 5000;
 const COST_LISTEN_MS = 600_000;
 
+// Dashboard/budget fields are sourced from an external API and may arrive as
+// strings like "N/A" or non-numeric JSON. Number("N/A") returns NaN, and
+// NaN.toFixed() returns "NaN" — printing that is misleading, so coerce to 0.
+function _finiteOr(n: unknown, fallback: number): number {
+  const v = typeof n === "number" ? n : Number(n);
+  return Number.isFinite(v) ? v : fallback;
+}
+
 function checkAnomaly(cost: CostData): void {
   const sess = getSession();
   const priorTotal = sess.totalCostUsd - cost.costUsd;
@@ -121,11 +129,11 @@ async function showDashboardSummary(config: VantageConfig): Promise<void> {
 
     if (summary) {
       const s = summary as Record<string, unknown>;
-      const todayCost = Number(s.today_cost_usd ?? 0);
-      const mtdCost = Number(s.mtd_cost_usd ?? 0);
-      const todayReqs = Number(s.today_requests ?? 0);
-      const budgetPct = Number(s.budget_pct ?? 0);
-      const budgetUsd = Number(s.budget_usd ?? 0);
+      const todayCost = _finiteOr(s.today_cost_usd, 0);
+      const mtdCost = _finiteOr(s.mtd_cost_usd, 0);
+      const todayReqs = _finiteOr(s.today_requests, 0);
+      const budgetPct = _finiteOr(s.budget_pct, 0);
+      const budgetUsd = _finiteOr(s.budget_usd, 0);
       console.log(`  ${dim("Today spend:")}    ${green("$" + todayCost.toFixed(4))}`);
       console.log(`  ${dim("MTD spend:")}      $${mtdCost.toFixed(4)}`);
       console.log(`  ${dim("Today requests:")} ${todayReqs}`);
@@ -136,11 +144,11 @@ async function showDashboardSummary(config: VantageConfig): Promise<void> {
     }
     if (kpis) {
       const k = kpis as Record<string, unknown>;
-      const totalCost = Number(k.total_cost_usd ?? 0);
-      const totalTokens = Number(k.total_tokens ?? 0);
-      const totalReqs = Number(k.total_requests ?? 0);
-      const avgLatency = Number(k.avg_latency_ms ?? 0);
-      const effScore = Number(k.efficiency_score ?? 0);
+      const totalCost = _finiteOr(k.total_cost_usd, 0);
+      const totalTokens = _finiteOr(k.total_tokens, 0);
+      const totalReqs = _finiteOr(k.total_requests, 0);
+      const avgLatency = _finiteOr(k.avg_latency_ms, 0);
+      const effScore = _finiteOr(k.efficiency_score, 0);
       console.log(`  ${dim("30d spend:")}      $${totalCost.toFixed(4)}`);
       console.log(`  ${dim("30d tokens:")}     ${totalTokens.toLocaleString()}`);
       console.log(`  ${dim("30d requests:")}   ${totalReqs.toLocaleString()}`);
@@ -191,9 +199,9 @@ async function showBudgetStatus(config: VantageConfig): Promise<void> {
     const data = await safeFetchJson(res);
     if (!data) throw new Error("Invalid JSON response from API");
     const d = data as Record<string, unknown>;
-    const budgetUsd = Number(d.budget_usd ?? 0);
-    const budgetPct = Number(d.budget_pct ?? 0);
-    const mtdCost = Number(d.mtd_cost_usd ?? 0);
+    const budgetUsd = _finiteOr(d.budget_usd, 0);
+    const budgetPct = _finiteOr(d.budget_pct, 0);
+    const mtdCost = _finiteOr(d.mtd_cost_usd, 0);
 
     console.log("");
     if (budgetUsd <= 0) {

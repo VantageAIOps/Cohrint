@@ -1,7 +1,7 @@
-import { execSync } from "child_process";
 import type { AgentAdapter, SpawnArgs } from "./registry.js";
 import type { AgentConfig } from "../config.js";
 import { sanitizeAgentCommand, sanitizeAgentArgs } from "../sanitize.js";
+import { detectBinary } from "./registry.js";
 
 export const geminiAdapter: AgentAdapter = {
   name: "gemini",
@@ -13,12 +13,7 @@ export const geminiAdapter: AgentAdapter = {
   exitCommand: "/quit",
   supportsContinue: true,
   async detect() {
-    try {
-      execSync("which gemini", { stdio: "ignore", timeout: 5000 });
-      return true;
-    } catch {
-      return false;
-    }
+    return detectBinary("gemini");
   },
   buildCommand(prompt: string, config?: AgentConfig): SpawnArgs {
     const cmd = sanitizeAgentCommand(config?.command, "gemini");

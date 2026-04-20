@@ -33,6 +33,10 @@ interface TrackingEvent {
 }
 
 const MAX_RETRIES = 5; // drop an event after this many failed flushes
+// Hard queue ceiling. If the tracking endpoint is slow/hung (or adversarial,
+// via a config-tampered vantageApiBase), unacknowledged batches re-queue
+// every flushInterval. Without this cap, memory grows unbounded.
+const MAX_QUEUE_SIZE = 500;
 
 export class Tracker {
   private queue: TrackingEvent[] = [];
@@ -144,6 +148,14 @@ export class Tracker {
 
     const eventKey = event.event_id;
     if (this.sentIds.has(eventKey) || this.queuedIds.has(eventKey)) return;
+    // Drop new events when the queue is saturated — a hung/adversarial API
+    // would otherwise let unacknowledged batches grow without bound.
+    if (this.queue.length >= MAX_QUEUE_SIZE) {
+      if (this.config.debug) {
+        console.warn(`[vantage] Dropping event: queue at MAX_QUEUE_SIZE (${MAX_QUEUE_SIZE})`);
+      }
+      return;
+    }
     this.queuedIds.add(eventKey);
     if (this.queuedIds.size > 1000) {
       const arr = Array.from(this.queuedIds);
@@ -207,7 +219,8 @@ export class Tracker {
           if (retryable.length < unsent.length && this.config.debug) {
             console.warn(`[vantage] Dropping ${unsent.length - retryable.length} events: exceeded ${MAX_RETRIES} retries`);
           }
-          this.queue.unshift(...retryable);
+          const free = Math.max(0, MAX_QUEUE_SIZE - this.queue.length);
+          this.queue.unshift(...retryable.slice(0, free));
         } else if (response.status >= 400) {
           console.warn(`[vantage] Dropping ${unsent.length} events: HTTP ${response.status}`);
         }
@@ -223,7 +236,8 @@ export class Tracker {
       const retryable = unsent
         .map((e) => ({ ...e, _retries: (e._retries ?? 0) + 1 }))
         .filter((e) => e._retries <= MAX_RETRIES);
-      this.queue.unshift(...retryable);
+      const free = Math.max(0, MAX_QUEUE_SIZE - this.queue.length);
+      this.queue.unshift(...retryable.slice(0, free));
     }
   }
 
