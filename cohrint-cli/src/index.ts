@@ -1230,6 +1230,11 @@ async function checkForUpdate(): Promise<void> {
     if (!data || typeof data !== "object") return;
     const version = (data as Record<string, unknown>).version;
     if (typeof version !== "string" || !version) return;
+    // Reject anything that's not strict semver-ish. A MITM'd or poisoned npm
+    // registry response could return "1.2.3\x1b]52;c;payload\x07" — the shell
+    // would interpret the OSC 52 escape as a clipboard-write. Keep only the
+    // characters a real npm version can contain.
+    if (!/^[A-Za-z0-9._\-+]{1,64}$/.test(version)) return;
     if (isNewerVersion(version, current)) {
       console.error(
         yellow(`\n  Update available: cohrint-cli ${current} → ${version}`)
