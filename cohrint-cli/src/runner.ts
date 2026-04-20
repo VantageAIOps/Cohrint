@@ -672,7 +672,10 @@ export function runAgentBuffered(
       return;
     }
 
-    const spinner = createSpinner(`Running ${agentName}...`);
+    // Scrub in case a compromised config.defaultAgent ever reaches us with
+    // embedded escape bytes (e.g., OSC 52) — createSpinner writes directly to
+    // process.stderr without its own sanitation.
+    const spinner = createSpinner(sanitizeDisplay(`Running ${agentName}...`));
     let spinnerStopped = false;
     const stopSpinner = () => {
       if (!spinnerStopped) {

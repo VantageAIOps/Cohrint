@@ -176,7 +176,11 @@ export function saveConfig(config: VantageConfig): void {
       try { unlinkSync(tmpPath); } catch {}
     }
     try {
-      writeFileSync(tmpPath, JSON.stringify(config, null, 2), { encoding: "utf-8", mode: 0o600 });
+      // O_EXCL ('wx') closes the TOCTOU window where an attacker could
+      // symlink tmpPath to /etc/shadow or similar between our unlink and
+      // our open — writeFileSync without 'wx' follows symlinks. 'wx' fails
+      // with EEXIST if the path reappears, so we never write through one.
+      writeFileSync(tmpPath, JSON.stringify(config, null, 2), { encoding: "utf-8", mode: 0o600, flag: "wx" });
       renameSync(tmpPath, configPath);
       _secureFile(configPath);
     } catch (err) {

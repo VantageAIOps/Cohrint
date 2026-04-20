@@ -66,11 +66,20 @@ class Session {
     });
 
     bus.on("cost:calculated", (data) => {
+      // Defence-in-depth: reject obviously-hostile numeric fields. parseFiniteCost
+      // already caps per-event cost at $1M, but feeding that repeatedly inflates
+      // the rolling average used by anomaly.ts, blinding the detector. Cap each
+      // event's contribution to a realistic ceiling so a single spoofed event
+      // can't meaningfully shift the baseline.
+      const safe = (n: unknown, max: number): number => {
+        if (typeof n !== "number" || !Number.isFinite(n) || n < 0) return 0;
+        return n > max ? max : n;
+      };
       this.state.promptCount++;
-      this.state.totalInputTokens += data.inputTokens;
-      this.state.totalOutputTokens += data.outputTokens;
-      this.state.totalCostUsd += data.costUsd;
-      this.state.totalSavedUsd += data.savedUsd;
+      this.state.totalInputTokens += safe(data.inputTokens, 1e11);
+      this.state.totalOutputTokens += safe(data.outputTokens, 1e11);
+      this.state.totalCostUsd += safe(data.costUsd, 1_000);
+      this.state.totalSavedUsd += safe(data.savedUsd, 1_000);
 
       const promptHash = createHash("sha256")
         .update(this.currentPrompt)

@@ -22,6 +22,17 @@ const PRICES: Record<string, ModelPrice> = {
   "grok-2": { input: 2, output: 10, cache: 0 },
 };
 
+// Bound per-call token inputs so a hostile agent feeding giant counts can't
+// produce Infinity cost (N * price overflows past Number.MAX_SAFE_INTEGER
+// at roughly 1.2e14 tokens). 1e10 is already absurd (~$750k on opus-4-6).
+const MAX_TOKENS_PER_CALL = 10_000_000_000;
+
+function _safeTokens(n: unknown): number {
+  if (typeof n !== "number" || !Number.isFinite(n) || n < 0) return 0;
+  if (n > MAX_TOKENS_PER_CALL) return MAX_TOKENS_PER_CALL;
+  return Math.floor(n);
+}
+
 export function calculateCost(
   model: string,
   promptTokens: number,
@@ -38,14 +49,21 @@ export function calculateCost(
       price = PRICES[key];
     } else {
       if (typeof process !== "undefined" && process.stderr) {
-        process.stderr.write(`  [vantage] Unknown model "${model}" — cost set to $0\n`);
+        // Scrub: model may originate from agent stdout and could contain
+        // escape bytes aimed at the operator's terminal.
+        const safeModel = String(model).replace(/[\x00-\x1f\x7f-\x9f]/g, "").slice(0, 80);
+        process.stderr.write(`  [vantage] Unknown model "${safeModel}" — cost set to $0\n`);
       }
       return 0;
     }
   }
-  const billableInput = Math.max(0, promptTokens - cachedTokens);
+  const pt = _safeTokens(promptTokens);
+  const ct = _safeTokens(completionTokens);
+  const kt = _safeTokens(cachedTokens);
+  const billableInput = Math.max(0, pt - kt);
   const inputCost = (billableInput * price.input) / 1_000_000;
-  const cacheCost = (cachedTokens * price.cache) / 1_000_000;
-  const outputCost = (completionTokens * price.output) / 1_000_000;
-  return inputCost + cacheCost + outputCost;
+  const cacheCost = (kt * price.cache) / 1_000_000;
+  const outputCost = (ct * price.output) / 1_000_000;
+  const total = inputCost + cacheCost + outputCost;
+  return Number.isFinite(total) && total >= 0 ? total : 0;
 }

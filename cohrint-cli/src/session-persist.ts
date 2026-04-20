@@ -101,7 +101,8 @@ export function saveState(state: PersistedState): void {
     try { unlinkSync(tmp); } catch {}
   }
   try {
-    writeFileSync(tmp, JSON.stringify(state, null, 2), { encoding: "utf-8", mode: 0o600 });
+    // O_EXCL ('wx') — see config.ts saveConfig for the TOCTOU rationale.
+    writeFileSync(tmp, JSON.stringify(state, null, 2), { encoding: "utf-8", mode: 0o600, flag: "wx" });
     renameSync(tmp, path);
     try { chmodSync(path, 0o600); } catch {}
   } catch (err) {
