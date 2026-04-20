@@ -921,6 +921,12 @@ async function startRepl(
           return;
         }
 
+        if (line === "/") {
+          printHelp();
+          prompt();
+          return;
+        }
+
         if (line.startsWith("/")) {
           const cmdRaw = line.slice(1).split(/\s/)[0];
           // Reflecting raw user input into the terminal is an OSC/CSI escape
