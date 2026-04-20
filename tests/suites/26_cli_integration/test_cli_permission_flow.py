@@ -26,6 +26,8 @@ from helpers.output import section, chk, get_results, reset_results
 ROOT = Path(__file__).parent.parent.parent.parent
 CLI_SRC = ROOT / "cohrint-cli" / "src" / "index.ts"
 RUNNER_SRC = ROOT / "cohrint-cli" / "src" / "runner.ts"
+SETUP_SRC = ROOT / "cohrint-cli" / "src" / "setup.ts"
+TRACKER_SRC = ROOT / "cohrint-cli" / "src" / "tracker.ts"
 
 
 def idx() -> str:
@@ -34,6 +36,14 @@ def idx() -> str:
 
 def runner() -> str:
     return RUNNER_SRC.read_text()
+
+
+def setup() -> str:
+    return SETUP_SRC.read_text()
+
+
+def tracker() -> str:
+    return TRACKER_SRC.read_text()
 
 
 class TestPermissionFlow:
@@ -121,6 +131,67 @@ class TestPermissionFlow:
         )
         assert "stdinRun.permissionDenials.length > 0" in src
         assert "process.exit(stdinRun.permissionDenials.length > 0 ? 2 : 0)" in src
+
+
+    def test_ci_perm_09_deny_by_default_on_unknown_input(self):
+        src = idx()
+        # Empty / mistyped input must NOT grant the tool.
+        # Explicit yes must still be "y" or "yes"; anything else re-prompts or denies.
+        chk(
+            "CI-PERM.9 permission resolver denies on unknown input (no implicit yes)",
+            'answer === "y" || answer === "yes"' in src
+            and 'answer === ""' in src
+            and "Please answer y, a, or n" in src,
+        )
+        assert 'answer === "y" || answer === "yes"' in src
+        assert "Please answer y, a, or n" in src
+
+    def test_ci_perm_10_sanitizes_tool_name_and_input(self):
+        src = idx()
+        chk(
+            "CI-PERM.10 tool name/input sanitized before stdout (ANSI injection blocked)",
+            "_sanitizeForTerminal" in src
+            and "\\x00-\\x1f\\x7f-\\x9f" in src
+            and "MAX_PREVIEW" in src,
+        )
+        assert "_sanitizeForTerminal" in src
+        assert "\\x00-\\x1f\\x7f-\\x9f" in src
+
+    def test_ci_perm_11_blocked_env_case_insensitive(self):
+        src = runner()
+        chk(
+            "CI-PERM.11 BLOCKED_ENV check normalizes to uppercase",
+            "_isBlockedEnv" in src
+            and "name.toUpperCase()" in src
+            and "BLOCKED_ENV.has" in src,
+        )
+        assert "_isBlockedEnv" in src
+        assert "name.toUpperCase()" in src
+
+    def test_ci_perm_12_runsetup_accepts_existing_readline(self):
+        s = setup()
+        i = idx()
+        chk(
+            "CI-PERM.12 runSetup reuses REPL's readline (no stdin ownership conflict)",
+            "existingRl?: ReturnType<typeof createInterface>" in s
+            and "ownsRl" in s
+            and "if (ownsRl) rl.close()" in s
+            and "runSetup(rl)" in i,
+        )
+        assert "existingRl?: ReturnType<typeof createInterface>" in s
+        assert "if (ownsRl) rl.close()" in s
+        assert "runSetup(rl)" in i
+
+    def test_ci_perm_13_tracker_removes_before_exit_on_stop(self):
+        src = tracker()
+        chk(
+            "CI-PERM.13 Tracker.stop() deregisters beforeExit listener (no leak on /setup)",
+            "_onBeforeExit" in src
+            and 'process.off("beforeExit"' in src
+            and "this._onBeforeExit = null" in src,
+        )
+        assert "_onBeforeExit" in src
+        assert 'process.off("beforeExit"' in src
 
 
 if __name__ == "__main__":

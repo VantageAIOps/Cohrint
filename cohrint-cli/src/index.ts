@@ -353,28 +353,48 @@ function _feedPermissionInput(line: string): void {
   }
 }
 
+function _sanitizeForTerminal(s: string, max: number): string {
+  // Strip ESC, CSI, and other control chars (C0 + DEL + C1) to prevent a
+  // compromised subprocess from injecting ANSI escapes via tool metadata.
+  const cleaned = s.replace(/[\x00-\x1f\x7f-\x9f]/g, "");
+  return cleaned.length > max ? cleaned.slice(0, max) + "…" : cleaned;
+}
+
 async function askToolPermission(
   toolName: string,
   toolInput: Record<string, unknown>,
   _rl: ReturnType<typeof createInterface>
 ): Promise<"yes" | "always" | "no"> {
-  const preview = Object.entries(toolInput)
-    .map(
-      ([k, v]) =>
-        `${k}=${typeof v === "string" ? v.slice(0, 50) : JSON.stringify(v)}`
-    )
+  const safeName = _sanitizeForTerminal(String(toolName), 60);
+  const MAX_KEY = 20;
+  const MAX_VAL = 50;
+  const MAX_PREVIEW = 200;
+  let preview = Object.entries(toolInput)
+    .map(([k, v]) => {
+      const safeKey = _sanitizeForTerminal(String(k), MAX_KEY);
+      const raw = typeof v === "string" ? v : JSON.stringify(v);
+      const safeVal = _sanitizeForTerminal(String(raw ?? ""), MAX_VAL);
+      return `${safeKey}=${safeVal}`;
+    })
     .join(", ");
+  if (preview.length > MAX_PREVIEW) preview = preview.slice(0, MAX_PREVIEW) + "…";
+
   return new Promise((resolve) => {
-    process.stdout.write(
-      yellow(`\n  ⚠ Claude wants to use ${toolName}(${preview})\n`)
-    );
-    process.stdout.write(`    ${dim("[y]es once  [a]lways  [n]o")}: `);
-    _permissionResolver = (line: string) => {
-      const answer = line.trim().toLowerCase();
-      if (answer === "a" || answer === "always") resolve("always");
-      else if (answer === "n" || answer === "no") resolve("no");
-      else resolve("yes");
+    const ask = () => {
+      process.stdout.write(
+        yellow(`\n  ⚠ Claude wants to use ${safeName}(${preview})\n`)
+      );
+      process.stdout.write(`    ${dim("[y]es once  [a]lways  [n]o")}: `);
+      _permissionResolver = (line: string) => {
+        const answer = line.trim().toLowerCase();
+        if (answer === "a" || answer === "always") return resolve("always");
+        if (answer === "y" || answer === "yes") return resolve("yes");
+        if (answer === "n" || answer === "no" || answer === "") return resolve("no");
+        process.stdout.write(dim(`    Please answer y, a, or n.\n`));
+        ask();
+      };
     };
+    ask();
   });
 }
 
@@ -649,12 +669,12 @@ async function startRepl(
           return;
         }
         if (line === "/setup") {
-          // Pause line events during setup so the new readline in runSetup
-          // can own stdin. Remove our listener temporarily — we'll re-add it
-          // if setup succeeds and we return to the REPL prompt.
+          // Pause line events during setup so runSetup's `rl.question` calls
+          // receive input directly instead of being intercepted by our
+          // line handler. runSetup reuses this rl — it must not be closed.
           rl.removeListener("line", onLineReceived);
           try {
-            const newConfig = await runSetup();
+            const newConfig = await runSetup(rl);
             Object.assign(config, newConfig);
             if (tracker) tracker.stop();
             tracker = new Tracker({

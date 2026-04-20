@@ -40,7 +40,7 @@ export class Tracker {
   private config: TrackerConfig;
   private sentIds = new Set<string>(); // confirmed-delivered IDs
   private queuedIds = new Set<string>(); // IDs currently in the send queue
-  private exitRegistered = false;
+  private _onBeforeExit: (() => void) | null = null;
   // Queue of submitted prompt texts — consumed FIFO on agent:completed.
   // Using a queue (not a scalar) handles session mode where N prompts are
   // submitted before a single agent:completed fires at session end.
@@ -230,13 +230,13 @@ export class Tracker {
     this.timer = setInterval(() => {
       this.flush().catch(() => {});
     }, this.config.flushInterval);
-    if (!this.exitRegistered) {
-      this.exitRegistered = true;
-      process.on("beforeExit", () => {
+    if (!this._onBeforeExit) {
+      this._onBeforeExit = () => {
         this.flush().catch((err) => {
           if (this.config?.debug) console.error("[vantage] Final flush failed:", err);
         });
-      });
+      };
+      process.on("beforeExit", this._onBeforeExit);
     }
   }
 
@@ -244,6 +244,12 @@ export class Tracker {
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
+    }
+    // Deregister beforeExit so a replaced Tracker doesn't flush a discarded
+    // instance on process exit (leak prevention across /setup reloads).
+    if (this._onBeforeExit) {
+      process.off("beforeExit", this._onBeforeExit);
+      this._onBeforeExit = null;
     }
     // Remove bus listeners so a replaced Tracker does not double-count events.
     bus.off("prompt:optimized", this._onOptimized);

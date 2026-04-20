@@ -245,12 +245,21 @@ export function hasActiveAgent(): boolean {
   const c = _activeChild;
   return !!((c && !c.killed && c.exitCode === null) || _cancelHooks.size > 0);
 }
-const BLOCKED_ENV = [
+const BLOCKED_ENV = new Set([
   "LD_PRELOAD",
   "LD_LIBRARY_PATH",
+  "LD_AUDIT",
   "DYLD_INSERT_LIBRARIES",
+  "DYLD_LIBRARY_PATH",
+  "DYLD_FALLBACK_LIBRARY_PATH",
+  "DYLD_FRAMEWORK_PATH",
   "PYTHONPATH",
-];
+  "NODE_OPTIONS",
+]);
+
+function _isBlockedEnv(name: string): boolean {
+  return BLOCKED_ENV.has(name.toUpperCase());
+}
 const SAFE_PASS_ENV = new Set([
   "PATH",
   "HOME",
@@ -295,12 +304,12 @@ function buildSafeEnv(extra?: Record<string, string>): Record<string, string> {
     (process.env.VANTAGE_PASS_ENV ?? "")
       .split(",")
       .map((s) => s.trim())
-      .filter((k) => k.length > 0 && !BLOCKED_ENV.includes(k))
+      .filter((k) => k.length > 0 && !_isBlockedEnv(k))
   );
   const env: Record<string, string> = {};
   for (const [k, v] of Object.entries(process.env)) {
     if (v === undefined) continue; // strip undefined values — cast-safe
-    if (BLOCKED_ENV.includes(k)) continue;
+    if (_isBlockedEnv(k)) continue;
     if (SAFE_PASS_ENV.has(k) || extraAllowed.has(k)) {
       env[k] = v;
     }

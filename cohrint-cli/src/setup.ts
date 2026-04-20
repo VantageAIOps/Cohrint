@@ -11,11 +11,17 @@ function ask(rl: ReturnType<typeof createInterface>, question: string): Promise<
   });
 }
 
-export async function runSetup(): Promise<VantageConfig> {
-  const rl = createInterface({
+export async function runSetup(
+  existingRl?: ReturnType<typeof createInterface>
+): Promise<VantageConfig> {
+  // Reuse the caller's readline if provided (REPL /setup path) so we don't
+  // open a second interface on process.stdin. Only close the interface in
+  // the finally if we own it (first-run path, no REPL yet).
+  const rl = existingRl ?? createInterface({
     input: process.stdin,
     output: process.stdout,
   });
+  const ownsRl = existingRl === undefined;
 
   try {
     console.log("");
@@ -90,7 +96,8 @@ export async function runSetup(): Promise<VantageConfig> {
 
     return config;
   } finally {
-    // Always close readline, even if detectAll() or ask() throws.
-    rl.close();
+    // Only close the readline if we created it here. If the caller passed
+    // one in, closing it would end stdin for their REPL.
+    if (ownsRl) rl.close();
   }
 }
