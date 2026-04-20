@@ -858,7 +858,10 @@ async function startRepl(
         }
 
         if (line.startsWith("/")) {
-          const cmdName = line.slice(1).split(/\s/)[0];
+          const cmdRaw = line.slice(1).split(/\s/)[0];
+          // Reflecting raw user input into the terminal is an OSC/CSI escape
+          // vector. Keep only printable ASCII and cap to 32 chars.
+          const cmdName = cmdRaw.replace(/[^\x20-\x7e]/g, "").slice(0, 32);
           console.log(red(`  Unknown command: /${cmdName}`));
           console.log(dim(`  Type /help for commands.`));
           prompt();

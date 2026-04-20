@@ -137,7 +137,15 @@ export function loadConfig(): VantageConfig {
     const raw = readFileSync(getConfigPath(), "utf-8");
     parsed = JSON.parse(raw) as Record<string, unknown>;
   } catch (err) {
-    console.warn(`[vantage] Config corrupted, using defaults: ${err instanceof Error ? err.message : String(err)}`);
+    // Only echo the error message for SyntaxError (safe: no path leak). For
+    // any filesystem error (EACCES / ENOENT-race via symlink swap / etc.)
+    // the error message can include the resolved absolute path, which is
+    // noise at best and an info-leak at worst. Log a generic line instead.
+    if (err instanceof SyntaxError) {
+      console.warn(`[vantage] Config corrupted, using defaults: ${err.message}`);
+    } else {
+      console.warn(`[vantage] Config unreadable, using defaults`);
+    }
     return { ...DEFAULT_CONFIG };
   }
   const merged: VantageConfig = {

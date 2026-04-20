@@ -1,7 +1,7 @@
 import { execSync } from "child_process";
 import type { AgentAdapter, SpawnArgs } from "./registry.js";
 import type { AgentConfig } from "../config.js";
-import { sanitizeAgentCommand } from "../sanitize.js";
+import { sanitizeAgentCommand, sanitizeAgentArgs } from "../sanitize.js";
 
 export const aiderAdapter: AgentAdapter = {
   name: "aider",
@@ -24,7 +24,8 @@ export const aiderAdapter: AgentAdapter = {
   },
   buildCommand(prompt: string, config?: AgentConfig): SpawnArgs {
     const cmd = sanitizeAgentCommand(config?.command, "aider");
-    const baseArgs = config?.args ?? ["--message"];
+    const baseArgs =
+      config?.args !== undefined ? sanitizeAgentArgs(config.args) : ["--message"];
     return {
       command: cmd,
       args: [...baseArgs, prompt, "--yes"],

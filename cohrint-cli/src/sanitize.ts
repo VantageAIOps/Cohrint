@@ -53,6 +53,15 @@ function _sanitizeArgv(items: unknown, label: string): string[] {
   return out;
 }
 
+// Defense-in-depth: every agent adapter's buildCommand/buildContinueCommand
+// must wrap caller-provided `config.args` / `config.extraFlags` with this
+// before spreading into spawn argv. Even though `loadConfig` already runs
+// `sanitizeConfig`, the adapters must not trust their AgentConfig input — a
+// future caller could assemble one inline.
+export function sanitizeAgentArgs(items: unknown, label = "agent.args"): string[] {
+  return _sanitizeArgv(items, label);
+}
+
 export function sanitizeAgentConfig(raw: AgentConfig | undefined): AgentConfig | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const out: AgentConfig = {};

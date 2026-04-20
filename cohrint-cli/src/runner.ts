@@ -412,7 +412,11 @@ export function runAgent(
       }
       child.stderr?.on("data", (chunk: Buffer) => {
         const text = chunk.toString("utf-8");
-        if (text.includes("No conversation found with session ID")) {
+        // Only the claude adapter emits this exact stderr phrase on stale
+        // --resume. Gating by agentName prevents a prompt-injected non-claude
+        // agent from forging the signal to force clearSession() + re-run,
+        // which would double-charge API credits and reset conversation state.
+        if (agentName === "claude" && text.includes("No conversation found with session ID")) {
           staleSessionDetected = true;
           return;
         }
@@ -512,9 +516,14 @@ export function runAgent(
           if (cost !== undefined) capturedCostUsd = cost;
           const denials = obj["permission_denials"];
           if (Array.isArray(denials)) {
+            // Cap to 32 so a prompt-injected agent can't emit a million denial
+            // objects and either OOM us or force a million sequential
+            // permission prompts in the REPL (DoS via interactive blocking).
             for (const d of denials as Record<string, unknown>[]) {
+              if (capturedDenials.length >= 32) break;
+              const toolName = String(d["tool_name"] ?? "unknown").slice(0, 256);
               capturedDenials.push({
-                toolName: String(d["tool_name"] ?? "unknown"),
+                toolName,
                 toolInput: (d["tool_input"] ?? {}) as Record<string, unknown>,
               });
             }
@@ -770,7 +779,9 @@ export function runAgentBuffered(
 
     child.stderr?.on("data", (chunk: Buffer) => {
       const text = chunk.toString("utf-8");
-      if (text.includes("No conversation found with session ID")) staleSessionDetectedBuf = true;
+      if (agentName === "claude" && text.includes("No conversation found with session ID")) {
+        staleSessionDetectedBuf = true;
+      }
       if (NOT_LOGGED_IN_RE.test(text)) notLoggedInDetectedBuf = true;
     });
 
