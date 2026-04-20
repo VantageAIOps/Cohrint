@@ -78,28 +78,73 @@ export function sanitizeAgentConfig(raw: AgentConfig | undefined): AgentConfig |
   return out;
 }
 
+const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+function _localhostHttpAllowed(): boolean {
+  return process.env.VANTAGE_ALLOW_HTTP === "1";
+}
+
 export function sanitizeConfig(raw: VantageConfig): VantageConfig {
   const agents: Record<string, AgentConfig> = {};
   if (raw.agents && typeof raw.agents === "object") {
     for (const [name, cfg] of Object.entries(raw.agents)) {
+      if (DANGEROUS_KEYS.has(name)) continue;
       const clean = sanitizeAgentConfig(cfg);
       if (clean) agents[name] = clean;
     }
   }
   const apiBase = String(raw.vantageApiBase || "");
+  const isLocalhostHttp =
+    /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(apiBase);
   const validApiBase =
     apiBase === "" ||
     apiBase.startsWith("https://") ||
-    // Permit http://localhost for local dev proxies only
-    /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(apiBase);
+    (isLocalhostHttp && _localhostHttpAllowed());
   if (!validApiBase) {
-    _warn(`rejecting non-HTTPS vantageApiBase "${apiBase}" — falling back to default`);
+    if (isLocalhostHttp) {
+      _warn(
+        `rejecting http://localhost vantageApiBase "${apiBase}" — set VANTAGE_ALLOW_HTTP=1 to opt into plaintext for local dev`
+      );
+    } else {
+      _warn(`rejecting non-HTTPS vantageApiBase "${apiBase}" — falling back to default`);
+    }
   }
-  return {
-    ...raw,
+  // Explicit allowlist — never blindly spread untrusted input. Unknown top-level
+  // fields are dropped so a future-added sensitive field can't sneak through
+  // unvalidated from a stale/malicious config.json.
+  const out: VantageConfig = {
+    defaultAgent:
+      typeof raw.defaultAgent === "string" ? raw.defaultAgent : "claude",
     agents,
+    vantageApiKey:
+      typeof raw.vantageApiKey === "string" ? raw.vantageApiKey : "",
     vantageApiBase: validApiBase ? apiBase : "https://api.cohrint.com",
+    privacy: typeof raw.privacy === "string" ? raw.privacy : "anonymized",
+    optimization:
+      raw.optimization && typeof raw.optimization === "object" && !Array.isArray(raw.optimization)
+        ? { enabled: Boolean((raw.optimization as { enabled?: unknown }).enabled) }
+        : { enabled: true },
+    tracking:
+      raw.tracking && typeof raw.tracking === "object" && !Array.isArray(raw.tracking)
+        ? {
+            enabled: Boolean((raw.tracking as { enabled?: unknown }).enabled),
+            batchSize: parseIntBounded(
+              String((raw.tracking as { batchSize?: unknown }).batchSize ?? ""),
+              10,
+              1,
+              10_000
+            ),
+            flushInterval: parseIntBounded(
+              String((raw.tracking as { flushInterval?: unknown }).flushInterval ?? ""),
+              30_000,
+              1_000,
+              24 * 60 * 60 * 1000
+            ),
+          }
+        : { enabled: true, batchSize: 10, flushInterval: 30_000 },
   };
+  if (typeof raw.debug === "boolean") out.debug = raw.debug;
+  return out;
 }
 
 export function sanitizeModelFlag(v: string | undefined): string | undefined {
@@ -143,7 +188,12 @@ export function parseIntBounded(
 export function assertHttpsApiBase(base: string): boolean {
   if (!base) return false;
   if (base.startsWith("https://")) return true;
-  if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(base)) return true;
+  if (
+    /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(base) &&
+    _localhostHttpAllowed()
+  ) {
+    return true;
+  }
   _warn(`refusing to send API key to non-HTTPS URL "${base}"`);
   return false;
 }

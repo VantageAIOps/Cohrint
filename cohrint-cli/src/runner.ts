@@ -516,6 +516,11 @@ export function runAgent(
 
     child.stdout?.on("data", (chunk: Buffer) => {
       lineBuffer += chunk.toString("utf-8");
+      if (lineBuffer.length > MAX_OUTPUT_BYTES) {
+        flushLine(lineBuffer.slice(0, MAX_OUTPUT_BYTES));
+        lineBuffer = "";
+        return;
+      }
       const lines = lineBuffer.split("\n");
       lineBuffer = lines.pop() ?? "";
       for (const line of lines) flushLine(line);
@@ -719,6 +724,11 @@ export function runAgentBuffered(
 
     child.stdout?.on("data", (chunk: Buffer) => {
       lineBuffer += chunk.toString("utf-8");
+      if (lineBuffer.length > MAX_OUTPUT_BYTES) {
+        flushLine(lineBuffer.slice(0, MAX_OUTPUT_BYTES));
+        lineBuffer = "";
+        return;
+      }
       const lines = lineBuffer.split("\n");
       lineBuffer = lines.pop() ?? "";
       for (const line of lines) flushLine(line);
