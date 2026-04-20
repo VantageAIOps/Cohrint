@@ -624,7 +624,15 @@ async function startRepl(
       const combined = pasteBuffer.join("\n").trim();
       pasteBuffer = [];
       pasteTimer = null;
-      if (handleLine) handleLine(combined);
+      if (handleLine) {
+        handleLine(combined);
+      } else if (combined) {
+        // Re-entry guard dropped this line. Surface it so the user knows
+        // the REPL isn't frozen — their input just raced a running agent.
+        process.stdout.write(
+          `\n${dim("  [input discarded: agent still running — resend when prompt returns]")}\n`
+        );
+      }
     }, PASTE_DELAY_MS);
   }
 
