@@ -414,6 +414,16 @@ export function runAgent(
     let child: ReturnType<typeof spawn>;
     let _stdinEndListener: (() => void) | null = null;
 
+    // Hoisted above the try/catch so the catch block can call it if any
+    // statement AFTER process.stdin.once("end", …) throws — otherwise the
+    // listener stays registered on process.stdin for the process lifetime.
+    const cleanupStdinListener = () => {
+      if (_stdinEndListener) {
+        try { process.stdin.off("end", _stdinEndListener); } catch {}
+        _stdinEndListener = null;
+      }
+    };
+
     try {
       const stdinMode = process.stdin.isTTY ? "ignore" : "pipe";
       child = spawn(spawnArgs.command, spawnArgs.args, {
@@ -458,18 +468,12 @@ export function runAgent(
         process.stderr.write(sanitizeDisplay(text));
       });
     } catch (err) {
+      cleanupStdinListener();
       if (child!) _activeChildren.delete(child);
       const msg = err instanceof Error ? err.message : String(err);
       reject(new Error(`Failed to start '${spawnArgs.command}': ${msg}`));
       return;
     }
-
-    const cleanupStdinListener = () => {
-      if (_stdinEndListener) {
-        try { process.stdin.off("end", _stdinEndListener); } catch {}
-        _stdinEndListener = null;
-      }
-    };
 
     const spinner = createSpinner("Thinking");
     let spinnerStopped = false;
@@ -703,6 +707,15 @@ export function runAgentBuffered(
     let child: ReturnType<typeof spawn>;
     let _stdinEndListener: (() => void) | null = null;
 
+    // Hoisted above the try/catch so the catch can clean up if anything
+    // after process.stdin.once("end", …) throws.
+    const cleanupStdinListener = () => {
+      if (_stdinEndListener) {
+        try { process.stdin.off("end", _stdinEndListener); } catch {}
+        _stdinEndListener = null;
+      }
+    };
+
     try {
       const stdinMode = process.stdin.isTTY ? "ignore" : "pipe";
       child = spawn(spawnArgs.command, spawnArgs.args, {
@@ -723,18 +736,12 @@ export function runAgentBuffered(
         }
       }
     } catch (err) {
+      cleanupStdinListener();
       if (child!) _activeChildren.delete(child);
       const msg = err instanceof Error ? err.message : String(err);
       reject(new Error(`Failed to start '${spawnArgs.command}': ${msg}`));
       return;
     }
-
-    const cleanupStdinListener = () => {
-      if (_stdinEndListener) {
-        try { process.stdin.off("end", _stdinEndListener); } catch {}
-        _stdinEndListener = null;
-      }
-    };
 
     // Scrub in case a compromised config.defaultAgent ever reaches us with
     // embedded escape bytes (e.g., OSC 52) — createSpinner writes directly to
