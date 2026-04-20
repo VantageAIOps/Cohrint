@@ -321,15 +321,19 @@ async function executePrompt(
     }
   }
 
+  // Copy caller-owned array — don't mutate. The stale-session retry path calls
+  // executePrompt twice with the same currentFlags array; mutating it would
+  // append --permission-mode / --allowedTools twice on the second call.
+  const mergedFlags = [...extraFlags];
   if (agent.name === "claude") {
     const agentCfg = config.agents?.["claude"];
     const permMode = agentCfg?.["permissionMode"];
     const allowedTools = agentCfg?.["allowedTools"];
-    if (permMode) extraFlags.push("--permission-mode", permMode);
-    if (allowedTools?.length) extraFlags.push("--allowedTools", allowedTools.join(","));
+    if (permMode) mergedFlags.push("--permission-mode", permMode);
+    if (allowedTools?.length) mergedFlags.push("--allowedTools", allowedTools.join(","));
   }
 
-  const agentConfig = extraFlags.length > 0 ? { extraFlags } : undefined;
+  const agentConfig = mergedFlags.length > 0 ? { extraFlags: mergedFlags } : undefined;
   const useContinue =
     continueConversation && agent.supportsContinue && agent.buildContinueCommand;
   const spawnArgs = useContinue

@@ -165,7 +165,11 @@ export function migrateOldSessions(): void {
     }
     const oldIds: Record<string, string> = {};
     for (const [k, v] of Object.entries(parsed)) {
-      if (typeof v === "string") oldIds[k] = v;
+      // Mirror loadState's guard — a crafted legacy file could smuggle a
+      // string like "--resume" that later splices into spawn argv as the
+      // sessionId positional. Only accept canonical UUIDs.
+      if (typeof k !== "string" || k.length > 64) continue;
+      if (isValidSessionId(v)) oldIds[k] = v as string;
     }
     withStateLock(() => {
       const current = loadState();

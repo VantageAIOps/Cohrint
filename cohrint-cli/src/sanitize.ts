@@ -17,7 +17,10 @@ const MODEL_RX = /^[A-Za-z0-9._:\-]{1,80}$/;
 const ALLOWED_TOOL_RX = /^[A-Za-z_][A-Za-z0-9_():,*/\-.]{0,79}$/;
 
 function _warn(msg: string): void {
-  if (process.env.VANTAGE_SANITIZE_SILENT) return;
+  // Strict "1" — any truthy value (including "0" and "false") would otherwise
+  // silence all sanitization warnings, which an attacker with env control
+  // could use to hide evidence of config tampering.
+  if (process.env.VANTAGE_SANITIZE_SILENT === "1") return;
   process.stderr.write(`[vantage] config: ${msg}\n`);
 }
 
