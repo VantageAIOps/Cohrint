@@ -105,6 +105,7 @@ import { teams }     from './routes/teams';
 import { cache }     from './routes/cache';
 import { prompts }   from './routes/prompts';
 import { versions }  from './routes/versions';
+import { cli }       from './routes/cli';
 import { runAnomalyDetection } from './lib/anomaly';
 import { createLogger } from './lib/logger';
 import { acquireLock } from './lib/cron-lock';
@@ -149,6 +150,7 @@ app.route('/v1/analytics/executive', executive); // CEO/superadmin unified dashb
 app.route('/v1/teams',              teams);      // Team CRUD (org accounts only)
 app.route('/v1/cache',              cache);      // Semantic cache (Vectorize + Workers AI)
 app.route('/v1/prompts',            prompts);    // Prompt registry + version cost tracking
+app.route('/v1/cli',                cli);        // cohrint-cli latest version + upgrade notice (no auth)
 
 // ── 404 fallback ──────────────────────────────────────────────────────────────
 app.notFound((c) => c.json({

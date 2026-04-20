@@ -1293,27 +1293,96 @@ function isNewerVersion(latest: string, current: string): boolean {
   return lPat > cPat;
 }
 
-async function checkForUpdate(): Promise<void> {
+// Strict semver-ish guard. A MITM'd or poisoned registry response could return
+// "1.2.3\x1b]52;c;payload\x07" — the shell would interpret the OSC 52 escape
+// as a clipboard-write. Reject anything outside real-version characters.
+function isValidVersionString(v: unknown): v is string {
+  return typeof v === "string" && /^[A-Za-z0-9._\-+]{1,64}$/.test(v);
+}
+
+// Same guardrail for install commands we intend to print back to the user.
+// We never execute it, but it still ends up on a terminal — so strip anything
+// outside printable ASCII and cap length.
+function isSafeInstallCmd(v: unknown): v is string {
+  return typeof v === "string" && v.length > 0 && v.length <= 200 && /^[\x20-\x7e]+$/.test(v);
+}
+
+async function fetchLatestFromCohrint(
+  apiBase: string,
+  apiKey: string | undefined
+): Promise<{ version: string; install: string; notice: string | null; minSupported: string | null } | null> {
   try {
-    const current = VERSION;
+    if (!assertHttpsApiBase(apiBase)) return null;
+    const headers: Record<string, string> = {};
+    if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+    const res = await fetch(`${apiBase}/v1/cli/latest`, {
+      headers,
+      signal: AbortSignal.timeout(2000),
+    });
+    if (!res.ok) return null;
+    const data = await safeFetchJson(res, 64 * 1024);
+    if (!data || typeof data !== "object") return null;
+    const d = data as Record<string, unknown>;
+    if (!isValidVersionString(d.version)) return null;
+    const install = isSafeInstallCmd(d.install_cmd) ? d.install_cmd : "npm install -g cohrint-cli";
+    const minSupported = isValidVersionString(d.min_supported_version) ? d.min_supported_version : null;
+    const notice =
+      typeof d.notice === "string" && d.notice.length > 0 && d.notice.length <= 500 && /^[\x20-\x7e]+$/.test(d.notice)
+        ? d.notice
+        : null;
+    return { version: d.version, install, notice, minSupported };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchLatestFromNpm(): Promise<{ version: string; install: string; notice: null; minSupported: null } | null> {
+  try {
     const res = await fetch("https://registry.npmjs.org/cohrint-cli/latest", {
       signal: AbortSignal.timeout(2000),
     });
-    if (!res.ok) return;
+    if (!res.ok) return null;
     const data = await safeFetchJson(res, 256 * 1024);
-    if (!data || typeof data !== "object") return;
+    if (!data || typeof data !== "object") return null;
     const version = (data as Record<string, unknown>).version;
-    if (typeof version !== "string" || !version) return;
-    // Reject anything that's not strict semver-ish. A MITM'd or poisoned npm
-    // registry response could return "1.2.3\x1b]52;c;payload\x07" — the shell
-    // would interpret the OSC 52 escape as a clipboard-write. Keep only the
-    // characters a real npm version can contain.
-    if (!/^[A-Za-z0-9._\-+]{1,64}$/.test(version)) return;
-    if (isNewerVersion(version, current)) {
+    if (!isValidVersionString(version)) return null;
+    return { version, install: "npm install -g cohrint-cli", notice: null, minSupported: null };
+  } catch {
+    return null;
+  }
+}
+
+async function checkForUpdate(): Promise<void> {
+  try {
+    const current = VERSION;
+    let config: VantageConfig | null = null;
+    try {
+      config = loadConfig();
+    } catch {}
+    const apiBase = config?.vantageApiBase || DEFAULT_CONFIG.vantageApiBase;
+    const latest =
+      (await fetchLatestFromCohrint(apiBase, config?.vantageApiKey)) ||
+      (await fetchLatestFromNpm());
+    if (!latest) return;
+
+    if (latest.minSupported && isNewerVersion(latest.minSupported, current)) {
       console.error(
-        yellow(`\n  Update available: cohrint-cli ${current} → ${version}`)
+        red(`\n  cohrint-cli ${current} is below the minimum supported version (${latest.minSupported}).`)
       );
-      console.error(dim(`  Run: npm install -g cohrint-cli\n`));
+      console.error(red(`  Please upgrade before continuing.`));
+      console.error(dim(`  Run: ${latest.install}\n`));
+      process.exit(1);
+    }
+
+    if (isNewerVersion(latest.version, current)) {
+      console.error(
+        yellow(`\n  Update available: cohrint-cli ${current} → ${latest.version}`)
+      );
+      console.error(dim(`  Run: ${latest.install}`));
+      if (latest.notice) {
+        console.error(dim(`  ${latest.notice}`));
+      }
+      console.error("");
     }
   } catch {}
 }

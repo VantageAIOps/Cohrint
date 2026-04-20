@@ -8,10 +8,34 @@
   "bin": {
     "cohrint": "dist/index.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --no-splitting",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
   },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/VantageAIOps/VantageAI.git",
+    "directory": "cohrint-cli"
+  },
+  "homepage": "https://cohrint.com",
+  "keywords": [
+    "cli",
+    "ai",
+    "llm",
+    "cost-tracking",
+    "claude",
+    "codex",
+    "gemini"
+  ],
   "devDependencies": {
     "esbuild": "0.27.4",
     "tsup": "8.5.1",
