@@ -215,7 +215,11 @@ const DEFAULT_TIMEOUT_MS = parseIntBounded(
 );
 
 type ActiveChild = ReturnType<typeof spawn>;
-let _activeChild: ActiveChild | null = null;
+// Set (not scalar): two concurrent runAgent/runAgentBuffered entrants
+// (possible under non-TTY piped mode or REPL edge cases) would otherwise
+// overwrite a single _activeChild reference, leaking the first child and
+// letting its cleanup handler fail the `=== child` identity check.
+const _activeChildren = new Set<ActiveChild>();
 const _cancelHooks = new Set<() => void>();
 
 function signalChildTree(c: ActiveChild, sig: NodeJS.Signals): void {
@@ -237,20 +241,22 @@ function registerCancelHook(fn: () => void): () => void {
 }
 
 export function cancelActiveAgent(): boolean {
-  const c = _activeChild;
-  const hadWork = !!c || _cancelHooks.size > 0;
-  if (c && !c.killed && c.exitCode === null) {
-    try {
-      signalChildTree(c, "SIGINT");
-      const sigterm = setTimeout(() => {
-        if (!c.killed && c.exitCode === null) signalChildTree(c, "SIGTERM");
-      }, 400);
-      const sigkill = setTimeout(() => {
-        if (!c.killed && c.exitCode === null) signalChildTree(c, "SIGKILL");
-      }, 1200);
-      sigterm.unref?.();
-      sigkill.unref?.();
-    } catch {}
+  const children = [..._activeChildren];
+  const hadWork = children.length > 0 || _cancelHooks.size > 0;
+  for (const c of children) {
+    if (!c.killed && c.exitCode === null) {
+      try {
+        signalChildTree(c, "SIGINT");
+        const sigterm = setTimeout(() => {
+          if (!c.killed && c.exitCode === null) signalChildTree(c, "SIGTERM");
+        }, 400);
+        const sigkill = setTimeout(() => {
+          if (!c.killed && c.exitCode === null) signalChildTree(c, "SIGKILL");
+        }, 1200);
+        sigterm.unref?.();
+        sigkill.unref?.();
+      } catch {}
+    }
   }
   // Fire cancel hooks BEFORE clearing — each hook stops its spinner and
   // resolves its promise synchronously so the REPL unblocks even if the
@@ -260,14 +266,29 @@ export function cancelActiveAgent(): boolean {
   for (const h of hooks) {
     try { h(); } catch {}
   }
-  _activeChild = null;
+  _activeChildren.clear();
   return hadWork;
 }
 
 export function hasActiveAgent(): boolean {
-  const c = _activeChild;
-  return !!((c && !c.killed && c.exitCode === null) || _cancelHooks.size > 0);
+  for (const c of _activeChildren) {
+    if (!c.killed && c.exitCode === null) return true;
+  }
+  return _cancelHooks.size > 0;
 }
+
+// Last-resort safety net: if the Node process exits (one-shot mode calls
+// process.exit(0) after tracker.flush; uncaught rejections; SIGHUP) while a
+// detached child is still running, the child becomes an orphan that keeps
+// burning API credits with no owner. process.on("exit") runs synchronously
+// on EVERY exit path, so send SIGTERM to every surviving child group here.
+process.on("exit", () => {
+  for (const c of _activeChildren) {
+    if (!c.killed && c.exitCode === null) {
+      try { signalChildTree(c, "SIGTERM"); } catch {}
+    }
+  }
+});
 const BLOCKED_ENV = new Set([
   "LD_PRELOAD",
   "LD_LIBRARY_PATH",
@@ -391,6 +412,7 @@ export function runAgent(
     let notLoggedInDetected = false;
     let lineBuffer = "";
     let child: ReturnType<typeof spawn>;
+    let _stdinEndListener: (() => void) | null = null;
 
     try {
       const stdinMode = process.stdin.isTTY ? "ignore" : "pipe";
@@ -399,15 +421,20 @@ export function runAgent(
         env: buildSafeEnv(spawnArgs.env),
         detached: process.platform !== "win32",
       });
-      _activeChild = child;
+      _activeChildren.add(child);
       if (!process.stdin.isTTY) {
         if (process.stdin.readableEnded || process.stdin.destroyed) {
           child.stdin?.end();
         } else {
           process.stdin.pipe(child.stdin!, { end: false });
-          process.stdin.once("end", () => {
-            child.stdin?.end();
-          });
+          // Named reference so close/error can remove it — otherwise every
+          // sequential agent spawn in non-TTY mode accumulates a dangling
+          // `end` listener on process.stdin, eventually tripping Node's
+          // MaxListenersExceededWarning and masking real leaks.
+          _stdinEndListener = () => {
+            try { child.stdin?.end(); } catch {}
+          };
+          process.stdin.once("end", _stdinEndListener);
         }
       }
       child.stderr?.on("data", (chunk: Buffer) => {
@@ -431,11 +458,18 @@ export function runAgent(
         process.stderr.write(sanitizeDisplay(text));
       });
     } catch (err) {
-      _activeChild = null;
+      if (child!) _activeChildren.delete(child);
       const msg = err instanceof Error ? err.message : String(err);
       reject(new Error(`Failed to start '${spawnArgs.command}': ${msg}`));
       return;
     }
+
+    const cleanupStdinListener = () => {
+      if (_stdinEndListener) {
+        try { process.stdin.off("end", _stdinEndListener); } catch {}
+        _stdinEndListener = null;
+      }
+    };
 
     const spinner = createSpinner("Thinking");
     let spinnerStopped = false;
@@ -478,6 +512,8 @@ export function runAgent(
       settled = true;
       clearTimeout(timer);
       stopSpinner();
+      cleanupStdinListener();
+      _activeChildren.delete(child);
       try { child.stdout?.removeAllListeners("data"); } catch {}
       try { child.stderr?.removeAllListeners("data"); } catch {}
       const durationMs = Date.now() - start;
@@ -500,6 +536,23 @@ export function runAgent(
         notLoggedIn: notLoggedInDetected || undefined,
       });
     });
+
+    // Cap per-denial tool_input size: a prompt-injected agent can emit a
+    // deeply nested object (e.g. {"a":{"a":{"a":…}}} 10k levels) or a
+    // multi-megabyte tool_input blob. formatToolInput / the REPL permission
+    // prompt both JSON.stringify values downstream — an adversarial object
+    // would stack-overflow or OOM before any trailing slice clamps fire.
+    const MAX_TOOL_INPUT_BYTES = 4096;
+    function capToolInput(v: unknown): Record<string, unknown> {
+      try {
+        const s = JSON.stringify(v);
+        if (typeof s !== "string" || s.length > MAX_TOOL_INPUT_BYTES) return {};
+        const parsed = v as Record<string, unknown>;
+        return parsed && typeof parsed === "object" ? parsed : {};
+      } catch {
+        return {};
+      }
+    }
 
     function flushLine(line: string) {
       if (NOT_LOGGED_IN_RE.test(line)) {
@@ -524,7 +577,7 @@ export function runAgent(
               const toolName = String(d["tool_name"] ?? "unknown").slice(0, 256);
               capturedDenials.push({
                 toolName,
-                toolInput: (d["tool_input"] ?? {}) as Record<string, unknown>,
+                toolInput: capToolInput(d["tool_input"]),
               });
             }
           }
@@ -571,7 +624,8 @@ export function runAgent(
     child.on("error", (err: NodeJS.ErrnoException) => {
       clearTimeout(timer);
       stopSpinner();
-      if (_activeChild === child) _activeChild = null;
+      cleanupStdinListener();
+      _activeChildren.delete(child);
       unregisterCancel();
       if (settled) return;
       settled = true;
@@ -587,7 +641,8 @@ export function runAgent(
     child.on("close", (code: number | null) => {
       clearTimeout(timer);
       stopSpinner();
-      if (_activeChild === child) _activeChild = null;
+      cleanupStdinListener();
+      _activeChildren.delete(child);
       unregisterCancel();
       if (settled) return;
       settled = true;
@@ -646,6 +701,7 @@ export function runAgentBuffered(
     let capturedSessionId: string | undefined;
     let lineBuffer = "";
     let child: ReturnType<typeof spawn>;
+    let _stdinEndListener: (() => void) | null = null;
 
     try {
       const stdinMode = process.stdin.isTTY ? "ignore" : "pipe";
@@ -654,23 +710,31 @@ export function runAgentBuffered(
         env: buildSafeEnv(spawnArgs.env),
         detached: process.platform !== "win32",
       });
-      _activeChild = child;
+      _activeChildren.add(child);
       if (!process.stdin.isTTY) {
         if (process.stdin.readableEnded || process.stdin.destroyed) {
           child.stdin?.end();
         } else {
           process.stdin.pipe(child.stdin!, { end: false });
-          process.stdin.once("end", () => {
-            child.stdin?.end();
-          });
+          _stdinEndListener = () => {
+            try { child.stdin?.end(); } catch {}
+          };
+          process.stdin.once("end", _stdinEndListener);
         }
       }
     } catch (err) {
-      _activeChild = null;
+      if (child!) _activeChildren.delete(child);
       const msg = err instanceof Error ? err.message : String(err);
       reject(new Error(`Failed to start '${spawnArgs.command}': ${msg}`));
       return;
     }
+
+    const cleanupStdinListener = () => {
+      if (_stdinEndListener) {
+        try { process.stdin.off("end", _stdinEndListener); } catch {}
+        _stdinEndListener = null;
+      }
+    };
 
     // Scrub in case a compromised config.defaultAgent ever reaches us with
     // embedded escape bytes (e.g., OSC 52) — createSpinner writes directly to
@@ -715,6 +779,8 @@ export function runAgentBuffered(
       settled = true;
       clearTimeout(timer);
       stopSpinner();
+      cleanupStdinListener();
+      _activeChildren.delete(child);
       try { child.stdout?.removeAllListeners("data"); } catch {}
       try { child.stderr?.removeAllListeners("data"); } catch {}
       const durationMs = Date.now() - start;
@@ -791,7 +857,8 @@ export function runAgentBuffered(
     child.on("error", (err: NodeJS.ErrnoException) => {
       clearTimeout(timer);
       stopSpinner();
-      if (_activeChild === child) _activeChild = null;
+      cleanupStdinListener();
+      _activeChildren.delete(child);
       unregisterCancel();
       if (settled) return;
       settled = true;
@@ -807,7 +874,8 @@ export function runAgentBuffered(
     child.on("close", (code: number | null) => {
       clearTimeout(timer);
       stopSpinner();
-      if (_activeChild === child) _activeChild = null;
+      cleanupStdinListener();
+      _activeChildren.delete(child);
       unregisterCancel();
       if (settled) return;
       settled = true;
