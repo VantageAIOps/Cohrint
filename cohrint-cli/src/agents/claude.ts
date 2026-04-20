@@ -1,6 +1,7 @@
 import { execSync } from "child_process";
 import type { AgentAdapter, SpawnArgs } from "./registry.js";
 import type { AgentConfig } from "../config.js";
+import { sanitizeAgentCommand } from "../sanitize.js";
 
 export const claudeAdapter: AgentAdapter = {
   name: "claude",
@@ -20,7 +21,7 @@ export const claudeAdapter: AgentAdapter = {
     }
   },
   buildCommand(prompt: string, config?: AgentConfig): SpawnArgs {
-    const cmd = config?.command || "claude";
+    const cmd = sanitizeAgentCommand(config?.command, "claude");
     const extraFlags = config?.extraFlags ?? [];
     return {
       command: cmd,
@@ -28,7 +29,7 @@ export const claudeAdapter: AgentAdapter = {
     };
   },
   buildContinueCommand(prompt: string, config?: AgentConfig, sessionId?: string): SpawnArgs {
-    const cmd = config?.command || "claude";
+    const cmd = sanitizeAgentCommand(config?.command, "claude");
     const extraArgs = config?.args?.filter((a) => a !== "-p") ?? [];
     const extraFlags = config?.extraFlags ?? [];
     const resumeArgs = sessionId

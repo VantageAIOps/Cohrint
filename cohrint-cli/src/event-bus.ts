@@ -8,7 +8,7 @@ export type VantageEventMap = {
     savedTokens: number;
     savedPercent: number;
   };
-  "agent:started": { agent: string; pid: number; command: string };
+  "agent:started": { agent: string; pid: number };
   "agent:completed": {
     agent: string;
     exitCode: number;

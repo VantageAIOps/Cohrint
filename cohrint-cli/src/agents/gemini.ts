@@ -1,6 +1,7 @@
 import { execSync } from "child_process";
 import type { AgentAdapter, SpawnArgs } from "./registry.js";
 import type { AgentConfig } from "../config.js";
+import { sanitizeAgentCommand } from "../sanitize.js";
 
 export const geminiAdapter: AgentAdapter = {
   name: "gemini",
@@ -20,7 +21,7 @@ export const geminiAdapter: AgentAdapter = {
     }
   },
   buildCommand(prompt: string, config?: AgentConfig): SpawnArgs {
-    const cmd = config?.command || "gemini";
+    const cmd = sanitizeAgentCommand(config?.command, "gemini");
     const baseArgs = config?.args ?? ["-p"];
     return {
       command: cmd,
@@ -28,7 +29,7 @@ export const geminiAdapter: AgentAdapter = {
     };
   },
   buildContinueCommand(prompt: string, config?: AgentConfig, _sessionId?: string): SpawnArgs {
-    const cmd = config?.command || "gemini";
+    const cmd = sanitizeAgentCommand(config?.command, "gemini");
     const extraArgs = config?.args?.filter((a) => a !== "-p") ?? [];
     return {
       command: cmd,

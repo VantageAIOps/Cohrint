@@ -5,14 +5,19 @@ import {
   unlinkSync,
   existsSync,
   renameSync,
+  chmodSync,
 } from "fs";
 import { join } from "path";
 import { homedir } from "os";
+import { isValidSessionId } from "./runner.js";
 
 export interface PersistedState {
   sessionIds: Record<string, string>;
   allowedTools: string[];
 }
+
+const ALLOWED_TOOL_RX = /^[A-Za-z_][A-Za-z0-9_():,*\s/\-.]{0,256}$/;
+const MAX_TOOLS = 128;
 
 function getVantageDir(): string {
   return join(homedir(), ".vantage");
@@ -25,10 +30,12 @@ function getStatePath(): string {
 export function saveState(state: PersistedState): void {
   const dir = getVantageDir();
   mkdirSync(dir, { recursive: true });
+  try { chmodSync(dir, 0o700); } catch {}
   const path = getStatePath();
   const tmp = path + ".tmp";
-  writeFileSync(tmp, JSON.stringify(state, null, 2), "utf-8");
+  writeFileSync(tmp, JSON.stringify(state, null, 2), { encoding: "utf-8", mode: 0o600 });
   renameSync(tmp, path);
+  try { chmodSync(path, 0o600); } catch {}
 }
 
 export function loadState(): PersistedState {
@@ -37,17 +44,26 @@ export function loadState(): PersistedState {
   try {
     const raw = readFileSync(path, "utf-8");
     const parsed = JSON.parse(raw) as Record<string, unknown>;
-    return {
-      sessionIds:
-        typeof parsed.sessionIds === "object" &&
-        parsed.sessionIds !== null &&
-        !Array.isArray(parsed.sessionIds)
-          ? (parsed.sessionIds as Record<string, string>)
-          : {},
-      allowedTools: Array.isArray(parsed.allowedTools)
-        ? (parsed.allowedTools as string[])
-        : [],
-    };
+    const rawIds =
+      typeof parsed.sessionIds === "object" &&
+      parsed.sessionIds !== null &&
+      !Array.isArray(parsed.sessionIds)
+        ? (parsed.sessionIds as Record<string, unknown>)
+        : {};
+    const sessionIds: Record<string, string> = {};
+    for (const [k, v] of Object.entries(rawIds)) {
+      if (typeof k !== "string" || k.length > 64) continue;
+      if (isValidSessionId(v)) sessionIds[k] = v as string;
+    }
+    const rawTools = Array.isArray(parsed.allowedTools) ? parsed.allowedTools : [];
+    const allowedTools: string[] = [];
+    for (const t of rawTools) {
+      if (typeof t !== "string") continue;
+      if (!ALLOWED_TOOL_RX.test(t)) continue;
+      allowedTools.push(t);
+      if (allowedTools.length >= MAX_TOOLS) break;
+    }
+    return { sessionIds, allowedTools };
   } catch {
     return { sessionIds: {}, allowedTools: [] };
   }

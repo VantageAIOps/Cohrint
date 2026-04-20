@@ -46,6 +46,12 @@ import {
   formatRecommendations,
   type SessionMetrics,
 } from "./recommendations.js";
+import {
+  sanitizeModelFlag,
+  sanitizeSystemFlag,
+  parseIntBounded,
+  assertHttpsApiBase,
+} from "./sanitize.js";
 
 const COST_TIMEOUT_MS = 5000;
 const COST_LISTEN_MS = 600_000;
@@ -84,8 +90,12 @@ async function showDashboardSummary(config: VantageConfig): Promise<void> {
     console.log(yellow("  No API key configured. Run setup or set VANTAGE_API_KEY."));
     return;
   }
+  const base = config.vantageApiBase || DEFAULT_CONFIG.vantageApiBase;
+  if (!assertHttpsApiBase(base)) {
+    console.log(red("  Refusing to send API key to non-HTTPS endpoint."));
+    return;
+  }
   try {
-    const base = config.vantageApiBase || DEFAULT_CONFIG.vantageApiBase;
     const headers: Record<string, string> = {
       Authorization: `Bearer ${config.vantageApiKey}`,
       "Content-Type": "application/json",
@@ -167,8 +177,12 @@ async function showBudgetStatus(config: VantageConfig): Promise<void> {
     console.log(yellow("  No API key configured."));
     return;
   }
+  const base = config.vantageApiBase || DEFAULT_CONFIG.vantageApiBase;
+  if (!assertHttpsApiBase(base)) {
+    console.log(red("  Refusing to send API key to non-HTTPS endpoint."));
+    return;
+  }
   try {
-    const base = config.vantageApiBase || DEFAULT_CONFIG.vantageApiBase;
     const res = await fetch(`${base}/v1/analytics/summary`, {
       headers: { Authorization: `Bearer ${config.vantageApiKey}` },
       signal: AbortSignal.timeout(10000),
@@ -578,8 +592,8 @@ async function startRepl(
   });
 
   const PASTE_DELAY_MS = replFlags["paste-delay"]
-    ? Number(replFlags["paste-delay"])
-    : Number(process.env.VANTAGE_PASTE_DELAY) || 80;
+    ? parseIntBounded(replFlags["paste-delay"], 80, 0, 60_000)
+    : parseIntBounded(process.env.VANTAGE_PASTE_DELAY, 80, 0, 60_000);
 
   let pasteBuffer: string[] = [];
   let pasteTimer: ReturnType<typeof setTimeout> | null = null;
@@ -944,7 +958,12 @@ async function readStdin(): Promise<string> {
   const MAX_STDIN_BYTES = 1024 * 1024;
   const chunks: Buffer[] = [];
   let totalBytes = 0;
-  const stdinTimeoutMs = Number(process.env.VANTAGE_STDIN_TIMEOUT) || 30000;
+  const stdinTimeoutMs = parseIntBounded(
+    process.env.VANTAGE_STDIN_TIMEOUT,
+    30000,
+    1_000,
+    10 * 60 * 1000,
+  );
   const timeout = setTimeout(() => {
     process.stdin.destroy();
   }, stdinTimeoutMs);
@@ -1020,11 +1039,13 @@ async function main(): Promise<void> {
   _activeAgentName = agent.name;
 
   const extraAgentFlags = [...agentFlags];
-  if (flags.model) extraAgentFlags.push("--model", flags.model);
-  if (flags.system) extraAgentFlags.push("--system", flags.system);
+  const safeModel = sanitizeModelFlag(flags.model);
+  const safeSystem = sanitizeSystemFlag(flags.system);
+  if (safeModel) extraAgentFlags.push("--model", safeModel);
+  if (safeSystem) extraAgentFlags.push("--system", safeSystem);
 
   const noOptimize = flags["no-optimize"] === "true";
-  const timeoutMs = flags.timeout ? Number(flags.timeout) : undefined;
+  const timeoutMs = parseIntBounded(flags.timeout, 0, 1, 24 * 60 * 60 * 1000) || undefined;
 
   initSession();
 

@@ -2,6 +2,7 @@ import { spawn } from "child_process";
 import { bus } from "./event-bus.js";
 import { createSpinner } from "./ui.js";
 import type { SpawnArgs } from "./agents/registry.js";
+import { parseIntBounded } from "./sanitize.js";
 
 const MAX_OUTPUT_BYTES = 5 * 1024 * 1024;
 const TOOL_BULLET = "⏺";
@@ -189,7 +190,12 @@ function parseStreamLine(line: string): ParsedLine {
   }
 }
 
-const DEFAULT_TIMEOUT_MS = Number(process.env.VANTAGE_TIMEOUT) || 300_000;
+const DEFAULT_TIMEOUT_MS = parseIntBounded(
+  process.env.VANTAGE_TIMEOUT,
+  300_000,
+  1_000,
+  24 * 60 * 60 * 1000,
+);
 
 type ActiveChild = ReturnType<typeof spawn>;
 let _activeChild: ActiveChild | null = null;
@@ -421,7 +427,6 @@ export function runAgent(
       bus.emit("agent:started", {
         agent: agentName,
         pid: child.pid,
-        command: `${spawnArgs.command} ${spawnArgs.args.join(" ")}`,
       });
     }
 
@@ -646,7 +651,6 @@ export function runAgentBuffered(
       bus.emit("agent:started", {
         agent: agentName,
         pid: child.pid,
-        command: `${spawnArgs.command} ${spawnArgs.args.join(" ")}`,
       });
     }
 

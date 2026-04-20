@@ -1,6 +1,7 @@
 import { execSync } from "child_process";
 import type { AgentAdapter, SpawnArgs } from "./registry.js";
 import type { AgentConfig } from "../config.js";
+import { sanitizeAgentCommand } from "../sanitize.js";
 
 export const chatgptAdapter: AgentAdapter = {
   name: "chatgpt",
@@ -20,7 +21,7 @@ export const chatgptAdapter: AgentAdapter = {
     }
   },
   buildCommand(prompt: string, config?: AgentConfig): SpawnArgs {
-    const cmd = config?.command || "chatgpt-cli";
+    const cmd = sanitizeAgentCommand(config?.command, "chatgpt-cli");
     const baseArgs = config?.args ?? [];
     return {
       command: cmd,
@@ -28,7 +29,7 @@ export const chatgptAdapter: AgentAdapter = {
     };
   },
   buildContinueCommand(prompt: string, config?: AgentConfig, sessionId?: string): SpawnArgs {
-    const cmd = config?.command || "chatgpt-cli";
+    const cmd = sanitizeAgentCommand(config?.command, "chatgpt-cli");
     const extraArgs = config?.args ?? [];
     const resumeArgs = sessionId ? ["--conversation", sessionId] : ["--continue"];
     return {
