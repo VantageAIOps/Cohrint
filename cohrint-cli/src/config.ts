@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync, chmodSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync, chmodSync, unlinkSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { sanitizeConfig } from "./sanitize.js";
@@ -98,15 +98,21 @@ export function loadConfig(): VantageConfig {
 }
 
 export function saveConfig(config: VantageConfig): void {
+  const dir = getConfigDir();
+  _secureDir(dir);
+  const configPath = getConfigPath();
+  const tmpPath = configPath + ".tmp";
+  // Orphan-tmp cleanup: a prior crash between write and rename would have
+  // left the API key sitting in a .tmp file. Unlink before we write ours.
+  if (existsSync(tmpPath)) {
+    try { unlinkSync(tmpPath); } catch {}
+  }
   try {
-    const dir = getConfigDir();
-    _secureDir(dir);
-    const configPath = getConfigPath();
-    const tmpPath = configPath + ".tmp";
     writeFileSync(tmpPath, JSON.stringify(config, null, 2), { encoding: "utf-8", mode: 0o600 });
     renameSync(tmpPath, configPath);
     _secureFile(configPath);
   } catch (err) {
+    try { unlinkSync(tmpPath); } catch {}
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[vantage] Failed to save config: ${msg}`);
     throw err;

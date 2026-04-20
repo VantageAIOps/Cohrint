@@ -330,6 +330,17 @@ export function isValidSessionId(id: unknown): boolean {
   );
 }
 
+// Agent stdout is untrusted. total_cost_usd from a compromised/hostile agent
+// could arrive as Infinity, NaN, or 1e308 — which would poison session totals
+// and get shipped to the telemetry API. Bound to a sane range.
+const MAX_PLAUSIBLE_COST_USD = 1_000_000;
+function parseFiniteCost(v: unknown): number | undefined {
+  if (typeof v !== "number") return undefined;
+  if (!Number.isFinite(v)) return undefined;
+  if (v < 0 || v > MAX_PLAUSIBLE_COST_USD) return undefined;
+  return v;
+}
+
 export interface PermissionDenial {
   toolName: string;
   toolInput: Record<string, unknown>;
@@ -476,8 +487,8 @@ export function runAgent(
       try {
         const obj = JSON.parse(line) as Record<string, unknown>;
         if (obj["type"] === "result") {
-          if (typeof obj["total_cost_usd"] === "number")
-            capturedCostUsd = obj["total_cost_usd"] as number;
+          const cost = parseFiniteCost(obj["total_cost_usd"]);
+          if (cost !== undefined) capturedCostUsd = cost;
           const denials = obj["permission_denials"];
           if (Array.isArray(denials)) {
             for (const d of denials as Record<string, unknown>[]) {
@@ -704,8 +715,9 @@ export function runAgentBuffered(
       if (line.trim()) {
         try {
           const obj = JSON.parse(line) as Record<string, unknown>;
-          if (obj["type"] === "result" && typeof obj["total_cost_usd"] === "number") {
-            capturedCostUsd = obj["total_cost_usd"] as number;
+          if (obj["type"] === "result") {
+            const cost = parseFiniteCost(obj["total_cost_usd"]);
+            if (cost !== undefined) capturedCostUsd = cost;
           }
         } catch {}
       }

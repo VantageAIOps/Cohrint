@@ -617,6 +617,9 @@ async function startRepl(
   const prompt = () => {
     process.stdout.write(promptLine(currentAgent.name));
     handleLine = async (input: string) => {
+      // Re-entry guard: clear handler before awaiting so a concurrent
+      // stdin burst (paste timer firing mid-await) can't double-spawn.
+      handleLine = null;
       const line = input.trim();
       if (!line) {
         prompt();

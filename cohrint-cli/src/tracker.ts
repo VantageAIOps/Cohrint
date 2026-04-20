@@ -215,7 +215,9 @@ export class Tracker {
     } catch (err) {
       bus.emit("cost:reported", { success: false });
       if (this.config.debug) {
-        console.error("[vantage] Failed to send events:", err);
+        // Log message only — raw Error can include fetch 'cause' with URL/headers.
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[vantage] Failed to send events: ${msg}`);
       }
       const unsent = batch.filter((e) => !this.sentIds.has(e.event_id));
       const retryable = unsent
@@ -233,7 +235,10 @@ export class Tracker {
     if (!this._onBeforeExit) {
       this._onBeforeExit = () => {
         this.flush().catch((err) => {
-          if (this.config?.debug) console.error("[vantage] Final flush failed:", err);
+          if (this.config?.debug) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error(`[vantage] Final flush failed: ${msg}`);
+          }
         });
       };
       process.on("beforeExit", this._onBeforeExit);

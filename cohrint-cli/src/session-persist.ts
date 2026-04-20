@@ -33,9 +33,17 @@ export function saveState(state: PersistedState): void {
   try { chmodSync(dir, 0o700); } catch {}
   const path = getStatePath();
   const tmp = path + ".tmp";
-  writeFileSync(tmp, JSON.stringify(state, null, 2), { encoding: "utf-8", mode: 0o600 });
-  renameSync(tmp, path);
-  try { chmodSync(path, 0o600); } catch {}
+  if (existsSync(tmp)) {
+    try { unlinkSync(tmp); } catch {}
+  }
+  try {
+    writeFileSync(tmp, JSON.stringify(state, null, 2), { encoding: "utf-8", mode: 0o600 });
+    renameSync(tmp, path);
+    try { chmodSync(path, 0o600); } catch {}
+  } catch (err) {
+    try { unlinkSync(tmp); } catch {}
+    throw err;
+  }
 }
 
 export function loadState(): PersistedState {
