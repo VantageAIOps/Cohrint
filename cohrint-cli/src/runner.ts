@@ -420,7 +420,11 @@ export function runAgent(
           notLoggedInDetected = true;
           return;
         }
-        process.stderr.write(chunk);
+        // A prompt-injected or compromised agent can emit OSC/CSI escapes on
+        // stderr just as easily as on stdout. Mirror the stdout scrubbing
+        // (sanitizeDisplay) so the terminal never sees attacker-controlled
+        // control sequences (OSC 52 clipboard-write, OSC 8 fake hyperlinks, …).
+        process.stderr.write(sanitizeDisplay(text));
       });
     } catch (err) {
       _activeChild = null;

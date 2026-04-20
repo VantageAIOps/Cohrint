@@ -1137,6 +1137,8 @@ async function main(): Promise<void> {
       }
     } catch {}
     await tracker.flush().catch(() => {});
+    // Deregister beforeExit + interval so a stray wake-up can't flush again.
+    tracker.stop();
     // Exit codes: permission denials = 2; agent crashed = the agent's
     // own exit code (or 1 if we couldn't spawn). Silent success-on-crash
     // would break CI pipelines that chain on `cohrint && deploy`.
@@ -1165,6 +1167,7 @@ async function main(): Promise<void> {
     if (stdinRun.notLoggedIn) {
       printNotLoggedIn(agent);
       await tracker.flush().catch(() => {});
+      tracker.stop();
       process.exit(1);
     }
     if (stdinRun.permissionDenials.length > 0) {
@@ -1191,6 +1194,7 @@ async function main(): Promise<void> {
       }
     } catch {}
     await tracker.flush().catch(() => {});
+    tracker.stop();
     if (stdinRun.permissionDenials.length > 0) process.exit(2);
     if (stdinRun.crashed) process.exit(stdinRun.exitCode || 1);
     process.exit(0);

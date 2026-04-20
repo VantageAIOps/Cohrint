@@ -112,7 +112,15 @@ interface TextSegment {
   content: string;
 }
 
+// Cap regex input to avoid catastrophic backtracking on adversarial prompts
+// with unclosed code fences. Larger inputs are passed through as a single
+// prose segment — optimization is a best-effort heuristic, not required.
+const SPLIT_MAX_BYTES = 256 * 1024;
+
 function splitCodeAndProse(text: string): TextSegment[] {
+  if (text.length > SPLIT_MAX_BYTES) {
+    return [{ type: "prose", content: text }];
+  }
   const segments: TextSegment[] = [];
   const codePattern = /```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]+`/g;
   let lastIndex = 0;

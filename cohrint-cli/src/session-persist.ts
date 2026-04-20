@@ -19,7 +19,10 @@ export interface PersistedState {
   allowedTools: string[];
 }
 
-const ALLOWED_TOOL_RX = /^[A-Za-z_][A-Za-z0-9_():,*\s/\-.]{0,256}$/;
+// Tight regex: no whitespace, bounded length. A prior permissive variant (with
+// `\s` and 256-char ceiling) allowed a crafted session.json to smuggle flag
+// fragments like "Bash --permission-mode bypassPermissions" into --allowedTools.
+const ALLOWED_TOOL_RX = /^[A-Za-z_][A-Za-z0-9_():,*/\-.]{0,79}$/;
 const MAX_TOOLS = 128;
 const LOCK_TIMEOUT_MS = 3_000;
 const LOCK_STALE_MS = 60_000;

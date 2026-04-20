@@ -12,7 +12,9 @@ const MAX_ARGV_ITEMS = 64;
 const MAX_ARGV_LEN = 4096;
 const MAX_SYSTEM_PROMPT = 8192;
 const MODEL_RX = /^[A-Za-z0-9._:\-]{1,80}$/;
-const ALLOWED_TOOL_RX = /^[A-Za-z_][A-Za-z0-9_():,*\s/\-.]*$/;
+// No whitespace — prevents smuggling flag-like fragments ("Bash --foo") when
+// tool names get joined with "," and passed via --allowedTools.
+const ALLOWED_TOOL_RX = /^[A-Za-z_][A-Za-z0-9_():,*/\-.]{0,79}$/;
 
 function _warn(msg: string): void {
   if (process.env.VANTAGE_SANITIZE_SILENT) return;

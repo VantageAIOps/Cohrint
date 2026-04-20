@@ -1,4 +1,15 @@
-import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync, chmodSync, unlinkSync } from "fs";
+import {
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  existsSync,
+  renameSync,
+  chmodSync,
+  unlinkSync,
+  openSync,
+  closeSync,
+  statSync,
+} from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { sanitizeConfig } from "./sanitize.js";
@@ -53,8 +64,55 @@ export function getConfigPath(): string {
   return join(getConfigDir(), "config.json");
 }
 
+function getConfigLockPath(): string {
+  return join(getConfigDir(), "config.lock");
+}
+
 export function configExists(): boolean {
   return existsSync(getConfigPath());
+}
+
+const LOCK_TIMEOUT_MS = 3_000;
+const LOCK_STALE_MS = 60_000;
+const LOCK_RETRY_MS = 25;
+
+function _busyWait(ms: number): void {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    // bounded by LOCK_TIMEOUT_MS — safe.
+  }
+}
+
+// Advisory lock to serialize load-modify-save on config.json between concurrent
+// CLI instances (e.g., two simultaneous /setup runs). Stale locks older than
+// LOCK_STALE_MS are reaped so a prior crash doesn't wedge future writes.
+function _acquireConfigLock(): number | null {
+  _secureDir(getConfigDir());
+  const lockPath = getConfigLockPath();
+  const deadline = Date.now() + LOCK_TIMEOUT_MS;
+  while (true) {
+    try {
+      return openSync(lockPath, "wx", 0o600);
+    } catch (err: unknown) {
+      const code = (err as { code?: string } | null)?.code;
+      if (code !== "EEXIST") return null;
+      try {
+        const st = statSync(lockPath);
+        if (Date.now() - st.mtimeMs > LOCK_STALE_MS) {
+          try { unlinkSync(lockPath); } catch {}
+          continue;
+        }
+      } catch {}
+      if (Date.now() >= deadline) return null;
+      _busyWait(LOCK_RETRY_MS);
+    }
+  }
+}
+
+function _releaseConfigLock(fd: number | null): void {
+  if (fd === null) return;
+  try { closeSync(fd); } catch {}
+  try { unlinkSync(getConfigLockPath()); } catch {}
 }
 
 function _secureDir(dir: string): void {
@@ -102,19 +160,24 @@ export function saveConfig(config: VantageConfig): void {
   _secureDir(dir);
   const configPath = getConfigPath();
   const tmpPath = configPath + ".tmp";
-  // Orphan-tmp cleanup: a prior crash between write and rename would have
-  // left the API key sitting in a .tmp file. Unlink before we write ours.
-  if (existsSync(tmpPath)) {
-    try { unlinkSync(tmpPath); } catch {}
-  }
+  const lockFd = _acquireConfigLock();
   try {
-    writeFileSync(tmpPath, JSON.stringify(config, null, 2), { encoding: "utf-8", mode: 0o600 });
-    renameSync(tmpPath, configPath);
-    _secureFile(configPath);
-  } catch (err) {
-    try { unlinkSync(tmpPath); } catch {}
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[vantage] Failed to save config: ${msg}`);
-    throw err;
+    // Orphan-tmp cleanup: a prior crash between write and rename would have
+    // left the API key sitting in a .tmp file. Unlink before we write ours.
+    if (existsSync(tmpPath)) {
+      try { unlinkSync(tmpPath); } catch {}
+    }
+    try {
+      writeFileSync(tmpPath, JSON.stringify(config, null, 2), { encoding: "utf-8", mode: 0o600 });
+      renameSync(tmpPath, configPath);
+      _secureFile(configPath);
+    } catch (err) {
+      try { unlinkSync(tmpPath); } catch {}
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[vantage] Failed to save config: ${msg}`);
+      throw err;
+    }
+  } finally {
+    _releaseConfigLock(lockFd);
   }
 }
