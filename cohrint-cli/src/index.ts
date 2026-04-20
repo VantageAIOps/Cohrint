@@ -143,6 +143,11 @@ async function showDashboardSummary(config: VantageConfig): Promise<void> {
         console.log(`  ${dim("Budget:")}         ${color(budgetPct + "%")} of $${budgetUsd}`);
       }
     }
+    let cacheSavingsUsd = 0;
+    let cacheTokens = 0;
+    let cacheHitRate = 0;
+    let duplicateCalls = 0;
+    let wastedCostUsd = 0;
     if (kpis) {
       const k = kpis as Record<string, unknown>;
       const totalCost = _finiteOr(k.total_cost_usd, 0);
@@ -150,6 +155,11 @@ async function showDashboardSummary(config: VantageConfig): Promise<void> {
       const totalReqs = _finiteOr(k.total_requests, 0);
       const avgLatency = _finiteOr(k.avg_latency_ms, 0);
       const effScore = _finiteOr(k.efficiency_score, 0);
+      cacheSavingsUsd = _finiteOr(k.cache_savings_usd, 0);
+      cacheTokens = _finiteOr(k.cache_tokens_total, 0);
+      cacheHitRate = _finiteOr(k.cache_hit_rate_pct, 0);
+      duplicateCalls = _finiteOr(k.duplicate_calls, 0);
+      wastedCostUsd = _finiteOr(k.wasted_cost_usd, 0);
       console.log(`  ${dim("30d spend:")}      $${totalCost.toFixed(4)}`);
       console.log(`  ${dim("30d tokens:")}     ${totalTokens.toLocaleString()}`);
       console.log(`  ${dim("30d requests:")}   ${totalReqs.toLocaleString()}`);
@@ -158,16 +168,33 @@ async function showDashboardSummary(config: VantageConfig): Promise<void> {
     }
 
     const session = getSession();
-    if (session.promptCount > 0) {
+    const hasOptSavings = session.totalSavedTokens > 0 || session.totalSavedUsd > 0;
+    const hasCacheSavings = cacheSavingsUsd > 0 || cacheTokens > 0 || cacheHitRate > 0;
+    const hasSession = session.promptCount > 0;
+
+    if (hasOptSavings || hasCacheSavings || hasSession) {
       console.log(dim("  " + "-".repeat(45)));
+      console.log(bold("  Savings & Session"));
+    }
+    if (hasSession) {
       console.log(
-        `  ${dim("Local session:")}  ${session.promptCount} prompts, $${session.totalCostUsd.toFixed(4)}`
+        `  ${dim("Session:")}        ${session.promptCount} prompts, $${session.totalCostUsd.toFixed(4)}`
       );
-      if (session.totalSavedTokens > 0) {
-        console.log(
-          `  ${dim("Tokens saved:")}   ${green(session.totalSavedTokens.toLocaleString())}`
-        );
-      }
+    }
+    if (hasOptSavings) {
+      console.log(
+        `  ${dim("Optimization:")}   ${green("$" + session.totalSavedUsd.toFixed(4))} · ${green(session.totalSavedTokens.toLocaleString())} tokens`
+      );
+    }
+    if (hasCacheSavings) {
+      console.log(
+        `  ${dim("Cache saved:")}    ${green("$" + cacheSavingsUsd.toFixed(4))} · ${green(cacheTokens.toLocaleString())} tokens (${cacheHitRate.toFixed(1)}% hit)`
+      );
+    }
+    if (duplicateCalls > 0 || wastedCostUsd > 0) {
+      console.log(
+        `  ${dim("Wasted (dupes):")} ${yellow("$" + wastedCostUsd.toFixed(4))} · ${duplicateCalls} duplicate calls`
+      );
     }
     console.log(dim("  " + "-".repeat(45)));
     console.log("");
