@@ -1,5 +1,5 @@
 """
-conftest.py — Shared fixtures and markers for vantage-agent tests.
+conftest.py — Shared fixtures and markers for cohrint-agent tests.
 """
 from __future__ import annotations
 
@@ -11,8 +11,8 @@ from unittest.mock import patch
 
 import pytest
 
-from vantage_agent.permissions import PermissionManager
-from vantage_agent.cost_tracker import SessionCost
+from cohrint_agent.permissions import PermissionManager
+from cohrint_agent.cost_tracker import SessionCost
 
 
 def _has_api_key() -> bool:
@@ -20,7 +20,7 @@ def _has_api_key() -> bool:
     if os.environ.get("ANTHROPIC_API_KEY"):
         return True
     for path in [
-        os.path.expanduser("~/.vantage-agent/api_key"),
+        os.path.expanduser("~/.cohrint-agent/api_key"),
         os.path.expanduser("~/.anthropic/api_key"),
     ]:
         if os.path.exists(path):
@@ -73,7 +73,7 @@ def workspace(tmp_path):
     (tmp_path / "data" / "users.csv").write_text("id,name,email\n1,Alice,alice@example.com\n2,Bob,bob@test.com\n")
 
     # README
-    (tmp_path / "README.md").write_text("# Test Project\n\nA test workspace for vantage-agent.\n")
+    (tmp_path / "README.md").write_text("# Test Project\n\nA test workspace for cohrint-agent.\n")
 
     # .gitignore
     (tmp_path / ".gitignore").write_text("__pycache__/\n*.pyc\n.env\n")
@@ -84,7 +84,7 @@ def workspace(tmp_path):
 @pytest.fixture
 def perms(tmp_path):
     """Isolated PermissionManager."""
-    return PermissionManager(config_dir=tmp_path / ".vantage-agent")
+    return PermissionManager(config_dir=tmp_path / ".cohrint-agent")
 
 
 @pytest.fixture
@@ -102,7 +102,7 @@ def client(workspace, perms, cost):
     if not HAS_API_KEY:
         pytest.skip("No API key")
 
-    from vantage_agent.api_client import AgentClient
+    from cohrint_agent.api_client import AgentClient
     # Pre-approve all tools for integration tests
     perms.approve(["Bash", "Write", "Edit"], always=False)
     return AgentClient(

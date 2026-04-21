@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from vantage_agent.hooks import (
+from cohrint_agent.hooks import (
     HookContext,
     CostSummary,
     classify_input_hook,
@@ -11,7 +11,7 @@ from vantage_agent.hooks import (
     check_budget_hook,
     BudgetExceededError,
 )
-from vantage_agent.anomaly import check_cost_anomaly_structured
+from cohrint_agent.anomaly import check_cost_anomaly_structured
 
 
 def _ctx(prompt: str = "hello world how are you doing today", budget_usd: float = 10.0) -> HookContext:

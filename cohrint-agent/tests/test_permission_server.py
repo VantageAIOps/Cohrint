@@ -10,12 +10,12 @@ from pathlib import Path
 
 import pytest
 
-from vantage_agent.permission_server import (
+from cohrint_agent.permission_server import (
     PermissionServer,
     build_session_settings_file,
     install_hook_script,
 )
-from vantage_agent.permissions import PermissionManager
+from cohrint_agent.permissions import PermissionManager
 
 
 def test_install_hook_script_creates_executable(tmp_path):
@@ -29,7 +29,7 @@ def test_install_hook_script_creates_executable(tmp_path):
 
 
 def test_build_session_settings_file_with_no_user_settings(tmp_path):
-    sock_path = "/tmp/vantage-perm-99999.sock"
+    sock_path = "/tmp/cohrint-perm-99999.sock"
     settings_path = tmp_path / "settings.json"
     build_session_settings_file(
         socket_path=sock_path,
@@ -50,7 +50,7 @@ def test_build_session_settings_file_merges_user_hooks(tmp_path):
             "PreToolUse": [{"matcher": "Bash(git*)", "hooks": [{"type": "command", "command": "user-hook.sh"}]}]
         }
     }))
-    sock_path = "/tmp/vantage-perm-99999.sock"
+    sock_path = "/tmp/cohrint-perm-99999.sock"
     settings_path = tmp_path / "settings.json"
     build_session_settings_file(
         socket_path=sock_path,
@@ -60,7 +60,7 @@ def test_build_session_settings_file_merges_user_hooks(tmp_path):
     )
     data = json.loads(settings_path.read_text())
     hooks = data["hooks"]["PreToolUse"]
-    # user hook first, vantage hook appended
+    # user hook first, cohrint hook appended
     assert len(hooks) == 2
     assert hooks[0]["matcher"] == "Bash(git*)"
     assert hooks[1]["hooks"][0]["env"]["COHRINT_SOCKET"] == sock_path
@@ -75,7 +75,7 @@ def test_permission_server_allow_response(tmp_path):
     }))
     pm = PermissionManager(config_dir=tmp_path)
     # Unix socket path must be short (104-char limit on macOS)
-    sock_path = f"/tmp/vantage-test-allow-{os.getpid()}.sock"
+    sock_path = f"/tmp/cohrint-test-allow-{os.getpid()}.sock"
 
     server = PermissionServer(socket_path=sock_path, permissions=pm)
     server.start()
@@ -120,7 +120,7 @@ def test_permission_server_deny_response(tmp_path):
         "session_approved": [], "audit_log": [],
     }))
     pm = PermissionManager(config_dir=tmp_path)
-    sock_path = f"/tmp/vantage-test-deny-{os.getpid()}.sock"
+    sock_path = f"/tmp/cohrint-test-deny-{os.getpid()}.sock"
     server = PermissionServer(socket_path=sock_path, permissions=pm)
     server.start()
     time.sleep(0.05)

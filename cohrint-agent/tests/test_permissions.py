@@ -1,5 +1,5 @@
 """
-Tests for vantage_agent.permissions — per-tool permission management.
+Tests for cohrint_agent.permissions — per-tool permission management.
 
 Tests permission state, persistence, and approval logic.
 Uses monkeypatch for user input simulation (unavoidable for interactive prompts).
@@ -11,8 +11,8 @@ from unittest.mock import patch
 
 import pytest
 
-from vantage_agent.permissions import PermissionManager
-from vantage_agent.tools import SAFE_TOOLS
+from cohrint_agent.permissions import PermissionManager
+from cohrint_agent.tools import SAFE_TOOLS
 
 
 @pytest.fixture
@@ -117,19 +117,19 @@ class TestCheckPermission:
         assert clean_perms.check_permission("Read", {"file_path": "/tmp/test"})
 
     def test_deny_returns_false(self, clean_perms):
-        with patch("vantage_agent.permissions.Prompt.ask", return_value="n"):
+        with patch("cohrint_agent.permissions.Prompt.ask", return_value="n"):
             result = clean_perms.check_permission("Bash", {"command": "rm -rf /"})
         assert not result
         assert not clean_perms.is_approved("Bash")
 
     def test_yes_once_approves_for_session(self, clean_perms):
-        with patch("vantage_agent.permissions.Prompt.ask", return_value="y"):
+        with patch("cohrint_agent.permissions.Prompt.ask", return_value="y"):
             result = clean_perms.check_permission("Bash", {"command": "echo hi"})
         assert result
         assert clean_perms.is_approved("Bash")
 
     def test_always_approves_permanently(self, clean_perms):
-        with patch("vantage_agent.permissions.Prompt.ask", return_value="a"):
+        with patch("cohrint_agent.permissions.Prompt.ask", return_value="a"):
             result = clean_perms.check_permission("Write", {"file_path": "/tmp/f", "content": "x"})
         assert result
         assert "Write" in clean_perms.always_approved

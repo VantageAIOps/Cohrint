@@ -1,6 +1,6 @@
 """Tests for anomaly.py — cost anomaly detection."""
 import pytest
-from vantage_agent.anomaly import check_cost_anomaly
+from cohrint_agent.anomaly import check_cost_anomaly
 
 
 class TestCheckCostAnomaly:

@@ -1,4 +1,4 @@
-# Vantage Agent
+# Cohrint Agent
 
 AI coding agent with per-tool permissions, cost tracking, prompt optimization, and anomaly detection. Works across Claude (API), Claude Code, Codex CLI, and Gemini CLI.
 
@@ -34,7 +34,7 @@ echo "summarize this file" | cohrint-agent
 
 ## Backends
 
-Vantage auto-detects the best backend. You can override with `--backend`:
+Cohrint auto-detects the best backend. You can override with `--backend`:
 
 | Backend | Description | Requires |
 |---------|-------------|---------|
@@ -52,7 +52,7 @@ Auto-detect priority: `COHRINT_BACKEND` env → `ANTHROPIC_API_KEY` → `claude`
 
 ## Session Management
 
-Sessions are persisted to `~/.vantage/sessions/`. Resume any previous session:
+Sessions are persisted to `~/.cohrint/sessions/`. Resume any previous session:
 
 ```bash
 # List sessions and costs
@@ -102,7 +102,7 @@ export COHRINT_API_KEY=crt_...
 cohrint-agent
 ```
 
-Or pass inline: `cohrint-agent --vantage-key crt_...`
+Or pass inline: `cohrint-agent --cohrint-key crt_...`
 
 ## All Flags
 
@@ -116,7 +116,7 @@ cohrint-agent [OPTIONS] [PROMPT]
   --max-tokens        Max output tokens (default: 16384)
   --resume SESSION_ID Resume a previous session
   --api-key           Anthropic API key (or ANTHROPIC_API_KEY env)
-  --vantage-key       Cohrint dashboard API key (or COHRINT_API_KEY env)
+  --cohrint-key       Cohrint dashboard API key (or COHRINT_API_KEY env)
   --system            Custom system prompt
   --no-optimize       Disable prompt optimization
   --cwd               Set working directory

@@ -1,11 +1,11 @@
 """
-Tests for vantage_agent.cost_tracker — token usage and cost calculation.
+Tests for cohrint_agent.cost_tracker — token usage and cost calculation.
 """
 from types import SimpleNamespace
 
 import pytest
 
-from vantage_agent.cost_tracker import SessionCost, TurnUsage, MODEL_PRICING
+from cohrint_agent.cost_tracker import SessionCost, TurnUsage, MODEL_PRICING
 
 
 class TestModelPricing:

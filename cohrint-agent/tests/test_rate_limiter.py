@@ -1,4 +1,4 @@
-"""Tests for vantage_agent.rate_limiter — 8 unit tests using tmp_path fixtures."""
+"""Tests for cohrint_agent.rate_limiter — 8 unit tests using tmp_path fixtures."""
 from __future__ import annotations
 
 import json
@@ -9,8 +9,8 @@ from unittest.mock import patch
 import pytest
 
 # We patch Path.home() globally inside each test so all _STATE_FILE / sessions_dir
-# references resolve under tmp_path instead of ~/.vantage/
-import vantage_agent.rate_limiter as rl
+# references resolve under tmp_path instead of ~/.cohrint/
+import cohrint_agent.rate_limiter as rl
 
 
 def _home_patcher(tmp_path: Path):
@@ -21,7 +21,7 @@ def _home_patcher(tmp_path: Path):
 
     @contextlib.contextmanager
     def _cm():
-        new_state = tmp_path / ".vantage" / "rate_state.json"
+        new_state = tmp_path / ".cohrint" / "rate_state.json"
         with _patch.object(Path, "home", return_value=tmp_path), \
              _patch.object(rl, "_STATE_FILE", new_state):
             yield
@@ -43,7 +43,7 @@ def test_acquire_succeeds_with_tokens(tmp_path):
 # 2. acquire() fails when bucket empty
 # ---------------------------------------------------------------------------
 def test_acquire_fails_when_empty(tmp_path):
-    state_file = tmp_path / ".vantage" / "rate_state.json"
+    state_file = tmp_path / ".cohrint" / "rate_state.json"
     state_file.parent.mkdir(parents=True, exist_ok=True)
     # Write a bucket with 0 tokens and last_refill = now (no time to refill)
     bucket = rl.RateBucket(tokens=0.0, capacity=60.0, refill_rate=0.0, last_refill=time.time())
@@ -90,7 +90,7 @@ def test_global_budget_zero_no_sessions(tmp_path):
 # 6. get_global_budget_used() sums across multiple session files
 # ---------------------------------------------------------------------------
 def test_global_budget_sums_sessions(tmp_path):
-    sessions_dir = tmp_path / ".vantage" / "sessions"
+    sessions_dir = tmp_path / ".cohrint" / "sessions"
     sessions_dir.mkdir(parents=True)
 
     for i, cost in enumerate([0.50, 1.25, 0.10]):
@@ -118,7 +118,7 @@ def test_wait_for_token_returns_true_immediately(tmp_path):
 # 8. wait_for_token() returns False when max_wait exceeded
 # ---------------------------------------------------------------------------
 def test_wait_for_token_returns_false_on_timeout(tmp_path):
-    state_file = tmp_path / ".vantage" / "rate_state.json"
+    state_file = tmp_path / ".cohrint" / "rate_state.json"
     state_file.parent.mkdir(parents=True, exist_ok=True)
     # Zero tokens, zero refill rate — will never get a token
     bucket = rl.RateBucket(tokens=0.0, capacity=60.0, refill_rate=0.0, last_refill=time.time())

@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vantage_agent.cli import parse_args, _handle_command, _print_summary
-from vantage_agent.cost_tracker import SessionCost
+from cohrint_agent.cli import parse_args, _handle_command, _print_summary
+from cohrint_agent.cost_tracker import SessionCost
 
 
 def _make_client(model="claude-sonnet-4-6"):
@@ -25,7 +25,7 @@ def _make_client(model="claude-sonnet-4-6"):
 # ── parse_args ────────────────────────────────────────────────────────────────
 
 def test_parse_args_defaults():
-    with patch.object(sys, "argv", ["vantageai-agent"]):
+    with patch.object(sys, "argv", ["cohrint-agent"]):
         args = parse_args()
     assert args.prompt == []
     assert args.model is None
@@ -36,32 +36,32 @@ def test_parse_args_defaults():
 
 
 def test_parse_args_oneshot_prompt():
-    with patch.object(sys, "argv", ["vantageai-agent", "hello", "world"]):
+    with patch.object(sys, "argv", ["cohrint-agent", "hello", "world"]):
         args = parse_args()
     assert args.prompt == ["hello", "world"]
 
 
 def test_parse_args_backend_choices():
     for backend in ("api", "claude", "codex", "gemini"):
-        with patch.object(sys, "argv", ["vantageai-agent", "--backend", backend]):
+        with patch.object(sys, "argv", ["cohrint-agent", "--backend", backend]):
             args = parse_args()
         assert args.backend == backend
 
 
 def test_parse_args_invalid_backend_exits():
-    with patch.object(sys, "argv", ["vantageai-agent", "--backend", "llama"]):
+    with patch.object(sys, "argv", ["cohrint-agent", "--backend", "llama"]):
         with pytest.raises(SystemExit):
             parse_args()
 
 
 def test_parse_args_resume():
-    with patch.object(sys, "argv", ["vantageai-agent", "--resume", "abc123"]):
+    with patch.object(sys, "argv", ["cohrint-agent", "--resume", "abc123"]):
         args = parse_args()
     assert args.resume == "abc123"
 
 
 def test_parse_args_no_optimize():
-    with patch.object(sys, "argv", ["vantageai-agent", "--no-optimize"]):
+    with patch.object(sys, "argv", ["cohrint-agent", "--no-optimize"]):
         args = parse_args()
     assert args.no_optimize is True
 
@@ -141,7 +141,7 @@ def test_non_command_returns_false():
 
 def test_print_summary_no_sessions(capsys):
     # SessionStore is imported inside _print_summary — patch at source
-    with patch("vantage_agent.session_store.SessionStore") as MockStore:
+    with patch("cohrint_agent.session_store.SessionStore") as MockStore:
         MockStore.return_value.list_all.return_value = []
         MockStore.return_value.total_cost_usd.return_value = 0.0
         _print_summary()
@@ -150,7 +150,7 @@ def test_print_summary_no_sessions(capsys):
 
 
 def test_print_summary_with_sessions(capsys):
-    with patch("vantage_agent.session_store.SessionStore") as MockStore:
+    with patch("cohrint_agent.session_store.SessionStore") as MockStore:
         MockStore.return_value.list_all.return_value = [
             {"id": "abc12345xyz", "backend": "api", "cost_summary": {"total_cost_usd": 0.05},
              "messages": ["a", "b", "c", "d"], "last_active_at": "2026-04-08T10:00:00"},
@@ -171,12 +171,12 @@ import sys
 
 def test_tier_command_updates_config(tmp_path, capsys):
     """REPL /tier command writes new tier to config.json."""
-    from vantage_agent.cli import _handle_tier_command
-    from vantage_agent.permissions import PermissionManager
+    from cohrint_agent.cli import _handle_tier_command
+    from cohrint_agent.permissions import PermissionManager
     pm = PermissionManager(config_dir=tmp_path)
-    with patch("vantage_agent.cli.Prompt.ask", return_value="1"):
+    with patch("cohrint_agent.cli.Prompt.ask", return_value="1"):
         _handle_tier_command(pm, config_dir=tmp_path)
-    from vantage_agent.setup_wizard import get_config
+    from cohrint_agent.setup_wizard import get_config
     cfg = get_config(config_dir=tmp_path)
     assert cfg["default_tier"] == 1
 
@@ -184,14 +184,14 @@ def test_tier_command_updates_config(tmp_path, capsys):
 def test_detect_backend_returns_api_when_key_present(monkeypatch):
     """When ANTHROPIC_API_KEY is set, _detect_backend returns 'api'."""
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
-    from vantage_agent.cli import _detect_backend
+    from cohrint_agent.cli import _detect_backend
     result = _detect_backend(api_key=None, requested_backend=None)
     assert result == "api"
 
 
 def test_detect_backend_returns_requested_backend():
     """Explicit --backend flag is respected."""
-    from vantage_agent.cli import _detect_backend
+    from cohrint_agent.cli import _detect_backend
     result = _detect_backend(api_key=None, requested_backend="claude")
     assert result == "claude"
 
@@ -199,7 +199,7 @@ def test_detect_backend_returns_requested_backend():
 def test_detect_backend_auto_detects_claude(monkeypatch):
     """When no API key and claude CLI found, auto-detects claude backend."""
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    with patch("vantage_agent.cli.auto_detect_backend", return_value="claude"):
-        from vantage_agent.cli import _detect_backend
+    with patch("cohrint_agent.cli.auto_detect_backend", return_value="claude"):
+        from cohrint_agent.cli import _detect_backend
         backend = _detect_backend(api_key=None, requested_backend=None)
     assert backend == "claude"

@@ -1,30 +1,50 @@
 import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
 
-// Latest cohrint-cli version that ships to end users. Bump this when a new
-// release is cut so installed CLIs see the update banner on next launch.
-const LATEST_CLI_VERSION = '2.2.5';
+// Per-client release metadata. The CLI sends `?client=node` (default when
+// absent, for backward compatibility) or `?client=python`. The worker picks
+// the matching row and returns it — this lets us ship a single endpoint
+// across both CLIs during the migration and independently bump each one.
+//
+// Bump `version` when a new release is cut; raise `minSupported` only for
+// security-critical forced upgrades — never above `version`.
+type ClientRelease = {
+  version: string;
+  minSupported: string;
+  installCmd: string;
+};
 
-// CLIs below this version are refused service at startup — used for forced
-// upgrades when a release contains a security-critical fix. Leave equal to
-// LATEST_CLI_VERSION or older; never ahead of it.
-const MIN_SUPPORTED_CLI_VERSION = '2.0.0';
+const RELEASES: Record<'node' | 'python', ClientRelease> = {
+  node: {
+    version: '2.2.5',
+    minSupported: '2.0.0',
+    installCmd: 'npm install -g cohrint-cli',
+  },
+  python: {
+    version: '0.2.4',
+    minSupported: '0.2.0',
+    installCmd: 'pip install --upgrade cohrint-agent',
+  },
+};
 
-const INSTALL_CMD = 'npm install -g cohrint-cli';
 const CHANGELOG_URL = 'https://github.com/VantageAIOps/VantageAI/releases';
 
 const cli = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
-// Public endpoint — no auth required. Accepts an optional Bearer token so
-// we can layer per-plan or per-user notices later without breaking clients
-// that haven't finished setup yet.
+// Public endpoint — no auth required. An optional Bearer token is accepted
+// for future per-plan notices. The `client` query param selects the release
+// row; unknown values fall back to `node` so legacy callers keep working.
 cli.get('/latest', (c) => {
+  const clientParam = (c.req.query('client') || '').toLowerCase();
+  const key: 'node' | 'python' = clientParam === 'python' ? 'python' : 'node';
+  const release = RELEASES[key];
   return c.json({
-    version: LATEST_CLI_VERSION,
-    min_supported_version: MIN_SUPPORTED_CLI_VERSION,
-    install_cmd: INSTALL_CMD,
+    version: release.version,
+    min_supported_version: release.minSupported,
+    install_cmd: release.installCmd,
     changelog_url: CHANGELOG_URL,
     notice: null as string | null,
+    client: key,
   });
 });
 

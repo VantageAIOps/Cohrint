@@ -34,9 +34,9 @@ claude = pytest.mark.skipif(
     reason="claude CLI not installed — skipping live backend tests",
 )
 
-from vantage_agent.backends.claude_backend import ClaudeCliBackend, _parse_stream_event
-from vantage_agent.permission_server import PermissionServer, install_hook_script, build_session_settings_file
-from vantage_agent.permissions import PermissionManager
+from cohrint_agent.backends.claude_backend import ClaudeCliBackend, _parse_stream_event
+from cohrint_agent.permission_server import PermissionServer, install_hook_script, build_session_settings_file
+from cohrint_agent.permissions import PermissionManager
 
 
 # ---------------------------------------------------------------------------
@@ -152,7 +152,7 @@ def test_multi_turn_resume_maintains_context(tmp_path):
 def test_permission_server_grant_once(tmp_path):
     """When permission server gets 'allow_session', tool executes and response arrives."""
     pm = _make_pm(tmp_path)
-    sock_path = f"/tmp/vantage-live-grant-{os.getpid()}.sock"
+    sock_path = f"/tmp/cohrint-live-grant-{os.getpid()}.sock"
     server = PermissionServer(socket_path=sock_path, permissions=pm)
     server.start()
 
@@ -205,9 +205,9 @@ def test_permission_server_grant_once(tmp_path):
 
 @claude
 def test_permission_server_deny_tool(tmp_path):
-    """When a tool is denied, model receives '[Vantage] denied' message and adapts."""
+    """When a tool is denied, model receives '[Cohrint] denied' message and adapts."""
     pm = _make_pm(tmp_path)
-    sock_path = f"/tmp/vantage-live-deny-{os.getpid()}.sock"
+    sock_path = f"/tmp/cohrint-live-deny-{os.getpid()}.sock"
     server = PermissionServer(socket_path=sock_path, permissions=pm)
     server.start()
 
@@ -264,7 +264,7 @@ def test_permission_server_deny_tool(tmp_path):
 def test_permission_server_deny_always_updates_audit(tmp_path):
     """'deny_always' decision is written to the audit log in permissions.json."""
     pm = _make_pm(tmp_path)
-    sock_path = f"/tmp/vantage-live-audit-{os.getpid()}.sock"
+    sock_path = f"/tmp/cohrint-live-audit-{os.getpid()}.sock"
     server = PermissionServer(socket_path=sock_path, permissions=pm)
     server.start()
 

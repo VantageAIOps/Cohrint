@@ -3,7 +3,7 @@
 Covers all scenarios from suite 35_recommendations (R01-R30).
 """
 import pytest
-from vantage_agent.recommendations import (
+from cohrint_agent.recommendations import (
     get_recommendations,
     get_inline_tip,
     format_recommendations,

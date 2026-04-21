@@ -11,7 +11,7 @@ import pytest
 from unittest.mock import patch, MagicMock, call
 from rich.console import Console
 
-from vantage_agent.renderer import (
+from cohrint_agent.renderer import (
     render_text_delta,
     render_text_complete,
     render_tool_use_start,
@@ -21,16 +21,16 @@ from vantage_agent.renderer import (
     render_permission_denied,
     render_error,
 )
-from vantage_agent.permissions import PermissionManager
-from vantage_agent.api_client import AgentClient
-from vantage_agent.cost_tracker import SessionCost
+from cohrint_agent.permissions import PermissionManager
+from cohrint_agent.api_client import AgentClient
+from cohrint_agent.cost_tracker import SessionCost
 
 
 def _capture_output(fn, *args, **kwargs) -> str:
     """Capture rich console output to a plain string (no ANSI codes)."""
     buf = io.StringIO()
     console = Console(file=buf, force_terminal=False, width=120, no_color=True)
-    with patch("vantage_agent.renderer.console", console):
+    with patch("cohrint_agent.renderer.console", console):
         fn(*args, **kwargs)
     return buf.getvalue()
 
@@ -54,7 +54,7 @@ class TestTextRendering:
         """Simulates streaming: multiple deltas should concatenate."""
         buf = io.StringIO()
         console = Console(file=buf, force_terminal=False, width=120, no_color=True)
-        with patch("vantage_agent.renderer.console", console):
+        with patch("cohrint_agent.renderer.console", console):
             render_text_delta("Hello ")
             render_text_delta("world")
             render_text_delta("!")
@@ -247,7 +247,7 @@ class TestMultiTurnRendering:
         """First turn: model returns text, no tools."""
         buf = io.StringIO()
         console = Console(file=buf, force_terminal=False, width=120, no_color=True)
-        with patch("vantage_agent.renderer.console", console):
+        with patch("cohrint_agent.renderer.console", console):
             render_text_delta("I'll help you ")
             render_text_delta("fix that bug.")
             render_text_complete("I'll help you fix that bug.")
@@ -258,7 +258,7 @@ class TestMultiTurnRendering:
         """Second turn: model calls a tool, gets result."""
         buf = io.StringIO()
         console = Console(file=buf, force_terminal=False, width=120, no_color=True)
-        with patch("vantage_agent.renderer.console", console):
+        with patch("cohrint_agent.renderer.console", console):
             render_tool_use_start("Read", {"file_path": "src/main.py"})
             render_tool_result("Read", "def main():\n    print('hello')")
             render_text_delta("I can see the issue...")
@@ -273,7 +273,7 @@ class TestMultiTurnRendering:
         """Third turn: model calls multiple tools in sequence."""
         buf = io.StringIO()
         console = Console(file=buf, force_terminal=False, width=120, no_color=True)
-        with patch("vantage_agent.renderer.console", console):
+        with patch("cohrint_agent.renderer.console", console):
             render_tool_use_start("Grep", {"pattern": "TODO", "path": "."})
             render_tool_result("Grep", "src/app.py:10: # TODO fix this")
             render_tool_use_start("Read", {"file_path": "src/app.py"})
@@ -292,7 +292,7 @@ class TestMultiTurnRendering:
         """Model calls tool, user denies, model gets error."""
         buf = io.StringIO()
         console = Console(file=buf, force_terminal=False, width=120, no_color=True)
-        with patch("vantage_agent.renderer.console", console):
+        with patch("cohrint_agent.renderer.console", console):
             render_tool_use_start("Bash", {"command": "rm -rf /tmp/test"})
             render_permission_denied("Bash")
             render_text_delta("The Bash command was denied. Let me try another approach.")
@@ -305,7 +305,7 @@ class TestMultiTurnRendering:
         """After multi-turn, cost summary is rendered."""
         buf = io.StringIO()
         console = Console(file=buf, force_terminal=False, width=120, no_color=True)
-        with patch("vantage_agent.renderer.console", console):
+        with patch("cohrint_agent.renderer.console", console):
             render_cost_summary(
                 model="claude-sonnet-4-6",
                 input_tokens=25000,
@@ -350,7 +350,7 @@ class TestAPIClientToolLoop:
             setattr(ev, k, v)
         return ev
 
-    @patch("vantage_agent.api_client.anthropic.Anthropic")
+    @patch("cohrint_agent.api_client.anthropic.Anthropic")
     def test_text_only_response(self, mock_anthropic_cls):
         """Model returns text only — no tool calls."""
         text_start = self._make_event("content_block_start",
@@ -373,7 +373,7 @@ class TestAPIClientToolLoop:
 
         assert result == "Hello world"
 
-    @patch("vantage_agent.api_client.anthropic.Anthropic")
+    @patch("cohrint_agent.api_client.anthropic.Anthropic")
     def test_tool_use_loop(self, mock_anthropic_cls):
         """Model calls a tool, gets result, then responds with text."""
         # Turn 1: tool_use
@@ -414,7 +414,7 @@ class TestAPIClientToolLoop:
         # Verify 2 API calls were made (tool loop)
         assert mock_client.messages.stream.call_count == 2
 
-    @patch("vantage_agent.api_client.anthropic.Anthropic")
+    @patch("cohrint_agent.api_client.anthropic.Anthropic")
     def test_permission_denied_stops_tool(self, mock_anthropic_cls, tmp_path):
         """When user denies a tool, error result is sent back."""
         cb = MagicMock()
@@ -467,7 +467,7 @@ class TestCLICommandRendering:
     """Test that CLI /commands produce correct output."""
 
     def test_help_shows_banner(self):
-        from vantage_agent.cli import BANNER
+        from cohrint_agent.cli import BANNER
         assert "Cohrint Agent" in BANNER
         assert "/help" in BANNER
         assert "/allow" in BANNER
@@ -476,7 +476,7 @@ class TestCLICommandRendering:
 
     def test_handle_command_cost(self):
         """The /cost command renders cost summary."""
-        from vantage_agent.cli import _handle_command
+        from cohrint_agent.cli import _handle_command
         mock_client = MagicMock()
         mock_client.cost = SessionCost(model="claude-sonnet-4-6")
         mock_client.cost.total_input = 1000
@@ -487,14 +487,14 @@ class TestCLICommandRendering:
         assert result is True
 
     def test_handle_command_optimize_toggle(self):
-        from vantage_agent.cli import _handle_command
+        from cohrint_agent.cli import _handle_command
         mock_client = MagicMock()
         mock_client.optimization = False
         _handle_command("/optimize on", mock_client)
         assert mock_client.optimization is True
 
     def test_handle_command_model_switch(self):
-        from vantage_agent.cli import _handle_command
+        from cohrint_agent.cli import _handle_command
         mock_client = MagicMock()
         mock_client.model = "claude-sonnet-4-6"
         mock_client.cost = MagicMock()
@@ -502,7 +502,7 @@ class TestCLICommandRendering:
         assert mock_client.model == "claude-opus-4-6"
 
     def test_unknown_command(self):
-        from vantage_agent.cli import _handle_command
+        from cohrint_agent.cli import _handle_command
         mock_client = MagicMock()
         result = _handle_command("/foobar", mock_client)
         assert result is True  # Handled (printed error)
@@ -515,7 +515,7 @@ class TestCLICommandRendering:
 def _capture_v2(**kwargs) -> str:
     buf = io.StringIO()
     con = Console(file=buf, no_color=True)
-    import vantage_agent.renderer as r
+    import cohrint_agent.renderer as r
     original = r.console
     r.console = con
     try:

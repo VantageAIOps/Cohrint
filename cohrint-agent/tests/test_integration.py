@@ -1,5 +1,5 @@
 """
-test_integration.py — Full integration tests for vantage-agent.
+test_integration.py — Full integration tests for cohrint-agent.
 
 Tests the complete flow: prompt → API → tool execution → result.
 Covers multi-turn conversations, tool use, permissions, edge cases,
@@ -67,8 +67,8 @@ class TestBashTool:
 
     def test_simple_command(self, client):
         """Agent executes a simple command."""
-        response = client.send("Run: echo 'vantage-test-42'. Show the output.")
-        assert "vantage-test-42" in response
+        response = client.send("Run: echo 'cohrint-test-42'. Show the output.")
+        assert "cohrint-test-42" in response
 
     def test_command_with_pipe(self, client, workspace):
         """Agent handles piped commands."""
@@ -116,9 +116,9 @@ class TestFileTools:
     def test_write_new_file(self, client, workspace):
         """Agent creates a new file."""
         target = workspace / "output.txt"
-        client.send(f"Write the text 'hello from vantage' to {target}")
+        client.send(f"Write the text 'hello from cohrint' to {target}")
         assert target.exists()
-        assert "hello from vantage" in target.read_text()
+        assert "hello from cohrint" in target.read_text()
 
     def test_edit_existing_file(self, client, workspace):
         """Agent edits a specific part of a file."""
@@ -195,7 +195,7 @@ class TestPermissionFlow:
 
     def test_safe_tools_no_prompt(self, perms, workspace):
         """Read/Glob/Grep execute without prompting."""
-        from vantage_agent.tools import execute_tool
+        from cohrint_agent.tools import execute_tool
         assert perms.is_approved("Read")
         result = execute_tool("Read", {"file_path": str(workspace / "main.py")}, str(workspace))
         assert "greet" in result
@@ -206,20 +206,20 @@ class TestPermissionFlow:
 
     def test_deny_prevents_execution(self, perms):
         """Denied tool returns False."""
-        with patch("vantage_agent.permissions.Prompt.ask", return_value="n"):
+        with patch("cohrint_agent.permissions.Prompt.ask", return_value="n"):
             assert not perms.check_permission("Bash", {"command": "rm -rf /"})
 
     def test_allow_once_then_approved(self, perms):
         """After allowing once, tool is approved for the session."""
-        with patch("vantage_agent.permissions.Prompt.ask", return_value="y"):
+        with patch("cohrint_agent.permissions.Prompt.ask", return_value="y"):
             assert perms.check_permission("Bash", {"command": "echo hi"})
         assert perms.is_approved("Bash")
 
     def test_allow_always_persists(self, perms, tmp_path):
         """'Always' persists to disk."""
-        with patch("vantage_agent.permissions.Prompt.ask", return_value="a"):
+        with patch("cohrint_agent.permissions.Prompt.ask", return_value="a"):
             perms.check_permission("Write", {"file_path": "/tmp/x", "content": "y"})
-        perm_file = tmp_path / ".vantage-agent" / "permissions.json"
+        perm_file = tmp_path / ".cohrint-agent" / "permissions.json"
         data = json.loads(perm_file.read_text())
         assert "Write" in data["always_approved"]
 
@@ -245,8 +245,8 @@ class TestPermissionFlowLive:
 
     def test_denied_tool_agent_adapts(self, workspace, cost):
         """When a tool is denied, agent gets error and adapts."""
-        from vantage_agent.api_client import AgentClient
-        from vantage_agent.permissions import PermissionManager
+        from cohrint_agent.api_client import AgentClient
+        from cohrint_agent.permissions import PermissionManager
 
         # Create perms that deny everything except Read
         perms = PermissionManager()
@@ -301,7 +301,7 @@ class TestCostTracking:
         """Tool use (multi-turn) costs more than simple text."""
         # Simple prompt
         client2_cost = SessionCost(model="claude-sonnet-4-6")
-        from vantage_agent.api_client import AgentClient
+        from cohrint_agent.api_client import AgentClient
         client2 = AgentClient(
             model="claude-sonnet-4-6",
             max_tokens=4096,
@@ -330,12 +330,12 @@ class TestCLICommands:
 
     def test_handle_help(self, workspace, perms, cost):
         """Test /help returns True (handled)."""
-        from vantage_agent.cli import _handle_command
-        from vantage_agent.api_client import AgentClient
+        from cohrint_agent.cli import _handle_command
+        from cohrint_agent.api_client import AgentClient
 
         if not os.environ.get("ANTHROPIC_API_KEY") and not any(
             os.path.exists(p) for p in [
-                os.path.expanduser("~/.vantage-agent/api_key"),
+                os.path.expanduser("~/.cohrint-agent/api_key"),
                 os.path.expanduser("~/.anthropic/api_key"),
             ]
         ):
@@ -373,21 +373,21 @@ class TestEdgeCasesOffline:
 
     def test_empty_file_read(self, workspace):
         """Read an empty file."""
-        from vantage_agent.tools import execute_tool
+        from cohrint_agent.tools import execute_tool
         (workspace / "empty.txt").write_text("")
         result = execute_tool("Read", {"file_path": str(workspace / "empty.txt")}, str(workspace))
         assert "empty" in result.lower()
 
     def test_binary_file_read(self, workspace):
         """Read a binary file doesn't crash."""
-        from vantage_agent.tools import execute_tool
+        from cohrint_agent.tools import execute_tool
         (workspace / "binary.bin").write_bytes(bytes(range(256)))
         result = execute_tool("Read", {"file_path": str(workspace / "binary.bin")}, str(workspace))
         assert isinstance(result, str)
 
     def test_unicode_file_operations(self, workspace):
         """Unicode content in files."""
-        from vantage_agent.tools import execute_tool
+        from cohrint_agent.tools import execute_tool
         unicode_content = "Hello 世界 🌍 Ñoño café"
         execute_tool("Write", {
             "file_path": str(workspace / "unicode.txt"),
@@ -401,7 +401,7 @@ class TestEdgeCasesOffline:
 
     def test_very_long_file(self, workspace):
         """Read a file with 10000 lines."""
-        from vantage_agent.tools import execute_tool
+        from cohrint_agent.tools import execute_tool
         content = "\n".join(f"line {i}" for i in range(10000))
         (workspace / "big.txt").write_text(content)
         result = execute_tool("Read", {
@@ -413,7 +413,7 @@ class TestEdgeCasesOffline:
 
     def test_special_chars_in_bash(self, workspace):
         """Bash handles special characters."""
-        from vantage_agent.tools import execute_tool
+        from cohrint_agent.tools import execute_tool
         result = execute_tool("Bash", {
             "command": "echo 'hello \"world\" $HOME `test`'",
         }, str(workspace))
@@ -421,7 +421,7 @@ class TestEdgeCasesOffline:
 
     def test_edit_multiline_string(self, workspace):
         """Edit a multiline block."""
-        from vantage_agent.tools import execute_tool
+        from cohrint_agent.tools import execute_tool
         (workspace / "multi.py").write_text(
             "def old():\n    pass\n\ndef other():\n    return 1\n"
         )
@@ -436,13 +436,13 @@ class TestEdgeCasesOffline:
 
     def test_glob_no_permission_needed(self, workspace):
         """Glob works without special permissions (safe tool)."""
-        from vantage_agent.tools import execute_tool
+        from cohrint_agent.tools import execute_tool
         result = execute_tool("Glob", {"pattern": "**/*.py"}, str(workspace))
         assert "main.py" in result
 
     def test_grep_across_many_files(self, workspace):
         """Grep searches across nested directories."""
-        from vantage_agent.tools import execute_tool
+        from cohrint_agent.tools import execute_tool
         result = execute_tool("Grep", {
             "pattern": "import",
             "path": str(workspace),
@@ -452,7 +452,7 @@ class TestEdgeCasesOffline:
 
     def test_bash_timeout_short(self, workspace):
         """Bash respects timeout."""
-        from vantage_agent.tools import execute_tool
+        from cohrint_agent.tools import execute_tool
         start = time.time()
         result = execute_tool("Bash", {
             "command": "sleep 30",
@@ -464,7 +464,7 @@ class TestEdgeCasesOffline:
 
     def test_write_then_read_roundtrip(self, workspace):
         """Write → Read roundtrip preserves content."""
-        from vantage_agent.tools import execute_tool
+        from cohrint_agent.tools import execute_tool
         content = "line1\nline2\nline3\n"
         execute_tool("Write", {
             "file_path": str(workspace / "roundtrip.txt"),
@@ -479,7 +479,7 @@ class TestEdgeCasesOffline:
 
     def test_edit_then_grep_verifies(self, workspace):
         """Edit a file then grep confirms the change."""
-        from vantage_agent.tools import execute_tool
+        from cohrint_agent.tools import execute_tool
         execute_tool("Edit", {
             "file_path": str(workspace / "main.py"),
             "old_string": "return a + b",
@@ -572,7 +572,7 @@ class TestEdgeCasesLive:
 
 @live
 class TestFeatureParity:
-    """Tests ensuring vantage-agent can do what Claude Code does."""
+    """Tests ensuring cohrint-agent can do what Claude Code does."""
 
     def test_explore_codebase(self, client, workspace):
         """Agent can explore a codebase structure."""
