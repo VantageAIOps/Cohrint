@@ -21,7 +21,7 @@ const RELEASES: Record<'node' | 'python', ClientRelease> = {
     installCmd: 'npm install -g cohrint-cli',
   },
   python: {
-    version: '0.2.4',
+    version: '0.2.7',
     minSupported: '0.2.0',
     installCmd: 'pip install --upgrade cohrint-agent',
   },

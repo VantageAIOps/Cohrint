@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cohrint-agent"
-version = "0.2.6"
+version = "0.2.7"
 description = "AI coding agent with per-tool permissions, cost tracking, and token optimization"
 readme = "README.md"
 license = { text = "MIT" }
