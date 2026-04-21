@@ -45,10 +45,14 @@ CATALOG: dict[str, VerbSpec] = {
         subcommands={
             "list [--backend X]": "List MCP servers (default: all backends).",
             "list -i": "Interactive selector — press Enter to see detail.",
+            "add NAME --command CMD [--arg A]": "Register a stdio MCP server.",
+            "add NAME --url URL": "Register a remote (HTTP) MCP server.",
+            "remove NAME [--backend X]": "Unregister an MCP server.",
         },
         examples=[
             "cohrint-agent mcp list",
-            "cohrint-agent mcp list --backend claude",
+            "cohrint-agent mcp add weather --command npx --arg -y --arg weather-mcp",
+            "cohrint-agent mcp remove weather --backend claude",
         ],
     ),
     "plugins": VerbSpec(
@@ -56,40 +60,104 @@ CATALOG: dict[str, VerbSpec] = {
         summary="Manage Claude Code plugins (claude-only).",
         subcommands={
             "list": "List enabled plugins. Empty for non-claude backends.",
+            "enable NAME": "Flip enabledPlugins[NAME] to true.",
+            "disable NAME": "Flip enabledPlugins[NAME] to false.",
         },
-        examples=["cohrint-agent plugins list"],
+        examples=[
+            "cohrint-agent plugins list",
+            "cohrint-agent plugins enable formatter@anthropic-tools",
+        ],
     ),
     "skills": VerbSpec(
         name="skills",
-        summary="List skills (Claude skills + Codex rules).",
+        summary="Manage skills (Claude skills + Codex rules).",
         subcommands={
             "list [--backend X]": "List skills across global + project dirs.",
+            "add PATH [--name N] [--backend X]": "Install a skill from a local path.",
+            "remove NAME [--backend X]": "Delete a skill.",
         },
-        examples=["cohrint-agent skills list"],
+        examples=[
+            "cohrint-agent skills list",
+            "cohrint-agent skills add ./my-skill",
+            "cohrint-agent skills remove my-skill",
+        ],
     ),
     "agents": VerbSpec(
         name="agents",
-        summary="List sub-agents (Claude agents/*.md + Codex AGENTS.md sections).",
-        subcommands={"list [--backend X]": "List available agents."},
-        examples=["cohrint-agent agents list"],
+        summary="Manage sub-agents (Claude agents/*.md).",
+        subcommands={
+            "list [--backend X]": "List available agents.",
+            "add PATH [--name N]": "Install an agent .md.",
+            "remove NAME": "Delete an agent.",
+        },
+        examples=[
+            "cohrint-agent agents list",
+            "cohrint-agent agents add ./reviewer.md",
+        ],
     ),
     "hooks": VerbSpec(
         name="hooks",
-        summary="Inspect hooks configured in settings.json.",
-        subcommands={"list": "Print every hook grouped by event + matcher."},
-        examples=["cohrint-agent hooks list"],
+        summary="Manage hooks in settings.json.",
+        subcommands={
+            "list": "Print every hook grouped by event + matcher.",
+            "add EVENT MATCHER CMD": "Append a command-type hook.",
+            "remove EVENT MATCHER": "Drop hooks matching EVENT[MATCHER].",
+        },
+        examples=[
+            "cohrint-agent hooks list",
+            'cohrint-agent hooks add PostToolUse "Write|Edit" "prettier --write"',
+        ],
     ),
     "permissions": VerbSpec(
         name="permissions",
-        summary="Inspect allow / deny / ask rules in settings.json.",
-        subcommands={"list": "Print every permission rule grouped by kind."},
-        examples=["cohrint-agent permissions list"],
+        summary="Manage allow/deny/ask rules in settings.json.",
+        subcommands={
+            "list": "Print every permission rule grouped by kind.",
+            "allow RULE": "Add RULE to permissions.allow.",
+            "deny RULE": "Add RULE to permissions.deny.",
+            "ask RULE": "Add RULE to permissions.ask.",
+            "remove KIND RULE": "Remove RULE from KIND bucket.",
+        },
+        examples=[
+            "cohrint-agent permissions allow 'Bash(npm *)'",
+            "cohrint-agent permissions deny 'Bash(rm -rf *)'",
+        ],
     ),
     "settings": VerbSpec(
         name="settings",
-        summary="View merged settings.json (global + project).",
-        subcommands={"show": "Pretty-print merged settings JSON."},
-        examples=["cohrint-agent settings show"],
+        summary="View + mutate merged settings.json.",
+        subcommands={
+            "show": "Pretty-print merged settings JSON.",
+            "set KEY VALUE": "Set a dotted key (value coerced to bool/int/JSON/str).",
+        },
+        examples=[
+            "cohrint-agent settings show",
+            "cohrint-agent settings set model claude-opus-4-6",
+            "cohrint-agent settings set permissions.defaultMode acceptEdits",
+        ],
+    ),
+    "init": VerbSpec(
+        name="init",
+        summary="Scaffold cohrint tooling in the current project (append-safe).",
+        subcommands={
+            "": "Add a cohrint block to CLAUDE.md + create .claude/settings.local.json.",
+            "--force": "Overwrite an existing cohrint block.",
+        },
+        examples=["cohrint-agent init", "cohrint-agent init --force"],
+    ),
+    "guardrails": VerbSpec(
+        name="guardrails",
+        summary="Toggle recommendation / hallucination guardrails.",
+        subcommands={
+            "status": "Show current guardrail settings.",
+            "on [KIND]": "Enable a guardrail (KIND = recommendation|hallucination|all).",
+            "off [KIND]": "Disable a guardrail.",
+        },
+        examples=[
+            "cohrint-agent guardrails status",
+            "cohrint-agent guardrails on hallucination",
+            "cohrint-agent guardrails off all",
+        ],
     ),
     "exec": VerbSpec(
         name="exec",

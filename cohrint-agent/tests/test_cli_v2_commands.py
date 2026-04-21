@@ -135,7 +135,7 @@ class TestSettings:
         assert "vim" in out
 
     def test_unknown_subcommand(self, capsys):
-        rc = settings_cmd.run(["set"])  # set not implemented until Phase 4
+        rc = settings_cmd.run(["bogus"])
         assert rc == 2
 
 

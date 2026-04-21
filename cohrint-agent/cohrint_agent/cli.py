@@ -60,7 +60,7 @@ BANNER = """
   [dim]AI coding agent with per-tool permissions, cost tracking & optimization[/dim]
   [dim]Model: {model}  |  CWD: {cwd}[/dim]
 
-  [dim]Commands:[/dim]
+  [dim]REPL commands:[/dim]
     [bold]/help[/bold]              Show commands
     [bold]/allow[/bold] Tool        Approve a tool (e.g. /allow Bash,Write,Edit)
     [bold]/allow all[/bold]         Approve all tools
@@ -70,8 +70,23 @@ BANNER = """
     [bold]/tier[/bold]              Change tool permission tier
     [bold]/reset[/bold]             Reset permissions & history
     [bold]/model[/bold] name        Switch model
+    [bold]/guardrails[/bold] on|off Toggle recommendation + hallucination guardrails
+    [bold]/verbs[/bold]             Show all verbs (mcp/skills/agents/…)
     [bold]/quit[/bold]              Exit
+
+  [dim]Shell verbs — run as `cohrint-agent <verb>`:[/dim]
+{verbs}
+  [dim]Run `cohrint-agent help` for full catalog.[/dim]
 """
+
+
+def _verb_summary_lines() -> str:
+    """Render one line per verb from the catalog — shown in the REPL banner."""
+    from .commands import CATALOG
+    lines: list[str] = []
+    for spec in CATALOG.values():
+        lines.append(f"    [bold]{spec.name:<12}[/bold] {spec.summary}")
+    return "\n".join(lines)
 
 
 def parse_args() -> argparse.Namespace:
@@ -245,7 +260,7 @@ def _handle_command(line: str, client: AgentClient) -> bool:
 
     # Bare "/" prints help — avoids "Unknown command: /" dead-end (T-DISPATCH.2).
     if stripped in ("/", "/help"):
-        console.print(BANNER.format(version=__version__, model=client.model, cwd=client.cwd))
+        console.print(BANNER.format(version=__version__, model=client.model, cwd=client.cwd, verbs=_verb_summary_lines()))
         return True
 
     if stripped == "/tools":
@@ -351,6 +366,34 @@ def _handle_command(line: str, client: AgentClient) -> bool:
         console.print("  [dim]Cost tracking reset for new model[/dim]")
         return True
 
+    if stripped == "/verbs":
+        from .commands import render_catalog
+        console.print(render_catalog())
+        return True
+
+    if stripped.startswith("/guardrails"):
+        from .guardrails import get_settings, set_kind
+        parts = stripped.split()
+        if len(parts) == 1:
+            s = get_settings()
+            console.print(
+                f"  [dim]guardrails:[/dim] "
+                f"recommendation=[{'green' if s.recommendation else 'red'}]{s.recommendation}[/], "
+                f"hallucination=[{'green' if s.hallucination else 'red'}]{s.hallucination}[/]"
+            )
+            return True
+        action = parts[1].lower()
+        kind = parts[2] if len(parts) >= 3 else "all"
+        if action not in ("on", "off"):
+            console.print("  [red]Usage: /guardrails [on|off] [recommendation|hallucination|all][/red]")
+            return True
+        try:
+            set_kind(kind, enabled=(action == "on"))
+            console.print(f"  [green]guardrails {action} ({kind})[/green]")
+        except ValueError as e:
+            console.print(f"  [red]{e}[/red]")
+        return True
+
     if stripped == "/tier":
         from .process_safety import safe_config_dir
         config_dir = safe_config_dir()
@@ -387,7 +430,7 @@ def _handle_command(line: str, client: AgentClient) -> bool:
 
 def run_repl(client: AgentClient, tracker: Tracker | None = None) -> None:
     """Interactive REPL."""
-    console.print(BANNER.format(version=__version__, model=client.model, cwd=client.cwd))
+    console.print(BANNER.format(version=__version__, model=client.model, cwd=client.cwd, verbs=_verb_summary_lines()))
 
     while True:
         try:

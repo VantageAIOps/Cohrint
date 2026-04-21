@@ -1945,6 +1945,60 @@ cohrint-agent --version</pre>
 <tr><td><code>/cost</code></td><td>Show session token usage and cost</td></tr>
 </tbody></table>
 
+<h2 id="cli-reference">CLI Reference — Verbs</h2>
+<p>Beyond the prompt / REPL modes, <code>cohrint-agent</code> exposes a set of <em>verbs</em> for managing MCP servers, plugins, skills, agents, hooks, permissions, settings, and guardrails across Claude Code, Gemini CLI, and Codex. Verbs only claim the invocation when <code>argv[1]</code> is one of the names below — any other first argument falls through to the prompt / REPL path unchanged.</p>
+
+<pre>$ cohrint-agent help                 # full catalog
+$ cohrint-agent <verb> --help        # per-verb help</pre>
+
+<table class="api-table">
+<thead><tr><th>Verb</th><th>Purpose</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td><code>models</code></td><td>List supported + unsupported models across backends.</td><td><code>cohrint-agent models info claude-opus-4-6</code></td></tr>
+<tr><td><code>mcp</code></td><td>list / add / remove MCP servers (claude · gemini · codex).</td><td><code>cohrint-agent mcp add weather --command npx --arg -y --arg weather-mcp</code></td></tr>
+<tr><td><code>plugins</code></td><td>list / enable / disable Claude Code plugins.</td><td><code>cohrint-agent plugins enable formatter@anthropic-tools</code></td></tr>
+<tr><td><code>skills</code></td><td>list / add / remove skills (Claude skills + Codex rules).</td><td><code>cohrint-agent skills add ./my-skill</code></td></tr>
+<tr><td><code>agents</code></td><td>list / add / remove sub-agents (Claude <code>agents/*.md</code>).</td><td><code>cohrint-agent agents add ./reviewer.md</code></td></tr>
+<tr><td><code>hooks</code></td><td>list / add / remove hooks in <code>settings.json</code>.</td><td><code>cohrint-agent hooks add PostToolUse "Write|Edit" "prettier --write"</code></td></tr>
+<tr><td><code>permissions</code></td><td>list / allow / deny / ask / remove rules.</td><td><code>cohrint-agent permissions allow 'Bash(npm *)'</code></td></tr>
+<tr><td><code>settings</code></td><td>show merged or set a dotted key in <code>settings.json</code>.</td><td><code>cohrint-agent settings set permissions.defaultMode acceptEdits</code></td></tr>
+<tr><td><code>init</code></td><td>Append-safe project scaffold — adds a <code>&lt;!-- cohrint:begin --&gt;</code> block to CLAUDE.md.</td><td><code>cohrint-agent init</code></td></tr>
+<tr><td><code>guardrails</code></td><td>Toggle recommendation / hallucination guardrails. Persists to <code>~/.cohrint-agent/config.json</code>.</td><td><code>cohrint-agent guardrails off hallucination</code></td></tr>
+<tr><td><code>exec</code></td><td><code>execvp</code> passthrough — run a backend CLI directly (TTY-preserving).</td><td><code>cohrint-agent exec claude mcp list</code></td></tr>
+</tbody></table>
+
+<h3>Backend coverage matrix</h3>
+<table class="api-table">
+<thead><tr><th>Resource</th><th>Claude</th><th>Gemini</th><th>Codex</th></tr></thead>
+<tbody>
+<tr><td>MCP servers</td><td>✓ <code>~/.claude.json</code></td><td>✓ <code>~/.gemini/settings.json</code></td><td>✓ <code>~/.codex/config.toml</code></td></tr>
+<tr><td>Plugins</td><td>✓ <code>enabledPlugins</code></td><td>—</td><td>—</td></tr>
+<tr><td>Skills</td><td>✓ <code>~/.claude/skills/&lt;name&gt;/</code></td><td>—</td><td>✓ <code>~/.codex/rules/*.md</code></td></tr>
+<tr><td>Agents</td><td>✓ <code>~/.claude/agents/*.md</code></td><td>—</td><td>parse-only (<code>AGENTS.md</code> sections)</td></tr>
+<tr><td>Hooks</td><td>✓ <code>settings.json → hooks</code></td><td>—</td><td>—</td></tr>
+<tr><td>Permissions</td><td>✓ <code>settings.json → permissions</code></td><td>—</td><td>—</td></tr>
+</tbody></table>
+
+<h3>Guardrails</h3>
+<p>Cohrint ships two opt-out guardrails that prepend a short system-prompt preamble on every turn:</p>
+<ul>
+<li><strong>Recommendation</strong> — when uncertain, recommend the safest option and state remaining risk.</li>
+<li><strong>Hallucination</strong> — never invent file paths, APIs, or function signatures; say "I don't know" when unsure.</li>
+</ul>
+<pre>$ cohrint-agent guardrails status          # view
+$ cohrint-agent guardrails off hallucination
+$ cohrint-agent guardrails on all</pre>
+<div class="info-box">Guardrails live at <code>~/.cohrint-agent/config.json</code> — separate from Claude Code's <code>settings.json</code> so they don't collide with its schema.</div>
+
+<h3><code>cohrint-agent init</code> — append-safe scaffold</h3>
+<p>Adds a cohrint-managed section to <code>CLAUDE.md</code> between <code>&lt;!-- cohrint:begin --&gt;</code> / <code>&lt;!-- cohrint:end --&gt;</code> markers. User edits outside that block are preserved verbatim; re-running <code>init --force</code> replaces only the block.</p>
+
+<h3>New REPL slash-commands</h3>
+<ul>
+<li><code>/verbs</code> — render the full verb catalog (same as <code>cohrint-agent help</code>).</li>
+<li><code>/guardrails</code> — status. <code>/guardrails on</code> / <code>/guardrails off recommendation</code> toggles from inside the REPL.</li>
+</ul>
+
 <h2>Claude Max Backend</h2>
 <p>Use your Claude Max subscription instead of API credits. The <code>--backend claude</code> flag routes prompts through the Claude Code CLI with full multi-turn session support via <code>--resume</code>.</p>
 <pre># First run shows tier selection wizard

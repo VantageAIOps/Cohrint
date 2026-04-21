@@ -169,12 +169,22 @@ class AgentClient:
         self._available_tools = self._build_tool_list()
 
     def _default_system(self) -> str:
-        return (
+        base = (
             "You are an expert coding assistant. You have access to tools for "
             "reading, writing, and editing files, running shell commands, and "
             "searching codebases. Use tools when needed to accomplish tasks. "
             f"Working directory: {self.cwd}"
         )
+        # Prepend cohrint guardrails if any are active. Read lazily so tests
+        # that monkey-patch the HOME or config path work without extra setup.
+        try:
+            from .guardrails import system_preamble
+            preamble = system_preamble()
+            if preamble:
+                return preamble + "\n\n" + base
+        except Exception:  # noqa: BLE001
+            pass
+        return base
 
     def _build_tool_list(self) -> list[dict[str, Any]]:
         """Return tool definitions for all known tools."""

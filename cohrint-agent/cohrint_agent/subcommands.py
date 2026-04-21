@@ -26,6 +26,8 @@ _ROUTES: dict[str, str] = {
     "hooks": "cohrint_agent.commands.hooks",
     "permissions": "cohrint_agent.commands.permissions",
     "settings": "cohrint_agent.commands.settings_cmd",
+    "init": "cohrint_agent.commands.init_cmd",
+    "guardrails": "cohrint_agent.commands.guardrails",
     "exec": "cohrint_agent.commands.exec_cmd",
 }
 
