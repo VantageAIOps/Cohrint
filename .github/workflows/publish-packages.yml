@@ -148,20 +148,22 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.agent == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Build and publish to PyPI
+      - name: Build
         working-directory: cohrint-agent
         run: |
-          pip install build twine
+          pip install build
           python -m build
-          twine upload dist/*
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: cohrint-agent/dist/
 
   summary:
     name: Publish Summary
