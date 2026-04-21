@@ -559,12 +559,44 @@ function buildInsertStmt(
   }
   const costUsd        = Number(ev.total_cost_usd  ?? ev.cost_total_usd       ??
                          r.cost_total_cost_usd ?? r.cost_usd ?? 0);
+  // Cost sanity bounds — a single LLM call costing > $10k is almost certainly
+  // a client bug or a malicious attempt to inflate analytics. Reject early.
+  const MAX_COST_USD = 10_000;
+  if (!Number.isFinite(costUsd) || costUsd < 0 || costUsd > MAX_COST_USD) {
+    throw new RangeError(`cost_usd out of valid range (0–${MAX_COST_USD})`);
+  }
   const latencyMs      = ev.latency_ms      ?? r.latency_ms            as number ?? 0;
   const tagsValue      = ev.tags ?? (r.tags as Record<string, string> | undefined);
 
-  const ts = ev.timestamp
-    ? Math.floor(new Date(ev.timestamp).getTime() / 1000)
-    : Math.floor(Date.now() / 1000);
+  // String-field server-side length caps. Client SDKs should enforce their own
+  // caps, but the server must not trust them — oversized strings bloat D1 and
+  // skew downstream analytics.
+  const MAX_STR = 256;
+  const strCap = (v: unknown): string | null => {
+    if (v == null) return null;
+    const s = String(v);
+    return s.length > MAX_STR ? s.slice(0, MAX_STR) : s;
+  };
+
+  // Clock sanity — reject events claiming to come from > 7 days in the past
+  // or > 1 hour in the future. Clients replaying old data must use a backfill
+  // endpoint, not /v1/events.
+  const nowMs = Date.now();
+  let tsMs: number;
+  if (ev.timestamp) {
+    const parsed = new Date(ev.timestamp).getTime();
+    if (!Number.isFinite(parsed)) {
+      throw new RangeError(`timestamp could not be parsed: ${String(ev.timestamp).slice(0, 64)}`);
+    }
+    const drift = parsed - nowMs;
+    if (drift < -7 * 24 * 3600 * 1000 || drift > 3600 * 1000) {
+      throw new RangeError('timestamp out of valid range (-7d…+1h from now)');
+    }
+    tsMs = parsed;
+  } else {
+    tsMs = nowMs;
+  }
+  const ts = Math.floor(tsMs / 1000);
 
   return db.prepare(`
     INSERT OR IGNORE INTO events (
@@ -579,20 +611,21 @@ function buildInsertStmt(
       created_at
     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).bind(
-    eventId, orgId, ev.provider ?? '', ev.model ?? '',
+    strCap(eventId) ?? eventId, orgId,
+    strCap(ev.provider) ?? '', strCap(ev.model) ?? '',
     promptTokens, completionTok,
     cacheTok, totalTokens,
     costUsd, latencyMs,
-    ev.team ?? null, ev.project ?? null, ev.user_id ?? null,
-    ev.feature ?? null, ev.endpoint ?? null,
-    ev.environment ?? 'production',
+    strCap(ev.team), strCap(ev.project), strCap(ev.user_id),
+    strCap(ev.feature), strCap(ev.endpoint),
+    strCap(ev.environment) ?? 'production',
     ev.is_streaming ? 1 : 0, ev.stream_chunks ?? 0,
-    ev.trace_id ?? null, ev.parent_event_id ?? null,
-    ev.agent_name ?? null, ev.span_depth ?? 0,
-    tagsValue ? JSON.stringify(tagsValue) : null,
-    ev.sdk_language ?? sdkLang ?? null,
-    ev.sdk_version  ?? sdkVer  ?? null,
-    ev.prompt_hash ?? null, ev.cache_hit ?? 0,
+    strCap(ev.trace_id), strCap(ev.parent_event_id),
+    strCap(ev.agent_name), ev.span_depth ?? 0,
+    tagsValue ? JSON.stringify(tagsValue).slice(0, 8192) : null,
+    strCap(ev.sdk_language ?? sdkLang),
+    strCap(ev.sdk_version  ?? sdkVer),
+    strCap(ev.prompt_hash), ev.cache_hit ?? 0,
     ts,
   );
 }

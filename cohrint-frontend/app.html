@@ -2245,7 +2245,12 @@ function apiFetch(path, opts) {
       });
     })
     .catch(function(err) {
-      // Network failure or fetch error — serve stale cache for reads
+      // 401 on an individual endpoint = permission denied for this user even
+      // though the session is otherwise valid. Don't silently serve stale data
+      // (user would see data they shouldn't have access to). Let the caller
+      // render an empty/denied state instead.
+      if (String(err && err.message) === '401') throw err;
+      // Network failure or other fetch error — serve stale cache for reads.
       if (isRead) {
         var stale = _cacheGetStale(path);
         if (stale) {
@@ -3420,7 +3425,7 @@ function renderTeamPie(teams) {
   _teamPieChart = new Chart(canvas, {
     type: 'doughnut',
     data: {
-      labels: data.map(function(t) { return t.team || t.name || 'Default'; }),
+      labels: data.map(function(t) { return esc(t.team || t.name || 'Default'); }),
       datasets: [{
         data: data.map(function(t) { return t.cost_usd || t.total_cost || t.cost || 0; }),
         backgroundColor: data.map(function(_, i) { return colors[i % colors.length]; }),
@@ -3656,7 +3661,7 @@ function renderProviderBreakdown(costs) {
   _providerChart = new Chart(canvas, {
     type: 'bar',
     data: {
-      labels: provs.map(function(p) { return meta[p] ? meta[p].label : p; }),
+      labels: provs.map(function(p) { return esc(meta[p] ? meta[p].label : p); }),
       datasets: [{
         label: 'Avg Monthly Cost',
         data: provs.map(function(p) {
@@ -5749,7 +5754,7 @@ function loadOptimization() {
       _optTrendChart = new Chart(canvas, {
         type: 'bar',
         data: {
-          labels: trend.map(function(r) { return r.month; }),
+          labels: trend.map(function(r) { return esc(r.month); }),
           datasets: [{
             label: 'Avg cost reduction',
             data: trend.map(function(r) { return r.avg_factor; }),
