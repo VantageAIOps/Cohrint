@@ -379,16 +379,43 @@ tr:hover td { background: var(--bg3); }
 
     <!-- ── Traffic ────────────────────────────────────────────────────── -->
     <div id="page-traffic" class="page">
-      <div class="page-title">&#128202; Network Traffic</div>
-      <div class="page-sub">Daily API events and frontend pageviews</div>
+      <div class="page-title">&#128202; Real Traffic Analysis</div>
+      <div class="page-sub">API events, cost, models and frontend usage across the platform</div>
+
+      <div class="kpi-grid" id="traffic-kpis">
+        <div class="kpi-card"><div class="kpi-label">Total events</div><div class="kpi-value skel" id="tr-events">&nbsp;</div><div class="kpi-note" id="tr-events-n"></div></div>
+        <div class="kpi-card"><div class="kpi-label">Peak day</div><div class="kpi-value skel" id="tr-peak">&nbsp;</div><div class="kpi-note" id="tr-peak-n"></div></div>
+        <div class="kpi-card"><div class="kpi-label">Total LLM cost</div><div class="kpi-value skel" id="tr-cost">&nbsp;</div><div class="kpi-note" id="tr-cost-n"></div></div>
+        <div class="kpi-card"><div class="kpi-label">Avg active orgs/day</div><div class="kpi-value skel" id="tr-orgs">&nbsp;</div><div class="kpi-note" id="tr-orgs-n"></div></div>
+        <div class="kpi-card"><div class="kpi-label">Pageviews</div><div class="kpi-value skel" id="tr-pv">&nbsp;</div><div class="kpi-note" id="tr-pv-n"></div></div>
+        <div class="kpi-card"><div class="kpi-label">Sessions</div><div class="kpi-value skel" id="tr-sess">&nbsp;</div><div class="kpi-note" id="tr-sess-n"></div></div>
+      </div>
 
       <div class="card">
-        <div class="card-title">API events per day</div>
-        <div class="chart-wrap"><canvas id="chart-api-traffic"></canvas></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <div class="card-title" style="margin:0">API events &amp; cost per day</div>
+          <div style="display:flex;gap:16px;font-size:11px;color:var(--mu)">
+            <span><span style="display:inline-block;width:10px;height:10px;background:#7c6bff;border-radius:2px;margin-right:5px;vertical-align:middle"></span>Events</span>
+            <span><span style="display:inline-block;width:18px;height:2px;background:#fbbf24;margin-right:5px;vertical-align:middle"></span>Cost (USD)</span>
+          </div>
+        </div>
+        <div class="chart-wrap" style="height:260px"><canvas id="chart-api-traffic"></canvas></div>
       </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-title">Provider split</div>
+          <div class="chart-wrap" style="height:210px"><canvas id="chart-provider-split"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Top models by events</div>
+          <div class="chart-wrap" style="height:210px"><canvas id="chart-top-models"></canvas></div>
+        </div>
+      </div>
+
       <div class="card">
-        <div class="card-title">Frontend pageviews per day</div>
-        <div class="chart-wrap"><canvas id="chart-page-traffic"></canvas></div>
+        <div class="card-title">Frontend pageviews &amp; sessions per day</div>
+        <div class="chart-wrap" style="height:180px"><canvas id="chart-page-traffic"></canvas></div>
       </div>
     </div>
 
@@ -687,15 +714,126 @@ async function loadFeatures() {
 }
 
 // ── Traffic ───────────────────────────────────────────────────────────────────
+function _setKpi(id, val, note) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = 'kpi-value';
+  el.textContent = val;
+  const n = document.getElementById(id + '-n');
+  if (n) n.textContent = note ?? '';
+}
+
 async function loadTraffic() {
   try {
-    const d = await apiFetch('/v1/superadmin/traffic');
-    const api = d.api_traffic ?? [];
-    const pv  = d.page_traffic ?? [];
-    drawBarChart('chart-api-traffic', 'apiTraffic',
-      api.map(r => r.day), api.map(r => r.events), 'API events', '#7c6bff');
-    drawBarChart('chart-page-traffic', 'pageTraffic',
-      pv.map(r => r.day), pv.map(r => r.pageviews), 'Pageviews', '#34d399');
+    const [d, feat] = await Promise.all([
+      apiFetch('/v1/superadmin/traffic'),
+      apiFetch('/v1/superadmin/features'),
+    ]);
+    const api       = d.api_traffic ?? [];
+    const pv        = d.page_traffic ?? [];
+    const providers = feat.providers ?? [];
+    const models    = (feat.models ?? []).slice(0, 8);
+
+    // KPIs — textContent only, no innerHTML
+    const totalEvents   = api.reduce((s, r) => s + (r.events ?? 0), 0);
+    const totalCost     = api.reduce((s, r) => s + (r.cost_usd ?? 0), 0);
+    const peakDay       = api.reduce((a, b) => (b.events ?? 0) > (a?.events ?? 0) ? b : a, null);
+    const avgOrgs       = api.length ? (api.reduce((s, r) => s + (r.active_orgs ?? 0), 0) / api.length) : 0;
+    const totalPv       = pv.reduce((s, r) => s + (r.pageviews ?? 0), 0);
+    const totalSessions = pv.reduce((s, r) => s + (r.sessions ?? 0), 0);
+
+    _setKpi('tr-events', fmt(totalEvents),             'last ' + PERIOD + 'd');
+    _setKpi('tr-peak',   peakDay ? fmt(peakDay.events) : '—', peakDay?.day ?? '');
+    _setKpi('tr-cost',   '$' + fmtCost(totalCost),     'last ' + PERIOD + 'd');
+    _setKpi('tr-orgs',   avgOrgs.toFixed(1),            'last ' + PERIOD + 'd');
+    _setKpi('tr-pv',     fmt(totalPv),                  'last ' + PERIOD + 'd');
+    _setKpi('tr-sess',   fmt(totalSessions),             'last ' + PERIOD + 'd');
+
+    // Events + cost dual-axis chart
+    if (_chartInstances['apiTraffic']) _chartInstances['apiTraffic'].destroy();
+    _chartInstances['apiTraffic'] = new Chart(document.getElementById('chart-api-traffic'), {
+      data: {
+        labels: api.map(r => r.day),
+        datasets: [
+          { type: 'bar',  label: 'Events',    data: api.map(r => r.events),
+            backgroundColor: '#7c6bffbb', borderRadius: 4, yAxisID: 'y' },
+          { type: 'line', label: 'Cost (USD)', data: api.map(r => +(r.cost_usd ?? 0).toFixed(4)),
+            borderColor: '#fbbf24', backgroundColor: 'transparent', yAxisID: 'y1',
+            tension: 0.35, pointRadius: 3, pointBackgroundColor: '#fbbf24', borderWidth: 2 },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
+        scales: {
+          x:  { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#888', font: { size: 10 }, maxTicksLimit: 12 } },
+          y:  { position: 'left',  grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#888', font: { size: 10 } }, beginAtZero: true },
+          y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { color: '#fbbf24aa', font: { size: 10 }, callback: v => '$' + v }, beginAtZero: true },
+        },
+      },
+    });
+
+    // Provider donut
+    if (_chartInstances['providerSplit']) _chartInstances['providerSplit'].destroy();
+    const COLORS = ['#7c6bff','#34d399','#fbbf24','#f87171','#60a5fa','#a78bfa','#fb923c'];
+    if (providers.length) {
+      _chartInstances['providerSplit'] = new Chart(document.getElementById('chart-provider-split'), {
+        type: 'doughnut',
+        data: {
+          labels: providers.map(p => p.provider),
+          datasets: [{ data: providers.map(p => p.events), backgroundColor: COLORS, borderWidth: 0 }],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, cutout: '65%',
+          plugins: {
+            legend: { position: 'right', labels: { color: '#888', font: { size: 11 }, boxWidth: 12, padding: 10 } },
+            tooltip: { callbacks: { label: ctx => ' ' + ctx.label + ': ' + fmt(ctx.raw) + ' events' } },
+          },
+        },
+      });
+    }
+
+    // Top models horizontal bar
+    if (_chartInstances['topModels']) _chartInstances['topModels'].destroy();
+    if (models.length) {
+      _chartInstances['topModels'] = new Chart(document.getElementById('chart-top-models'), {
+        type: 'bar',
+        data: {
+          labels: models.map(m => m.model.length > 22 ? m.model.slice(0, 22) + '…' : m.model),
+          datasets: [{ label: 'Events', data: models.map(m => m.events), backgroundColor: '#34d39988', borderRadius: 4 }],
+        },
+        options: {
+          indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#888', font: { size: 10 } }, beginAtZero: true },
+            y: { grid: { display: false }, ticks: { color: '#888', font: { size: 10 } } },
+          },
+        },
+      });
+    }
+
+    // Pageviews + sessions grouped bar
+    if (_chartInstances['pageTraffic']) _chartInstances['pageTraffic'].destroy();
+    _chartInstances['pageTraffic'] = new Chart(document.getElementById('chart-page-traffic'), {
+      type: 'bar',
+      data: {
+        labels: pv.map(r => r.day),
+        datasets: [
+          { label: 'Pageviews', data: pv.map(r => r.pageviews), backgroundColor: '#34d39988', borderRadius: 3 },
+          { label: 'Sessions',  data: pv.map(r => r.sessions),  backgroundColor: '#60a5fa88', borderRadius: 3 },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: true, labels: { color: '#888', font: { size: 11 }, boxWidth: 12 } } },
+        scales: {
+          x: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#888', font: { size: 10 }, maxTicksLimit: 12 } },
+          y: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#888', font: { size: 10 } }, beginAtZero: true },
+        },
+      },
+    });
+
   } catch(e) { toast('Failed to load traffic: ' + e.message, true); }
 }
 
