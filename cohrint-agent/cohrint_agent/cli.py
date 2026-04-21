@@ -474,8 +474,11 @@ def run_repl(client: AgentClient, tracker: Tracker | None = None) -> None:
             if budget > 0 and get_global_budget_used() >= budget:
                 console.print(f"[red]Global budget of ${budget:.2f} reached across all sessions.[/red]")
                 continue
+            # Capture the completed-prompt state BEFORE send() increments
+            # prompt_count inside SessionCost.record_prompt(). Any offset
+            # here (e.g. `- 1`) delays anomaly detection by one full turn.
             prior_total = client.cost.total_cost_usd
-            prior_count = client.cost.prompt_count - 1  # before this prompt
+            prior_count = client.cost.prompt_count
             client.send(line)
             # Show per-turn cost + anomaly check
             if client.cost.turns:

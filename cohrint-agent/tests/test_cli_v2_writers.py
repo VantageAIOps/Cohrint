@@ -220,3 +220,131 @@ class TestAtomicity:
         writers.add_mcp("x", backend="claude", command="y")
         data = json.loads((home / ".claude.json").read_text())
         assert data["unrelated"]["deep"]["value"] == 42
+
+    def test_preserves_insertion_order(self, fake_env):
+        """Round-trip must not reorder keys (sort_keys regression guard)."""
+        home, _ = fake_env
+        original = {"zz": 1, "aa": 2, "mcpServers": {}}
+        (home / ".claude.json").write_text(json.dumps(original, indent=2))
+        writers.add_mcp("m", backend="claude", command="x")
+        writers.remove_mcp("m", backend="claude")
+        data = json.loads((home / ".claude.json").read_text())
+        assert list(data.keys()) == ["zz", "aa", "mcpServers"]
+
+    def test_preserves_file_mode(self, fake_env):
+        home, _ = fake_env
+        target = home / ".claude.json"
+        target.write_text(json.dumps({"mcpServers": {}}))
+        os.chmod(target, 0o600)
+        writers.add_mcp("x", backend="claude", command="y")
+        assert (target.stat().st_mode & 0o777) == 0o600
+
+    def test_rejects_tmp_symlink(self, fake_env):
+        """Pre-planted symlink at tmp path must be refused (S4)."""
+        home, _ = fake_env
+        target = home / ".claude.json"
+        target.write_text(json.dumps({"mcpServers": {}}))
+        # Plant a symlink at the exact tmp path the writer will try to use
+        tmp = target.with_suffix(target.suffix + f".cohrint.{os.getpid()}.tmp")
+        decoy = home / "decoy"
+        decoy.write_text("safe")
+        try:
+            os.symlink(str(decoy), str(tmp))
+        except (OSError, NotImplementedError):
+            pytest.skip("symlinks unsupported on this filesystem")
+        # Writer should raise rather than follow the symlink into `decoy`.
+        with pytest.raises(OSError):
+            writers.add_mcp("x", backend="claude", command="y")
+        assert decoy.read_text() == "safe"
+
+
+# ─────────────────────────── security guards ────────────────────────────
+
+class TestSecurityGuards:
+    def test_rejects_unsafe_mcp_name_toml_injection(self, fake_env):
+        r = writers.add_mcp("x]\n[evil", backend="codex", command="q")
+        assert not r.ok
+        assert "name" in r.message
+
+    def test_rejects_unsafe_mcp_name_claude(self, fake_env):
+        r = writers.add_mcp("has space", backend="claude", command="q")
+        assert not r.ok
+        assert "name" in r.message
+
+    def test_toml_escapes_quotes_in_command(self, fake_env):
+        home, _ = fake_env
+        writers.add_mcp("ok", backend="codex", command='say "hi"')
+        toml = (home / ".codex" / "config.toml").read_text()
+        # The embedded quote must be escaped — not break the TOML string
+        assert '\\"hi\\"' in toml
+
+    def test_codex_home_outside_home_rejected(self, fake_env, tmp_path, monkeypatch):
+        rogue = tmp_path / "rogue"
+        rogue.mkdir()
+        monkeypatch.setenv("CODEX_HOME", str(rogue))
+        writers.add_mcp("safe", backend="codex", command="q")
+        # Write should have landed under the real HOME (~/.codex), not rogue
+        assert not (rogue / "config.toml").exists()
+        home, _ = fake_env
+        assert (home / ".codex" / "config.toml").exists()
+
+
+# ─────────────────────── nested TOML sub-tables ─────────────────────────
+
+class TestCodexNestedSubtables:
+    def test_remove_strips_nested_subtable(self, fake_env):
+        home, _ = fake_env
+        (home / ".codex").mkdir()
+        (home / ".codex" / "config.toml").write_text(
+            '[mcp_servers.srv]\ncommand = "x"\n\n'
+            '[mcp_servers.srv.env]\nFOO = "bar"\n\n'
+            '[mcp_servers.keep]\ncommand = "y"\n'
+        )
+        r = writers.remove_mcp("srv", backend="codex")
+        assert r.ok
+        toml = (home / ".codex" / "config.toml").read_text()
+        assert "mcp_servers.srv" not in toml
+        assert "FOO" not in toml  # sub-table keys must be gone too
+        assert "mcp_servers.keep" in toml
+
+
+# ─────────────────────────── dedup guards ───────────────────────────────
+
+class TestDedup:
+    def test_hook_dedup_same_command(self, fake_env):
+        writers.add_hook("PreToolUse", "Bash", "log.sh")
+        r = writers.add_hook("PreToolUse", "Bash", "log.sh")
+        assert not r.ok
+        assert "already" in r.message.lower()
+
+    def test_hook_allows_different_command(self, fake_env):
+        writers.add_hook("PreToolUse", "Bash", "a.sh")
+        r = writers.add_hook("PreToolUse", "Bash", "b.sh")
+        assert r.ok
+
+    def test_permission_cross_bucket_rejected(self, fake_env):
+        writers.add_permission("allow", "Bash(rm *)")
+        r = writers.add_permission("deny", "Bash(rm *)")
+        assert not r.ok
+        assert "already" in r.message.lower()
+
+
+# ─────────────────────────────── init --force ───────────────────────────
+
+class TestInitForceIdempotent:
+    def test_force_collapses_duplicate_blocks(self, fake_env):
+        """A file with two stacked begin/end blocks should collapse to one."""
+        _, cwd = fake_env
+        md = cwd / "CLAUDE.md"
+        md.write_text(
+            "# Proj\n\n"
+            f"{writers.COHRINT_BEGIN}\nold1\n{writers.COHRINT_END}\n\n"
+            f"{writers.COHRINT_BEGIN}\nold2\n{writers.COHRINT_END}\n"
+        )
+        r = writers.init_project(force=True)
+        assert r.ok
+        text = md.read_text()
+        # Exactly one begin/end pair after force
+        assert text.count(writers.COHRINT_BEGIN) == 1
+        assert text.count(writers.COHRINT_END) == 1
+        assert "old1" not in text and "old2" not in text

@@ -44,11 +44,19 @@ def _cwd() -> Path:
 
 
 def _codex_home() -> Path:
+    """Resolve ~/.codex, honoring CODEX_HOME only if it sits inside $HOME.
+
+    Without containment a hostile env could point the scanner at /etc or
+    another system path and leak its contents into resource listings.
+    """
     override = os.environ.get("CODEX_HOME")
     if override:
         try:
-            return Path(override).expanduser().resolve()
-        except (OSError, RuntimeError):
+            candidate = Path(override).expanduser().resolve()
+            home_resolved = _home().resolve()
+            candidate.relative_to(home_resolved)
+            return candidate
+        except (OSError, RuntimeError, ValueError):
             pass
     return _home() / ".codex"
 

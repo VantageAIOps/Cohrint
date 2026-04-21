@@ -177,6 +177,29 @@ def _validate_tool_input(tool_name: str, tool_input: dict) -> str | None:
 # Tool execution
 # ---------------------------------------------------------------------------
 
+def _audit_bash(cmd: str, cwd: str, timeout: float) -> None:
+    """Append a single-line JSON audit record for every Bash invocation.
+
+    Lives at ``~/.cohrint-agent/audit/bash.log``. Best-effort: never
+    raise — auditing must not block a legitimate command.
+    """
+    try:
+        home = Path(os.path.expanduser("~")) / ".cohrint-agent" / "audit"
+        home.mkdir(parents=True, exist_ok=True)
+        import json, time
+        rec = {
+            "ts": time.time(),
+            "pid": os.getpid(),
+            "cwd": cwd,
+            "timeout": timeout,
+            "command": cmd[:4096],
+        }
+        with (home / "bash.log").open("a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
 def execute_tool(name: str, tool_input: dict[str, Any], cwd: str) -> str:
     """Execute a tool locally and return the result as a string."""
     error = _validate_tool_input(name, tool_input)
@@ -214,6 +237,7 @@ def _exec_bash(inp: dict[str, Any], cwd: str) -> str:
     if _math.isnan(timeout) or _math.isinf(timeout) or timeout <= 0:
         timeout = 120.0
     timeout = min(timeout, 600.0)
+    _audit_bash(cmd, cwd, timeout)
     try:
         result = subprocess.run(
             cmd,

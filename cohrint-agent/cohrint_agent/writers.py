@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,6 +24,22 @@ from typing import Literal
 
 Backend = Literal["claude", "gemini", "codex"]
 Scope = Literal["global", "project"]
+
+# Accept identifier-safe names only — this is both a UX guard (catches typos)
+# and a security guard: TOML section headers and shell paths are built from
+# these strings, and quoting TOML section names is non-trivial.
+_SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9_.\-]+$")
+
+
+def _safe_name(name: str) -> bool:
+    return bool(name) and len(name) <= 128 and bool(_SAFE_NAME_RE.match(name))
+
+
+def _toml_quote(value: str) -> str:
+    """Quote a value for a TOML basic string."""
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    escaped = escaped.replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+    return f'"{escaped}"'
 
 
 @dataclass
@@ -60,9 +77,22 @@ def _gemini_settings(scope: Scope) -> Path:
 
 
 def _codex_config() -> Path:
+    """Resolve ~/.codex/config.toml, honoring CODEX_HOME only if contained in $HOME.
+
+    A hostile process that sets CODEX_HOME=/etc could otherwise redirect our
+    writes outside the user's home. We resolve symlinks and require the final
+    path to sit under the real home directory before trusting it.
+    """
     override = os.environ.get("CODEX_HOME")
-    base = Path(override) if override else _home() / ".codex"
-    return base / "config.toml"
+    if override:
+        try:
+            candidate = Path(override).expanduser().resolve()
+            home_resolved = _home().resolve()
+            candidate.relative_to(home_resolved)
+            return candidate / "config.toml"
+        except (OSError, RuntimeError, ValueError):
+            pass
+    return _home() / ".codex" / "config.toml"
 
 
 # ─────────────────────────── atomic read/write ──────────────────────────
@@ -77,11 +107,37 @@ def _read_json(path: Path) -> dict:
 
 
 def _write_json_atomic(path: Path, data: dict) -> None:
+    """Write ``data`` to ``path`` atomically.
+
+    - Preserves insertion order (no sort_keys) so round-trips are byte-stable.
+    - Refuses to follow a pre-planted symlink at the tmp path (O_NOFOLLOW).
+    - Preserves the original file's mode when it exists; otherwise 0o600.
+    - Uses a PID-suffixed tmp name so concurrent writers don't collide.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".cohrint.tmp")
-    with tmp.open("w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, sort_keys=True)
-        f.write("\n")
+    tmp = path.with_suffix(path.suffix + f".cohrint.{os.getpid()}.tmp")
+    try:
+        orig_mode = path.stat().st_mode & 0o7777
+    except (FileNotFoundError, OSError):
+        orig_mode = 0o600
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    fd = os.open(str(tmp), flags, 0o600)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+            f.write("\n")
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+    try:
+        os.chmod(tmp, orig_mode)
+    except OSError:
+        pass
     os.replace(tmp, path)
 
 
@@ -96,6 +152,8 @@ def add_mcp(
     url: str | None = None,
     args: list[str] | None = None,
 ) -> WriteResult:
+    if not _safe_name(name):
+        return WriteResult(False, f"mcp add: name must match [A-Za-z0-9_.-]+ (got {name!r})")
     if not command and not url:
         return WriteResult(False, "mcp add: --command or --url is required.")
     if backend == "codex":
@@ -118,6 +176,8 @@ def add_mcp(
 
 
 def remove_mcp(name: str, *, backend: Backend, scope: Scope = "global") -> WriteResult:
+    if not _safe_name(name):
+        return WriteResult(False, f"mcp remove: name must match [A-Za-z0-9_.-]+ (got {name!r})")
     if backend == "codex":
         return _remove_mcp_codex(name)
     path = _claude_mcp_file(scope) if backend == "claude" else _gemini_settings(scope)
@@ -142,9 +202,9 @@ def _add_mcp_codex(name: str, *, command: str | None, args: list[str]) -> WriteR
     path.parent.mkdir(parents=True, exist_ok=True)
     if not command:
         return WriteResult(False, "mcp add (codex): --command is required.")
-    lines = [f'\n[mcp_servers.{name}]', f'command = "{command}"']
+    lines = [f"\n[mcp_servers.{name}]", f"command = {_toml_quote(command)}"]
     if args:
-        joined = ", ".join(f'"{a}"' for a in args)
+        joined = ", ".join(_toml_quote(a) for a in args)
         lines.append(f"args = [{joined}]")
     lines.append("")
     with path.open("a", encoding="utf-8") as f:
@@ -164,14 +224,18 @@ def _remove_mcp_codex(name: str) -> WriteResult:
         return WriteResult(False, f"mcp remove (codex): {path} not found")
     src = path.read_text(encoding="utf-8")
     header = f"[mcp_servers.{name}]"
+    # Also recognise nested sub-tables `[mcp_servers.<name>.env]` as belonging
+    # to this server so we strip them along with the parent section.
+    nested_prefix = f"[mcp_servers.{name}."
     out: list[str] = []
     skipping = False
     for line in src.splitlines():
         stripped = line.strip()
-        if stripped == header:
+        if stripped == header or stripped.startswith(nested_prefix):
             skipping = True
             continue
         if skipping and stripped.startswith("[") and stripped.endswith("]"):
+            # Any non-matching section ends the skip region.
             skipping = False
         if not skipping:
             out.append(line)
@@ -362,13 +426,16 @@ def add_hook(
     groups = hooks.setdefault(event, [])
     if not isinstance(groups, list):
         return WriteResult(False, f"add_hook: hooks.{event} is not a list")
+    new_entry = {"type": "command", "command": command}
     for g in groups:
         if isinstance(g, dict) and g.get("matcher") == matcher:
             entries = g.setdefault("hooks", [])
-            entries.append({"type": "command", "command": command})
+            if new_entry in entries:
+                return WriteResult(False, f"add_hook: {event}[{matcher}] already has this command")
+            entries.append(new_entry)
             _write_json_atomic(path, data)
             return WriteResult(True, f"appended hook to {event}[{matcher}]")
-    groups.append({"matcher": matcher, "hooks": [{"type": "command", "command": command}]})
+    groups.append({"matcher": matcher, "hooks": [new_entry]})
     _write_json_atomic(path, data)
     return WriteResult(True, f"added {event}[{matcher}] → {command[:60]}")
 
@@ -407,6 +474,17 @@ def add_permission(kind: str, rule: str, *, scope: Scope = "global") -> WriteRes
         return WriteResult(False, f"add_permission: permissions.{kind} is not a list")
     if rule in bucket:
         return WriteResult(False, f"add_permission: '{rule}' already in {kind}")
+    # Cross-bucket dedup: a rule can't live in two different buckets (e.g.
+    # the same pattern in both allow and deny yields an ambiguous policy).
+    for other in ("allow", "deny", "ask"):
+        if other == kind:
+            continue
+        existing = perm.get(other)
+        if isinstance(existing, list) and rule in existing:
+            return WriteResult(
+                False,
+                f"add_permission: '{rule}' already in {other}; remove it first or the effective policy is ambiguous",
+            )
     bucket.append(rule)
     _write_json_atomic(path, data)
     return WriteResult(True, f"added '{rule}' to permissions.{kind}")
@@ -467,16 +545,25 @@ def init_project(*, force: bool = False) -> WriteResult:
         if COHRINT_BEGIN in src:
             if not force:
                 return WriteResult(False, "init: CLAUDE.md already has a cohrint block. Use --force to overwrite.")
-            # Splice: replace existing block
-            import re
-            new = re.sub(
+            # Strip ALL existing cohrint blocks first (handles a file that got
+            # duplicated blocks from a buggy earlier run) then append one fresh
+            # block. This is idempotent: N blocks collapse to 1.
+            stripped, n = re.subn(
                 rf"{re.escape(COHRINT_BEGIN)}.*?{re.escape(COHRINT_END)}\n?",
-                block,
+                "",
                 src,
                 flags=re.DOTALL,
             )
-            claude_md.write_text(new, encoding="utf-8")
-            touched.append("CLAUDE.md (replaced block)")
+            if n == 0:
+                # Marker present but pattern didn't match — corrupt/partial
+                # block. Refuse rather than silently stacking on top.
+                return WriteResult(
+                    False,
+                    "init: CLAUDE.md has a cohrint:begin marker without a matching end. "
+                    "Fix manually or delete the block before retrying.",
+                )
+            claude_md.write_text(stripped.rstrip() + "\n\n" + block, encoding="utf-8")
+            touched.append(f"CLAUDE.md (replaced {n} block{'s' if n > 1 else ''})")
         else:
             claude_md.write_text(src.rstrip() + "\n\n" + block, encoding="utf-8")
             touched.append("CLAUDE.md (appended block)")

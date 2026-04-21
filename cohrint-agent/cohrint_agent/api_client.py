@@ -51,10 +51,19 @@ def _prompt_for_api_key() -> str:
         f"{note}\n"
         "Get your API key at: https://console.anthropic.com/settings/keys\n"
     )
+    # Use getpass so the key isn't echoed to the terminal / tmux scrollback /
+    # CI transcripts. Fall back to input() if getpass can't access the tty
+    # (rare — e.g. some embedded runners).
+    import getpass
     try:
-        key = input("Paste your API key (or press Enter to skip): ").strip()
+        key = getpass.getpass("Paste your API key (hidden, or press Enter to skip): ").strip()
     except (EOFError, KeyboardInterrupt):
         return ""
+    except Exception:  # noqa: BLE001 — getpass may raise on exotic TTYs
+        try:
+            key = input("Paste your API key (or press Enter to skip): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            return ""
     if not key:
         return ""
     save_path = os.path.expanduser("~/.cohrint-agent/api_key")

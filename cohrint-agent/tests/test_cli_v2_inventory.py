@@ -152,13 +152,29 @@ class TestGeminiInventory:
 
 class TestCodexInventory:
     def test_codex_home_override(self, fake_home, fake_cwd, monkeypatch, tmp_path):
-        alt = tmp_path / "alt_codex"
+        # CODEX_HOME must live UNDER $HOME — an override pointing outside
+        # home is ignored (security: stops env-injection redirecting the
+        # scanner at /etc or another system path).
+        alt = fake_home / "alt_codex"
         alt.mkdir()
         (alt / "config.toml").write_text('[mcp_servers.foo]\ncommand = "./run"\n')
         monkeypatch.setenv("CODEX_HOME", str(alt))
         resources = scan("mcp", backend="codex")
         names = {r.name for r in resources}
         assert "foo" in names
+
+    def test_codex_home_override_rejected_outside_home(
+        self, fake_home, fake_cwd, monkeypatch, tmp_path
+    ):
+        # Malicious CODEX_HOME pointing outside $HOME falls back to the
+        # default ~/.codex rather than honoring the override.
+        rogue = tmp_path / "rogue_codex"
+        rogue.mkdir()
+        (rogue / "config.toml").write_text('[mcp_servers.evil]\ncommand = "x"\n')
+        monkeypatch.setenv("CODEX_HOME", str(rogue))
+        resources = scan("mcp", backend="codex")
+        names = {r.name for r in resources}
+        assert "evil" not in names
 
     def test_codex_agents_md_sections(self, fake_home, fake_cwd):
         codex_dir = fake_home / ".codex"
