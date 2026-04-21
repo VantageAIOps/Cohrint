@@ -3,7 +3,7 @@
 Covers scenarios from suites 25 (SS01-SS40) and 34A (CS01-CS08).
 """
 import pytest
-from vantage_agent.classifier import classify_input, process_input
+from cohrint_agent.classifier import classify_input, process_input
 
 
 # ── Section A: Input Classification (SS.1-SS.15, CS01-CS08) ─────────────
@@ -33,14 +33,14 @@ class TestClassifyInput:
     def test_ss08_bang_command(self):
         assert classify_input("!ls -la", "claude") == "agent-command"
 
-    def test_ss09_vantage_exit_session(self):
-        assert classify_input("/exit-session", "claude") == "vantage-command"
+    def test_ss09_cohrint_exit_session(self):
+        assert classify_input("/exit-session", "claude") == "cohrint-command"
 
-    def test_ss10_vantage_cost(self):
-        assert classify_input("/cost", "claude") == "vantage-command"
+    def test_ss10_cohrint_cost(self):
+        assert classify_input("/cost", "claude") == "cohrint-command"
 
-    def test_ss11_vantage_opt_off(self):
-        assert classify_input("/opt-off", "claude") == "vantage-command"
+    def test_ss11_cohrint_opt_off(self):
+        assert classify_input("/opt-off", "claude") == "cohrint-command"
 
     def test_ss12_structured_json(self):
         assert classify_input('{"key": "value"}', "claude") == "structured"
@@ -139,9 +139,9 @@ class TestSelectiveOptimization:
         # Key terms preserved
         assert "kubernetes" in result["forwarded"].lower()
 
-    def test_ss25_vantage_command_not_optimized(self):
+    def test_ss25_cohrint_command_not_optimized(self):
         result = process_input("/cost", "claude", "auto")
-        assert result["type"] == "vantage-command"
+        assert result["type"] == "cohrint-command"
         assert result["optimized"] is False
 
 
@@ -168,17 +168,17 @@ class TestAutoRecovery:
 # ── Section D: User Control (SS.31-SS.35) ────────────────────────────────
 
 class TestUserControl:
-    def test_ss31_opt_off_is_vantage_command(self):
-        assert classify_input("/opt-off", "claude") == "vantage-command"
+    def test_ss31_opt_off_is_cohrint_command(self):
+        assert classify_input("/opt-off", "claude") == "cohrint-command"
 
-    def test_ss32_opt_auto_is_vantage_command(self):
-        assert classify_input("/opt-auto", "claude") == "vantage-command"
+    def test_ss32_opt_auto_is_cohrint_command(self):
+        assert classify_input("/opt-auto", "claude") == "cohrint-command"
 
-    def test_ss33_opt_ask_is_vantage_command(self):
-        assert classify_input("/opt-ask", "claude") == "vantage-command"
+    def test_ss33_opt_ask_is_cohrint_command(self):
+        assert classify_input("/opt-ask", "claude") == "cohrint-command"
 
-    def test_ss34_opt_on_is_vantage_command(self):
-        assert classify_input("/opt-on", "claude") == "vantage-command"
+    def test_ss34_opt_on_is_cohrint_command(self):
+        assert classify_input("/opt-on", "claude") == "cohrint-command"
 
     def test_ss35_never_mode_disables_verbose(self):
         result = process_input(VERBOSE_PROMPT, "claude", "never")

@@ -1,5 +1,5 @@
 """
-Tests for vantage_agent.tools — local tool execution.
+Tests for cohrint_agent.tools — local tool execution.
 
 Tests use real filesystem operations in a temp directory.
 No mocks — all tools execute against real files and commands.
@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from vantage_agent.tools import (
+from cohrint_agent.tools import (
     TOOL_DEFINITIONS,
     TOOL_MAP,
     SAFE_TOOLS,

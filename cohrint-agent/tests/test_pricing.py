@@ -3,7 +3,7 @@
 Covers test scenarios from suites 21C, 26B, 30E, 34E, 31-Flow5.
 """
 import pytest
-from vantage_agent.pricing import calculate_cost, find_cheapest, MODEL_PRICES
+from cohrint_agent.pricing import calculate_cost, find_cheapest, MODEL_PRICES
 
 
 class TestCalculateCost:
@@ -22,9 +22,18 @@ class TestCalculateCost:
         assert cost > 0
 
     def test_unknown_model_uses_default_pricing(self):
-        """Unknown models return 0.0 — cost cannot be estimated."""
+        """Unknown models fall back to default rates, not 0.0.
+
+        Returning 0.0 for an unknown model silently masks spend and can
+        bypass budget enforcement (T-COST.unknown_model).
+        """
         cost = calculate_cost("totally-unknown-model-xyz", 1000, 500)
-        assert cost == 0.0
+        expected = (
+            1000 * MODEL_PRICES["default"]["input"] / 1_000_000
+            + 500 * MODEL_PRICES["default"]["output"] / 1_000_000
+        )
+        assert cost == pytest.approx(expected)
+        assert cost > 0
 
     def test_zero_tokens_zero_cost(self):
         assert calculate_cost("gpt-4o", 0, 0) == 0

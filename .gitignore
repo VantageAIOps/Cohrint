@@ -71,3 +71,9 @@ TODO.md
 # Test seed state and credentials — contain real API keys, NEVER commit
 tests/artifacts/da45_seed_state.json
 tests/artifacts/da45_credentials.txt
+
+# Playwright MCP cache
+.playwright-mcp/
+
+# Scratch / brainstorming (superpowers)
+.superpowers/

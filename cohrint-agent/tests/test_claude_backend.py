@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vantage_agent.backends.claude_backend import ClaudeCliBackend, _parse_stream_event
+from cohrint_agent.backends.claude_backend import ClaudeCliBackend, _parse_stream_event
 
 
 def _make_event(**kwargs) -> bytes:
@@ -88,7 +88,7 @@ def test_build_command_includes_required_flags(tmp_path):
 
 
 def test_capabilities():
-    from vantage_agent.backends.base import BackendCapabilities
+    from cohrint_agent.backends.base import BackendCapabilities
     backend = ClaudeCliBackend.__new__(ClaudeCliBackend)
     assert backend.capabilities.token_count == "exact"
     assert backend.capabilities.supports_process is False

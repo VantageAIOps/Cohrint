@@ -1,7 +1,7 @@
 """Tests for tracker.py — dashboard telemetry client."""
 import pytest
 from unittest.mock import patch, MagicMock
-from vantage_agent.tracker import Tracker, TrackerConfig, DashboardEvent, PROVIDER_MAP
+from cohrint_agent.tracker import Tracker, TrackerConfig, DashboardEvent, PROVIDER_MAP
 
 
 class TestTrackerConfig:
@@ -47,7 +47,7 @@ class TestTracker:
         assert t._queue[0].total_tokens == 150
         t.stop()
 
-    @patch("vantage_agent.tracker.httpx.post")
+    @patch("cohrint_agent.tracker.httpx.post")
     def test_flush_sends_batch(self, mock_post):
         mock_post.return_value = MagicMock(status_code=200)
         t = Tracker(TrackerConfig(api_key="test-key", batch_size=100))
@@ -59,7 +59,7 @@ class TestTracker:
         assert "events" in call_kwargs.kwargs["json"]
         assert len(t._queue) == 0
 
-    @patch("vantage_agent.tracker.httpx.post")
+    @patch("cohrint_agent.tracker.httpx.post")
     def test_auto_flush_at_batch_size(self, mock_post):
         mock_post.return_value = MagicMock(status_code=200)
         t = Tracker(TrackerConfig(api_key="test-key", batch_size=2))
@@ -68,7 +68,7 @@ class TestTracker:
         t.record(model="m", input_tokens=1, output_tokens=1, cost_usd=0.001, latency_ms=10)
         assert mock_post.call_count == 1
 
-    @patch("vantage_agent.tracker.httpx.post")
+    @patch("cohrint_agent.tracker.httpx.post")
     def test_strict_privacy_strips_agent_name(self, mock_post):
         mock_post.return_value = MagicMock(status_code=200)
         t = Tracker(TrackerConfig(api_key="test-key", batch_size=100, privacy="strict"))
@@ -81,7 +81,7 @@ class TestTracker:
         t = Tracker(TrackerConfig(api_key="test"))
         t.flush()  # should not raise
 
-    @patch("vantage_agent.tracker.httpx.post", side_effect=Exception("network error"))
+    @patch("cohrint_agent.tracker.httpx.post", side_effect=Exception("network error"))
     def test_flush_handles_error(self, mock_post):
         t = Tracker(TrackerConfig(api_key="test-key", batch_size=100))
         t.record(model="m", input_tokens=1, output_tokens=1, cost_usd=0.001, latency_ms=10)

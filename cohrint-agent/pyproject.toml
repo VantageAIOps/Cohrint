@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cohrint-agent"
-version = "0.2.6"
+version = "0.3.0"
 description = "AI coding agent with per-tool permissions, cost tracking, and token optimization"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.9"
-authors = [{ name = "Aman Jain", email = "aman@vantageaiops.com" }]
+authors = [{ name = "Aman Jain", email = "aman@cohrint.com" }]
 keywords = ["ai", "agent", "cost-tracking", "claude", "codex", "gemini", "llm"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -25,21 +25,25 @@ classifiers = [
     "Topic :: Utilities",
 ]
 dependencies = [
-    "anthropic>=0.40.0",
-    "rich>=13.0.0",
+    # Upper bounds pin tested-major ranges so a SDK major bump with
+    # breaking tool-use/message schema changes can't silently break
+    # every turn on a fresh install.
+    "anthropic>=0.40.0,<1.0",
+    "rich>=13.0.0,<15.0",
+    "httpx>=0.24.0,<1.0",
 ]
 
 [project.urls]
 Homepage = "https://cohrint.com"
 Documentation = "https://cohrint.com/docs"
-Repository = "https://github.com/amanjain/vantageai"
-"Bug Tracker" = "https://github.com/amanjain/vantageai/issues"
+Repository = "https://github.com/amanjain/cohrint"
+"Bug Tracker" = "https://github.com/amanjain/cohrint/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0", "pytest-asyncio>=0.21"]
 
 [project.scripts]
-cohrint-agent = "vantage_agent.cli:main"
+cohrint-agent = "cohrint_agent.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["vantage_agent*"]
+include = ["cohrint_agent*"]

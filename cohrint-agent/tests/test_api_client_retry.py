@@ -14,7 +14,7 @@ def make_client():
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).parent.parent))
-    from vantage_agent.api_client import AgentClient
+    from cohrint_agent.api_client import AgentClient
 
     c = AgentClient.__new__(AgentClient)
     c.client = MagicMock()

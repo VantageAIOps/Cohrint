@@ -1,6 +1,6 @@
 """Tests for optimizer.py — prompt compression engine."""
 import pytest
-from vantage_agent.optimizer import (
+from cohrint_agent.optimizer import (
     compress_prompt,
     count_tokens,
     looks_like_structured_data,

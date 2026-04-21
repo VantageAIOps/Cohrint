@@ -6,32 +6,32 @@ from unittest.mock import patch
 
 import pytest
 
-from vantage_agent.backends import create_backend, auto_detect_backend
-from vantage_agent.backends.base import BackendCapabilities, BackendResult
+from cohrint_agent.backends import create_backend, auto_detect_backend
+from cohrint_agent.backends.base import BackendCapabilities, BackendResult
 
 
 def test_auto_detect_api_key_returns_api():
-    with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-test", "VANTAGE_BACKEND": ""}):
+    with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-test", "COHRINT_BACKEND": ""}):
         name = auto_detect_backend()
     assert name == "api"
 
 
 def test_auto_detect_claude_binary_returns_claude():
-    with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "", "VANTAGE_BACKEND": ""}):
+    with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "", "COHRINT_BACKEND": ""}):
         with patch("shutil.which", side_effect=lambda b: "/usr/bin/claude" if b == "claude" else None):
             name = auto_detect_backend()
     assert name == "claude"
 
 
 def test_auto_detect_no_binaries_raises_error():
-    with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "", "VANTAGE_BACKEND": ""}):
+    with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "", "COHRINT_BACKEND": ""}):
         with patch("shutil.which", return_value=None):
             with pytest.raises(RuntimeError, match="No backend found"):
                 auto_detect_backend()
 
 
 def test_explicit_env_var_overrides_autodetect():
-    with patch.dict(os.environ, {"VANTAGE_BACKEND": "gemini", "ANTHROPIC_API_KEY": "sk-test"}):
+    with patch.dict(os.environ, {"COHRINT_BACKEND": "gemini", "ANTHROPIC_API_KEY": "sk-test"}):
         name = auto_detect_backend()
     assert name == "gemini"
 
@@ -70,7 +70,7 @@ def test_unknown_backend_raises():
 
 
 def test_tool_registry_translates_anthropic_to_openai():
-    from vantage_agent.tool_registry import ToolRegistry
+    from cohrint_agent.tool_registry import ToolRegistry
     tools = ToolRegistry.for_format("openai")
     assert len(tools) > 0
     for tool in tools:
@@ -79,7 +79,7 @@ def test_tool_registry_translates_anthropic_to_openai():
 
 
 def test_tool_registry_translates_anthropic_to_google():
-    from vantage_agent.tool_registry import ToolRegistry
+    from cohrint_agent.tool_registry import ToolRegistry
     tools = ToolRegistry.for_format("google")
     assert len(tools) > 0
     for tool in tools:
@@ -88,7 +88,7 @@ def test_tool_registry_translates_anthropic_to_google():
 
 
 def test_tool_registry_anthropic_passthrough():
-    from vantage_agent.tool_registry import ToolRegistry
-    from vantage_agent.tools import TOOL_DEFINITIONS
+    from cohrint_agent.tool_registry import ToolRegistry
+    from cohrint_agent.tools import TOOL_DEFINITIONS
     tools = ToolRegistry.for_format("anthropic")
     assert tools == list(TOOL_DEFINITIONS)

@@ -7,8 +7,8 @@ from unittest.mock import patch
 import httpx
 import pytest
 
-from vantage_agent.optimizer import optimize_prompt
-from vantage_agent.tracker import Tracker, TrackerConfig
+from cohrint_agent.optimizer import optimize_prompt
+from cohrint_agent.tracker import Tracker, TrackerConfig
 
 
 # ---------------------------------------------------------------------------
@@ -87,8 +87,8 @@ def test_unknown_agent_provider_defaults_to_unknown_not_anthropic():
 
 def test_pricing_dictionaries_consistent():
     """cost_tracker.py and pricing.py must use the same model key for claude-haiku-4-5."""
-    from vantage_agent.pricing import MODEL_PRICES
-    from vantage_agent.cost_tracker import MODEL_PRICING
+    from cohrint_agent.pricing import MODEL_PRICES
+    from cohrint_agent.cost_tracker import MODEL_PRICING
 
     haiku_key_in_pricing = any("haiku-4-5" in k for k in MODEL_PRICES)
     haiku_key_in_tracker = any("haiku-4-5" in k for k in MODEL_PRICING)
@@ -106,8 +106,19 @@ def test_pricing_dictionaries_consistent():
 # Bug 5: Flush-before-success loses events
 # ---------------------------------------------------------------------------
 
-def test_flush_retains_events_on_network_error():
-    """Events must NOT be cleared from queue if the HTTP POST fails."""
+def test_flush_retains_events_on_network_error(tmp_path, monkeypatch):
+    """Events must be preserved (in-queue OR spooled to disk) after HTTP POST fails.
+
+    Current impl: on ConnectError the batch is written to ~/.cohrint/spool.jsonl
+    and cleared from memory — persistent spool survives process restart, whereas
+    in-memory retention does not. The invariant the user cares about is "no event
+    lost", so we verify the sum across queue + spool.
+    """
+    # Redirect spool to an isolated tmp dir so the test is hermetic.
+    import cohrint_agent.tracker as tracker_mod
+    monkeypatch.setattr(tracker_mod, "_SPOOL_DIR", tmp_path)
+    monkeypatch.setattr(tracker_mod, "_SPOOL_FILE", tmp_path / "spool.jsonl")
+
     tracker = _make_tracker("full")
     tracker.record(
         model="claude-sonnet-4-6",
@@ -115,13 +126,20 @@ def test_flush_retains_events_on_network_error():
         output_tokens=50,
         cost_usd=0.001,
         latency_ms=100,
-        agent_name="vantage-agent",
+        agent_name="cohrint-agent",
     )
     assert len(tracker._queue) == 1
 
     with patch("httpx.post", side_effect=httpx.ConnectError("timeout")):
         tracker.flush()
 
-    assert len(tracker._queue) == 1, (
-        "Events were lost from queue after a failed HTTP POST"
+    spool_file = tmp_path / "spool.jsonl"
+    spooled_lines = (
+        [ln for ln in spool_file.read_text().splitlines() if ln.strip()]
+        if spool_file.exists() else []
+    )
+    preserved = len(tracker._queue) + len(spooled_lines)
+    assert preserved >= 1, (
+        f"Event lost after failed HTTP POST: queue={len(tracker._queue)}, "
+        f"spooled={len(spooled_lines)}"
     )

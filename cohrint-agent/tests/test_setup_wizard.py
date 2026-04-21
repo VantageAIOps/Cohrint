@@ -7,8 +7,8 @@ from unittest.mock import patch
 
 import pytest
 
-from vantage_agent.permissions import PermissionManager
-from vantage_agent.setup_wizard import (
+from cohrint_agent.permissions import PermissionManager
+from cohrint_agent.setup_wizard import (
     TIER_TOOLS,
     apply_tier,
     get_config,

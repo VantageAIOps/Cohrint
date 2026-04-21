@@ -32,11 +32,11 @@ def _make_exporter(**env_overrides):
         "COHRINT_OTEL_ENABLED": "false",
         "OTEL_EXPORTER_OTLP_ENDPOINT": "https://api.cohrint.com",
         "COHRINT_API_KEY": "",
-        "VANTAGE_ORG_ID": "",
+        "COHRINT_ORG_ID": "",
         **env_overrides,
     }
     with patch.dict(os.environ, env, clear=False):
-        from vantage_agent.telemetry import OTelExporter
+        from cohrint_agent.telemetry import OTelExporter
         return OTelExporter()
 
 
@@ -49,7 +49,7 @@ def test_disabled_by_default_no_http_call():
     # Ensure env var is NOT set to true
     env = {"COHRINT_OTEL_ENABLED": "false"}
     with patch.dict(os.environ, env, clear=False):
-        from vantage_agent.telemetry import OTelExporter
+        from cohrint_agent.telemetry import OTelExporter
         exporter = OTelExporter()
         with patch("httpx.post") as mock_post:
             exporter.export(SAMPLE_EVENT)
@@ -65,7 +65,7 @@ def test_enabled_makes_http_calls():
     env = {"COHRINT_OTEL_ENABLED": "true", "COHRINT_API_KEY": "vnt_test"}
     with patch.dict(os.environ, env, clear=False):
         from importlib import reload
-        import vantage_agent.telemetry as tel_mod
+        import cohrint_agent.telemetry as tel_mod
         reload(tel_mod)
         exporter = tel_mod.OTelExporter()
         with patch("httpx.post") as mock_post:
@@ -83,7 +83,7 @@ def test_metrics_payload_structure():
     env = {"COHRINT_OTEL_ENABLED": "true", "COHRINT_API_KEY": "vnt_test"}
     with patch.dict(os.environ, env, clear=False):
         from importlib import reload
-        import vantage_agent.telemetry as tel_mod
+        import cohrint_agent.telemetry as tel_mod
         reload(tel_mod)
         exporter = tel_mod.OTelExporter()
         payload = exporter._build_metrics_payload(SAMPLE_EVENT)
@@ -122,7 +122,7 @@ def test_logs_payload_structure():
     env = {"COHRINT_OTEL_ENABLED": "true"}
     with patch.dict(os.environ, env, clear=False):
         from importlib import reload
-        import vantage_agent.telemetry as tel_mod
+        import cohrint_agent.telemetry as tel_mod
         reload(tel_mod)
         exporter = tel_mod.OTelExporter()
         payload = exporter._build_logs_payload(SAMPLE_EVENT)
@@ -137,7 +137,10 @@ def test_logs_payload_structure():
     assert body["model"] == "claude-sonnet-4-6"
     assert body["prompt_tokens"] == 100
     assert body["completion_tokens"] == 50
-    assert body["session_id"] == "sess-abc123"
+    # session_id is hashed on the telemetry boundary to prevent turn-
+    # sequence reconstruction at the collector (T-PRIVACY.otel_session_id_always_hashed).
+    import hashlib as _h
+    assert body["session_id"] == _h.sha256(b"sess-abc123").hexdigest()
 
     model_attr = next(a for a in log_record["attributes"] if a["key"] == "model")
     assert model_attr["value"]["stringValue"] == "claude-sonnet-4-6"
@@ -152,7 +155,7 @@ def test_silently_ignores_network_errors():
     env = {"COHRINT_OTEL_ENABLED": "true", "COHRINT_API_KEY": "vnt_test"}
     with patch.dict(os.environ, env, clear=False):
         from importlib import reload
-        import vantage_agent.telemetry as tel_mod
+        import cohrint_agent.telemetry as tel_mod
         reload(tel_mod)
         exporter = tel_mod.OTelExporter()
         with patch("httpx.post", side_effect=ConnectionError("network down")):
@@ -169,7 +172,7 @@ def test_export_async_returns_immediately():
     env = {"COHRINT_OTEL_ENABLED": "true", "COHRINT_API_KEY": "vnt_test"}
     with patch.dict(os.environ, env, clear=False):
         from importlib import reload
-        import vantage_agent.telemetry as tel_mod
+        import cohrint_agent.telemetry as tel_mod
         reload(tel_mod)
         exporter = tel_mod.OTelExporter()
 
@@ -200,7 +203,7 @@ def test_custom_endpoint_is_respected():
     }
     with patch.dict(os.environ, env, clear=False):
         from importlib import reload
-        import vantage_agent.telemetry as tel_mod
+        import cohrint_agent.telemetry as tel_mod
         reload(tel_mod)
         exporter = tel_mod.OTelExporter()
         assert exporter.endpoint == custom
@@ -223,16 +226,16 @@ def test_missing_env_vars_use_defaults():
     import os
     # Remove the vars entirely if present
     keys_to_remove = ["COHRINT_OTEL_ENABLED", "OTEL_EXPORTER_OTLP_ENDPOINT",
-                      "COHRINT_API_KEY", "VANTAGE_ORG_ID"]
+                      "COHRINT_API_KEY", "COHRINT_ORG_ID"]
     clean_env = {k: "" for k in keys_to_remove}
     # We can't truly "unset" with patch.dict easily, so set to empty/false
     with patch.dict(os.environ, {"COHRINT_OTEL_ENABLED": "false",
                                   "OTEL_EXPORTER_OTLP_ENDPOINT": "",
                                   "COHRINT_API_KEY": "",
-                                  "VANTAGE_ORG_ID": ""},
+                                  "COHRINT_ORG_ID": ""},
                     clear=False):
         from importlib import reload
-        import vantage_agent.telemetry as tel_mod
+        import cohrint_agent.telemetry as tel_mod
         reload(tel_mod)
         # Patch os.environ.get to simulate truly missing vars
         original_get = os.environ.get

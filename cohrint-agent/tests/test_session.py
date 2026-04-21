@@ -1,4 +1,4 @@
-"""Tests for VantageSession and SessionStore."""
+"""Tests for CohrintSession and SessionStore."""
 from __future__ import annotations
 
 import json
@@ -8,9 +8,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from vantage_agent.session import VantageSession, MAX_HISTORY_TOKENS, _CHARS_PER_TOKEN
-from vantage_agent.session_store import SessionStore, SessionNotFoundError
-from vantage_agent.backends.base import BackendResult, BackendCapabilities
+from cohrint_agent.session import CohrintSession, MAX_HISTORY_TOKENS, _CHARS_PER_TOKEN
+from cohrint_agent.session_store import SessionStore, SessionNotFoundError
+from cohrint_agent.backends.base import BackendResult, BackendCapabilities
 
 
 def _mock_backend(name: str = "api", supports_process: bool = False) -> MagicMock:
@@ -37,7 +37,7 @@ def _mock_backend(name: str = "api", supports_process: bool = False) -> MagicMoc
 
 def test_session_creates_with_uuid(tmp_path):
     backend = _mock_backend()
-    session = VantageSession.create(backend=backend, cwd=str(tmp_path))
+    session = CohrintSession.create(backend=backend, cwd=str(tmp_path))
     assert session.session_id
     uuid.UUID(session.session_id)  # raises if invalid
 
@@ -45,7 +45,7 @@ def test_session_creates_with_uuid(tmp_path):
 def test_session_saves_after_successful_turn(tmp_path):
     backend = _mock_backend()
     store = SessionStore(sessions_dir=tmp_path / "sessions")
-    session = VantageSession.create(backend=backend, cwd=str(tmp_path), store=store)
+    session = CohrintSession.create(backend=backend, cwd=str(tmp_path), store=store)
 
     session.send("hello")
 
@@ -59,10 +59,10 @@ def test_session_saves_after_successful_turn(tmp_path):
 def test_session_resume_restores_history(tmp_path):
     backend = _mock_backend()
     store = SessionStore(sessions_dir=tmp_path / "sessions")
-    session = VantageSession.create(backend=backend, cwd=str(tmp_path), store=store)
+    session = CohrintSession.create(backend=backend, cwd=str(tmp_path), store=store)
     session.send("first message")
 
-    session2 = VantageSession.resume(session.session_id, backend=backend, store=store)
+    session2 = CohrintSession.resume(session.session_id, backend=backend, store=store)
     assert len(session2.history) == 2
     assert session2.history[0]["role"] == "user"
     assert session2.history[0]["text"] == "first message"
@@ -71,17 +71,17 @@ def test_session_resume_restores_history(tmp_path):
 def test_session_resume_restores_cost_summary(tmp_path):
     backend = _mock_backend()
     store = SessionStore(sessions_dir=tmp_path / "sessions")
-    session = VantageSession.create(backend=backend, cwd=str(tmp_path), store=store)
+    session = CohrintSession.create(backend=backend, cwd=str(tmp_path), store=store)
     session.send("test")
 
-    session2 = VantageSession.resume(session.session_id, backend=backend, store=store)
+    session2 = CohrintSession.resume(session.session_id, backend=backend, store=store)
     assert session2._cost_summary.get("total_cost_usd", 0) > 0
 
 
 def test_history_trimmed_at_max_tokens(tmp_path):
     """History exceeding MAX_HISTORY_TOKENS must be trimmed before sending."""
     backend = _mock_backend()
-    session = VantageSession.create(backend=backend, cwd=str(tmp_path))
+    session = CohrintSession.create(backend=backend, cwd=str(tmp_path))
 
     # Inject huge history >> MAX_HISTORY_TOKENS
     big_text = "x" * (MAX_HISTORY_TOKENS * _CHARS_PER_TOKEN // 2 + 100)
@@ -100,7 +100,7 @@ def test_session_id_propagated_to_tracker(tmp_path):
     """tracker.record() must be called with correct session_id."""
     backend = _mock_backend()
     tracker = MagicMock()
-    session = VantageSession.create(backend=backend, cwd=str(tmp_path), tracker=tracker)
+    session = CohrintSession.create(backend=backend, cwd=str(tmp_path), tracker=tracker)
     session.send("test prompt")
 
     tracker.record.assert_called_once()
@@ -112,7 +112,7 @@ def test_interrupt_pops_orphaned_user_message(tmp_path):
     """KeyboardInterrupt during send must not leave orphaned user message."""
     backend = _mock_backend()
     backend.send.side_effect = KeyboardInterrupt
-    session = VantageSession.create(backend=backend, cwd=str(tmp_path))
+    session = CohrintSession.create(backend=backend, cwd=str(tmp_path))
     try:
         session.send("interrupted prompt")
     except KeyboardInterrupt:
@@ -123,15 +123,18 @@ def test_interrupt_pops_orphaned_user_message(tmp_path):
 def test_session_not_found_raises(tmp_path):
     store = SessionStore(sessions_dir=tmp_path / "sessions")
     backend = _mock_backend()
+    # Valid UUIDv4 format but no matching file on disk — exercises the
+    # SessionNotFoundError branch rather than InvalidSessionIdError (T-SAFETY.4).
+    missing = "00000000-0000-4000-8000-000000000000"
     with pytest.raises(SessionNotFoundError):
-        VantageSession.resume("nonexistent-id", backend=backend, store=store)
+        CohrintSession.resume(missing, backend=backend, store=store)
 
 
 def test_session_store_list_all(tmp_path):
     store = SessionStore(sessions_dir=tmp_path / "sessions")
     backend = _mock_backend()
     for _ in range(3):
-        s = VantageSession.create(backend=backend, cwd=str(tmp_path), store=store)
+        s = CohrintSession.create(backend=backend, cwd=str(tmp_path), store=store)
         s.send("hello")
 
     sessions = store.list_all()
@@ -142,7 +145,7 @@ def test_session_store_total_cost(tmp_path):
     store = SessionStore(sessions_dir=tmp_path / "sessions")
     backend = _mock_backend()
     for _ in range(2):
-        s = VantageSession.create(backend=backend, cwd=str(tmp_path), store=store)
+        s = CohrintSession.create(backend=backend, cwd=str(tmp_path), store=store)
         s.send("hello")
 
     total = store.total_cost_usd()
