@@ -79,6 +79,8 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.mcp == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -90,7 +92,7 @@ jobs:
         run: |
           npm ci
           npm run build
-          npm publish --access public
+          npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -99,6 +101,8 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.sdk == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -110,7 +114,7 @@ jobs:
         run: |
           npm ci
           npm run build
-          npm publish --access public
+          npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -119,6 +123,8 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.proxy == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -130,7 +136,7 @@ jobs:
         run: |
           npm ci
           npm run build
-          npm publish --access public
+          npm publish --access public --provenance
           NEW_VER=$(node -e "console.log(require('./package.json').version)")
           npm deprecate "cohrint-local-proxy@<${NEW_VER}" "Upgrade to ${NEW_VER}: run npm install -g cohrint-local-proxy"
         env:
