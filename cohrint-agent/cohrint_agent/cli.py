@@ -325,7 +325,24 @@ def _handle_command(line: str, client: AgentClient) -> bool:
     if stripped.startswith("/model"):
         parts = stripped.split(None, 1)
         if len(parts) < 2:
+            # Bare `/model` opens a TUI picker grouped by backend. On non-TTY
+            # (piped/scripted REPL) we fall through to a flat print instead.
+            from .pricing import MODEL_PRICES
+            from .tui import is_tty, select_one
+            if is_tty():
+                choices = [m for m in sorted(MODEL_PRICES) if m != "default"]
+                picked = select_one(
+                    f"Current: {client.model}. Pick a model:",
+                    choices,
+                    default=client.model if client.model in choices else None,
+                )
+                if picked and picked != client.model:
+                    client.model = picked
+                    client.cost = SessionCost(model=picked)
+                    console.print(f"  [green]Switched to {picked}[/green]")
+                return True
             console.print(f"  [dim]Current model: {client.model}[/dim]")
+            console.print("  [dim]Supported: run `cohrint-agent models` to list all.[/dim]")
             return True
         new_model = parts[1].strip()
         client.model = new_model
@@ -521,6 +538,14 @@ def main() -> None:
     if len(sys.argv) == 2 and sys.argv[1] == "summary":
         _print_summary()
         return
+
+    # Dispatch verb subcommands (mcp, skills, agents, models, hooks, etc.)
+    # BEFORE argparse so they don't collide with the prompt-positional arg.
+    # A user typing `cohrint-agent "fix the bug"` still hits the prompt path —
+    # dispatcher only claims known verbs. Catalog: cohrint_agent.commands.CATALOG
+    from .subcommands import dispatch, is_subcommand
+    if is_subcommand(sys.argv):
+        raise SystemExit(dispatch(sys.argv))
 
     args = parse_args()
 
