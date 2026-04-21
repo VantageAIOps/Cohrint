@@ -73,5 +73,6 @@ def test_apply_tier_3_still_excludes_bash(tmp_path):
 
 
 def test_get_config_returns_defaults_when_missing(tmp_path):
+    # fail-closed default: socket absent → deny the tool call
     cfg = get_config(config_dir=tmp_path)
-    assert cfg.get("hook_fail_policy") == "allow"
+    assert cfg.get("hook_fail_policy") == "deny"

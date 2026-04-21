@@ -51,10 +51,19 @@ def _prompt_for_api_key() -> str:
         f"{note}\n"
         "Get your API key at: https://console.anthropic.com/settings/keys\n"
     )
+    # Use getpass so the key isn't echoed to the terminal / tmux scrollback /
+    # CI transcripts. Fall back to input() if getpass can't access the tty
+    # (rare — e.g. some embedded runners).
+    import getpass
     try:
-        key = input("Paste your API key (or press Enter to skip): ").strip()
+        key = getpass.getpass("Paste your API key (hidden, or press Enter to skip): ").strip()
     except (EOFError, KeyboardInterrupt):
         return ""
+    except Exception:  # noqa: BLE001 — getpass may raise on exotic TTYs
+        try:
+            key = input("Paste your API key (or press Enter to skip): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            return ""
     if not key:
         return ""
     save_path = os.path.expanduser("~/.cohrint-agent/api_key")
@@ -169,12 +178,22 @@ class AgentClient:
         self._available_tools = self._build_tool_list()
 
     def _default_system(self) -> str:
-        return (
+        base = (
             "You are an expert coding assistant. You have access to tools for "
             "reading, writing, and editing files, running shell commands, and "
             "searching codebases. Use tools when needed to accomplish tasks. "
             f"Working directory: {self.cwd}"
         )
+        # Prepend cohrint guardrails if any are active. Read lazily so tests
+        # that monkey-patch the HOME or config path work without extra setup.
+        try:
+            from .guardrails import system_preamble
+            preamble = system_preamble()
+            if preamble:
+                return preamble + "\n\n" + base
+        except Exception:  # noqa: BLE001
+            pass
+        return base
 
     def _build_tool_list(self) -> list[dict[str, Any]]:
         """Return tool definitions for all known tools."""

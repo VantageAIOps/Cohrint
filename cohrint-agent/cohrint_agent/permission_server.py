@@ -322,13 +322,16 @@ esac
 # Need interactive prompt: connect to cohrint-agent socket
 if [ -z "$SOCKET_PATH" ] || [ ! -S "$SOCKET_PATH" ]; then
     # No socket available — apply fail policy
+    # Fail CLOSED if the socket vanished mid-session: a crashed agent must
+    # not silently escalate every tool call. Users who prefer the old
+    # fail-open behaviour can set hook_fail_policy="allow" explicitly.
     POLICY=$(python3 -c "
 import json, os
 cfg = os.path.join(os.environ.get('COHRINT_CONFIG_DIR', os.path.expanduser('~/.cohrint-agent')), 'config.json')
 d = json.load(open(cfg)) if os.path.exists(cfg) else {}
-print(d.get('hook_fail_policy', 'allow'))
-" 2>/dev/null || echo "allow")
-    [ "$POLICY" = "deny" ] && exit 2 || exit 0
+print(d.get('hook_fail_policy', 'deny'))
+" 2>/dev/null || echo "deny")
+    [ "$POLICY" = "allow" ] && exit 0 || exit 2
 fi
 
 # Connect to socket and get decision

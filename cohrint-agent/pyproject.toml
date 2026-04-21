@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cohrint-agent"
-version = "0.3.0"
+version = "0.4.0"
 description = "AI coding agent with per-tool permissions, cost tracking, and token optimization"
 readme = "README.md"
 license = { text = "MIT" }
@@ -31,6 +31,12 @@ dependencies = [
     "anthropic>=0.40.0,<1.0",
     "rich>=13.0.0,<15.0",
     "httpx>=0.24.0,<1.0",
+    # TUI selectors for `cohrint-agent <verb> --interactive` and REPL /-menus.
+    # prompt_toolkit is pulled in transitively.
+    "questionary>=2.0,<3.0",
+    # TOML parser for Codex config.toml. stdlib `tomllib` covers 3.11+;
+    # `tomli` is the wire-compatible backport for 3.9/3.10.
+    "tomli>=2.0; python_version<'3.11'",
 ]
 
 [project.urls]

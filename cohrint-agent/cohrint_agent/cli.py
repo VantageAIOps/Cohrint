@@ -60,7 +60,7 @@ BANNER = """
   [dim]AI coding agent with per-tool permissions, cost tracking & optimization[/dim]
   [dim]Model: {model}  |  CWD: {cwd}[/dim]
 
-  [dim]Commands:[/dim]
+  [dim]REPL commands:[/dim]
     [bold]/help[/bold]              Show commands
     [bold]/allow[/bold] Tool        Approve a tool (e.g. /allow Bash,Write,Edit)
     [bold]/allow all[/bold]         Approve all tools
@@ -70,8 +70,23 @@ BANNER = """
     [bold]/tier[/bold]              Change tool permission tier
     [bold]/reset[/bold]             Reset permissions & history
     [bold]/model[/bold] name        Switch model
+    [bold]/guardrails[/bold] on|off Toggle recommendation + hallucination guardrails
+    [bold]/verbs[/bold]             Show all verbs (mcp/skills/agents/…)
     [bold]/quit[/bold]              Exit
+
+  [dim]Shell verbs — also invokable in REPL as `/<verb> …` or `cohrint-agent <verb>`:[/dim]
+{verbs}
+  [dim]Run `cohrint-agent help` for full catalog.[/dim]
 """
+
+
+def _verb_summary_lines() -> str:
+    """Render one line per verb from the catalog — shown in the REPL banner."""
+    from .commands import CATALOG
+    lines: list[str] = []
+    for spec in CATALOG.values():
+        lines.append(f"    [bold]{spec.name:<12}[/bold] {spec.summary}")
+    return "\n".join(lines)
 
 
 def parse_args() -> argparse.Namespace:
@@ -245,7 +260,7 @@ def _handle_command(line: str, client: AgentClient) -> bool:
 
     # Bare "/" prints help — avoids "Unknown command: /" dead-end (T-DISPATCH.2).
     if stripped in ("/", "/help"):
-        console.print(BANNER.format(version=__version__, model=client.model, cwd=client.cwd))
+        console.print(BANNER.format(version=__version__, model=client.model, cwd=client.cwd, verbs=_verb_summary_lines()))
         return True
 
     if stripped == "/tools":
@@ -325,13 +340,58 @@ def _handle_command(line: str, client: AgentClient) -> bool:
     if stripped.startswith("/model"):
         parts = stripped.split(None, 1)
         if len(parts) < 2:
+            # Bare `/model` opens a TUI picker grouped by backend. On non-TTY
+            # (piped/scripted REPL) we fall through to a flat print instead.
+            from .pricing import MODEL_PRICES
+            from .tui import is_tty, select_one
+            if is_tty():
+                choices = [m for m in sorted(MODEL_PRICES) if m != "default"]
+                picked = select_one(
+                    f"Current: {client.model}. Pick a model:",
+                    choices,
+                    default=client.model if client.model in choices else None,
+                )
+                if picked and picked != client.model:
+                    client.model = picked
+                    client.cost = SessionCost(model=picked)
+                    console.print(f"  [green]Switched to {picked}[/green]")
+                return True
             console.print(f"  [dim]Current model: {client.model}[/dim]")
+            console.print("  [dim]Supported: run `cohrint-agent models` to list all.[/dim]")
             return True
         new_model = parts[1].strip()
         client.model = new_model
         client.cost = SessionCost(model=new_model)
         console.print(f"  [green]Switched to {new_model}[/green]")
         console.print("  [dim]Cost tracking reset for new model[/dim]")
+        return True
+
+    if stripped == "/verbs":
+        from .commands import render_catalog
+        console.print(render_catalog())
+        return True
+
+    if stripped.startswith("/guardrails"):
+        from .guardrails import get_settings, set_kind
+        parts = stripped.split()
+        if len(parts) == 1:
+            s = get_settings()
+            console.print(
+                f"  [dim]guardrails:[/dim] "
+                f"recommendation=[{'green' if s.recommendation else 'red'}]{s.recommendation}[/], "
+                f"hallucination=[{'green' if s.hallucination else 'red'}]{s.hallucination}[/]"
+            )
+            return True
+        action = parts[1].lower()
+        kind = parts[2] if len(parts) >= 3 else "all"
+        if action not in ("on", "off"):
+            console.print("  [red]Usage: /guardrails [on|off] [recommendation|hallucination|all][/red]")
+            return True
+        try:
+            set_kind(kind, enabled=(action == "on"))
+            console.print(f"  [green]guardrails {action} ({kind})[/green]")
+        except ValueError as e:
+            console.print(f"  [red]{e}[/red]")
         return True
 
     if stripped == "/tier":
@@ -357,6 +417,23 @@ def _handle_command(line: str, client: AgentClient) -> bool:
         return True
 
     if stripped.startswith("/"):
+        # Route /<verb> [...args] to the same subcommand modules that power
+        # `cohrint-agent <verb>`. Keeps one source of truth for verb output
+        # and avoids duplicating per-verb REPL handlers.
+        from .commands import VERBS
+        from .subcommands import dispatch as _verb_dispatch
+        parts = stripped[1:].split()
+        if parts and parts[0] in VERBS:
+            try:
+                _verb_dispatch(["cohrint-agent", *parts])
+            except SystemExit:
+                # argparse inside verb modules calls sys.exit on --help / bad
+                # args. Swallow so the REPL keeps running.
+                pass
+            except Exception as e:  # noqa: BLE001 — verb crash must not kill REPL
+                console.print(f"  [red]/{parts[0]} failed: {e}[/red]")
+            return True
+
         # Dispatcher gate (T-DISPATCH.1): unknown slash commands never fall
         # through to agent/prompt dispatch — they terminate here.
         # scrub_token guards T-SAFETY.5/6/12: OSC-52 in "/...\x1b]52;..." must
@@ -370,7 +447,11 @@ def _handle_command(line: str, client: AgentClient) -> bool:
 
 def run_repl(client: AgentClient, tracker: Tracker | None = None) -> None:
     """Interactive REPL."""
-    console.print(BANNER.format(version=__version__, model=client.model, cwd=client.cwd))
+    # Tab-completion + history. No-op on non-TTY / missing readline.
+    from .repl_completer import install as _install_completer
+    _install_completer()
+
+    console.print(BANNER.format(version=__version__, model=client.model, cwd=client.cwd, verbs=_verb_summary_lines()))
 
     while True:
         try:
@@ -382,6 +463,18 @@ def run_repl(client: AgentClient, tracker: Tracker | None = None) -> None:
 
         if not line.strip():
             continue
+
+        # Nudge: a bare single-word CLI verb (`mcp`, `plugins`, …) is almost
+        # never a real prompt — redirect before we spend tokens on the LLM.
+        _stripped_line = line.strip()
+        if " " not in _stripped_line and not _stripped_line.startswith("/"):
+            from .commands import VERBS as _VERBS
+            if _stripped_line in _VERBS:
+                console.print(
+                    f"  [dim]Did you mean [bold]/{_stripped_line}[/bold]? "
+                    f"(bare verbs aren't auto-dispatched; prefix with `/`)[/dim]"
+                )
+                continue
 
         # Handle /commands
         if line.strip().startswith("/"):
@@ -414,8 +507,11 @@ def run_repl(client: AgentClient, tracker: Tracker | None = None) -> None:
             if budget > 0 and get_global_budget_used() >= budget:
                 console.print(f"[red]Global budget of ${budget:.2f} reached across all sessions.[/red]")
                 continue
+            # Capture the completed-prompt state BEFORE send() increments
+            # prompt_count inside SessionCost.record_prompt(). Any offset
+            # here (e.g. `- 1`) delays anomaly detection by one full turn.
             prior_total = client.cost.total_cost_usd
-            prior_count = client.cost.prompt_count - 1  # before this prompt
+            prior_count = client.cost.prompt_count
             client.send(line)
             # Show per-turn cost + anomaly check
             if client.cost.turns:
@@ -521,6 +617,14 @@ def main() -> None:
     if len(sys.argv) == 2 and sys.argv[1] == "summary":
         _print_summary()
         return
+
+    # Dispatch verb subcommands (mcp, skills, agents, models, hooks, etc.)
+    # BEFORE argparse so they don't collide with the prompt-positional arg.
+    # A user typing `cohrint-agent "fix the bug"` still hits the prompt path —
+    # dispatcher only claims known verbs. Catalog: cohrint_agent.commands.CATALOG
+    from .subcommands import dispatch, is_subcommand
+    if is_subcommand(sys.argv):
+        raise SystemExit(dispatch(sys.argv))
 
     args = parse_args()
 

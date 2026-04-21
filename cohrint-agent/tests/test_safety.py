@@ -3193,11 +3193,13 @@ class TestScan21PermShapeCheck:
 class TestScan21ConfigShape:
     """setup_wizard.get_config must reject tampered value types."""
 
-    def test_bogus_hook_fail_policy_falls_back_to_allow(self, tmp_path):
+    def test_bogus_hook_fail_policy_falls_back_to_default(self, tmp_path):
+        # Default is "deny" (fail-closed): a tampered value must not give the
+        # caller a free "allow" via type confusion.
         from cohrint_agent.setup_wizard import get_config
         (tmp_path / "config.json").write_text('{"hook_fail_policy": ["deny"]}')
         cfg = get_config(config_dir=tmp_path)
-        assert cfg["hook_fail_policy"] == "allow"
+        assert cfg["hook_fail_policy"] == "deny"
 
     def test_bogus_default_tier_becomes_none(self, tmp_path):
         from cohrint_agent.setup_wizard import get_config
