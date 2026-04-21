@@ -74,7 +74,7 @@ BANNER = """
     [bold]/verbs[/bold]             Show all verbs (mcp/skills/agents/…)
     [bold]/quit[/bold]              Exit
 
-  [dim]Shell verbs — run as `cohrint-agent <verb>`:[/dim]
+  [dim]Shell verbs — also invokable in REPL as `/<verb> …` or `cohrint-agent <verb>`:[/dim]
 {verbs}
   [dim]Run `cohrint-agent help` for full catalog.[/dim]
 """
@@ -417,6 +417,23 @@ def _handle_command(line: str, client: AgentClient) -> bool:
         return True
 
     if stripped.startswith("/"):
+        # Route /<verb> [...args] to the same subcommand modules that power
+        # `cohrint-agent <verb>`. Keeps one source of truth for verb output
+        # and avoids duplicating per-verb REPL handlers.
+        from .commands import VERBS
+        from .subcommands import dispatch as _verb_dispatch
+        parts = stripped[1:].split()
+        if parts and parts[0] in VERBS:
+            try:
+                _verb_dispatch(["cohrint-agent", *parts])
+            except SystemExit:
+                # argparse inside verb modules calls sys.exit on --help / bad
+                # args. Swallow so the REPL keeps running.
+                pass
+            except Exception as e:  # noqa: BLE001 — verb crash must not kill REPL
+                console.print(f"  [red]/{parts[0]} failed: {e}[/red]")
+            return True
+
         # Dispatcher gate (T-DISPATCH.1): unknown slash commands never fall
         # through to agent/prompt dispatch — they terminate here.
         # scrub_token guards T-SAFETY.5/6/12: OSC-52 in "/...\x1b]52;..." must
@@ -430,6 +447,10 @@ def _handle_command(line: str, client: AgentClient) -> bool:
 
 def run_repl(client: AgentClient, tracker: Tracker | None = None) -> None:
     """Interactive REPL."""
+    # Tab-completion + history. No-op on non-TTY / missing readline.
+    from .repl_completer import install as _install_completer
+    _install_completer()
+
     console.print(BANNER.format(version=__version__, model=client.model, cwd=client.cwd, verbs=_verb_summary_lines()))
 
     while True:
@@ -442,6 +463,18 @@ def run_repl(client: AgentClient, tracker: Tracker | None = None) -> None:
 
         if not line.strip():
             continue
+
+        # Nudge: a bare single-word CLI verb (`mcp`, `plugins`, …) is almost
+        # never a real prompt — redirect before we spend tokens on the LLM.
+        _stripped_line = line.strip()
+        if " " not in _stripped_line and not _stripped_line.startswith("/"):
+            from .commands import VERBS as _VERBS
+            if _stripped_line in _VERBS:
+                console.print(
+                    f"  [dim]Did you mean [bold]/{_stripped_line}[/bold]? "
+                    f"(bare verbs aren't auto-dispatched; prefix with `/`)[/dim]"
+                )
+                continue
 
         # Handle /commands
         if line.strip().startswith("/"):
