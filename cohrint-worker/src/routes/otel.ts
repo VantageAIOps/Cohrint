@@ -37,6 +37,54 @@ import { createLogger } from '../lib/logger';
 
 const otel = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
+// ── Ingest hard caps (DoS + storage bloat protection) ──────────────────────
+// Every field below is an upper bound; legitimate clients should never hit
+// these. We truncate silently rather than rejecting — dropping a whole batch
+// over one oversized attribute would be worse than storing a truncated value.
+const OTEL_LIMITS = {
+  MAX_BODY_BYTES:          5 * 1024 * 1024, // 5 MB per OTLP request
+  MAX_RESOURCE_METRICS:    200,
+  MAX_SCOPE_METRICS:       50,   // per resource
+  MAX_METRICS:             200,  // per scope
+  MAX_DATAPOINTS:          500,  // per metric
+  MAX_ATTRS_PER_DP:        50,
+  MAX_ATTR_KEY_CHARS:      128,
+  MAX_ATTR_VALUE_CHARS:    4096,
+  MAX_METRIC_VALUE:        1e12, // 1 trillion tokens is already absurd
+} as const;
+
+/** Bounded getAttr — truncates both key and string value. */
+function capAttrString(s: string | null | undefined, max: number): string | undefined {
+  if (s == null) return undefined;
+  return s.length > max ? s.slice(0, max) : s;
+}
+
+/** Clamp a numeric metric value to a sane range; drop NaN/Infinity. */
+function clampMetricValue(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  if (n < 0) return 0;
+  return Math.min(n, OTEL_LIMITS.MAX_METRIC_VALUE);
+}
+
+/** Parse an OTLP timeUnixNano into a Date; reject malformed values. */
+function parseOtelTimestamp(raw: string | number | undefined): Date {
+  if (raw == null) return new Date();
+  const s = String(raw);
+  // OTLP nanos are 19-digit strings; also allow shorter integers for older SDKs.
+  if (!/^\d{1,19}$/.test(s)) return new Date();
+  try {
+    const ms = Number(BigInt(s) / 1_000_000n);
+    if (!Number.isFinite(ms)) return new Date();
+    // Reject obvious garbage: before 2000-01-01 or after now + 1h.
+    const floor = 946_684_800_000;
+    const ceiling = Date.now() + 3600_000;
+    if (ms < floor || ms > ceiling) return new Date();
+    return new Date(ms);
+  } catch {
+    return new Date();
+  }
+}
+
 // ── Types for OTLP JSON format ──────────────────────────────────────────────
 
 interface OTLPResourceAttribute {
@@ -199,9 +247,18 @@ async function otelRateLimit(kv: KVNamespace, orgId: string, limitRpm: number): 
   return true;
 }
 
-// Validate API key and return org_id
-// Auth uses orgs.api_key_hash (owner) or org_members.api_key_hash (member)
-async function resolveOrg(apiKey: string | null, db: D1Database): Promise<string | null> {
+interface OtelAuthCtx {
+  orgId: string;
+  /** null when the key is an owner key (unrestricted). Otherwise the member's scope_team (may still be null if member is org-wide). */
+  memberScopeTeam: string | null;
+  /** Set only for member keys. When set, OTel attributes claiming a different developer_email are rewritten. */
+  memberEmail: string | null;
+  isMember: boolean;
+}
+
+// Validate API key and return auth context (org + member scoping if applicable).
+// Auth uses orgs.api_key_hash (owner) or org_members.api_key_hash (member).
+async function resolveOrg(apiKey: string | null, db: D1Database): Promise<OtelAuthCtx | null> {
   if (!apiKey) return null;
   const encoder = new TextEncoder();
   const data = encoder.encode(apiKey);
@@ -209,13 +266,21 @@ async function resolveOrg(apiKey: string | null, db: D1Database): Promise<string
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-  // Check owner key first
+  // Check owner key first (unrestricted — can emit on behalf of any member)
   const org = await db.prepare('SELECT id FROM orgs WHERE api_key_hash = ?').bind(hash).first() as { id: string } | null;
-  if (org) return org.id;
+  if (org) return { orgId: org.id, memberScopeTeam: null, memberEmail: null, isMember: false };
 
-  // Check member key
-  const member = await db.prepare('SELECT org_id FROM org_members WHERE api_key_hash = ?').bind(hash).first() as { org_id: string } | null;
-  return member?.org_id ?? null;
+  // Check member key — enforce scope_team + email to prevent cross-team/user spoof.
+  const member = await db.prepare(
+    'SELECT org_id, scope_team, email FROM org_members WHERE api_key_hash = ?',
+  ).bind(hash).first() as { org_id: string; scope_team: string | null; email: string | null } | null;
+  if (!member) return null;
+  return {
+    orgId: member.org_id,
+    memberScopeTeam: member.scope_team,
+    memberEmail: member.email,
+    isMember: true,
+  };
 }
 
 // ── Metrics Endpoint ────────────────────────────────────────────────────────
@@ -225,10 +290,11 @@ otel.post('/v1/metrics', async (c) => {
 
   // Auth
   const apiKey = extractAuth(c);
-  const orgId = await resolveOrg(apiKey, c.env.DB);
-  if (!orgId) {
+  const auth = await resolveOrg(apiKey, c.env.DB);
+  if (!auth) {
     return c.json({ error: 'Invalid or missing API key. Set OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer crt_YOUR_KEY"' }, 401);
   }
+  const orgId = auth.orgId;
 
   // Rate limit: 3000 OTel ingest requests per minute per org
   const otelRpm = parseInt(c.env.RATE_LIMIT_RPM ?? '1000', 10) * 3;
@@ -237,6 +303,13 @@ otel.post('/v1/metrics', async (c) => {
     const retryAt = Math.ceil(Date.now() / 60_000) * 60;
     c.header('Retry-After', String(retryAt - Math.floor(Date.now() / 1000)));
     return c.json({ error: 'Rate limit exceeded', retry_after: retryAt }, 429);
+  }
+
+  // Body-size guard — reject oversized payloads before JSON parse so a
+  // malicious client can't pin CPU parsing 100MB of nested JSON.
+  const contentLength = Number(c.req.header('content-length') ?? 0);
+  if (Number.isFinite(contentLength) && contentLength > OTEL_LIMITS.MAX_BODY_BYTES) {
+    return c.json({ error: `Body too large (max ${OTEL_LIMITS.MAX_BODY_BYTES} bytes)` }, 413);
   }
 
   // Parse OTLP JSON body
@@ -249,37 +322,54 @@ otel.post('/v1/metrics', async (c) => {
 
   const records: ParsedOTelRecord[] = [];
 
-  for (const rm of body.resourceMetrics ?? []) {
+  const resourceMetrics = (body.resourceMetrics ?? []).slice(0, OTEL_LIMITS.MAX_RESOURCE_METRICS);
+  for (const rm of resourceMetrics) {
     const resAttrs = rm.resource?.attributes ?? [];
     const serviceName = getAttr(resAttrs, 'service.name') ?? 'unknown';
     const { provider, tool_type } = detectProvider(serviceName);
 
     // Extract user identity from resource attributes
-    const developerEmail = getAttr(resAttrs, 'user.email');
+    let developerEmail = getAttr(resAttrs, 'user.email');
     const developerId = getAttr(resAttrs, 'developer.id') ?? getAttr(resAttrs, 'user.account_uuid') ?? getAttr(resAttrs, 'user.account_id') ?? getAttr(resAttrs, 'user.id');
     const sessionId = getAttr(resAttrs, 'session.id');
     const terminalType = getAttr(resAttrs, 'terminal.type');
-    const team         = getAttr(resAttrs, 'team.id') ?? getAttr(resAttrs, 'department');
+    let team          = getAttr(resAttrs, 'team.id') ?? getAttr(resAttrs, 'department');
     const costCenter   = getAttr(resAttrs, 'cost_center');
     const agentName    = getAttr(resAttrs, 'agent_name') ?? getAttr(resAttrs, 'gen_ai.agent.name') ?? serviceName;
     const businessUnit = getAttr(resAttrs, 'business_unit') ?? getAttr(resAttrs, 'cost_center');
 
-    for (const sm of rm.scopeMetrics ?? []) {
-      for (const metric of sm.metrics ?? []) {
-        const dataPoints = metric.sum?.dataPoints ?? metric.gauge?.dataPoints ?? [];
-        const histPoints = metric.histogram?.dataPoints ?? [];
+    // Member-key tenancy enforcement: a member key MUST NOT emit metrics
+    // attributed to another user or team. Override the claimed attributes with
+    // the authenticated member's identity rather than rejecting the batch
+    // (SDKs emit in bulk — one mis-tagged attr shouldn't drop the whole flush).
+    if (auth.isMember) {
+      if (auth.memberEmail) developerEmail = auth.memberEmail;
+      if (auth.memberScopeTeam) team = auth.memberScopeTeam;
+    }
+
+    const scopeMetrics = (rm.scopeMetrics ?? []).slice(0, OTEL_LIMITS.MAX_SCOPE_METRICS);
+    for (const sm of scopeMetrics) {
+      const metrics = (sm.metrics ?? []).slice(0, OTEL_LIMITS.MAX_METRICS);
+      for (const metric of metrics) {
+        // Reject records with no metric name — they're garbage that would pollute analytics.
+        if (!metric.name) continue;
+        const dataPoints = (metric.sum?.dataPoints ?? metric.gauge?.dataPoints ?? []).slice(0, OTEL_LIMITS.MAX_DATAPOINTS);
+        const histPoints = (metric.histogram?.dataPoints ?? []).slice(0, OTEL_LIMITS.MAX_DATAPOINTS);
 
         for (const dp of dataPoints) {
-          const metricAttrs = dp.attributes ?? [];
+          const metricAttrs = (dp.attributes ?? []).slice(0, OTEL_LIMITS.MAX_ATTRS_PER_DP);
           // Model resolution: metric attrs → resource attrs → service.name inference
-          const model = getAttr(metricAttrs, 'model')
-            ?? getAttr(metricAttrs, 'gen_ai.request.model')
-            ?? getAttr(resAttrs, 'gen_ai.request.model')
-            ?? getAttr(resAttrs, 'model')
-            ?? inferModelFromServiceName(serviceName);
-          const tokenType = getAttr(metricAttrs, 'type') ?? getAttr(metricAttrs, 'gen_ai.token.type');
-          const value = getNumericValue(dp);
-          const ts = dp.timeUnixNano ? new Date(Number(BigInt(dp.timeUnixNano) / 1_000_000n)).toISOString() : new Date().toISOString();
+          const model = capAttrString(
+            getAttr(metricAttrs, 'model')
+              ?? getAttr(metricAttrs, 'gen_ai.request.model')
+              ?? getAttr(resAttrs, 'gen_ai.request.model')
+              ?? getAttr(resAttrs, 'model')
+              ?? inferModelFromServiceName(serviceName),
+            OTEL_LIMITS.MAX_ATTR_VALUE_CHARS,
+          ) ?? null;
+          const tokenType = capAttrString(getAttr(metricAttrs, 'type') ?? getAttr(metricAttrs, 'gen_ai.token.type'), 64);
+          const value = clampMetricValue(getNumericValue(dp));
+          const ts = parseOtelTimestamp(dp.timeUnixNano).toISOString();
 
           const record: ParsedOTelRecord = {
             org_id: orgId,
@@ -414,10 +504,13 @@ otel.post('/v1/metrics', async (c) => {
 
         // Handle histogram data points (token usage from Copilot, duration metrics)
         for (const hp of histPoints) {
-          const histAttrs = hp.attributes ?? [];
-          const model = getAttr(histAttrs, 'gen_ai.request.model') ?? getAttr(histAttrs, 'model');
-          const tokenType = getAttr(histAttrs, 'gen_ai.token.type') ?? getAttr(histAttrs, 'type');
-          const ts = hp.timeUnixNano ? new Date(Number(BigInt(hp.timeUnixNano) / 1_000_000n)).toISOString() : new Date().toISOString();
+          const histAttrs = (hp.attributes ?? []).slice(0, OTEL_LIMITS.MAX_ATTRS_PER_DP);
+          const model = capAttrString(
+            getAttr(histAttrs, 'gen_ai.request.model') ?? getAttr(histAttrs, 'model'),
+            OTEL_LIMITS.MAX_ATTR_VALUE_CHARS,
+          ) ?? null;
+          const tokenType = capAttrString(getAttr(histAttrs, 'gen_ai.token.type') ?? getAttr(histAttrs, 'type'), 64);
+          const ts = parseOtelTimestamp(hp.timeUnixNano).toISOString();
 
           if (metric.name === 'gen_ai.client.token.usage' && hp.sum !== undefined) {
             const record: ParsedOTelRecord = {
@@ -655,10 +748,11 @@ otel.post('/v1/metrics', async (c) => {
 
 otel.post('/v1/logs', async (c) => {
   const apiKey = extractAuth(c);
-  const orgId = await resolveOrg(apiKey, c.env.DB);
-  if (!orgId) {
+  const auth = await resolveOrg(apiKey, c.env.DB);
+  if (!auth) {
     return c.json({ error: 'Invalid or missing API key' }, 401);
   }
+  const orgId = auth.orgId;
 
   // Rate limit: shared OTel bucket with /v1/metrics
   const otelRpm = parseInt(c.env.RATE_LIMIT_RPM ?? '1000', 10) * 3;
@@ -667,6 +761,11 @@ otel.post('/v1/logs', async (c) => {
     const retryAt = Math.ceil(Date.now() / 60_000) * 60;
     c.header('Retry-After', String(retryAt - Math.floor(Date.now() / 1000)));
     return c.json({ error: 'Rate limit exceeded', retry_after: retryAt }, 429);
+  }
+
+  const contentLength = Number(c.req.header('content-length') ?? 0);
+  if (Number.isFinite(contentLength) && contentLength > OTEL_LIMITS.MAX_BODY_BYTES) {
+    return c.json({ error: `Body too large (max ${OTEL_LIMITS.MAX_BODY_BYTES} bytes)` }, 413);
   }
 
   let body: OTLPLogsRequest;
@@ -682,26 +781,33 @@ otel.post('/v1/logs', async (c) => {
     const resAttrs = rl.resource?.attributes ?? [];
     const serviceName = getAttr(resAttrs, 'service.name') ?? 'unknown';
     const { provider } = detectProvider(serviceName);
-    const developerEmail  = getAttr(resAttrs, 'user.email');
+    let developerEmail    = getAttr(resAttrs, 'user.email');
     const developerId     = getAttr(resAttrs, 'developer.id') ?? getAttr(resAttrs, 'user.account_uuid') ?? getAttr(resAttrs, 'user.id');
     const sessionId       = getAttr(resAttrs, 'session.id');
-    const logTeam         = getAttr(resAttrs, 'team.id') ?? getAttr(resAttrs, 'department');
+    let logTeam           = getAttr(resAttrs, 'team.id') ?? getAttr(resAttrs, 'department');
     const logAgentName    = getAttr(resAttrs, 'agent_name') ?? getAttr(resAttrs, 'gen_ai.agent.name') ?? serviceName;
     const logBusinessUnit = getAttr(resAttrs, 'business_unit') ?? getAttr(resAttrs, 'cost_center');
 
+    // Member-key tenancy enforcement (same as metrics route).
+    if (auth.isMember) {
+      if (auth.memberEmail) developerEmail = auth.memberEmail;
+      if (auth.memberScopeTeam) logTeam = auth.memberScopeTeam;
+    }
+
     for (const sl of rl.scopeLogs ?? []) {
       for (const log of sl.logRecords ?? []) {
-        const logAttrs = log.attributes ?? [];
-        const eventName = getAttr(logAttrs, 'event.name') ?? 'unknown';
-        const model = getAttr(logAttrs, 'model') ?? getAttr(logAttrs, 'gen_ai.request.model');
-        const costUsd = parseFloat(getAttr(logAttrs, 'cost_usd') ?? '0');
-        const inputTokens = parseInt(getAttr(logAttrs, 'input_tokens') ?? '0', 10);
-        const outputTokens = parseInt(getAttr(logAttrs, 'output_tokens') ?? '0', 10);
-        const cacheReadTokens = parseInt(getAttr(logAttrs, 'cache_read_tokens') ?? '0', 10);
-        const durationMs = parseFloat(getAttr(logAttrs, 'duration_ms') ?? '0');
-        const ts = log.timeUnixNano
-          ? new Date(Number(BigInt(log.timeUnixNano) / 1_000_000n)).toISOString()
-          : new Date().toISOString();
+        const logAttrs = (log.attributes ?? []).slice(0, OTEL_LIMITS.MAX_ATTRS_PER_DP);
+        const eventName = capAttrString(getAttr(logAttrs, 'event.name'), 128) ?? 'unknown';
+        const model = capAttrString(
+          getAttr(logAttrs, 'model') ?? getAttr(logAttrs, 'gen_ai.request.model'),
+          OTEL_LIMITS.MAX_ATTR_VALUE_CHARS,
+        );
+        const costUsd = clampMetricValue(parseFloat(getAttr(logAttrs, 'cost_usd') ?? '0'));
+        const inputTokens = clampMetricValue(parseInt(getAttr(logAttrs, 'input_tokens') ?? '0', 10));
+        const outputTokens = clampMetricValue(parseInt(getAttr(logAttrs, 'output_tokens') ?? '0', 10));
+        const cacheReadTokens = clampMetricValue(parseInt(getAttr(logAttrs, 'cache_read_tokens') ?? '0', 10));
+        const durationMs = clampMetricValue(parseFloat(getAttr(logAttrs, 'duration_ms') ?? '0'));
+        const ts = parseOtelTimestamp(log.timeUnixNano).toISOString();
 
         // Store api_request events as usage records (most valuable)
         if (eventName === 'api_request' || eventName === 'claude_code.api_request') {
@@ -731,6 +837,15 @@ otel.post('/v1/logs', async (c) => {
 
         // Store all events in a separate lightweight event log for audit/debugging
         try {
+          // Cap raw_attrs to 16KB so one abusive client can't bloat the DB.
+          const rawAttrs = JSON.stringify(Object.fromEntries(
+            logAttrs.map(a => [
+              capAttrString(a.key, OTEL_LIMITS.MAX_ATTR_KEY_CHARS) ?? '',
+              typeof a.value.stringValue === 'string'
+                ? capAttrString(a.value.stringValue, OTEL_LIMITS.MAX_ATTR_VALUE_CHARS)
+                : (a.value.intValue ?? a.value.doubleValue),
+            ]),
+          )).slice(0, 16384);
           await c.env.DB.prepare(`
             INSERT INTO otel_events (
               org_id, provider, session_id, developer_email, event_name,
@@ -740,7 +855,7 @@ otel.post('/v1/logs', async (c) => {
           `).bind(
             orgId, provider, sessionId, developerEmail, eventName,
             model, costUsd, inputTokens, outputTokens, durationMs, ts,
-            JSON.stringify(Object.fromEntries(logAttrs.map(a => [a.key, a.value.stringValue ?? a.value.intValue ?? a.value.doubleValue]))),
+            rawAttrs,
             logAgentName, logTeam, logBusinessUnit,
           ).run();
           eventCount++;
@@ -783,9 +898,14 @@ otel.post('/v1/logs', async (c) => {
 
 otel.post('/v1/traces', async (c) => {
   const apiKey = extractAuth(c);
-  const orgId = await resolveOrg(apiKey, c.env.DB);
-  if (!orgId) {
+  const auth = await resolveOrg(apiKey, c.env.DB);
+  if (!auth) {
     return c.json({ error: 'Invalid or missing API key' }, 401);
+  }
+  const orgId = auth.orgId;
+  const contentLength = Number(c.req.header('content-length') ?? 0);
+  if (Number.isFinite(contentLength) && contentLength > OTEL_LIMITS.MAX_BODY_BYTES) {
+    return c.json({ error: `Body too large (max ${OTEL_LIMITS.MAX_BODY_BYTES} bytes)` }, 413);
   }
 
   let body: {

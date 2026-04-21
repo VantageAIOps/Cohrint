@@ -17,7 +17,11 @@ COHRINT_API_KEY=crt_your_key npx -y cohrint-mcp
 # 3. Add to your editor (see below)
 ```
 
-## Tools (12 total)
+## Tools (15 total — 14 read-only + 1 opt-in write)
+
+By default the server exposes only the 14 read-only + offline tools. The single
+write tool (`setup_claude_hook`, which modifies `~/.claude/settings.json`) is
+hidden unless you opt in — see [Permissions](#permissions--sandboxing) below.
 
 ### Analytics tools (require API key)
 | Tool | Description |
@@ -34,10 +38,17 @@ COHRINT_API_KEY=crt_your_key npx -y cohrint-mcp
 ### Optimizer tools (work offline, no API key needed)
 | Tool | Description |
 |------|-------------|
-| `optimize_prompt` | Compress prompts to reduce token usage |
+| `optimize_prompt` | Compress prompts to reduce token usage, with optimization tips |
 | `analyze_tokens` | Count tokens and estimate cost for text |
-| `estimate_costs` | Compare costs across 24 models (OpenAI, Anthropic, Google, Meta, DeepSeek, Mistral) |
+| `estimate_costs` | Compare costs across 22+ models (OpenAI, Anthropic, Google, Meta, DeepSeek, Mistral) |
 | `compress_context` | Compress conversation history within a token budget |
+| `find_cheapest_model` | Rank supported models by cost for a given workload |
+| `get_recommendations` | Surface top cost-saving suggestions from your usage |
+
+### Setup tool (off by default — filesystem write)
+| Tool | Description |
+|------|-------------|
+| `setup_claude_hook` | Install the Cohrint Stop hook into `~/.claude/settings.json` so Claude Code sessions are auto-tracked. Requires `COHRINT_MCP_ALLOW_SETUP=1`. |
 
 ## Editor setup
 
@@ -54,7 +65,7 @@ COHRINT_API_KEY=crt_your_key npx -y cohrint-mcp
 ```json
 {
   "mcpServers": {
-    "vantage": {
+    "cohrint": {
       "command": "npx",
       "args": ["-y", "cohrint-mcp"],
       "env": {
@@ -78,7 +89,7 @@ COHRINT_API_KEY=crt_your_key npx -y cohrint-mcp
 ```json
 {
   "mcpServers": {
-    "vantage": {
+    "cohrint": {
       "type": "stdio",
       "command": "npx",
       "args": ["-y", "cohrint-mcp"],
@@ -92,7 +103,7 @@ COHRINT_API_KEY=crt_your_key npx -y cohrint-mcp
 
 **Global** — add to `~/.claude/mcp.json` (applies to all projects).
 
-**Verify:** Run `/mcp` inside Claude Code — you should see "vantage" listed with 12 tools.
+**Verify:** Run `/mcp` inside Claude Code — you should see "cohrint" listed with 15 tools.
 
 ---
 
@@ -103,7 +114,7 @@ COHRINT_API_KEY=crt_your_key npx -y cohrint-mcp
 ```json
 {
   "mcpServers": {
-    "vantage": {
+    "cohrint": {
       "command": "npx",
       "args": ["-y", "cohrint-mcp"],
       "env": {
@@ -125,7 +136,7 @@ COHRINT_API_KEY=crt_your_key npx -y cohrint-mcp
 ```json
 {
   "mcpServers": {
-    "vantage": {
+    "cohrint": {
       "command": "npx",
       "args": ["-y", "cohrint-mcp"],
       "env": {
@@ -147,7 +158,7 @@ COHRINT_API_KEY=crt_your_key npx -y cohrint-mcp
 ```json
 {
   "servers": {
-    "vantage": {
+    "cohrint": {
       "type": "stdio",
       "command": "npx",
       "args": ["-y", "cohrint-mcp"],
@@ -167,7 +178,7 @@ Open Cline → MCP Servers → Add Server → paste:
 
 ```json
 {
-  "vantage": {
+  "cohrint": {
     "command": "npx",
     "args": ["-y", "cohrint-mcp"],
     "env": {
@@ -186,7 +197,7 @@ Add to Zed `settings.json` (Zed → Settings → Open Settings):
 ```json
 {
   "context_servers": {
-    "vantage": {
+    "cohrint": {
       "command": {
         "path": "npx",
         "args": ["-y", "cohrint-mcp"],

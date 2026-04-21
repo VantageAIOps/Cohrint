@@ -2245,7 +2245,12 @@ function apiFetch(path, opts) {
       });
     })
     .catch(function(err) {
-      // Network failure or fetch error — serve stale cache for reads
+      // 401 on an individual endpoint = permission denied for this user even
+      // though the session is otherwise valid. Don't silently serve stale data
+      // (user would see data they shouldn't have access to). Let the caller
+      // render an empty/denied state instead.
+      if (String(err && err.message) === '401') throw err;
+      // Network failure or other fetch error — serve stale cache for reads.
       if (isRead) {
         var stale = _cacheGetStale(path);
         if (stale) {

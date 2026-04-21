@@ -287,9 +287,15 @@ document.getElementById('inp-email').addEventListener('keydown', e => {
 
 // ── Auto-login from ?api_key= URL param ──────────────────────────────────────
 (function() {
-  const autoKey = new URLSearchParams(window.location.search).get('api_key') || '';
+  const params = new URLSearchParams(window.location.search);
+  const autoKey = params.get('api_key') || '';
   if (autoKey && (autoKey.startsWith('crt_') || autoKey.startsWith('vnt_'))) {
     document.getElementById('inp-key').value = autoKey;
+    // Scrub the key from the URL immediately so it doesn't linger in history,
+    // Referer headers, or analytics pixels. The value is already in the form.
+    const clean = new URL(window.location.href);
+    clean.searchParams.delete('api_key');
+    window.history.replaceState({}, '', clean.toString());
     setTimeout(doSignIn, 100);
   }
 })();
