@@ -70,4 +70,7 @@ def dispatch(argv: list[str]) -> int:
     if run_fn is None:
         sys.stderr.write(f"cohrint-agent: '{first}' module is missing run()\n")
         return 1
-    return int(run_fn(argv[2:]))
+    # Verbs that fall off the end of their run() return None — coerce to 0
+    # so `sys.exit(dispatch(...))` doesn't crash on a clean success path.
+    result = run_fn(argv[2:])
+    return int(result) if result is not None else 0

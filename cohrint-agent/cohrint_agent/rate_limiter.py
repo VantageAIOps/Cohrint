@@ -110,7 +110,12 @@ def acquire(cost: float = 1.0) -> bool:
                 allowed = bucket.tokens >= cost
                 if allowed:
                     bucket.tokens -= cost
-                state_file.write_text(json.dumps(asdict(bucket)))
+                # Atomic write: SIGKILL mid-write must never leave a partial
+                # JSON file (which would reset the bucket to default on the
+                # next launch and silently defeat rate limiting).
+                tmp_path = state_file.with_suffix(state_file.suffix + ".tmp")
+                tmp_path.write_text(json.dumps(asdict(bucket)))
+                os.replace(tmp_path, state_file)
             finally:
                 fcntl.flock(lf, fcntl.LOCK_UN)
         return allowed

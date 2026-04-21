@@ -512,13 +512,18 @@ otel.post('/v1/metrics', async (c) => {
           const tokenType = capAttrString(getAttr(histAttrs, 'gen_ai.token.type') ?? getAttr(histAttrs, 'type'), 64);
           const ts = parseOtelTimestamp(hp.timeUnixNano).toISOString();
 
-          if (metric.name === 'gen_ai.client.token.usage' && hp.sum !== undefined) {
+          // Histogram data points carry client-supplied `sum` values — clamp
+          // through the same guard as counter datapoints so a crafted sender
+          // can't store negative / NaN / 1e300 values.
+          const hpSum = hp.sum !== undefined ? clampMetricValue(hp.sum) : undefined;
+
+          if (metric.name === 'gen_ai.client.token.usage' && hpSum !== undefined) {
             const record: ParsedOTelRecord = {
               org_id: orgId, provider, tool_type, source: 'otel',
               developer_email: developerEmail, developer_id: developerId,
               team, cost_center: costCenter, agent_name: agentName, business_unit: businessUnit, model,
-              input_tokens: tokenType === 'input' ? hp.sum : 0,
-              output_tokens: tokenType === 'output' ? hp.sum : 0,
+              input_tokens: tokenType === 'input' ? hpSum : 0,
+              output_tokens: tokenType === 'output' ? hpSum : 0,
               cached_tokens: 0, cache_creation_tokens: 0, total_requests: 0, cost_usd: 0,
               session_id: sessionId, terminal_type: terminalType,
               lines_added: 0, lines_removed: 0, commits: 0, pull_requests: 0,
@@ -528,7 +533,7 @@ otel.post('/v1/metrics', async (c) => {
             records.push(record);
           }
 
-          if (metric.name === 'gen_ai.client.operation.duration' && hp.sum !== undefined) {
+          if (metric.name === 'gen_ai.client.operation.duration' && hpSum !== undefined) {
             const record: ParsedOTelRecord = {
               org_id: orgId, provider, tool_type, source: 'otel',
               developer_email: developerEmail, developer_id: developerId,
@@ -538,13 +543,13 @@ otel.post('/v1/metrics', async (c) => {
               session_id: sessionId, terminal_type: terminalType,
               lines_added: 0, lines_removed: 0, commits: 0, pull_requests: 0,
               active_time_s: 0, ttft_ms: null,
-              latency_ms: hp.sum * 1000, // seconds → ms
+              latency_ms: clampMetricValue(hpSum * 1000), // seconds → ms
               raw_metric_name: metric.name, timestamp: ts,
             };
             records.push(record);
           }
 
-          if (metric.name === 'copilot_chat.time_to_first_token' && hp.sum !== undefined) {
+          if (metric.name === 'copilot_chat.time_to_first_token' && hpSum !== undefined) {
             const record: ParsedOTelRecord = {
               org_id: orgId, provider, tool_type, source: 'otel',
               developer_email: developerEmail, developer_id: developerId,
@@ -553,7 +558,7 @@ otel.post('/v1/metrics', async (c) => {
               cache_creation_tokens: 0, total_requests: 0, cost_usd: 0,
               session_id: sessionId, terminal_type: terminalType,
               lines_added: 0, lines_removed: 0, commits: 0, pull_requests: 0,
-              active_time_s: 0, ttft_ms: hp.sum * 1000, latency_ms: null,
+              active_time_s: 0, ttft_ms: clampMetricValue(hpSum * 1000), latency_ms: null,
               raw_metric_name: metric.name, timestamp: ts,
             };
             records.push(record);
@@ -787,6 +792,8 @@ otel.post('/v1/logs', async (c) => {
     let logTeam           = getAttr(resAttrs, 'team.id') ?? getAttr(resAttrs, 'department');
     const logAgentName    = getAttr(resAttrs, 'agent_name') ?? getAttr(resAttrs, 'gen_ai.agent.name') ?? serviceName;
     const logBusinessUnit = getAttr(resAttrs, 'business_unit') ?? getAttr(resAttrs, 'cost_center');
+    const logCostCenter   = getAttr(resAttrs, 'cost_center');
+    const logTerminalType = getAttr(resAttrs, 'terminal.type');
 
     // Member-key tenancy enforcement (same as metrics route).
     if (auth.isMember) {
@@ -823,9 +830,11 @@ otel.post('/v1/logs', async (c) => {
           try {
             await stmt.bind(
               orgId, provider, 'coding_assistant', developerId, developerEmail,
-              getAttr(resAttrs, 'team.id'), getAttr(resAttrs, 'cost_center'),
+              // Use the rewritten logTeam/logCostCenter so a member key cannot
+              // attribute this row to a team or cost centre it doesn't own.
+              logTeam, logCostCenter,
               model, inputTokens, outputTokens, cacheReadTokens, costUsd,
-              sessionId, getAttr(resAttrs, 'terminal.type'),
+              sessionId, logTerminalType,
               null, durationMs, ts, ts,
               JSON.stringify({ event: eventName, attrs: Object.fromEntries(logAttrs.map(a => [a.key, a.value.stringValue ?? a.value.intValue ?? a.value.doubleValue])) }),
             ).run();
