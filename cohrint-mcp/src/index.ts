@@ -54,7 +54,15 @@ import {
 
 const API_KEY  = process.env.COHRINT_API_KEY ?? '';
 const API_BASE = normalizeApiBase(process.env.COHRINT_API_BASE ?? 'https://api.cohrint.com');
-const ORG      = process.env.COHRINT_ORG ?? parseOrgFromKey(API_KEY);
+// Sanitise the env-supplied ORG just like the key-derived one — an ORG value
+// containing a pipe or newline would otherwise break every markdown table
+// rendered downstream (e.g. `| Period | {ORG} |`).
+const ORG      = sanitizeOrgSlug(process.env.COHRINT_ORG ?? parseOrgFromKey(API_KEY));
+
+function sanitizeOrgSlug(raw: string): string {
+  const clean = String(raw).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64);
+  return clean || 'default';
+}
 
 function normalizeApiBase(raw: string): string {
   const trimmed = raw.replace(/\/+$/, '');
@@ -734,7 +742,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           ...(promptHash ? { prompt_hash: promptHash } : {}),
         };
         const trackResp = await api('/v1/events', { method: 'POST', body: JSON.stringify(event) }) as Record<string, unknown>;
-        const cacheWarning = trackResp?.cache_warning ? sanitizeString(trackResp.cache_warning, 500) : null;
+        const cacheWarning = trackResp?.cache_warning
+          ? escapeMd(sanitizeString(trackResp.cache_warning, 500))
+          : null;
         const baseText = `✅ Tracked: ${escapeMd(model)} | ${promptTokens}→${completionTokens} tokens | $${totalCost.toFixed(4)} | ${latency > 0 ? `${latency}ms` : 'no latency recorded'}`;
         return {
           content: [{
@@ -866,7 +876,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'get_cost_gate': {
-        const periodArg = String(args?.period ?? 'today');
+        // Enum-whitelist: anything other than the three known periods falls
+        // back to "today". Prevents arbitrary text being echoed back into
+        // markdown table cells from `args.period`.
+        const rawPeriod = String(args?.period ?? 'today');
+        const periodArg = (rawPeriod === 'today' || rawPeriod === 'week' || rawPeriod === 'month')
+          ? rawPeriod : 'today';
         const days = periodArg === 'today' ? 1 : periodArg === 'week' ? 7 : 30;
         const [costData, summary] = await Promise.all([
           api(`/v1/analytics/cost?period=${days}`) as Promise<Record<string, number>>,
@@ -1092,18 +1107,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           .sort((a, b) => a.totalCost - b.totalCost);
 
         if (!filtered.length) {
-          return { content: [{ type: 'text', text: `No models found matching tier=${tierFilter ?? 'any'}, provider=${providerFilter ?? 'any'}` }] };
+          return { content: [{ type: 'text', text: `No models found matching tier=${escapeMd(tierFilter ?? 'any')}, provider=${escapeMd(providerFilter ?? 'any')}` }] };
         }
 
         const top3 = filtered.slice(0, 3);
+        const tierLabel = tierFilter ? `, tier: ${escapeMd(tierFilter)}` : '';
+        const providerLabel = providerFilter ? `, provider: ${escapeMd(providerFilter)}` : '';
         const lines = [
-          `🏆 **Cheapest Models** (${inputTokens} in + ${outputTokens} out tokens${tierFilter ? `, tier: ${tierFilter}` : ''}${providerFilter ? `, provider: ${providerFilter}` : ''})`,
+          `🏆 **Cheapest Models** (${inputTokens} in + ${outputTokens} out tokens${tierLabel}${providerLabel})`,
           ``,
           `| Rank | Model | Provider | Tier | Cost |`,
           `|------|-------|----------|------|------|`,
-          ...top3.map((m, i) => `| ${i + 1} | **${m.model}** | ${m.provider} | ${m.tier} | $${m.totalCost.toFixed(6)} |`),
+          ...top3.map((m, i) => `| ${i + 1} | **${escapeMd(m.model)}** | ${escapeMd(m.provider)} | ${escapeMd(m.tier)} | $${m.totalCost.toFixed(6)} |`),
           ``,
-          `**Recommendation:** Use **${top3[0].model}** (${top3[0].provider}) at $${top3[0].totalCost.toFixed(6)} per call`,
+          `**Recommendation:** Use **${escapeMd(top3[0].model)}** (${escapeMd(top3[0].provider)}) at $${top3[0].totalCost.toFixed(6)} per call`,
         ];
         return { content: [{ type: 'text', text: lines.join('\n') }] };
       }
