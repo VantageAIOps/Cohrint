@@ -38,8 +38,11 @@ class CodexBackend(Backend):
         # text=False + manual decode: `text=True` uses locale encoding and
         # raises UnicodeDecodeError on a bad byte, crashing the turn
         # (T-SAFETY.subproc_utf8_replace).
+        # Pin absolute path — see T-SAFETY.backend_path_pin (scan 22).
+        from ..process_safety import resolve_backend_binary
+        codex_bin = resolve_backend_binary("codex") or "codex"
         result = subprocess.run(
-            ["codex"] if argv_unsafe else ["codex", "-p", full_prompt],
+            [codex_bin] if argv_unsafe else [codex_bin, "-p", full_prompt],
             input=full_prompt.encode("utf-8") if argv_unsafe else None,
             capture_output=True,
             cwd=cwd,
@@ -75,10 +78,12 @@ class CodexBackend(Backend):
         )
 
     def start_process(self) -> AgentProcess | None:
-        if not shutil.which("codex"):
+        from ..process_safety import resolve_backend_binary
+        codex_bin = resolve_backend_binary("codex")
+        if not codex_bin:
             return None
         proc = subprocess.Popen(
-            ["codex"],
+            [codex_bin],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,

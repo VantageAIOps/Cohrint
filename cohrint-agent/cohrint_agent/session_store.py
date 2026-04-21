@@ -29,6 +29,26 @@ def _default_sessions_dir() -> Path:
 MAX_SESSIONS_LISTED = 1000
 MAX_SESSION_FILE_BYTES = 1 * 1024 * 1024  # 1 MiB per session JSON
 
+# Highest schema_version this build understands. A future-tagged session
+# (e.g. schema_version=99 written by a newer release, or a tampered
+# marker) must be refused on load rather than parsed through as if it
+# matched v1 — downstream code assumes v1 field shapes
+# (T-INPUT.schema_version_reject).
+CURRENT_SCHEMA_VERSION = 1
+
+
+def _validate_schema_version(data: object, session_id: str) -> None:
+    """Raise SessionNotFoundError if schema_version is missing or > current."""
+    if not isinstance(data, dict):
+        raise SessionNotFoundError(
+            f"Session {session_id!r} payload is not an object"
+        )
+    sv = data.get("schema_version", 1)
+    if not isinstance(sv, int) or sv < 1 or sv > CURRENT_SCHEMA_VERSION:
+        raise SessionNotFoundError(
+            f"Session {session_id!r} schema_version {sv!r} unsupported"
+        )
+
 
 # Strict UUIDv4 — version=4 nibble + RFC-4122 variant (8|9|a|b). Rejects
 # legacy, malformed, or attacker-supplied IDs (e.g. "../../etc/passwd") so
@@ -87,13 +107,28 @@ class SessionStore:
         #      correctly instead of racing on open("w") (truncate-before-lock).
         tmp = path.with_suffix(path.suffix + ".tmp")
         lockfile = path.with_suffix(path.suffix + ".lock")
-        with open(lockfile, "a+") as lk:
+        from .process_safety import open_lockfile
+        with open_lockfile(lockfile) as lk:
             fcntl.flock(lk, fcntl.LOCK_EX)
             try:
                 # Open tmp with explicit 0o600 so session history isn't
                 # readable by anyone but the owner — umask-independent
                 # (T-PRIVACY.sessions_file_0600).
-                fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+                # O_EXCL so a stale/attacker-planted <uuid>.json.tmp cannot
+                # be silently reused; unlink any leftover then retry once
+                # (T-SAFETY.tmp_excl).
+                try:
+                    fd = os.open(
+                        tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_TRUNC, 0o600
+                    )
+                except FileExistsError:
+                    try:
+                        os.unlink(tmp)
+                    except OSError:
+                        pass
+                    fd = os.open(
+                        tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_TRUNC, 0o600
+                    )
                 with os.fdopen(fd, "w") as f:
                     json.dump(data, f, indent=2)
                     f.flush()
@@ -137,7 +172,9 @@ class SessionStore:
                     raise SessionNotFoundError(
                         f"Session {session_id!r} exceeds {MAX_SESSION_FILE_BYTES} bytes"
                     )
-                return json.loads(raw.decode("utf-8", errors="replace"))
+                data = json.loads(raw.decode("utf-8", errors="replace"))
+                _validate_schema_version(data, session_id)
+                return data
             finally:
                 fcntl.flock(f, fcntl.LOCK_UN)
 
@@ -164,7 +201,16 @@ class SessionStore:
                     raw = f.read(MAX_SESSION_FILE_BYTES + 1)
                     if len(raw) > MAX_SESSION_FILE_BYTES:
                         continue
-                sessions.append(json.loads(raw))
+                parsed = json.loads(raw)
+                # Skip future-schema or malformed payloads rather than
+                # letting them surface into the session listing, where
+                # downstream consumers assume v1 field shapes.
+                if not isinstance(parsed, dict):
+                    continue
+                sv = parsed.get("schema_version", 1)
+                if not isinstance(sv, int) or sv < 1 or sv > CURRENT_SCHEMA_VERSION:
+                    continue
+                sessions.append(parsed)
             except Exception:
                 continue
         return sorted(sessions, key=lambda s: s.get("last_active_at", ""), reverse=True)

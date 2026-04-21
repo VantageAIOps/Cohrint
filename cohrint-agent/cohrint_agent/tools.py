@@ -198,8 +198,22 @@ def execute_tool(name: str, tool_input: dict[str, Any], cwd: str) -> str:
 
 
 def _exec_bash(inp: dict[str, Any], cwd: str) -> str:
-    cmd = inp["command"]
-    timeout = inp.get("timeout", 120)
+    # Model-generated tool_input may have arbitrary JSON types. Reject
+    # non-string commands and coerce timeout into a finite (0, 600] float
+    # so subprocess.run can't inherit NaN/inf/negative timeouts
+    # (T-INPUT.bash_shape_check).
+    cmd = inp.get("command")
+    if not isinstance(cmd, str) or not cmd:
+        return "Error: Bash 'command' must be a non-empty string"
+    import math as _math
+    raw_t = inp.get("timeout", 120)
+    try:
+        timeout = float(raw_t)
+    except (TypeError, ValueError):
+        timeout = 120.0
+    if _math.isnan(timeout) or _math.isinf(timeout) or timeout <= 0:
+        timeout = 120.0
+    timeout = min(timeout, 600.0)
     try:
         result = subprocess.run(
             cmd,
@@ -225,8 +239,19 @@ def _exec_bash(inp: dict[str, Any], cwd: str) -> str:
 
 def _exec_read(inp: dict[str, Any]) -> str:
     file_path = inp["file_path"]
-    offset = inp.get("offset", 0)
-    limit = inp.get("limit", 2000)
+    # Clamp offset/limit to sensible bounds. Model-generated values may
+    # be negative (slices from tail — leaks end-of-file when start was
+    # intended) or astronomically large (huge list allocation)
+    # (T-INPUT.read_bounds).
+    try:
+        offset = max(0, int(inp.get("offset", 0) or 0))
+    except (TypeError, ValueError):
+        offset = 0
+    try:
+        limit = int(inp.get("limit", 2000) or 2000)
+    except (TypeError, ValueError):
+        limit = 2000
+    limit = max(1, min(10000, limit))
     try:
         p = Path(file_path)
         if not p.exists():

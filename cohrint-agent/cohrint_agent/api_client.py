@@ -107,7 +107,15 @@ class AgentClient:
                 os.path.expanduser("~/.config/anthropic/api_key"),
             ]:
                 if os.path.exists(path):
-                    api_key = open(path).read().strip()
+                    # Bounded read — API keys are ~100 bytes; a tampered or
+                    # symlinked file pointing at /dev/zero would otherwise
+                    # OOM on startup (T-DOS.api_key_size_cap).
+                    try:
+                        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+                        with os.fdopen(fd, "r") as f:
+                            api_key = f.read(8192).strip()
+                    except OSError:
+                        continue
                     break
         if not api_key:
             api_key = _prompt_for_api_key()
@@ -128,6 +136,27 @@ class AgentClient:
                 "  3. run: cohrint-agent --setup\n"
                 "  4. use --backend claude if you have the claude CLI installed"
             )
+        # Defense in depth: the anthropic SDK honors ANTHROPIC_BASE_URL
+        # at its own __init__; if an attacker has set it to an HTTP URL
+        # (or a host outside api.anthropic.com), every prompt and the
+        # Authorization header go to them. Strip unsafe values before
+        # instantiating the client (T-SAFETY.anthropic_base_url_validate,
+        # scan 22). Child subprocesses are separately covered by
+        # process_safety._STRIP_ALWAYS.
+        _base = os.environ.get("ANTHROPIC_BASE_URL", "")
+        if _base:
+            from urllib.parse import urlparse as _urlparse
+            try:
+                _u = _urlparse(_base)
+                _host = (_u.hostname or "").lower()
+                _ok = (
+                    _u.scheme == "https"
+                    and (_host == "api.anthropic.com" or _host.endswith(".anthropic.com"))
+                )
+            except Exception:
+                _ok = False
+            if not _ok:
+                os.environ.pop("ANTHROPIC_BASE_URL", None)
         self.client = anthropic.Anthropic(api_key=api_key)
         self.model = model
         self.max_tokens = max_tokens
@@ -341,19 +370,32 @@ class AgentClient:
             })
         return content
 
+    # Wall-clock ceiling on the retry phase. Bounded per-attempt sleeps
+    # are not enough — a sustained 529 with three attempts stacks ~7 s of
+    # sleep plus three upstream requests against a hung API. Abort the
+    # loop if we've spent longer than this total (T-DOS.retry_deadline).
+    _RETRY_WALL_CLOCK_SECS = 30.0
+
     def _send_with_retry(self, *args, max_retries: int = 3, **kwargs):
         """Send with exponential backoff on RateLimitError."""
+        deadline = _time.monotonic() + self._RETRY_WALL_CLOCK_SECS
         for attempt in range(max_retries + 1):
             try:
                 return self.client.messages.stream(*args, **kwargs)
             except anthropic.RateLimitError:
-                if attempt == max_retries:
+                if attempt == max_retries or _time.monotonic() >= deadline:
                     raise
                 wait = (2 ** attempt) + 0.5  # 0.5, 1.5, 4.5 seconds
-                _time.sleep(wait)
+                remaining = deadline - _time.monotonic()
+                if remaining <= 0:
+                    raise
+                _time.sleep(min(wait, remaining))
             except anthropic.APIStatusError as e:
                 if e.status_code == 529 and attempt < max_retries:  # overloaded
-                    _time.sleep(2 ** attempt)
+                    remaining = deadline - _time.monotonic()
+                    if remaining <= 0:
+                        raise
+                    _time.sleep(min(2 ** attempt, remaining))
                     continue
                 raise
 

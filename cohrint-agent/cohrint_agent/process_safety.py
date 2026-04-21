@@ -33,24 +33,45 @@ def clamp_argv(value: str, *, max_len: int = MAX_ARGV_STRLEN) -> str:
     return value
 
 
+def _real_home() -> Path | None:
+    """Resolve the user's real home from the passwd DB, NOT $HOME.
+
+    ``Path.home()`` trusts ``$HOME``, so an attacker who flips
+    ``HOME=/tmp/evil`` redirects every ``~/.cohrint-agent/*`` lookup
+    into attacker-controlled space. Anchoring to the uid's pw_dir
+    closes that door (T-SAFETY.home_env_hijack, scan 22).
+
+    Returns ``None`` on minimal containers where pwd lookup fails —
+    callers must handle that case.
+    """
+    try:
+        import pwd as _pwd
+        return Path(_pwd.getpwuid(os.getuid()).pw_dir).resolve()
+    except (KeyError, OSError, ImportError):
+        return None
+
+
 def safe_config_dir() -> Path:
     """Resolve ``COHRINT_CONFIG_DIR`` to an absolute path, reject escape.
 
     An attacker-controlled env may set ``COHRINT_CONFIG_DIR=/etc`` or a
     symlink that points outside ``$HOME``. We ``resolve()`` the candidate
-    and require it to be within ``$HOME``; otherwise we fall back to the
-    default ``~/.cohrint-agent``. Guards T-SAFETY.config_dir_escape.
+    and require it to be within the user's **real** home (pw_dir, not
+    ``$HOME``); otherwise we fall back to the default
+    ``~/.cohrint-agent``. Guards T-SAFETY.config_dir_escape,
+    T-SAFETY.home_env_hijack.
     """
-    default = Path.home() / ".cohrint-agent"
+    real = _real_home()
+    # Fallback used only when pwd lookup fails entirely (minimal
+    # containers); in that case we honor ``$HOME`` but warn downstream
+    # via the normal default.
+    home = real if real is not None else Path.home().resolve()
+    default = home / ".cohrint-agent"
     raw = os.environ.get("COHRINT_CONFIG_DIR")
     if not raw:
         return default
     try:
         candidate = Path(raw).expanduser().resolve()
-    except (OSError, RuntimeError):
-        return default
-    try:
-        home = Path.home().resolve()
     except (OSError, RuntimeError):
         return default
     if candidate == home or home in candidate.parents:
@@ -94,6 +115,17 @@ _STRIP_ALWAYS = frozenset(
         "PERL5OPT",
         "RUBYOPT",
         "BROWSER",  # macOS / Linux — hijackable on http opens
+        # ANTHROPIC_BASE_URL is honored by the anthropic SDK — if a child
+        # `claude` / `codex` subprocess inherits an attacker-set value
+        # (e.g. COHRINT_PASS_ENV is bypassed on the strip check), every
+        # prompt + bearer token gets POSTed to the attacker. Parent-side
+        # validation in api_client covers the parent; this strip covers
+        # children (T-SAFETY.anthropic_base_url_strip, scan 22).
+        "ANTHROPIC_BASE_URL",
+        "ANTHROPIC_API_BASE",
+        # OpenAI / Codex mirror vectors for the CLI backends we spawn.
+        "OPENAI_BASE_URL",
+        "OPENAI_API_BASE",
     }
 )
 
@@ -162,3 +194,64 @@ def safe_child_env(
             out[name] = src[name]
 
     return out
+
+
+# ────────────── binary resolver (scan 22, T-SAFETY.backend_path_pin) ───────
+#
+# Child CLIs (claude / codex / gemini / aider) are spawned by argv[0] bare
+# name, which leaves the choice of binary to the inherited PATH. A writable
+# earlier PATH entry (e.g. ``~/.local/bin``) beats the system install and
+# receives every prompt verbatim. Resolve once at backend init and pin the
+# absolute path; bail if the resolved file is writable by group/other.
+
+_BACKEND_BIN_CACHE: dict[str, str | None] = {}
+
+
+def resolve_backend_binary(name: str) -> str | None:
+    """Return an absolute path for ``name`` on PATH, or None if missing / unsafe.
+
+    Rejects a resolved path whose directory or the binary itself has
+    group/other write bits — matches what ``ssh -V`` would tolerate for a
+    trusted helper. Cached on first lookup.
+    """
+    import shutil as _shutil
+    if name in _BACKEND_BIN_CACHE:
+        return _BACKEND_BIN_CACHE[name]
+    path = _shutil.which(name)
+    if not path:
+        _BACKEND_BIN_CACHE[name] = None
+        return None
+    try:
+        real = os.path.realpath(path)
+        st = os.stat(real)
+    except OSError:
+        _BACKEND_BIN_CACHE[name] = None
+        return None
+    # Refuse group/other writable binaries.
+    if st.st_mode & 0o022:
+        _BACKEND_BIN_CACHE[name] = None
+        return None
+    _BACKEND_BIN_CACHE[name] = real
+    return real
+
+
+# ────────────── lock-file helper (scan 18, T-SAFETY.lockfile_nofollow) ─────
+# Python's open() on a lock path follows symlinks: `open(path, "w")` under
+# O_TRUNC zero-truncates whatever the symlink points at, and `open(path, "a+")`
+# still resolves the symlink. A local attacker with write access to the config
+# dir can plant `rate_state.lock → ~/.bashrc` to either truncate a user file
+# or hand the process an fd into an attacker-chosen target. We open via
+# os.open with O_NOFOLLOW so the symlink swap yields ELOOP instead.
+def open_lockfile(path):
+    """Open a lock-file fd with O_NOFOLLOW, 0o600. Returns a file object.
+
+    Caller owns the lifecycle; wrap in ``with`` or close explicitly. Only
+    callers doing ``fcntl.flock`` should use this — for plain config/state
+    writes use the atomic tmp+os.replace pattern instead.
+    """
+    fd = os.open(
+        str(path),
+        os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW,
+        0o600,
+    )
+    return os.fdopen(fd, "w")

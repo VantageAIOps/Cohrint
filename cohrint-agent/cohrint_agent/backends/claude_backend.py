@@ -58,8 +58,13 @@ class ClaudeCliBackend(Backend):
         # exceed Linux MAX_ARG_STRLEN (128 KiB) and make execve refuse to
         # spawn the agent. Over-long prompts are truncated, not rejected —
         # the tail loss is preferable to a silent failure.
+        # Pin the claude binary to an absolute path resolved once at
+        # init time so a later PATH flip or a writable ~/.local/bin
+        # trojan can't win (T-SAFETY.backend_path_pin, scan 22).
+        from ..process_safety import resolve_backend_binary
+        claude_bin = resolve_backend_binary("claude") or "claude"
         cmd = [
-            "claude", "-p", clamp_argv(prompt),
+            claude_bin, "-p", clamp_argv(prompt),
             "--output-format", "stream-json",
             "--verbose",
             "--permission-mode", "bypassPermissions",

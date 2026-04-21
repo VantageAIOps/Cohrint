@@ -9,6 +9,7 @@ Bash is NEVER in any tier — always requires per-call hook approval.
 """
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 from pathlib import Path
@@ -54,31 +55,80 @@ def needs_setup(config_dir: Path | None = None) -> bool:
 
 
 def get_config(config_dir: Path | None = None) -> dict:
-    """Load config.json, returning defaults for missing keys."""
+    """Load config.json, returning defaults for missing keys.
+
+    Values are shape-validated: a tampered config.json carrying wrong
+    types (e.g. ``hook_fail_policy: ["deny"]``) must fall back to the
+    default rather than propagate into the bash hook's string compare
+    (T-INPUT.config_shape)."""
     cfg_path = _config_dir(config_dir) / _CONFIG_FILE
-    defaults = {"hook_fail_policy": "allow", "default_tier": None}
+    defaults: dict = {"hook_fail_policy": "allow", "default_tier": None}
     if not cfg_path.exists():
         return defaults
     try:
         data = json.loads(cfg_path.read_text())
-        return {**defaults, **data}
     except Exception:
         return defaults
+    if not isinstance(data, dict):
+        return defaults
+    out = dict(defaults)
+    hfp = data.get("hook_fail_policy")
+    if hfp in ("allow", "deny"):
+        out["hook_fail_policy"] = hfp
+    dt = data.get("default_tier")
+    if isinstance(dt, int) and 1 <= dt <= 4:
+        out["default_tier"] = dt
+    return out
 
 
 def write_config(data: dict, config_dir: Path | None = None) -> None:
-    """Write (merge) keys into config.json."""
+    """Write (merge) keys into config.json.
+
+    Concurrent cohrint-agent invocations (REPL + one-shot in parallel) can
+    race read-modify-write and clobber each other's keys. Serialize via
+    flock on a sidecar lockfile, read-merge-rename atomically under the
+    lock (T-CONCUR.config_rmw).
+    """
     cd = _config_dir(config_dir)
     cd.mkdir(parents=True, exist_ok=True)
     cfg_path = cd / _CONFIG_FILE
-    existing: dict = {}
-    if cfg_path.exists():
+    lockfile = cfg_path.with_suffix(cfg_path.suffix + ".lock")
+    tmp = cfg_path.with_suffix(cfg_path.suffix + ".tmp")
+    from .process_safety import open_lockfile
+    with open_lockfile(lockfile) as lk:
+        fcntl.flock(lk, fcntl.LOCK_EX)
         try:
-            existing = json.loads(cfg_path.read_text())
-        except Exception:
-            pass
-    existing.update(data)
-    cfg_path.write_text(json.dumps(existing, indent=2))
+            existing: dict = {}
+            if cfg_path.exists():
+                try:
+                    # O_NOFOLLOW: refuse to follow a config.json symlink
+                    # pointed at an attacker target.
+                    fd = os.open(cfg_path, os.O_RDONLY | os.O_NOFOLLOW)
+                    with os.fdopen(fd, "r") as f:
+                        existing = json.loads(f.read())
+                except (OSError, ValueError):
+                    existing = {}
+            if not isinstance(existing, dict):
+                existing = {}
+            existing.update(data)
+            try:
+                os.unlink(tmp)
+            except FileNotFoundError:
+                pass
+            fd = os.open(
+                tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_TRUNC, 0o600
+            )
+            with os.fdopen(fd, "w") as f:
+                json.dump(existing, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, cfg_path)
+        finally:
+            fcntl.flock(lk, fcntl.LOCK_UN)
+    try:
+        os.unlink(lockfile)
+    except OSError:
+        pass
 
 
 def apply_tier(tier: int, permissions: "PermissionManager") -> None:

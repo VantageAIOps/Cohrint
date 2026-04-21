@@ -497,6 +497,12 @@ def _print_summary() -> None:
 
 
 def main() -> None:
+    # Process-wide umask 0o077 — every mkdir / file creation defaults to
+    # owner-only perms so the brief window between mkdir(mode=0o700) and
+    # the follow-up chmod on shared CI runners doesn't expose session/
+    # permissions files (T-SAFETY.umask_default, scan 18).
+    os.umask(0o077)
+
     # Install a SIGTERM handler so `docker stop`, `systemctl stop`, and
     # CI timeouts get the same graceful-exit path as Ctrl+C instead of
     # killing the process with billed-but-unsaved spend in flight

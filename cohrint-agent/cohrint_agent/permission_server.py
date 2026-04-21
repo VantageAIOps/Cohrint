@@ -31,8 +31,15 @@ class PermissionServer(threading.Thread):
         self._server_sock: socket.socket | None = None
 
     def run(self) -> None:
-        if os.path.exists(self.socket_path):
+        # Drop redundant exists() check — another process can create the
+        # socket between check and unlink, so just unlink and swallow
+        # FileNotFoundError (T-SAFETY.socket_unlink_toctou).
+        try:
             os.unlink(self.socket_path)
+        except FileNotFoundError:
+            pass
+        except OSError:
+            pass
         self._server_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         # AF_UNIX socket files inherit the process umask. Under a cleared
         # umask (common in Docker / CI) the socket would land world-RW,
@@ -63,24 +70,43 @@ class PermissionServer(threading.Thread):
             self._server_sock.close()
         except Exception:
             pass
-        if os.path.exists(self.socket_path):
+        try:
             os.unlink(self.socket_path)
+        except FileNotFoundError:
+            pass
+        except OSError:
+            pass
 
     # Absolute ceiling on the hook payload. Claude Code hook payloads are
     # typically <4 KiB; 64 KiB is generous but blocks a rogue socket peer
     # from growing the buffer to OOM (T-SAFETY.recv_bound).
     _MAX_RECV_BYTES = 64 * 1024
+    # Wall-clock deadline for the receive phase. A fixed per-recv timeout
+    # does not defeat slow-loris: a peer can send 1 byte just under the
+    # per-recv timeout forever. The wall-clock ceiling is absolute and
+    # guarantees the handler returns (T-DOS.slow_loris).
+    _RECV_WALL_CLOCK_SECS = 10.0
 
     def _handle_connection(self, conn: socket.socket) -> None:
         try:
+            import time as _time
             data = b""
-            conn.settimeout(5.0)
+            deadline = _time.monotonic() + self._RECV_WALL_CLOCK_SECS
             while b"\n" not in data:
                 if len(data) >= self._MAX_RECV_BYTES:
                     # Peer is sending a runaway payload — refuse.
                     conn.sendall(b"deny\n")
                     return
-                chunk = conn.recv(4096)
+                remaining = deadline - _time.monotonic()
+                if remaining <= 0:
+                    conn.sendall(b"deny\n")
+                    return
+                conn.settimeout(min(5.0, remaining))
+                try:
+                    chunk = conn.recv(4096)
+                except socket.timeout:
+                    conn.sendall(b"deny\n")
+                    return
                 if not chunk:
                     break
                 data += chunk
@@ -88,6 +114,21 @@ class PermissionServer(threading.Thread):
             # filename in tool_input doesn't silently 500 the socket and
             # surface as a mysterious "denied" without any user prompt.
             tool_data = json.loads(data.decode("utf-8", errors="replace").strip())
+            # Shape-validate before queueing. A same-UID attacker (or a
+            # buggy hook caller) could send a non-dict or a dict whose
+            # tool_name is not a string; downstream code assumes both
+            # and would AttributeError otherwise. Normalise now so the
+            # main-thread prompt has clean inputs (T-INPUT.perm_shape).
+            if not isinstance(tool_data, dict):
+                conn.sendall(b"deny\n")
+                return
+            tn = tool_data.get("tool_name")
+            if not isinstance(tn, str) or not tn or len(tn) > 128:
+                conn.sendall(b"deny\n")
+                return
+            ti = tool_data.get("tool_input")
+            if not isinstance(ti, dict):
+                tool_data["tool_input"] = {}
             self.perm_request_queue.put(tool_data)
             # Block until main thread provides decision. On timeout we MUST
             # fail closed — auto-approving because the user didn't answer
@@ -136,7 +177,14 @@ def install_hook_script(config_dir: Path) -> Path:
     can't redirect the write to an arbitrary file like ``~/.bashrc``
     (T-SAFETY.hook_script_symlink). os.replace on the same fs is atomic
     and does not follow the destination symlink on Linux/macOS.
+
+    The shebang + python3 references are resolved to absolute paths at
+    install time so the hook is not PATH-dependent when Claude Code
+    invokes it. Otherwise a writable earlier PATH entry (e.g.
+    ~/.local/bin/python3) wins every permission decision by overriding
+    the expected interpreter (T-SAFETY.hook_script_path_hijack, scan 22).
     """
+    import shutil as _shutil
     config_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     try:
         os.chmod(config_dir, 0o700)
@@ -144,6 +192,14 @@ def install_hook_script(config_dir: Path) -> Path:
         pass
     hook_path = config_dir / "perm-hook.sh"
     tmp_path = config_dir / "perm-hook.sh.tmp"
+    # Resolve the interpreters now, pin absolute paths into the script.
+    bash_bin = _shutil.which("bash") or "/bin/bash"
+    python_bin = _shutil.which("python3") or "/usr/bin/python3"
+    script = _HOOK_SCRIPT
+    script = script.replace("#!/bin/bash", f"#!{bash_bin}", 1)
+    # Replace bare "python3 " occurrences with the resolved absolute path.
+    # Each occurrence is surrounded by whitespace (positional argument).
+    script = script.replace("python3 ", f"{python_bin} ")
     # Create tmp fresh with O_EXCL so even the tmp path can't be pre-planted
     # by an attacker in the same user context.
     try:
@@ -152,7 +208,7 @@ def install_hook_script(config_dir: Path) -> Path:
         pass
     fd = os.open(str(tmp_path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o755)
     with os.fdopen(fd, "w") as f:
-        f.write(_HOOK_SCRIPT)
+        f.write(script)
     os.replace(tmp_path, hook_path)
     return hook_path
 

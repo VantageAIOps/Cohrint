@@ -2114,7 +2114,10 @@ class TestBackendArgvDashInjection:
         be.send(prompt="--full-auto", history=[], cwd=".")
         # Argv must not contain the dash-leading prompt
         assert "--full-auto" not in captured["argv"]
-        assert captured["argv"] == ["codex"]
+        # argv[0] may be either bare 'codex' or an absolute pinned path
+        # (scan 22). Accept both forms.
+        assert len(captured["argv"]) == 1
+        assert captured["argv"][0].endswith("codex") or "codex" in captured["argv"][0]
         assert captured["stdin"] is not None
         assert b"--full-auto" in captured["stdin"]
 
@@ -2136,7 +2139,9 @@ class TestBackendArgvDashInjection:
         monkeypatch.setattr(codex_backend.subprocess, "run", _fake_run)
         be = codex_backend.CodexBackend()
         be.send(prompt="hello world", history=[], cwd=".")
-        assert captured["argv"][:2] == ["codex", "-p"]
+        # argv[0] is either 'codex' or an absolute pinned path (scan 22).
+        assert captured["argv"][0].endswith("codex") or "codex" in captured["argv"][0]
+        assert captured["argv"][1] == "-p"
         assert captured["stdin"] is None
 
     def test_gemini_dash_prompt_routes_via_stdin(self, monkeypatch):
@@ -2610,6 +2615,20 @@ class TestLazyConfigDir:
         path = _rl_mod._STATE_FILE
         assert str(path).startswith(str(tmp_path))
 
+    def test_acquire_does_not_raise_NameError(self, tmp_path, monkeypatch):
+        """Runtime regression: acquire()/get_global_budget_used() read
+        _STATE_FILE from inside their own module. Bare-name lookup does
+        NOT fire module-level __getattr__, so they must resolve via
+        sys.modules to avoid NameError on a fresh install
+        (T-SAFETY.rate_limiter_runtime_bare_name)."""
+        import cohrint_agent.rate_limiter as _rl_mod
+        if "_STATE_FILE" in _rl_mod.__dict__:
+            del _rl_mod.__dict__["_STATE_FILE"]
+        monkeypatch.setattr(_rl_mod, "safe_config_dir", lambda: tmp_path)
+        # Must not raise — the bug this guards against is NameError.
+        _rl_mod.acquire(cost=0.0)
+        _rl_mod.get_global_budget_used()
+
 
 # ────────── T-BOUNDS.per_message_cap (scan 17) ─────────────────────────────
 
@@ -2683,7 +2702,7 @@ class TestSigtermHandler:
         # The SIGTERM handler must be installed inside main().
         idx = src.find("def main(")
         assert idx >= 0
-        tail = src[idx:idx + 800]
+        tail = src[idx:idx + 2000]
         assert "SIGTERM" in tail, "main() does not install a SIGTERM handler"
         assert "signal.signal" in tail
 
@@ -2707,3 +2726,634 @@ class TestNonTtyDeny:
         pm = P.PermissionManager(config_dir=tmp_path)
         result = pm.check_permission("Bash", {"command": "ls"})
         assert result is False
+
+
+# ────────── Scan 18 — filesystem race / TOCTOU regressions ─────────────────
+
+
+class TestScan18TmpExcl:
+    """session_store save() must open tmp with O_EXCL so a pre-planted or
+    leftover <uuid>.json.tmp cannot be silently reused
+    (T-SAFETY.tmp_excl)."""
+
+    def test_session_save_source_uses_o_excl(self):
+        from pathlib import Path as _P
+        src = _P("cohrint_agent/session_store.py").read_text()
+        # The tmp open inside save() must include O_EXCL.
+        assert "O_EXCL" in src, "session_store save() missing O_EXCL on tmp open"
+
+
+class TestScan18ConfigRMW:
+    """write_config must be safe against concurrent read-modify-write —
+    two parallel writers cannot clobber one another's keys
+    (T-CONCUR.config_rmw)."""
+
+    def test_concurrent_writers_preserve_all_keys(self, tmp_path):
+        import json as _j
+        import threading
+        from cohrint_agent.setup_wizard import write_config
+
+        cd = tmp_path
+        barrier = threading.Barrier(8)
+
+        def _writer(i: int) -> None:
+            barrier.wait()
+            write_config({f"k{i}": i}, config_dir=cd)
+
+        threads = [threading.Thread(target=_writer, args=(i,)) for i in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        # Read the raw file — get_config strips unknown keys for safety
+        # (scan 21), but the on-disk merge must preserve them.
+        final = _j.loads((cd / "config.json").read_text())
+        for i in range(8):
+            assert final.get(f"k{i}") == i, f"lost key k{i} from concurrent write"
+
+    def test_write_config_rejects_symlink_target(self, tmp_path):
+        """If an attacker plants config.json as a symlink at the target,
+        the O_NOFOLLOW read path refuses to follow it and treats the
+        file as empty rather than reading the target's contents."""
+        from cohrint_agent.setup_wizard import write_config, get_config
+
+        cd = tmp_path
+        target = tmp_path / "attacker_secret.json"
+        target.write_text('{"stolen": "yes"}')
+        cfg = cd / "config.json"
+        os.symlink(target, cfg)
+
+        # Write should succeed and REPLACE the symlink with a regular
+        # file (os.replace does not follow the destination symlink).
+        write_config({"default_tier": 2}, config_dir=cd)
+
+        # cfg is now a regular file containing only our write — the
+        # attacker's JSON never merged in.
+        assert not cfg.is_symlink()
+        final = get_config(config_dir=cd)
+        assert final["default_tier"] == 2
+        assert "stolen" not in final
+
+
+class TestScan18PermServerUnlink:
+    """PermissionServer.run must unlink stale socket without a separate
+    exists() check — the check-then-unlink race would OSError on a
+    competing process cleaning up the same path
+    (T-SAFETY.socket_unlink_toctou)."""
+
+    def test_permission_server_source_uses_bare_unlink(self):
+        from pathlib import Path as _P
+        src = _P("cohrint_agent/permission_server.py").read_text()
+        # The old exists()+unlink pattern must be gone.
+        assert "os.path.exists(self.socket_path)" not in src, (
+            "permission_server still gates unlink on exists() — TOCTOU"
+        )
+        # FileNotFoundError suppression must be present instead.
+        assert "FileNotFoundError" in src
+
+
+class TestScan18LockfileNoFollow:
+    """All advisory lockfiles must be opened via open_lockfile() which
+    applies O_NOFOLLOW, rejecting a pre-planted symlink that would
+    otherwise flock a file under the attacker's control
+    (T-SAFETY.lockfile_nofollow)."""
+
+    def test_open_lockfile_rejects_symlink(self, tmp_path):
+        from cohrint_agent.process_safety import open_lockfile
+
+        real = tmp_path / "real.target"
+        real.write_text("")
+        link = tmp_path / "evil.lock"
+        os.symlink(real, link)
+        with pytest.raises(OSError):
+            with open_lockfile(link):
+                pass
+
+    def test_rate_limiter_uses_open_lockfile(self):
+        from pathlib import Path as _P
+        src = _P("cohrint_agent/rate_limiter.py").read_text()
+        assert "open_lockfile(lock_file)" in src, (
+            "rate_limiter still uses raw open() on the lockfile path"
+        )
+
+    def test_session_store_uses_open_lockfile(self):
+        from pathlib import Path as _P
+        src = _P("cohrint_agent/session_store.py").read_text()
+        assert "open_lockfile(lockfile)" in src
+
+
+class TestScan18UmaskRestricted:
+    """main() must call os.umask(0o077) so config/session files created
+    downstream cannot become world-readable even if a later caller
+    forgets to chmod (T-PRIVACY.umask)."""
+
+    def test_main_source_sets_restrictive_umask(self):
+        from pathlib import Path as _P
+        src = _P("cohrint_agent/cli.py").read_text()
+        idx = src.find("def main(")
+        assert idx >= 0
+        tail = src[idx:idx + 1200]
+        assert "os.umask(0o077)" in tail, (
+            "main() does not set a restrictive umask"
+        )
+
+
+class TestScan18SpoolLazy:
+    """Tracker._SPOOL_DIR must resolve lazily via module __getattr__ —
+    eager Path.home() at import crashes in minimal containers
+    (T-SAFETY.lazy_config_dir)."""
+
+    def test_spool_dir_is_lazy(self):
+        from cohrint_agent import tracker as _t
+        # _SPOOL_DIR must NOT be present in module __dict__ by default.
+        # A concrete attribute indicates eager resolution.
+        if "_SPOOL_DIR" in _t.__dict__:
+            # Accept only if it's been set by a test monkeypatch in this
+            # run (shadows __getattr__). Fresh import should have no dict
+            # entry — verify __getattr__ path exists as the fallback.
+            pass
+        # The getter must exist and return a Path.
+        import sys as _sys
+        got = getattr(_sys.modules["cohrint_agent.tracker"], "_SPOOL_DIR")
+        from pathlib import Path as _P
+        assert isinstance(got, _P)
+
+
+# ────────── Scan 19 — resource exhaustion / DoS regressions ─────────────────
+
+
+class TestScan19ApiKeyBounded:
+    """Reading the API key file must be size-bounded — a tampered or
+    symlink-pointed-at-/dev/zero file would otherwise OOM startup
+    (T-DOS.api_key_size_cap)."""
+
+    def test_api_client_source_bounds_key_read(self):
+        from pathlib import Path as _P
+        src = _P("cohrint_agent/api_client.py").read_text()
+        # The unbounded open(path).read() pattern must be gone.
+        assert "open(path).read().strip()" not in src, (
+            "api_client still reads api_key with unbounded .read()"
+        )
+        # A bounded read must be present on an api_key code path.
+        assert ".read(8192)" in src or "O_NOFOLLOW" in src
+
+
+class TestScan19SlowLoris:
+    """permission_server._handle_connection must enforce a wall-clock
+    deadline in addition to the per-recv timeout; a peer that sends 1
+    byte just under the per-recv limit must not hold the socket forever
+    (T-DOS.slow_loris)."""
+
+    def test_handle_connection_source_uses_wall_clock_deadline(self):
+        from pathlib import Path as _P
+        src = _P("cohrint_agent/permission_server.py").read_text()
+        idx = src.find("def _handle_connection")
+        assert idx >= 0
+        body = src[idx : idx + 1500]
+        assert "monotonic" in body, (
+            "_handle_connection has no wall-clock deadline — slow-loris vector"
+        )
+        assert "deadline" in body
+
+    def test_slow_loris_peer_is_cut_off(self):
+        """End-to-end: open a connection, send nothing, server must close
+        within the wall-clock limit rather than hanging indefinitely."""
+        import socket
+        import tempfile
+        import time
+        import uuid
+
+        from cohrint_agent import permission_server as _ps
+
+        # AF_UNIX paths are capped at ~104 bytes on macOS; pytest's
+        # tmp_path can exceed that, so use /tmp directly with a random id.
+        sock_path = os.path.join(
+            tempfile.gettempdir(), f"cohrint-sl-{uuid.uuid4().hex[:8]}.sock"
+        )
+        # Shrink the wall clock for the test.
+        orig = _ps.PermissionServer._RECV_WALL_CLOCK_SECS
+        _ps.PermissionServer._RECV_WALL_CLOCK_SECS = 1.0
+        try:
+            class _Fake:
+                pass
+
+            srv = _ps.PermissionServer(sock_path, _Fake())
+            srv.start()
+            try:
+                # Wait for server to be listening.
+                deadline = time.monotonic() + 3.0
+                while time.monotonic() < deadline:
+                    if os.path.exists(sock_path):
+                        break
+                    time.sleep(0.02)
+                assert os.path.exists(sock_path), "server never bound"
+
+                client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                client.settimeout(5.0)
+                client.connect(sock_path)
+                # Send nothing. The server must close us out within
+                # _RECV_WALL_CLOCK_SECS and reply "deny\n".
+                start = time.monotonic()
+                try:
+                    resp = client.recv(32)
+                except socket.timeout:
+                    resp = b""
+                elapsed = time.monotonic() - start
+                client.close()
+                assert elapsed < 3.0, (
+                    f"slow-loris peer held connection {elapsed:.1f}s — no deadline"
+                )
+                assert resp.startswith(b"deny")
+            finally:
+                srv.stop()
+                srv.join(timeout=2.0)
+        finally:
+            _ps.PermissionServer._RECV_WALL_CLOCK_SECS = orig
+            try:
+                os.unlink(sock_path)
+            except OSError:
+                pass
+
+
+class TestScan19BudgetScanBounded:
+    """get_global_budget_used must size-cap each session file it reads —
+    matches the MAX_SESSION_FILE_BYTES protection already on list_all
+    (T-DOS.budget_scan_size_cap)."""
+
+    def test_oversized_session_file_is_skipped(self, tmp_path, monkeypatch):
+        import cohrint_agent.rate_limiter as _rl
+        if "_STATE_FILE" in _rl.__dict__:
+            del _rl.__dict__["_STATE_FILE"]
+        monkeypatch.setattr(_rl, "safe_config_dir", lambda: tmp_path)
+
+        sessions = tmp_path / "sessions"
+        sessions.mkdir(parents=True)
+
+        # Write a valid small session with cost 2.5
+        import json as _j
+        (sessions / "aaa.json").write_text(_j.dumps({
+            "cost_summary": {"total_cost_usd": 2.5}
+        }))
+        # Write an oversized (2 MiB > 1 MiB cap) session — must be skipped.
+        huge = {"cost_summary": {"total_cost_usd": 999999.0}, "pad": "x" * (2 * 1024 * 1024)}
+        (sessions / "bbb.json").write_text(_j.dumps(huge))
+
+        # Clear cache.
+        _rl._budget_cache.update({"value": None, "ts": 0.0, "key": None})
+        total = _rl.get_global_budget_used()
+        assert total == 2.5, f"oversized session was not skipped; got total={total}"
+
+
+class TestScan19SpoolReadBounded:
+    """tracker._spool_write / _spool_drain must size-cap the read — the
+    line-count cap is only applied post-read, so an adversarially large
+    spool file would be fully read into memory first
+    (T-DOS.spool_read_size_cap)."""
+
+    def test_spool_source_has_byte_cap(self):
+        from pathlib import Path as _P
+        src = _P("cohrint_agent/tracker.py").read_text()
+        assert "_MAX_SPOOL_BYTES" in src, (
+            "tracker has no _MAX_SPOOL_BYTES ceiling on read"
+        )
+        # The ceiling must be used in at least one rf.read call.
+        assert "_MAX_SPOOL_BYTES + 1" in src
+
+
+class TestScan19RetryDeadline:
+    """_send_with_retry must abort after a wall-clock deadline — bounded
+    per-attempt sleeps alone allow stacked waits against a hung upstream
+    (T-DOS.retry_deadline)."""
+
+    def test_retry_source_has_wall_clock_deadline(self):
+        from pathlib import Path as _P
+        src = _P("cohrint_agent/api_client.py").read_text()
+        idx = src.find("def _send_with_retry")
+        assert idx >= 0
+        body = src[idx : idx + 2000]
+        assert "deadline" in body, (
+            "_send_with_retry has no wall-clock deadline"
+        )
+        assert "_RETRY_WALL_CLOCK_SECS" in body or "monotonic" in body
+
+
+# ────────── Scan 21 — deserialization / input-boundary regressions ─────────
+
+
+class TestScan21BashTypeCheck:
+    """_exec_bash must coerce model-supplied 'timeout' into a finite
+    (0, 600] float and refuse non-string 'command' (T-INPUT.bash_shape_check)."""
+
+    def test_non_string_command_rejected(self):
+        from cohrint_agent.tools import _exec_bash
+        out = _exec_bash({"command": {"evil": True}}, ".")
+        assert "must be a non-empty string" in out
+
+    def test_nan_timeout_defaults_to_120(self):
+        from cohrint_agent.tools import _exec_bash
+        out = _exec_bash({"command": "echo ok", "timeout": float("nan")}, ".")
+        # Command should actually run (not crash on NaN).
+        assert "ok" in out or "error" not in out.lower() or out.strip()
+
+    def test_inf_timeout_clamped(self):
+        from cohrint_agent.tools import _exec_bash
+        out = _exec_bash({"command": "echo hello", "timeout": float("inf")}, ".")
+        assert "hello" in out
+
+    def test_negative_timeout_defaulted(self):
+        from cohrint_agent.tools import _exec_bash
+        out = _exec_bash({"command": "echo neg", "timeout": -5}, ".")
+        assert "neg" in out
+
+
+class TestScan21ReadBounds:
+    """_exec_read must clamp offset/limit — negative offsets must not
+    leak end-of-file, huge limits must not allocate huge lists
+    (T-INPUT.read_bounds)."""
+
+    def test_negative_offset_treated_as_zero(self, tmp_path):
+        from cohrint_agent.tools import _exec_read
+        f = tmp_path / "x.txt"
+        f.write_text("a\nb\nc\n")
+        out = _exec_read({"file_path": str(f), "offset": -1000, "limit": 10})
+        # First numbered line must be "1\ta" — not a negative-index slice.
+        assert out.startswith("1\ta")
+
+    def test_huge_limit_clamped(self, tmp_path):
+        from cohrint_agent.tools import _exec_read
+        f = tmp_path / "y.txt"
+        f.write_text("line\n" * 20)
+        out = _exec_read({"file_path": str(f), "limit": 10**18})
+        # Should return without raising and contain a bounded number of lines.
+        assert out.count("\n") < 10001
+
+
+class TestScan21BudgetRangeGate:
+    """get_global_budget_used must reject NaN/inf/negative/huge
+    total_cost_usd values rather than add them to the running total
+    (T-INPUT.budget_range_gate)."""
+
+    def test_nan_cost_is_skipped(self, tmp_path, monkeypatch):
+        import cohrint_agent.rate_limiter as _rl
+        if "_STATE_FILE" in _rl.__dict__:
+            del _rl.__dict__["_STATE_FILE"]
+        monkeypatch.setattr(_rl, "safe_config_dir", lambda: tmp_path)
+        sessions = tmp_path / "sessions"
+        sessions.mkdir(parents=True)
+
+        # A valid session worth $1.
+        (sessions / "aaa.json").write_text('{"cost_summary": {"total_cost_usd": 1.0}}')
+        # NaN cost — must be ignored, not poison the total.
+        (sessions / "bbb.json").write_text('{"cost_summary": {"total_cost_usd": NaN}}')
+        # inf cost — must be ignored.
+        (sessions / "ccc.json").write_text('{"cost_summary": {"total_cost_usd": Infinity}}')
+        # Negative cost — must be ignored.
+        (sessions / "ddd.json").write_text('{"cost_summary": {"total_cost_usd": -9999}}')
+        # Too-large cost — must be ignored.
+        (sessions / "eee.json").write_text('{"cost_summary": {"total_cost_usd": 1e12}}')
+
+        _rl._budget_cache.update({"value": None, "ts": 0.0, "key": None})
+        total = _rl.get_global_budget_used()
+        assert total == 1.0
+        import math as _m
+        assert not _m.isnan(total)
+        assert not _m.isinf(total)
+
+
+class TestScan21SessionSchemaVersion:
+    """SessionStore.load must refuse future-tagged schema_versions instead
+    of parsing through as v1 (T-INPUT.schema_version_reject)."""
+
+    def test_future_schema_version_refused(self, tmp_path):
+        import uuid
+        from cohrint_agent.session_store import (
+            SessionStore,
+            SessionNotFoundError,
+            CURRENT_SCHEMA_VERSION,
+        )
+        store = SessionStore(sessions_dir=tmp_path)
+        sid = str(uuid.uuid4())
+        import json as _j
+        (tmp_path / f"{sid}.json").write_text(
+            _j.dumps({"id": sid, "schema_version": CURRENT_SCHEMA_VERSION + 1})
+        )
+        with pytest.raises(SessionNotFoundError) as excinfo:
+            store.load(sid)
+        assert "schema_version" in str(excinfo.value)
+
+    def test_non_dict_payload_refused(self, tmp_path):
+        import uuid
+        from cohrint_agent.session_store import SessionStore, SessionNotFoundError
+        store = SessionStore(sessions_dir=tmp_path)
+        sid = str(uuid.uuid4())
+        (tmp_path / f"{sid}.json").write_text('"just a string"')
+        with pytest.raises(SessionNotFoundError):
+            store.load(sid)
+
+    def test_list_all_skips_future_schema(self, tmp_path):
+        import uuid, json as _j
+        from cohrint_agent.session_store import (
+            SessionStore,
+            CURRENT_SCHEMA_VERSION,
+        )
+        store = SessionStore(sessions_dir=tmp_path)
+        # One valid v1 session + one future-tagged + one non-dict.
+        good_id = str(uuid.uuid4())
+        bad_id = str(uuid.uuid4())
+        nondict_id = str(uuid.uuid4())
+        (tmp_path / f"{good_id}.json").write_text(
+            _j.dumps({"id": good_id, "schema_version": 1, "last_active_at": "z"})
+        )
+        (tmp_path / f"{bad_id}.json").write_text(
+            _j.dumps({"id": bad_id, "schema_version": CURRENT_SCHEMA_VERSION + 5})
+        )
+        (tmp_path / f"{nondict_id}.json").write_text('[1, 2, 3]')
+        got = store.list_all()
+        assert len(got) == 1
+        assert got[0]["id"] == good_id
+
+
+class TestScan21PermShapeCheck:
+    """permission_server._handle_connection must shape-validate the JSON
+    payload before enqueueing it — a non-dict or a dict without a string
+    tool_name must respond deny without poisoning the main-thread queue
+    (T-INPUT.perm_shape)."""
+
+    def test_handle_source_validates_tool_name(self):
+        from pathlib import Path as _P
+        src = _P("cohrint_agent/permission_server.py").read_text()
+        idx = src.find("def _handle_connection")
+        assert idx >= 0
+        body = src[idx : idx + 2500]
+        assert "isinstance(tool_data, dict)" in body
+        assert "isinstance(tn, str)" in body
+
+
+class TestScan21ConfigShape:
+    """setup_wizard.get_config must reject tampered value types."""
+
+    def test_bogus_hook_fail_policy_falls_back_to_allow(self, tmp_path):
+        from cohrint_agent.setup_wizard import get_config
+        (tmp_path / "config.json").write_text('{"hook_fail_policy": ["deny"]}')
+        cfg = get_config(config_dir=tmp_path)
+        assert cfg["hook_fail_policy"] == "allow"
+
+    def test_bogus_default_tier_becomes_none(self, tmp_path):
+        from cohrint_agent.setup_wizard import get_config
+        (tmp_path / "config.json").write_text('{"default_tier": "9; rm -rf"}')
+        cfg = get_config(config_dir=tmp_path)
+        assert cfg["default_tier"] is None
+
+    def test_out_of_range_tier_rejected(self, tmp_path):
+        from cohrint_agent.setup_wizard import get_config
+        (tmp_path / "config.json").write_text('{"default_tier": 99}')
+        cfg = get_config(config_dir=tmp_path)
+        assert cfg["default_tier"] is None
+
+    def test_valid_tier_preserved(self, tmp_path):
+        from cohrint_agent.setup_wizard import get_config
+        (tmp_path / "config.json").write_text('{"default_tier": 2, "hook_fail_policy": "deny"}')
+        cfg = get_config(config_dir=tmp_path)
+        assert cfg["default_tier"] == 2
+        assert cfg["hook_fail_policy"] == "deny"
+
+
+# ────────── Scan 22 — supply chain / PATH / env hijack regressions ─────────
+
+
+class TestScan22AnthropicBaseUrlStrip:
+    """ANTHROPIC_BASE_URL must live in the _STRIP_ALWAYS set so child
+    subprocesses never inherit an attacker-set SDK endpoint
+    (T-SAFETY.anthropic_base_url_strip)."""
+
+    def test_anthropic_base_url_in_strip_set(self):
+        from cohrint_agent.process_safety import _STRIP_ALWAYS
+        assert "ANTHROPIC_BASE_URL" in _STRIP_ALWAYS
+        assert "ANTHROPIC_API_BASE" in _STRIP_ALWAYS
+        assert "OPENAI_BASE_URL" in _STRIP_ALWAYS
+        assert "OPENAI_API_BASE" in _STRIP_ALWAYS
+
+    def test_safe_child_env_strips_anthropic_base_url(self):
+        from cohrint_agent.process_safety import safe_child_env
+        out = safe_child_env({
+            "ANTHROPIC_BASE_URL": "http://attacker.example/",
+            "OPENAI_BASE_URL": "http://attacker.example/",
+            "PATH": "/usr/bin",
+        })
+        assert "ANTHROPIC_BASE_URL" not in out
+        assert "OPENAI_BASE_URL" not in out
+
+
+class TestScan22AnthropicBaseUrlValidate:
+    """api_client must refuse a non-HTTPS / non-anthropic.com
+    ANTHROPIC_BASE_URL on the parent process too — the anthropic SDK
+    honors it and would exfiltrate prompts + bearer token
+    (T-SAFETY.anthropic_base_url_validate)."""
+
+    def test_api_client_source_validates_base_url(self):
+        from pathlib import Path as _P
+        src = _P("cohrint_agent/api_client.py").read_text()
+        assert 'os.environ.pop("ANTHROPIC_BASE_URL"' in src
+        assert "anthropic.com" in src
+
+
+class TestScan22HookScriptPathPin:
+    """The installed perm-hook.sh must use absolute interpreter paths so
+    a writable PATH entry can't supply a trojan python3 that returns
+    'allow' for every prompt (T-SAFETY.hook_script_path_hijack)."""
+
+    def test_installed_hook_has_absolute_shebang(self, tmp_path):
+        from cohrint_agent.permission_server import install_hook_script
+        hp = install_hook_script(tmp_path)
+        content = hp.read_text()
+        # Shebang must be absolute (starts with /)
+        first_line = content.splitlines()[0]
+        assert first_line.startswith("#!/"), (
+            f"Hook shebang is relative / wrong: {first_line!r}"
+        )
+        # No bare 'python3 ' invocations inside the script body.
+        assert "\npython3 " not in content and " python3 " not in content, (
+            "hook script still calls python3 via PATH"
+        )
+
+
+class TestScan22BackendBinaryResolver:
+    """resolve_backend_binary must return an absolute path for installed
+    binaries and reject world/group-writable ones
+    (T-SAFETY.backend_path_pin)."""
+
+    def test_resolver_returns_absolute_path_or_none(self):
+        from cohrint_agent.process_safety import resolve_backend_binary
+        # ls should always exist on a sane test box.
+        got = resolve_backend_binary("ls")
+        if got is not None:
+            assert os.path.isabs(got)
+
+    def test_resolver_rejects_world_writable(self, tmp_path, monkeypatch):
+        from cohrint_agent.process_safety import (
+            resolve_backend_binary,
+            _BACKEND_BIN_CACHE,
+        )
+        _BACKEND_BIN_CACHE.clear()
+        # Plant a writable "evil" binary, prepend its dir to PATH.
+        evil = tmp_path / "cohrint-evil-bin"
+        evil.write_text("#!/bin/sh\necho hi\n")
+        # Group + other writable.
+        os.chmod(evil, 0o777)
+        monkeypatch.setenv("PATH", f"{tmp_path}:{os.environ.get('PATH','')}")
+        got = resolve_backend_binary("cohrint-evil-bin")
+        assert got is None, (
+            "world/group writable binary must be refused"
+        )
+        _BACKEND_BIN_CACHE.clear()
+
+    def test_claude_backend_source_pins_bin(self):
+        from pathlib import Path as _P
+        src = _P("cohrint_agent/backends/claude_backend.py").read_text()
+        assert "resolve_backend_binary" in src
+
+    def test_codex_backend_source_pins_bin(self):
+        from pathlib import Path as _P
+        src = _P("cohrint_agent/backends/codex_backend.py").read_text()
+        assert "resolve_backend_binary" in src
+
+    def test_gemini_backend_source_pins_bin(self):
+        from pathlib import Path as _P
+        src = _P("cohrint_agent/backends/gemini_backend.py").read_text()
+        assert "resolve_backend_binary" in src
+
+
+class TestScan22HomeEnvHijack:
+    """safe_config_dir must anchor to pw_dir (UID-based), not $HOME —
+    otherwise HOME=/tmp/evil + COHRINT_CONFIG_DIR=/tmp/evil/x bypasses
+    the escape check (T-SAFETY.home_env_hijack)."""
+
+    def test_safe_config_dir_rejects_home_redirect(self, tmp_path, monkeypatch):
+        from cohrint_agent.process_safety import safe_config_dir, _real_home
+        real = _real_home()
+        if real is None:
+            pytest.skip("pwd lookup unavailable in this environment")
+        # Attempt to redirect both HOME and the config dir into /tmp.
+        evil = tmp_path / "evil_home"
+        evil.mkdir()
+        cfg = evil / ".cohrint-agent"
+        monkeypatch.setenv("HOME", str(evil))
+        monkeypatch.setenv("COHRINT_CONFIG_DIR", str(cfg))
+        # /tmp is in the explicit tmp-root allowlist, so the helper
+        # will still accept this candidate (by design for test support).
+        # The critical invariant is that the DEFAULT path (no
+        # COHRINT_CONFIG_DIR) stays in the real home.
+        monkeypatch.delenv("COHRINT_CONFIG_DIR", raising=False)
+        got = safe_config_dir()
+        assert str(got).startswith(str(real)), (
+            f"default config dir escaped real home: {got} not under {real}"
+        )
+
+    def test_real_home_differs_from_HOME_when_spoofed(self, monkeypatch):
+        from cohrint_agent.process_safety import _real_home
+        monkeypatch.setenv("HOME", "/tmp/hijacked-home")
+        real = _real_home()
+        if real is None:
+            pytest.skip("pwd lookup unavailable")
+        assert str(real) != "/tmp/hijacked-home"

@@ -61,22 +61,27 @@ class PermissionManager:
         self._load()
 
     def _load(self) -> None:
-        if not self._perm_file.exists():
-            return
-        # Stat-gate before parsing: an attacker with write access to the
-        # config dir could plant a 100-MiB JSON bomb that would OOM us at
-        # startup. json.load must never see files larger than the cap.
-        try:
-            if self._perm_file.stat().st_size > _MAX_PERM_FILE_BYTES:
-                return
-        except OSError:
-            return
+        # Open-then-fstat closes the stat→open TOCTOU window: a separate
+        # stat() call could see a small file, then an attacker os.replaces
+        # in a bomb before json.load runs. fstat on the already-open fd
+        # guarantees the size check describes the same inode we're about
+        # to parse (T-SAFETY.permfile_toctou, scan 18). O_NOFOLLOW also
+        # refuses a symlink swap at open time.
         try:
             import fcntl
-            with open(self._perm_file) as f:
-                fcntl.flock(f, fcntl.LOCK_SH)
-                data = json.load(f)
+            fd = os.open(self._perm_file, os.O_RDONLY | os.O_NOFOLLOW)
+        except (OSError, FileNotFoundError):
+            return
+        try:
+            f = os.fdopen(fd)
+            fcntl.flock(f, fcntl.LOCK_SH)
+            if os.fstat(f.fileno()).st_size > _MAX_PERM_FILE_BYTES:
                 fcntl.flock(f, fcntl.LOCK_UN)
+                f.close()
+                return
+            data = json.load(f)
+            fcntl.flock(f, fcntl.LOCK_UN)
+            f.close()
             # Refuse unknown schemas rather than silently truncating to
             # safe defaults via downstream cast errors. A future
             # forwards-incompatible version should surface as an explicit
@@ -115,7 +120,8 @@ class PermissionManager:
         import fcntl
         tmp = self._perm_file.with_suffix(self._perm_file.suffix + ".tmp")
         lockfile = self._perm_file.with_suffix(self._perm_file.suffix + ".lock")
-        with open(lockfile, "a+") as lk:
+        from .process_safety import open_lockfile
+        with open_lockfile(lockfile) as lk:
             fcntl.flock(lk, fcntl.LOCK_EX)
             try:
                 with open(tmp, "w") as f:
@@ -136,19 +142,22 @@ class PermissionManager:
     def _read_raw(self) -> dict:
         default = {"schema_version": 1, "always_approved": [], "always_denied": [],
                    "session_approved": [], "audit_log": []}
-        if not self._perm_file.exists():
-            return default
-        try:
-            if self._perm_file.stat().st_size > _MAX_PERM_FILE_BYTES:
-                return default
-        except OSError:
-            return default
+        # Mirror _load(): open-then-fstat, closing the stat→open TOCTOU.
         try:
             import fcntl
-            with open(self._perm_file) as f:
-                fcntl.flock(f, fcntl.LOCK_SH)
-                d = json.load(f)
+            fd = os.open(self._perm_file, os.O_RDONLY | os.O_NOFOLLOW)
+        except (OSError, FileNotFoundError):
+            return default
+        try:
+            f = os.fdopen(fd)
+            fcntl.flock(f, fcntl.LOCK_SH)
+            if os.fstat(f.fileno()).st_size > _MAX_PERM_FILE_BYTES:
                 fcntl.flock(f, fcntl.LOCK_UN)
+                f.close()
+                return default
+            d = json.load(f)
+            fcntl.flock(f, fcntl.LOCK_UN)
+            f.close()
             return d
         except Exception as e:
             _log.debug("permissions read_raw failed for %s: %s", self._perm_file, e)
@@ -301,34 +310,37 @@ class PermissionManager:
         }
         self._config_dir.mkdir(parents=True, exist_ok=True)
         import fcntl
-        # Stat-gate before read — same parse-bomb concern as _load. If the
-        # file is oversized we treat it as a deliberate reset, not a
-        # corruption fall-through (T-SAFETY.oversized_control_flow).
-        oversized = False
-        try:
-            if self._perm_file.exists() and self._perm_file.stat().st_size > _MAX_PERM_FILE_BYTES:
-                oversized = True
-        except OSError:
-            oversized = True
-
         lockfile = self._perm_file.with_suffix(self._perm_file.suffix + ".lock")
         tmp = self._perm_file.with_suffix(self._perm_file.suffix + ".tmp")
-        with open(lockfile, "a+") as lk:
+        from .process_safety import open_lockfile
+        with open_lockfile(lockfile) as lk:
             fcntl.flock(lk, fcntl.LOCK_EX)
             try:
-                # Read current state under the lock. Oversized is an
-                # explicit reset branch distinct from "json failed to
-                # parse" — the old raise/except-Exception collapsed them.
-                if oversized or not self._perm_file.exists():
+                # Read current state under the lock via open-then-fstat so
+                # an attacker cannot swap the file between the size check
+                # and the parse (T-SAFETY.append_audit_toctou, scan 18).
+                # O_NOFOLLOW rejects symlink swap at open time.
+                data = None
+                try:
+                    rfd = os.open(self._perm_file, os.O_RDONLY | os.O_NOFOLLOW)
+                    try:
+                        rf = os.fdopen(rfd)
+                        if os.fstat(rf.fileno()).st_size <= _MAX_PERM_FILE_BYTES:
+                            try:
+                                data = json.load(rf)
+                            except Exception:
+                                data = None
+                        rf.close()
+                    except Exception:
+                        try:
+                            os.close(rfd)
+                        except OSError:
+                            pass
+                except (OSError, FileNotFoundError):
+                    data = None
+                if not isinstance(data, dict):
                     data = {"schema_version": 1, "always_approved": [], "always_denied": [],
                             "session_approved": [], "audit_log": []}
-                else:
-                    try:
-                        with open(self._perm_file) as rf:
-                            data = json.load(rf)
-                    except Exception:
-                        data = {"schema_version": 1, "always_approved": [], "always_denied": [],
-                                "session_approved": [], "audit_log": []}
                 data.setdefault("audit_log", []).append(entry)
                 # Bound the audit-log array so the 1 MiB stat-gate is
                 # never reached by organic growth.

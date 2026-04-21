@@ -36,8 +36,11 @@ class GeminiBackend(Backend):
         argv_unsafe = full_prompt.startswith("-")
         # text=False + manual decode for utf-8 errors="replace" resilience
         # (T-SAFETY.subproc_utf8_replace).
+        # Pin absolute path (T-SAFETY.backend_path_pin, scan 22).
+        from ..process_safety import resolve_backend_binary
+        gemini_bin = resolve_backend_binary("gemini") or "gemini"
         result = subprocess.run(
-            ["gemini"] if argv_unsafe else ["gemini", "-p", full_prompt],
+            [gemini_bin] if argv_unsafe else [gemini_bin, "-p", full_prompt],
             input=full_prompt.encode("utf-8") if argv_unsafe else None,
             capture_output=True,
             cwd=cwd,
@@ -70,10 +73,12 @@ class GeminiBackend(Backend):
         )
 
     def start_process(self) -> AgentProcess | None:
-        if not shutil.which("gemini"):
+        from ..process_safety import resolve_backend_binary
+        gemini_bin = resolve_backend_binary("gemini")
+        if not gemini_bin:
             return None
         proc = subprocess.Popen(
-            ["gemini"],
+            [gemini_bin],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,

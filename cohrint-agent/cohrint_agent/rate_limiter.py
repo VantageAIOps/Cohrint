@@ -73,13 +73,18 @@ def acquire(cost: float = 1.0) -> bool:
     """Try to consume `cost` tokens. Returns True if allowed, False if rate limited.
     Thread-safe via in-process lock + fcntl file lock (cross-process safe).
     Lock file is acquired BEFORE reading/writing state file."""
-    # Derive paths from _STATE_FILE so tests can patch just _STATE_FILE
-    state_file = _STATE_FILE
+    # Resolve via module __getattr__ so tests that patch rate_limiter._STATE_FILE
+    # still work, but bare-name lookup doesn't raise NameError at runtime.
+    import sys as _sys
+    state_file = getattr(_sys.modules[__name__], "_STATE_FILE")
     lock_file = state_file.parent / "rate_state.lock"
     state_file.parent.mkdir(parents=True, exist_ok=True)
     with _LOCK:
         # Acquire lock file first, then read/write state file
-        with open(lock_file, "w") as lf:
+        # O_NOFOLLOW on lock-file open — rejects a `rate_state.lock`
+        # symlink pointed at an attacker-chosen target (T-SAFETY.lockfile_nofollow).
+        from .process_safety import open_lockfile
+        with open_lockfile(lock_file) as lf:
             fcntl.flock(lf, fcntl.LOCK_EX)
             try:
                 # Now safely read/write state file
@@ -125,8 +130,9 @@ def get_global_budget_used() -> float:
     """Sum total_cost_usd across all session files in the sessions dir.
     Results are cached for 10 seconds to avoid O(N) scan on every prompt."""
     now = time.time()
-    # Derive sessions dir from _STATE_FILE so tests can patch just _STATE_FILE
-    sessions_dir = _STATE_FILE.parent / "sessions"
+    # See acquire() — resolve via module so __getattr__ fires on bare lookup.
+    import sys as _sys
+    sessions_dir = getattr(_sys.modules[__name__], "_STATE_FILE").parent / "sessions"
     cache_key = str(sessions_dir)
     if (
         _budget_cache["value"] is not None
@@ -139,11 +145,41 @@ def get_global_budget_used() -> float:
     if not sessions_dir.exists():
         _budget_cache.update({"value": total, "ts": now, "key": cache_key})
         return total
+    # Mirror the list_all() bound in session_store: reject any session file
+    # larger than MAX_SESSION_FILE_BYTES instead of reading it wholesale —
+    # otherwise a bloated / tampered file on the TTL-miss path OOMs every
+    # caller that hits check_budget (T-DOS.budget_scan_size_cap).
+    from .session_store import MAX_SESSION_FILE_BYTES
+    files_scanned = 0
     for f in sessions_dir.glob("*.json"):
+        if files_scanned >= 10000:
+            break
+        files_scanned += 1
         try:
-            data = json.loads(f.read_text())
-            cs = data.get("cost_summary", {})
-            total += cs.get("total_cost_usd", 0.0)
+            with open(f, "rb") as fh:
+                if os.fstat(fh.fileno()).st_size > MAX_SESSION_FILE_BYTES:
+                    continue
+                raw = fh.read(MAX_SESSION_FILE_BYTES + 1)
+                if len(raw) > MAX_SESSION_FILE_BYTES:
+                    continue
+            data = json.loads(raw)
+            if not isinstance(data, dict):
+                continue
+            cs = data.get("cost_summary")
+            if not isinstance(cs, dict):
+                continue
+            v = cs.get("total_cost_usd", 0.0)
+            # Coerce + range-gate. A tampered session file carrying
+            # NaN/inf (json.loads accepts these by default) would poison
+            # total and silently defeat the global-budget gate
+            # (T-INPUT.budget_range_gate).
+            try:
+                v = float(v)
+            except (TypeError, ValueError):
+                continue
+            if math.isnan(v) or math.isinf(v) or v < 0 or v > 1e9:
+                continue
+            total += v
         except Exception:
             pass
     _budget_cache.update({"value": total, "ts": now, "key": cache_key})

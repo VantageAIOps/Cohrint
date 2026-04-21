@@ -26,10 +26,26 @@ from .update_check import _assert_https_api_base
 
 # ── Spool helpers ─────────────────────────────────────────────────────────────
 
-_SPOOL_DIR = Path.home() / ".cohrint"
-_SPOOL_FILE = _SPOOL_DIR / "spool.jsonl"
+# Lazy resolution so minimal containers without a /etc/passwd entry for
+# the UID (Path.home() raises RuntimeError) don't crash at import
+# (T-SAFETY.lazy_spool_dir, scan 18). Mirrors the rate_limiter pattern.
+def __getattr__(name: str):
+    if name == "_SPOOL_DIR":
+        return Path.home() / ".cohrint"
+    if name == "_SPOOL_FILE":
+        return Path.home() / ".cohrint" / "spool.jsonl"
+    if name == "_SPOOL_LOCK_FILE":
+        return Path.home() / ".cohrint" / "spool.lock"
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 _MAX_SPOOL = 1000
-_spool_lock = threading.Lock()
+# Absolute spool size cap enforced at read time. _MAX_SPOOL bounds line
+# count during WRITE, but a concurrent writer without the cap (test
+# harness, older version, manual tamper) can grow the file past any line
+# count we compute — so cap read bytes too (T-DOS.spool_read_size_cap).
+_MAX_SPOOL_BYTES = 16 * 1024 * 1024  # 16 MiB
+_spool_lock = threading.Lock()  # in-process; cross-process uses fcntl below
 
 # In-memory queue ceiling. If the dashboard keeps rejecting events (e.g. a
 # persistent HTTP 400 from a misconfigured endpoint) the queue would
@@ -49,21 +65,57 @@ def _spool_write(events: list[dict[str, Any]]) -> None:
     SIGKILL mid-write without zero-byting the spool
     (T-SAFETY.spool_atomic).
     """
+    # Resolve via module __getattr__ (lazy) and import fcntl / open_lockfile
+    # inside the try so a missing fcntl on non-POSIX is caught by the outer
+    # "never raises" guarantee.
+    import sys as _sys
+    _mod = _sys.modules[__name__]
+    spool_dir = getattr(_mod, "_SPOOL_DIR")
+    spool_file = getattr(_mod, "_SPOOL_FILE")
+    spool_lock_file = getattr(_mod, "_SPOOL_LOCK_FILE")
     try:
-        _SPOOL_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+        import fcntl
+        from .process_safety import open_lockfile
+        spool_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
         try:
-            os.chmod(_SPOOL_DIR, 0o700)
+            os.chmod(spool_dir, 0o700)
         except OSError:
             pass
-        with _spool_lock:
+        # Cross-process lock — threading.Lock only serializes threads in
+        # THIS process. Two REPL processes sharing the spool would otherwise
+        # race read+unlink vs read+write and lose events
+        # (T-SAFETY.spool_cross_process, scan 18).
+        with _spool_lock, open_lockfile(spool_lock_file) as lk:
+            fcntl.flock(lk, fcntl.LOCK_EX)
             existing: list[str] = []
-            if _SPOOL_FILE.exists():
-                existing = _SPOOL_FILE.read_text(encoding="utf-8").splitlines()
+            # Open-then-read under lock; ignore FileNotFoundError since the
+            # drain path may have unlinked between mkdir and here.
+            try:
+                rfd = os.open(str(spool_file), os.O_RDONLY | os.O_NOFOLLOW)
+                try:
+                    with os.fdopen(rfd, "rb") as rf:
+                        if os.fstat(rf.fileno()).st_size > _MAX_SPOOL_BYTES:
+                            existing = []
+                        else:
+                            raw = rf.read(_MAX_SPOOL_BYTES + 1)
+                            if len(raw) > _MAX_SPOOL_BYTES:
+                                existing = []
+                            else:
+                                existing = raw.decode(
+                                    "utf-8", errors="replace"
+                                ).splitlines()
+                except Exception:
+                    try:
+                        os.close(rfd)
+                    except OSError:
+                        pass
+            except FileNotFoundError:
+                existing = []
             new_lines = [json.dumps(e) for e in events]
             combined = existing + new_lines
             if len(combined) > _MAX_SPOOL:
                 combined = combined[len(combined) - _MAX_SPOOL:]
-            tmp_path = _SPOOL_FILE.with_suffix(_SPOOL_FILE.suffix + ".tmp")
+            tmp_path = spool_file.with_suffix(spool_file.suffix + ".tmp")
             try:
                 tmp_path.unlink()
             except FileNotFoundError:
@@ -77,7 +129,8 @@ def _spool_write(events: list[dict[str, Any]]) -> None:
                 f.write("\n".join(combined) + "\n")
                 f.flush()
                 os.fsync(f.fileno())
-            os.replace(tmp_path, _SPOOL_FILE)
+            os.replace(tmp_path, spool_file)
+            fcntl.flock(lk, fcntl.LOCK_UN)
     except Exception as exc:  # noqa: BLE001
         try:
             # Only emit the exception type. ``exc`` from OSError includes
@@ -92,12 +145,39 @@ def _spool_write(events: list[dict[str, Any]]) -> None:
 
 def _spool_drain() -> list[dict[str, Any]]:
     """Read and delete the spool file. Returns list of event dicts."""
+    import sys as _sys
+    _mod = _sys.modules[__name__]
+    spool_file = getattr(_mod, "_SPOOL_FILE")
+    spool_lock_file = getattr(_mod, "_SPOOL_LOCK_FILE")
     try:
-        with _spool_lock:
-            if not _SPOOL_FILE.exists():
+        import fcntl
+        from .process_safety import open_lockfile
+        # Cross-process lock — serializes drain vs concurrent _spool_write
+        # so we don't race read vs append (T-SAFETY.spool_cross_process).
+        try:
+            spool_file.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        except OSError:
+            pass
+        with _spool_lock, open_lockfile(spool_lock_file) as lk:
+            fcntl.flock(lk, fcntl.LOCK_EX)
+            try:
+                rfd = os.open(str(spool_file), os.O_RDONLY | os.O_NOFOLLOW)
+                with os.fdopen(rfd, "rb") as rf:
+                    if os.fstat(rf.fileno()).st_size > _MAX_SPOOL_BYTES:
+                        lines = []
+                    else:
+                        raw = rf.read(_MAX_SPOOL_BYTES + 1)
+                        if len(raw) > _MAX_SPOOL_BYTES:
+                            lines = []
+                        else:
+                            lines = raw.decode(
+                                "utf-8", errors="replace"
+                            ).splitlines()
+                spool_file.unlink(missing_ok=True)
+            except FileNotFoundError:
+                fcntl.flock(lk, fcntl.LOCK_UN)
                 return []
-            lines = _SPOOL_FILE.read_text(encoding="utf-8").splitlines()
-            _SPOOL_FILE.unlink(missing_ok=True)
+            fcntl.flock(lk, fcntl.LOCK_UN)
         events: list[dict[str, Any]] = []
         for line in lines:
             line = line.strip()
