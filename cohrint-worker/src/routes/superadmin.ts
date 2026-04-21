@@ -267,14 +267,24 @@ superadmin.get('/traffic', async (c) => {
   await bootstrapTables(c.env.DB);
 
   const [apiTraffic, pageTraffic] = await Promise.all([
+    // JOIN orgs to split real (is_test=0) vs test (is_test=1) traffic per day
     c.env.DB.prepare(`
-      SELECT date(created_at,'unixepoch') AS day,
+      SELECT date(e.created_at,'unixepoch') AS day,
              COUNT(*) AS events,
-             COUNT(DISTINCT org_id) AS active_orgs,
-             COALESCE(SUM(cost_usd),0) AS cost_usd
-      FROM events WHERE created_at >= ?
+             COUNT(DISTINCT e.org_id) AS active_orgs,
+             COALESCE(SUM(e.cost_usd),0) AS cost_usd,
+             COUNT(CASE WHEN o.is_test = 0 THEN 1 END) AS real_events,
+             COUNT(CASE WHEN o.is_test = 1 THEN 1 END) AS test_events,
+             COALESCE(SUM(CASE WHEN o.is_test = 0 THEN e.cost_usd ELSE 0 END),0) AS real_cost_usd,
+             COUNT(DISTINCT CASE WHEN o.is_test = 0 THEN e.org_id END) AS real_active_orgs
+      FROM events e
+      JOIN orgs o ON o.id = e.org_id
+      WHERE e.created_at >= ?
       GROUP BY day ORDER BY day
-    `).bind(since).all<{ day: string; events: number; active_orgs: number; cost_usd: number }>(),
+    `).bind(since).all<{
+      day: string; events: number; active_orgs: number; cost_usd: number;
+      real_events: number; test_events: number; real_cost_usd: number; real_active_orgs: number;
+    }>(),
 
     c.env.DB.prepare(`
       SELECT date(created_at,'unixepoch') AS day,

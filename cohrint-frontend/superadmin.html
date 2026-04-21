@@ -395,8 +395,9 @@ tr:hover td { background: var(--bg3); }
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
           <div class="card-title" style="margin:0">API events &amp; cost per day</div>
           <div style="display:flex;gap:16px;font-size:11px;color:var(--mu)">
-            <span><span style="display:inline-block;width:10px;height:10px;background:#7c6bff;border-radius:2px;margin-right:5px;vertical-align:middle"></span>Events</span>
-            <span><span style="display:inline-block;width:18px;height:2px;background:#fbbf24;margin-right:5px;vertical-align:middle"></span>Cost (USD)</span>
+            <span><span style="display:inline-block;width:10px;height:10px;background:#34d399;border-radius:2px;margin-right:5px;vertical-align:middle"></span>Real</span>
+            <span><span style="display:inline-block;width:10px;height:10px;background:#fbbf2455;border-radius:2px;margin-right:5px;vertical-align:middle"></span>Test</span>
+            <span><span style="display:inline-block;width:18px;height:2px;background:#7c6bff;margin-right:5px;vertical-align:middle"></span>Cost (USD)</span>
           </div>
         </div>
         <div class="chart-wrap" style="height:260px"><canvas id="chart-api-traffic"></canvas></div>
@@ -734,32 +735,35 @@ async function loadTraffic() {
     const providers = feat.providers ?? [];
     const models    = (feat.models ?? []).slice(0, 8);
 
-    // KPIs — textContent only, no innerHTML
-    const totalEvents   = api.reduce((s, r) => s + (r.events ?? 0), 0);
-    const totalCost     = api.reduce((s, r) => s + (r.cost_usd ?? 0), 0);
-    const peakDay       = api.reduce((a, b) => (b.events ?? 0) > (a?.events ?? 0) ? b : a, null);
-    const avgOrgs       = api.length ? (api.reduce((s, r) => s + (r.active_orgs ?? 0), 0) / api.length) : 0;
+    // KPIs — real vs test split
+    const realEvents    = api.reduce((s, r) => s + (r.real_events ?? 0), 0);
+    const testEvents    = api.reduce((s, r) => s + (r.test_events ?? 0), 0);
+    const realCost      = api.reduce((s, r) => s + (r.real_cost_usd ?? 0), 0);
+    const peakDay       = api.reduce((a, b) => (b.real_events ?? 0) > (a?.real_events ?? 0) ? b : a, null);
+    const avgRealOrgs   = api.length ? (api.reduce((s, r) => s + (r.real_active_orgs ?? 0), 0) / api.length) : 0;
     const totalPv       = pv.reduce((s, r) => s + (r.pageviews ?? 0), 0);
     const totalSessions = pv.reduce((s, r) => s + (r.sessions ?? 0), 0);
 
-    _setKpi('tr-events', fmt(totalEvents),             'last ' + PERIOD + 'd');
-    _setKpi('tr-peak',   peakDay ? fmt(peakDay.events) : '—', peakDay?.day ?? '');
-    _setKpi('tr-cost',   '$' + fmtCost(totalCost),     'last ' + PERIOD + 'd');
-    _setKpi('tr-orgs',   avgOrgs.toFixed(1),            'last ' + PERIOD + 'd');
-    _setKpi('tr-pv',     fmt(totalPv),                  'last ' + PERIOD + 'd');
-    _setKpi('tr-sess',   fmt(totalSessions),             'last ' + PERIOD + 'd');
+    _setKpi('tr-events', fmt(realEvents),  'real · ' + fmt(testEvents) + ' test');
+    _setKpi('tr-peak',   peakDay ? fmt(peakDay.real_events) : '—', peakDay?.day ?? '');
+    _setKpi('tr-cost',   '$' + fmtCost(realCost), 'real traffic only');
+    _setKpi('tr-orgs',   avgRealOrgs.toFixed(1),   'real orgs avg/day');
+    _setKpi('tr-pv',     fmt(totalPv),    'last ' + PERIOD + 'd');
+    _setKpi('tr-sess',   fmt(totalSessions), 'last ' + PERIOD + 'd');
 
-    // Events + cost dual-axis chart
+    // Stacked bar: real events (green) + test events (muted) + cost line (right axis)
     if (_chartInstances['apiTraffic']) _chartInstances['apiTraffic'].destroy();
     _chartInstances['apiTraffic'] = new Chart(document.getElementById('chart-api-traffic'), {
       data: {
         labels: api.map(r => r.day),
         datasets: [
-          { type: 'bar',  label: 'Events',    data: api.map(r => r.events),
-            backgroundColor: '#7c6bffbb', borderRadius: 4, yAxisID: 'y' },
-          { type: 'line', label: 'Cost (USD)', data: api.map(r => +(r.cost_usd ?? 0).toFixed(4)),
-            borderColor: '#fbbf24', backgroundColor: 'transparent', yAxisID: 'y1',
-            tension: 0.35, pointRadius: 3, pointBackgroundColor: '#fbbf24', borderWidth: 2 },
+          { type: 'bar',  label: 'Real events', data: api.map(r => r.real_events ?? 0),
+            backgroundColor: '#34d399bb', borderRadius: 2, yAxisID: 'y', stack: 'events' },
+          { type: 'bar',  label: 'Test events',  data: api.map(r => r.test_events ?? 0),
+            backgroundColor: '#fbbf2444', borderRadius: 2, yAxisID: 'y', stack: 'events' },
+          { type: 'line', label: 'Real cost (USD)', data: api.map(r => +(r.real_cost_usd ?? 0).toFixed(4)),
+            borderColor: '#7c6bff', backgroundColor: 'transparent', yAxisID: 'y1',
+            tension: 0.35, pointRadius: 3, pointBackgroundColor: '#7c6bff', borderWidth: 2 },
         ],
       },
       options: {
@@ -767,8 +771,8 @@ async function loadTraffic() {
         plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
         scales: {
           x:  { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#888', font: { size: 10 }, maxTicksLimit: 12 } },
-          y:  { position: 'left',  grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#888', font: { size: 10 } }, beginAtZero: true },
-          y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { color: '#fbbf24aa', font: { size: 10 }, callback: v => '$' + v }, beginAtZero: true },
+          y:  { position: 'left',  stacked: true, grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#888', font: { size: 10 } }, beginAtZero: true },
+          y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { color: '#7c6bffaa', font: { size: 10 }, callback: v => '$' + v }, beginAtZero: true },
         },
       },
     });
