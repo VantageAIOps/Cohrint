@@ -3425,7 +3425,7 @@ function renderTeamPie(teams) {
   _teamPieChart = new Chart(canvas, {
     type: 'doughnut',
     data: {
-      labels: data.map(function(t) { return esc(t.team || t.name || 'Default'); }),
+      labels: data.map(function(t) { return t.team || t.name || 'Default'; }),
       datasets: [{
         data: data.map(function(t) { return t.cost_usd || t.total_cost || t.cost || 0; }),
         backgroundColor: data.map(function(_, i) { return colors[i % colors.length]; }),
@@ -3661,7 +3661,7 @@ function renderProviderBreakdown(costs) {
   _providerChart = new Chart(canvas, {
     type: 'bar',
     data: {
-      labels: provs.map(function(p) { return esc(meta[p] ? meta[p].label : p); }),
+      labels: provs.map(function(p) { return meta[p] ? meta[p].label : p; }),
       datasets: [{
         label: 'Avg Monthly Cost',
         data: provs.map(function(p) {
@@ -5754,7 +5754,7 @@ function loadOptimization() {
       _optTrendChart = new Chart(canvas, {
         type: 'bar',
         data: {
-          labels: trend.map(function(r) { return esc(r.month); }),
+          labels: trend.map(function(r) { return r.month; }),
           datasets: [{
             label: 'Avg cost reduction',
             data: trend.map(function(r) { return r.avg_factor; }),

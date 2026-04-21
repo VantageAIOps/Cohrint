@@ -41,7 +41,8 @@ export function resolveAllowedTools(raw: string | undefined): Set<string> {
  * Sanitise a user-supplied string.
  *
  * Steps: coerce → truncate to `maxLen` → strip control chars (0x00-0x1F
- * except \t \n \r, plus 0x7F).
+ * except \t \n \r, plus 0x7F). Note: \r is not stripped here but is
+ * normalised to a space by escapeMd() for Markdown table contexts.
  *
  * Apply to anything that will be:
  *   - echoed back to the LLM in tool output (indirect prompt-injection vector), or
@@ -54,9 +55,9 @@ export function sanitizeString(v: unknown, maxLen: number): string {
   return clipped.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
 }
 
-/** Escape markdown pipe + newline so sanitised text can't break a table row. */
+/** Escape markdown pipe + newline/CR so sanitised text can't break a table row. */
 export function escapeMd(s: string): string {
-  return s.replace(/\|/g, '\\|').replace(/\n/g, ' ');
+  return s.replace(/\|/g, '\\|').replace(/[\n\r]/g, ' ');
 }
 
 /**
