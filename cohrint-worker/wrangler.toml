@@ -64,6 +64,10 @@ crons = ["*/10 * * * *", "0 2 * * *"]
 #                              Get a free key at resend.com — 3,000 emails/month
 # TOKEN_ENCRYPTION_SECRET    — AES-256-GCM key material for Copilot PAT encryption
 #                              Generate: openssl rand -base64 32
+# UPSTASH_REDIS_REST_URL     — Upstash Redis REST endpoint (replaces KV for rate limiting)
+#                              From: upstash.com → your database → REST API → UPSTASH_REDIS_REST_URL
+# UPSTASH_REDIS_REST_TOKEN   — Upstash Redis REST token
+#                              From: upstash.com → your database → REST API → UPSTASH_REDIS_REST_TOKEN
 
 # ── Cloudflare Queues (T010 — async event ingest) ────────────────────────────
 [[queues.producers]]

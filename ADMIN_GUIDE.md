@@ -1151,24 +1151,66 @@ Restricted to `owner` or `admin` to prevent member-triggered O(N contributors) r
 
 ## 10. Rate Limiting Algorithm
 
-### 10.1 Fixed-Window Counter via KV
+### 10.1 Upstash Redis — Fixed-Window Counter via HTTP Pipeline
 
-```typescript
-async function checkRateLimit(kv: KVNamespace, orgId: string, limitRpm: number): Promise<boolean> {
-  const key   = `rl:${orgId}:${Math.floor(Date.now() / 60_000)}`;  // 1-minute bucket
-  const raw   = await kv.get(key);
-  const count = raw ? parseInt(raw, 10) : 0;
-  if (count >= limitRpm) return false;
-  await kv.put(key, String(count + 1), { expirationTtl: 70 });     // 70s TTL (60s + 10s skew)
-  return true;
-}
+Rate limiting moved from Cloudflare KV to **Upstash Redis** (free tier: 10K commands/day).
+KV was hitting its 1,000 write/day free-tier limit under normal OTel traffic.
+
+**Storage:** `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` worker secrets.
+
+**Two tiers controlled by `orgs` table columns:**
+
+| Column | Value | Behaviour |
+|---|---|---|
+| `is_test` | `1` | Skip rate limiting entirely — 0 Redis commands |
+| `is_test` | `0` (default) | Apply rate limiting |
+| `plan` | `'free'` (default) | Per-key limiting only — 2 Redis commands/request |
+| `plan` | anything else | Per-key + org-level limiting — 4 Redis commands/request |
+
+**Algorithm — INCR + EXPIRE pipeline (1 HTTP round-trip):**
+
+```
+bucket = floor(now / 60_000)   // 1-minute window
+
+// Always (non-test accounts):
+INCR  rl:key:{apiKey[0..8]}:{bucket}   → keyCount
+EXPIRE rl:key:{apiKey[0..8]}:{bucket} 70
+
+// Premium only (plan != 'free'):
+INCR  rl:org:{orgId}:{bucket}          → orgCount
+EXPIRE rl:org:{orgId}:{bucket} 70
+
+if keyCount > RATE_LIMIT_RPM → 429
+if orgCount > RATE_LIMIT_RPM * 5 → 429
 ```
 
-- Rate limited **per-org** (shared across all members)
-- Default: `RATE_LIMIT_RPM = 1000`
+- Default: `RATE_LIMIT_RPM = 1000` (env var in wrangler.toml)
 - 429 response includes: `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining: 0`
-- KV write failure = allow (graceful degradation, non-blocking)
-- Known tradeoff: burst at minute boundary (2x allowed for ~1 second). Acceptable for background telemetry.
+- Upstash failure → allow through (graceful degradation)
+
+### 10.2 Operational Runbook
+
+**Mark an account as internal/test (skip rate limiting):**
+```sql
+UPDATE orgs SET is_test=1 WHERE id='<org-id>';
+```
+
+**Upgrade a paying customer to premium rate limiting:**
+```sql
+UPDATE orgs SET plan='pro' WHERE id='<org-id>';
+```
+> `plan` is the single source of truth for payment status. When Stripe integration is added,
+> the webhook handler updates `plan` automatically on `invoice.paid` / `customer.subscription.deleted`.
+
+**Downgrade / cancel:**
+```sql
+UPDATE orgs SET plan='free' WHERE id='<org-id>';
+```
+
+**Check current flags for an org:**
+```sql
+SELECT id, plan, is_test FROM orgs WHERE id='<org-id>';
+```
 
 ---
 

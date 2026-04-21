@@ -134,8 +134,8 @@ auth.post('/recover', async (c) => {
       try {
         await c.env.KV.put(kvKey, JSON.stringify({ orgId: org.id, type: 'owner', ip: requestIp }), { expirationTtl: 3600 });
         redeemUrl = `https://api.cohrint.com/v1/auth/recover/redeem?token=${token}`;
-      } catch {
-        // KV unavailable — email still sent without one-click redeem link
+      } catch (kvErr) {
+        createLogger(c.get('requestId') ?? 'unknown').warn('recover: KV put failed — sending email without redeem link', { err: String(kvErr) });
       }
 
       const { subject, html } = keyRecoveryEmail({

@@ -148,6 +148,7 @@ const API = 'https://api.cohrint.com';
 // Deferred until after DOMContentLoaded + idle to avoid Safari/WebKit race
 // where redirect fires before Playwright's domcontentloaded wait resolves.
 function _checkExistingSession() {
+  if (window._recoverToken) return; // recovery flow in progress — never auto-redirect
   fetch(`${API}/v1/auth/session`, { credentials: 'include' })
     .then(res => {
       if (res.ok) {
@@ -353,17 +354,22 @@ document.getElementById('inp-email').addEventListener('keydown', e => {
     return;
   }
 
-  // Error from redeem
+  // Error from redeem — show prominently and auto-open recover panel
   if (errCode) {
     const msgs = {
-      expired:       'Recovery link has expired (1-hour limit). Please request a new one below.',
-      missing_token: 'Invalid recovery link.',
-      invalid:       'Recovery link is invalid or already used. Please request a new one.',
+      expired:       'Recovery link has expired (1-hour limit). Request a new one below.',
+      missing_token: 'Invalid recovery link. Request a new one below.',
+      invalid:       'Recovery link already used or invalid. Request a new one below.',
     };
-    const err = document.getElementById('signin-err');
-    err.textContent = msgs[errCode] || 'Recovery failed — please try again.';
-    err.style.display = 'block';
     window.history.replaceState({}, '', '/auth');
+    // Switch to recover panel so user can immediately request a fresh link
+    document.getElementById('signin-box').style.display = 'none';
+    const box = document.getElementById('recover-box');
+    box.style.display = 'block';
+    const msg = document.createElement('div');
+    msg.style.cssText = 'background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);border-radius:8px;padding:12px 14px;font-size:13px;color:var(--re);margin-bottom:16px';
+    msg.textContent = msgs[errCode] || 'Recovery failed — please try again.';
+    box.insertBefore(msg, box.querySelector('.field') || box.firstChild);
   }
 })();
 
