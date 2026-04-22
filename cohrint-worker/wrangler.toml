@@ -4,7 +4,6 @@ compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
 # ── Custom domain — api.cohrint.com → this Worker ────────────────────────────
-# Uses [[custom_domains]] instead of routes[] — no Zone:Workers Routes permission needed
 [[routes]]
 pattern = "api.cohrint.com"
 custom_domain = true
@@ -91,12 +90,13 @@ max_batch_size     = 50
 max_batch_timeout  = 10
 max_retries        = 1
 
-# ── Staging environment (main branch → main.cohrint.com) ─────────────────────
+# ── Staging environment (main branch → workers.dev only) ─────────────────────
 # Deploy: wrangler deploy --env staging
-# To expose on api-staging.cohrint.com, add a custom domain in Cloudflare dashboard
-# and configure DNS before enabling [[env.staging.routes]].
+# IMPORTANT: workers_dev = true prevents the staging env from inheriting the
+# production [[routes]] entry. Without this, staging deploys overwrite api.cohrint.com.
 [env.staging]
-name = "cohrint-api-staging"
+name        = "cohrint-api-staging"
+workers_dev = true
 [env.staging.vars]
 ENVIRONMENT     = "staging"
 ALLOWED_ORIGINS = "https://main.cohrint.com,https://*.cohrint.pages.dev,http://localhost:*"
