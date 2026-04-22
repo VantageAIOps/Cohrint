@@ -2385,6 +2385,7 @@ class TestSpoolPerms:
         from cohrint_agent import tracker as T
         monkeypatch.setattr(T, "_SPOOL_DIR", tmp_path / "spool_dir")
         monkeypatch.setattr(T, "_SPOOL_FILE", tmp_path / "spool_dir" / "spool.jsonl")
+        monkeypatch.setattr(T, "_SPOOL_LOCK_FILE", tmp_path / "spool_dir" / "spool.lock")
         old_umask = _os.umask(0o000)
         try:
             T._spool_write([{"event_id": "x"}])
@@ -2409,6 +2410,7 @@ class TestSpoolAtomic:
         from cohrint_agent import tracker as T
         monkeypatch.setattr(T, "_SPOOL_DIR", tmp_path / "spool_dir")
         monkeypatch.setattr(T, "_SPOOL_FILE", tmp_path / "spool_dir" / "spool.jsonl")
+        monkeypatch.setattr(T, "_SPOOL_LOCK_FILE", tmp_path / "spool_dir" / "spool.lock")
 
         replace_calls: list[tuple[str, str]] = []
         orig_replace = _os.replace
