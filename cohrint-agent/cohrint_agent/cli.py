@@ -59,6 +59,7 @@ BANNER = """
   [bold]Cohrint Agent[/bold] [dim]v{version}[/dim]
   [dim]AI coding agent with per-tool permissions, cost tracking & optimization[/dim]
   [dim]Model: {model}  |  CWD: {cwd}[/dim]
+  [dim]Optimization: {optimization}  |  Guardrails: {guardrails}[/dim]
 
   [dim]REPL commands:[/dim]
     [bold]/help[/bold]              Show commands
@@ -78,6 +79,25 @@ BANNER = """
 {verbs}
   [dim]Run `cohrint-agent help` for full catalog.[/dim]
 """
+
+
+_HEDGE_PHRASES = (
+    "i don't know", "i do not know", "i'm not sure", "i am not sure",
+    "i can't verify", "i cannot verify", "i can't confirm", "i cannot confirm",
+    "i'm unable to verify", "i am unable to verify", "i cannot guarantee",
+    "doesn't exist", "does not exist", "isn't a real", "is not a real",
+    "no such", "not a valid", "not an actual", "fabricat", "hallucin",
+    "i don't have access", "i do not have access", "i recommend verifying",
+    "please verify", "you should verify", "i'd recommend checking",
+    "i would recommend checking", "i suggest verifying", "check the official",
+    "refer to the official", "consult the documentation",
+)
+
+
+def _detect_hedge(text: str) -> bool:
+    """Return True if the response contains hallucination-avoidance language."""
+    lower = text.lower()
+    return any(phrase in lower for phrase in _HEDGE_PHRASES)
 
 
 def _verb_summary_lines() -> str:
@@ -154,11 +174,36 @@ class _ClaudeCliClient:
         self.optimization = True
 
     def send(self, prompt: str, no_optimize: bool = False) -> str:
-        result = self.backend.send(prompt=prompt, history=[], cwd=self.cwd)
+        actual_prompt = prompt
+        # Run optimization silently — results stored for post-response display
+        self._last_opt_result: object = None
+
+        if self.optimization and not no_optimize:
+            opt = optimize_prompt(prompt)
+            actual_prompt = opt.optimized
+            self._last_opt_result = opt
+
+        from .guardrails import get_settings as _get_gs, system_preamble as _preamble
+        _gs = _get_gs()
+        _active = [k for k, v in (("hallucination", _gs.hallucination), ("recommendation", _gs.recommendation)) if v]
+        self._last_guardrail_active = _active
+        if _active:
+            preamble = _preamble()
+            if preamble:
+                actual_prompt = preamble + "\n\n" + actual_prompt
+
+        # Pre-send: show what the optimizer stripped — only emits when there
+        # were real savings, so clean prompts stay visually quiet.
+        from .renderer import render_optimization_preview
+        if isinstance(self._last_opt_result, OptimizationResult):
+            render_optimization_preview(self._last_opt_result, self.model)
+
+        result = self.backend.send(prompt=actual_prompt, history=[], cwd=self.cwd)
         self.cost.record_usage_raw(
             input_tokens=result.input_tokens,
             output_tokens=result.output_tokens,
             cost_usd=result.cost_usd,
+            cache_read_tokens=getattr(result, "cache_read_tokens", 0),
         )
         return result.output_text
 
@@ -260,7 +305,15 @@ def _handle_command(line: str, client: AgentClient) -> bool:
 
     # Bare "/" prints help — avoids "Unknown command: /" dead-end (T-DISPATCH.2).
     if stripped in ("/", "/help"):
-        console.print(BANNER.format(version=__version__, model=client.model, cwd=client.cwd, verbs=_verb_summary_lines()))
+        from .guardrails import get_settings as _gs
+        _g = _gs()
+        _guardrail_state = "on" if (_g.recommendation and _g.hallucination) else "partial/off"
+        console.print(BANNER.format(
+            version=__version__, model=client.model, cwd=client.cwd,
+            verbs=_verb_summary_lines(),
+            optimization="on" if client.optimization else "off",
+            guardrails=_guardrail_state,
+        ))
         return True
 
     if stripped == "/tools":
@@ -451,16 +504,26 @@ def run_repl(client: AgentClient, tracker: Tracker | None = None) -> None:
     from .repl_completer import install as _install_completer
     _install_completer()
 
-    console.print(BANNER.format(version=__version__, model=client.model, cwd=client.cwd, verbs=_verb_summary_lines()))
+    from .guardrails import get_settings as _gs
+    _g = _gs()
+    _guardrail_state = "on" if (_g.recommendation and _g.hallucination) else "partial/off"
+    console.print(BANNER.format(
+        version=__version__, model=client.model, cwd=client.cwd,
+        verbs=_verb_summary_lines(),
+        optimization="on" if client.optimization else "off",
+        guardrails=_guardrail_state,
+    ))
 
+    from .repl_input import read_prompt
     while True:
-        try:
-            console.print()
-            line = console.input("[bold cyan]cohrint>[/bold cyan] ")
-        except (EOFError, KeyboardInterrupt):
+        console.print()
+        line = read_prompt()
+        # read_prompt returns None on Ctrl-D / Ctrl-C with empty buffer —
+        # signals quit. Empty string means "user pressed Enter on blank"
+        # — re-prompt silently without spending a backend turn.
+        if line is None:
             console.print("\n  [dim]Goodbye.[/dim]")
             break
-
         if not line.strip():
             continue
 
@@ -512,14 +575,65 @@ def run_repl(client: AgentClient, tracker: Tracker | None = None) -> None:
             # here (e.g. `- 1`) delays anomaly detection by one full turn.
             prior_total = client.cost.total_cost_usd
             prior_count = client.cost.prompt_count
-            client.send(line)
-            # Show per-turn cost + anomaly check
+            response_text = client.send(line)
+            # ── Post-response: Cohrint analysis block ─────────────────────
+            # Aggregates optimization savings, hallucination guardrail,
+            # anomaly detection, recommendation tip, and per-turn / session
+            # cost into one uniformly-rendered block via renderer.py.
             if client.cost.turns:
                 last = client.cost.turns[-1]
-                console.print(
-                    f"  [dim]↳ {last.input_tokens + last.output_tokens:,} tokens · ${last.cost_usd:.4f}[/dim]"
+
+                from .anomaly import check_cost_anomaly_structured
+                _anomaly = check_cost_anomaly_structured(last.cost_usd, prior_total, prior_count)
+                anomaly_line = (
+                    f"${_anomaly.current_cost:.4f} this turn vs "
+                    f"${_anomaly.avg_cost:.4f} avg ({_anomaly.ratio:.1f}x)"
+                ) if _anomaly.detected else None
+
+                _active = getattr(client, "_last_guardrail_active", [])
+                recommendation: str | None = None
+                if "recommendation" in _active:
+                    try:
+                        from .recommendations import SessionMetrics, get_inline_tip
+                        _total_count = prior_count + 1
+                        _total_cost = prior_total + last.cost_usd
+                        _tip = get_inline_tip(SessionMetrics(
+                            prompt_count=_total_count,
+                            total_cost_usd=_total_cost,
+                            total_input_tokens=last.input_tokens,
+                            total_output_tokens=last.output_tokens,
+                            total_cached_tokens=0,
+                            agent="claude",
+                            model=client.model,
+                            last_prompt_cost_usd=last.cost_usd,
+                            last_prompt_tokens=last.input_tokens + last.output_tokens,
+                            avg_cost_per_prompt=_total_cost / _total_count if _total_count else 0.0,
+                        ))
+                        if _tip:
+                            recommendation = _tip.lstrip("💡").strip().split(chr(10))[0]
+                    except Exception:
+                        pass
+
+                from .renderer import render_cohrint_analysis
+                from .pricing import cache_read_savings
+                _cache_saved_usd = cache_read_savings(client.model, last.cache_read_tokens)
+                render_cohrint_analysis(
+                    optimization=getattr(client, "_last_opt_result", None),
+                    model=client.model,
+                    guardrail_hedge_detected=(
+                        "hallucination" in _active and bool(response_text)
+                        and _detect_hedge(response_text)
+                    ),
+                    guardrail_active=_active,
+                    anomaly_line=anomaly_line,
+                    recommendation=recommendation,
+                    turn_input_tokens=last.input_tokens,
+                    turn_output_tokens=last.output_tokens,
+                    turn_cost_usd=last.cost_usd,
+                    session_cost_usd=client.cost.total_cost_usd,
+                    cache_saved_usd=_cache_saved_usd,
+                    cache_read_tokens=last.cache_read_tokens,
                 )
-                check_cost_anomaly(last.cost_usd, prior_total, prior_count)
                 if tracker:
                     tracker.record(
                         model=client.model,

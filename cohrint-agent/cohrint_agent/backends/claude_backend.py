@@ -22,10 +22,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from rich.console import Console as _Console
+
 from .base import Backend, BackendCapabilities, BackendResult
 from ..process_safety import clamp_argv, safe_child_env
 from ..pricing import calculate_cost
 from ..sanitize import scrub_for_terminal, scrub_token
+
+_console = _Console()
 
 if TYPE_CHECKING:
     from ..permission_server import PermissionServer
@@ -123,6 +127,13 @@ class ClaudeCliBackend(Backend):
             if self._permission_server else None
         )
 
+        # Live spinner so the user doesn't think the CLI is stuck during
+        # subprocess boot + first-token latency (typically 1-3s). It
+        # auto-clears the moment any renderable event arrives below.
+        from ..renderer import make_waiting_spinner
+        spinner = make_waiting_spinner("Thinking")
+        spinner.__enter__()
+
         proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -188,6 +199,13 @@ class ClaudeCliBackend(Backend):
                     # event carries session_id + cost — losing it breaks
                     # --resume on the next turn).
                     event = json.loads(line.decode("utf-8", errors="replace").strip())
+                    # Clear the spinner the moment any renderable event
+                    # arrives — must happen BEFORE _parse_stream_event
+                    # prints so spinner control codes don't clobber the
+                    # first line of output.
+                    etype = event.get("type")
+                    if etype in ("assistant", "rate_limit_event"):
+                        spinner.stop_immediate()
                     _parse_stream_event(event, state, render=True)
                 except (json.JSONDecodeError, UnicodeDecodeError):
                     pass
@@ -196,6 +214,7 @@ class ClaudeCliBackend(Backend):
                 reader.join()
             proc.wait()
         finally:
+            spinner.stop_immediate()
             # Belt-and-suspenders cleanup: if we exited the loop via an
             # exception, kill the child so it doesn't outlive us. wait()
             # is idempotent if the normal path already reaped it.
@@ -219,6 +238,7 @@ class ClaudeCliBackend(Backend):
         result = state.get("result") or {}
         input_tokens = result.get("input_tokens", 0)
         output_tokens = result.get("output_tokens", 0)
+        cache_read_tokens = result.get("cache_read_tokens", 0)
         cost_usd = result.get("total_cost_usd", 0.0)
         session_id = result.get("session_id")
 
@@ -238,6 +258,7 @@ class ClaudeCliBackend(Backend):
             model=self._model,
             exit_code=proc.returncode or 0,
             cost_usd=cost_usd,
+            cache_read_tokens=cache_read_tokens,
         )
 
 
@@ -245,23 +266,44 @@ def _parse_stream_event(event: dict, state: dict, render: bool = True) -> None:
     """
     Mutate state based on one stream-json event line.
     Renders text to terminal when render=True.
+
+    The cost footer is intentionally NOT printed here anymore — it is
+    aggregated into the post-response ``render_cohrint_analysis`` block
+    so users don't see cost reported twice per turn.
     """
-    from rich.console import Console
-    console = Console() if render else None
+    console = _console if render else None
     event_type = event.get("type", "")
 
     if event_type == "assistant":
         msg = event.get("message", {})
         for block in msg.get("content", []):
             if isinstance(block, dict):
-                if block.get("type") == "text":
+                btype = block.get("type")
+                if btype == "text":
                     text = block.get("text", "")
+                    # First text block of the turn — emit a visible
+                    # "── Claude ──" stage marker so tool calls and the
+                    # final answer are clearly separated.
+                    if text and not state.get("assistant_header_printed"):
+                        state["assistant_header_printed"] = True
+                        if render and console:
+                            from ..renderer import render_assistant_header
+                            render_assistant_header("claude")
                     state["text"] += text
-                    if render and console and text:
-                        console.print(text, end="", highlight=False)
-                elif block.get("type") == "tool_use" and render and console:
-                    console.print(
-                        f"\n  [dim]→ Using {block.get('name', '?')}...[/dim]"
+                    if render and text:
+                        import sys as _sys
+                        _sys.stdout.write(text)
+                        _sys.stdout.flush()
+                elif btype == "thinking":
+                    thinking = block.get("thinking", "")
+                    if render and console and thinking:
+                        from ..renderer import render_thinking
+                        render_thinking(thinking)
+                elif btype == "tool_use" and render and console:
+                    from ..renderer import render_tool_use_start
+                    render_tool_use_start(
+                        block.get("name", "?"),
+                        block.get("input", {}) or {},
                     )
 
     elif event_type == "result":
@@ -271,17 +313,9 @@ def _parse_stream_event(event: dict, state: dict, render: bool = True) -> None:
             "session_id": event.get("session_id"),
             "input_tokens": usage.get("input_tokens", 0),
             "output_tokens": usage.get("output_tokens", 0),
+            "cache_read_tokens": usage.get("cache_read_input_tokens", 0),
             "num_turns": event.get("num_turns", 1),
         }
-        if render and console:
-            cost = event.get("total_cost_usd", 0.0)
-            inp = usage.get("input_tokens", 0)
-            out = usage.get("output_tokens", 0)
-            console.print(
-                f"\n  [dim]↳ {inp + out:,} tokens · "
-                f"API-equivalent: ${cost:.4f}  "
-                f"[Max subscription: $0.00 actual][/dim]"
-            )
 
     elif event_type == "rate_limit_event":
         info = event.get("rate_limit_info", {})

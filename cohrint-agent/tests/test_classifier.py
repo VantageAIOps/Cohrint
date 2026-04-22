@@ -67,13 +67,19 @@ class TestStructuredDataGuard:
     def test_cs03_leading_triple_backtick(self):
         assert classify_input("```python\nimport os\n```", "claude") == "structured"
 
-    def test_cs04_fenced_code_block_anywhere(self):
+    def test_cs04_fenced_code_embedded_still_prompt(self):
+        # Prose with an embedded fenced block must still optimize — the
+        # optimizer's _split_code_and_prose already preserves code regions,
+        # so skipping the entire prompt is overkill (fix for the
+        # "confirm `validateStream()` exists in package X" regression).
         text = "Here is some prose before ```python\nimport os\n``` and after"
-        assert classify_input(text, "claude") == "structured"
+        assert classify_input(text, "claude") == "prompt"
 
-    def test_cs05_inline_code_skips(self):
+    def test_cs05_inline_code_still_prompt(self):
+        # Same rationale as cs04 — inline backticks must not gate the
+        # optimizer off for an otherwise-prose prompt.
         text = "Use the `os.path.join` function for path handling in your code"
-        assert classify_input(text, "claude") == "structured"
+        assert classify_input(text, "claude") == "prompt"
 
     def test_cs06_plain_prose_is_prompt(self):
         assert classify_input("Could you please explain how to deploy to AWS", "claude") == "prompt"
