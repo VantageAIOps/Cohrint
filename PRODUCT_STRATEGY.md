@@ -1,13 +1,15 @@
-# Cohrint — Product Strategy v8.0
-**The 10-Year War Room Plan: From LLM Cost Tracker → AI Spend Intelligence Layer → Bloomberg of AI**
+# Cohrint — Product Strategy v9.0
+**The Land-and-Expand Plan: Routing Wedge → CFO Expansion → AI Spend Governance Category**
 
 **Author:** Aman Jain / Kamal Soft Pvt Ltd
-**Date:** 2026-04-17
-**Version:** 8.0 — P3 Milestone Complete + Competitive Strategy Reframe
+**Date:** 2026-04-22
+**Version:** 9.0 — Stage 1 Complete (Routing + Quality Control) · Execution Spec v3 Applied
 **Stage:** Pre-Seed / 1-Man Army
-**Critical Window:** 18 months
+**Critical Window:** 18 months · Stage 2 starts when Stage 1 has 3 paying customers
 
-> **v8.0 Changes:** P3 milestone complete. Semantic Cache Layer (Cloudflare Vectorize + Workers AI, per-org namespaces, 0.92 threshold, $ saved tracking), Prompt Registry MVP (version prompts, cost-per-version, admin-only write), Agent Trace DAG Visualization (graph reconstruction from parent_event_id, team-scoped), and Public Benchmark Dashboard (k-anonymity floor, percentile rankings, quarterly snapshots) all shipped and live (PRs #65, #66). Security hardening shipped: RBAC role-based tab visibility, date-type bug fixes, per-dev hallucination scores (PR #67). Test suite count raised to 51+. Section 5 "What's Built" updated to reflect new features. Section 13 Task Plan updated: P3 items closed. Section 15 restructured from raw competitive teardown to formal Competitive Strategy section (renamed).
+> **v9.0 Changes:** Full execution spec v3 applied. Go-to-market sequence inverted: land with the routing installer, expand with the CFO renewer, sell the category later. Stage 1 (Months 1–4) is now complete: rule-based intent classifier (<50ms, zero API calls), cheapest-model router per intent class, 1–5% quality sampling against premium model (fire-and-forget), graceful fallback on 429/5xx, routing savings API (`GET /v1/analytics/savings`), Routing Savings KPI card on dashboard, Cohrint Index v0 methodology page, local proxy bumped to v1.1.0 (PR #87). Homepage rewritten to Stage 1 copy (PR #86 — hero: "Cut your AI coding bill 40%", outcome pricing, 3-step routing explainer). Section 3 (stage model) replaced with v3 3-stage land-and-expand sequence. Section 5 "What's Built" updated with routing system. Financial model updated to reflect 15% of savings pricing. Task plan: Stage 1 closed, Stage 2 items opened.
+
+> **v8.0 Changes:** P3 milestone complete. Semantic Cache Layer (Cloudflare Vectorize + Workers AI, per-org namespaces, 0.92 threshold, $ saved tracking), Prompt Registry MVP (version prompts, cost-per-version, admin-only write), Agent Trace DAG Visualization (graph reconstruction from parent_event_id, team-scoped), and Public Benchmark Dashboard (k-anonymity floor, percentile rankings, quarterly snapshots) all shipped and live (PRs #65, #66). Security hardening shipped: RBAC role-based tab visibility, date-type bug fixes, per-dev hallucination scores (PR #67). Test suite count raised to 51+.
 
 > **v7.0 Changes:** P2 milestone complete. All Copilot adapter, Datadog exporter, Benchmark system, Cross-Platform Console, Audit Log, Trust page, Report page fully shipped and live. Updated "What's Built" to reflect 18-table schema, 41 test suites, MCP v1.1.1, CLI rename to npx vantageai-cli, Python SDK v1.0.1. Competitive landscape rewritten for April 2026 — Cohrint now holds a unique cross-stack position no competitor covers. Task plan updated: P2 closed, P3 tasks reprioritized.
 
@@ -82,36 +84,51 @@ The P2 milestone shipped the three features that create this permanent advantage
 
 ---
 
-## 3. The Pivot — From Tool to Platform
+## 3. The Land-and-Expand Sequence (Execution Spec v3)
 
-The pivot is not about rebuilding. It's about reframing what exists and layering the right capabilities on top. Every feature you've built is still valid — the narrative and the target buyer need to shift.
+**Core principle:** Land with the installer. Expand with the renewer. Sell the category later.
+
+The previous brief sold the full governance-and-insurance category from day one. That is how seed-stage companies die in the gap between "too ambitious for customers" and "too unproven for investors." v9 inverts the order.
 
 ```
-Stage 1 · Now — Developer Tool
-Token tracker, cost dashboard, prompt optimizer.
-Target: individual developers. ACV: $0–99/mo.
+Stage 1 · Months 1–4 · COMPLETE ✅ — Land
+"We cut your AI coding bill 40% with zero engineering effort."
+Buyer: Platform engineering lead.
+Product: Routing with quality control. Nothing else on the homepage.
+Pricing: 15% of documented savings, minimum $1,500/mo.
+Proof: Three design-partner case studies (in progress).
+Success metric: Three paying customers at $2k+ MRR, measured savings >$10k/mo each.
 
-     ↓
+     ↓ unlock: 3 paying customers
 
-Stage 2 · Month 3–6 — Engineering Org Platform
-Multi-tool consolidated spend, per-developer ROI, team budgets,
-AI coding tool procurement dashboard.
-Target: CTOs at 50–500 person companies. ACV: $5K–25K/yr.
+Stage 2 · Months 4–9 — Expand
+"Your CFO needs to see this."
+Buyer: VP Engineering → CFO.
+Product: Routing + Cohrint Verified (compliance-grade audit IDs) + quarterly AI P&L export.
+Pricing: Enterprise tier at $60k/year, outcome-backed.
+Proof: The Cohrint Index v1 published with 50-team dataset.
+Success metric: Five enterprise accounts, one analyst briefing, one CFO case study filmed.
 
-     ↓
+     ↓ unlock: 5 enterprise accounts
 
-Stage 3 · Month 9–18 — AI Spend Intelligence Layer
-Cross-company benchmarks, model quality intelligence, vendor
-negotiation data, board-ready audit trails.
-Target: CFOs, Procurement, VPs at 500+ companies. ACV: $50K–200K/yr.
-
-     ↓
-
-Stage 4 · Year 2–5 — Bloomberg of AI Pricing
-The neutral market intelligence layer. Aggregated benchmarks across
-1000s of companies. Pricing negotiation as a service. AI governance
-compliance. The system of record for AI spend. ACV: $200K–1M/yr.
+Stage 3 · Months 9–18 — Own
+"AI Spend Governance is a category. Cohrint defined it."
+Buyer: CFO + CISO + board.
+Product: Routing + Verified + P&L + AI Spend Insurance (premium tier).
+Pricing: Underwritten guarantee contracts, $150k+ ACV.
+Proof: Gartner/Forrester category mention, 15+ enterprise logos, actuarial loss ratio data.
+Success metric: $5M ARR run-rate, one insurance policy sold, Series A at governance multiple.
 ```
+
+**The rule: Do not start Stage 2 until Stage 1 has three paying customers. Do not start Stage 3 until Stage 2 has five. Violating this order is what kills the company.**
+
+### What Does NOT Ship Until Stage 2/3
+
+Cut from external positioning entirely until the stage that owns it:
+- AI Spend Insurance tier (Stage 3 only — no public mention until month 9)
+- Cohrint Verified / audit IDs (Stage 2 — no homepage placement in Stage 1)
+- Quarterly AI P&L export (Stage 2)
+- "AI Spend Governance" as a category term (Stage 2 only)
 
 ### The Structural Advantage
 
@@ -195,12 +212,22 @@ All items below are shipped and live at `cohrint.com` as of 2026-04-17.
 |--------|---------|--------|
 | Python SDK | `cohrint` v1.0.1 on PyPI | ✅ Live |
 | TypeScript SDK | `cohrint` on npm | ✅ Live |
-| MCP Server | `cohrint-mcp` v1.1.1 on npm — 12 tools | ✅ Live |
+| MCP Server | `cohrint-mcp` v1.1.3 on npm — 12 tools | ✅ Live |
 | CLI Agent | `npx vantageai-cli` — transparent AI agent wrapper | ✅ Live |
-| Local Proxy | `vantage-local-proxy` — 3 privacy modes (strict/standard/relaxed) | ✅ Live |
+| Local Proxy | `cohrint-local-proxy` v1.1.0 on npm — routing + 3 privacy modes | ✅ Live |
 | OTel OTLP | 1 env var → 10+ tools (Claude Code, Copilot, Cursor, Gemini CLI, Cline, Codex, Kiro, Windsurf, Continue, OpenCode) | ✅ Live |
 
 ### Core Feature Inventory
+
+**Stage 1: Routing with Quality Control (✅ Complete — PR #87)**
+- [x] Rule-based intent classifier — classifies autocomplete / generation / refactor / explanation in <50ms, zero API calls
+- [x] Cheapest-model router — per-intent candidate list (gemini-2.0-flash, gpt-4o-mini, claude-haiku-4-5 etc.), selects lowest-cost option that meets quality bar
+- [x] Quality sampling — 1–5% fire-and-forget shadow calls to premium model; detects quality drift without blocking main request
+- [x] Graceful fallback — 429/5xx on routed model retries with original model; routing metadata logged on every event
+- [x] Routing Savings API — `GET /v1/analytics/savings` returns total_savings_usd, routing_rate, by-intent and by-model breakdowns; uses D1 `json_extract(tags,'$.routing.*')`
+- [x] Dashboard KPI card — "Routing Savings" card on app.html; shows savings USD, rerouted count, routing rate %
+- [x] Local proxy v1.1.0 — `cohrint-local-proxy` on npm, non-streaming routing, streaming passthrough
+- [x] Cohrint Index v0 — methodology page at `/cohrint-index.html`, CC0 license, 4 metrics, 50-team minimum stated
 
 **Cost Visibility and Governance**
 - [x] Unified cost dashboard — aggregate spend across all tools, teams, time ranges
@@ -621,15 +648,24 @@ No competitor covers all four. This is the cross-stack narrative that should lea
 
 ## 10. Financial Model
 
-### Unit Economics (Target)
+### Stage 1 Pricing (Outcome-Based — Live)
 
 | Tier | Price | Target | MRR | Gross Margin |
 |------|-------|--------|-----|-------------|
-| Free | $0 | Unlimited (acquisition) | $0 pipeline | — |
-| Team $99/mo | $99 | 50 by Month 6 | $4,950 | ~85% |
-| Business $499/mo | $499 | 20 by Month 9 | $9,980 | ~80% |
-| Enterprise $2K–10K/mo | Custom | 5 by Month 12 | $20K–50K | ~75% |
-| **Total Target M12** | | | **$35K–65K MRR** | ~80% |
+| Free | $0 | Teams under $500/mo AI spend | — | — |
+| Growth | 15% of documented savings, min $1,500/mo | 10 by Month 4 | $15K–30K | ~85% |
+| Enterprise | Custom (available after 30 days on Growth) | 3 by Month 6 | $15K–50K | ~80% |
+| **Stage 1 Target M4** | | | **$15K–35K MRR** | ~82% |
+
+### Stage 2 Pricing (Enterprise Expansion — Q3 2026)
+
+| Tier | Price | Target | ARR |
+|------|-------|--------|-----|
+| Enterprise (Routing + Verified + AI P&L) | $60k/year, outcome-backed | 5 accounts | $300K ARR |
+
+### Previous Seat-Based Model (Retired)
+
+Old tiers ($99/mo Team, $499/mo Business) are retired. Outcome-based pricing was adopted per Execution Spec v3: "15% of documented savings, no savings, no bill."
 
 ### Monthly Burn (1-Man Army)
 
@@ -790,11 +826,55 @@ Trigger: KV counter → org hits 40,000 events (80% of 50K free tier).
 
 ## 13. Task Plan — Priority-Ordered Execution
 
-_Reordered 2026-04-17 based on P3 completion, competitive analysis, and threat assessment. Tasks ordered by: (1) competitive urgency, (2) revenue impact, (3) effort. Completed tasks marked ✅._
+_Reordered 2026-04-22 based on Stage 1 completion (Execution Spec v3). Tasks ordered by: (1) stage gate, (2) revenue impact, (3) effort. Completed tasks marked ✅._
 
 ---
 
-### P0 — Done / Merged
+### Stage 1 — COMPLETE ✅ (Months 1–4)
+
+All Stage 1 engineering shipped. GTM items (design partners, first paying customers) are the current blocker for Stage 2 unlock.
+
+| Task | Status | PR |
+|------|--------|----|
+| Rule-based intent classifier (autocomplete/generation/refactor/explanation, <50ms) | ✅ Merged | #87 |
+| Cheapest-model router per intent class | ✅ Merged | #87 |
+| Quality sampling (1–5% fire-and-forget shadow calls) | ✅ Merged | #87 |
+| Graceful fallback on 429/5xx | ✅ Merged | #87 |
+| `GET /v1/analytics/savings` savings API | ✅ Merged | #87 |
+| Routing Savings KPI card on dashboard | ✅ Merged | #87 |
+| Cohrint Index v0 methodology page | ✅ Merged | #87 |
+| Homepage rewrite to Stage 1 copy | ✅ Merged | #86 |
+| Local proxy v1.1.0 published to npm | ✅ Merged | #87 |
+| npm provenance attestation (`--provenance`) on all packages | ✅ Merged | #85 |
+| PyPI Trusted Publishing for cohrint-agent | ✅ | — |
+
+---
+
+### Stage 2 UNLOCK GATE — 3 Paying Customers Required
+
+**Do not build Stage 2 features until 3 customers are on the Growth tier.**
+
+Current GTM priorities (not engineering):
+- [ ] Email 5 platform engineering leads (pain: AI bill > $2K/mo, no routing)
+- [ ] Close 1 design partner on free (routing + savings dashboard access)
+- [ ] Close 3 paying customers at $1,500/mo minimum (Growth tier)
+- [ ] Film 1 CFO-facing case study with a named customer
+
+---
+
+### Stage 2 Engineering Queue (Months 4–9) — DO NOT START YET
+
+| Task | What | Why |
+|------|------|-----|
+| Cohrint Verified | Compliance-grade audit IDs for every routing decision | CFO accountability; unlocks regulated industries |
+| Quarterly AI P&L export | PDF/CSV: total AI spend, savings, routing efficiency, quality drift | Board reporting gap; CFO renewal driver |
+| Cohrint Index v1 | Full 50-team anonymized dataset, CC0 published | Marketing proof; enables analyst briefing |
+| Enterprise tier at $60k/year | Annual contracts with Routing + Verified + P&L | Revenue milestone |
+| Analyst briefing (one Gartner/Forrester contact) | Cohrint Index v1 data as the pitch | Stage 3 category setup |
+
+---
+
+### P0 — Done / Merged (Historical)
 
 | Task | Status | PR |
 |------|--------|----|

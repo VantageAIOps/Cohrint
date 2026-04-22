@@ -1,5 +1,7 @@
 # Cohrint — Developer Admin Guide
-**Version 2.0 · April 2026 · INTERNAL — NOT FOR PUBLIC DISTRIBUTION**
+**Version 2.1 · April 2026 · INTERNAL — NOT FOR PUBLIC DISTRIBUTION**
+
+> **v2.1 Changes (2026-04-22):** Stage 1 routing system shipped (PR #87). Added Section 37: Intent Classifier + Model Router. Added Section 38: Routing Quality Sampling. Updated Section 25 (Local Proxy) to reflect v1.1.0 routing behaviour. Updated Section 6.1 endpoint map to include `GET /v1/analytics/savings`. Updated Section 1 (Product Overview) to describe routing.
 
 ---
 
@@ -41,6 +43,9 @@
 34. [Cross-Platform Console](#34-cross-platform-console)
 35. [Audit Log](#35-audit-log)
 36. [Quick Reference Card](#36-quick-reference-card)
+37. [Intent Classifier + Model Router](#37-intent-classifier--model-router)
+38. [Routing Quality Sampling](#38-routing-quality-sampling)
+39. [Routing Savings API](#39-routing-savings-api)
 
 ---
 
@@ -50,7 +55,7 @@ Cohrint is an **AI cost intelligence and observability platform**. It gives engi
 
 ### What It Does (One Paragraph)
 
-An application integrates the Cohrint SDK (Python or JS). Every LLM API call the app makes is transparently intercepted; the SDK extracts cost, token, latency, and metadata from the response and POSTs it to `api.cohrint.com`. The Worker stores it in D1 (SQLite). The dashboard (`app.html`) polls or streams from the same API to render charts, KPI cards, and team breakdowns. The **Semantic Cache layer** intercepts prompts before they reach the LLM and returns cached responses for semantically equivalent prompts, reducing cost. The **Prompt Registry** lets admins version and A/B-compare prompt templates with per-version cost attribution. The **Benchmark Dashboard** surfaces anonymized industry percentile rankings (k-anonymity floor: 5 orgs). Admins set budgets, alerts fire via Slack when thresholds are crossed, and team members each get scoped keys so they see only their team's data.
+Cohrint is an **AI coding cost intelligence and routing platform**. The local proxy (`cohrint-local-proxy`) intercepts LLM API calls from Claude Code, Cursor, and Copilot; classifies the intent (autocomplete / generation / refactor / explanation) in <50ms; routes to the cheapest model that meets the quality bar; samples 1–5% of traffic against a premium model to detect quality drift; and publishes real-time savings data to the API. Applications can also integrate the SDK (Python or JS) directly — every LLM call is transparently intercepted, cost/token/latency extracted, and POSTed to `api.cohrint.com`. The Worker stores events in D1 (SQLite). The dashboard (`app.html`) streams from the same API to render charts, KPI cards, team breakdowns, and the Routing Savings card. The **Semantic Cache layer** intercepts prompts before they reach the LLM and returns cached responses for semantically equivalent prompts. The **Prompt Registry** lets admins version and A/B-compare prompt templates with per-version cost attribution. The **Benchmark Dashboard** surfaces anonymized industry percentile rankings (k-anonymity floor: 5 orgs). Admins set budgets; alerts fire via Slack when thresholds are crossed.
 
 ### Technology Stack
 
@@ -757,6 +762,7 @@ Written async by LLM judge (Claude Opus 4.6). Fields: `hallucination_score`, `fa
 | `GET /v1/analytics/traces/:traceId` | — | full span DAG for one trace |
 | `GET /v1/analytics/cost?period=N` | N days + today | CI cost gate |
 | `GET /v1/analytics/executive` | 30 days | cross-source spend roll-up (ceo+) |
+| `GET /v1/analytics/savings?period=N` | N days (default 30) | routing savings: total_savings_usd, routing_rate, by_intent[], by_model[] |
 
 ### 6.2 Agent Trace DAG
 
@@ -2206,3 +2212,125 @@ API: `https://api.cohrint.com` | Dashboard: `https://cohrint.com`
 - INTEGER tables: bind `Math.floor(Date.now()/1000)` or `unixepoch()`
 - TEXT tables: bind `"YYYY-MM-DD HH:MM:SS"` or `datetime('now')`
 - Wrong bind = silent full-table scan (no error)
+
+---
+
+## 37. Intent Classifier + Model Router
+
+**File:** `cohrint-local-proxy/src/intent-classifier.ts` and `cohrint-local-proxy/src/routing-config.ts`
+
+**Stage:** Stage 1 core (shipped PR #87)
+
+### 37.1 Intent Classification
+
+Rule-based, zero latency — no API calls. Classifies every LLM request into one of four coding intents:
+
+| Intent | Detection Logic |
+|--------|----------------|
+| `autocomplete` | Prompt token count < 40 AND no sentence-ending punctuation in last message |
+| `refactor` | Pattern keywords: refactor, rewrite, improve, optimize, simplify, clean, restructure |
+| `generation` | Pattern keywords: write, create, generate, implement, build, code, add, scaffold |
+| `explanation` | Pattern keywords: explain, describe, what is/are/does, how does/do/can, why does/is |
+
+Scoring: count pattern matches across all message content + system prompt. Precedence when tied: refactor > generation > explanation > autocomplete.
+
+```typescript
+export function classifyIntent(messages: Message[], system?: string): CodingIntent
+```
+
+### 37.2 Routing Decision
+
+`routingDecision(requestedModel, intent)` applies these rules:
+
+| Intent | Candidate models (cheapest first) | Premium model | Sample rate |
+|--------|----------------------------------|---------------|-------------|
+| autocomplete | gemini-2.0-flash, gpt-4o-mini, claude-haiku-4-5 | gpt-4o | 5% |
+| explanation | gpt-4o-mini, gemini-2.0-flash, claude-haiku-4-5 | claude-sonnet-4-6 | 3% |
+| generation | gpt-4o-mini, claude-haiku-4-5, gemini-1.5-flash | gpt-4o | 4% |
+| refactor | gpt-4o-mini, claude-haiku-4-5, gemini-1.5-pro | claude-sonnet-4-6 | 5% |
+
+Selection: first candidate whose provider is configured in the local proxy config. Returns `reason`:
+- `cost_optimization` — routed to a cheaper model
+- `same_model` — cheapest candidate is already the requested model
+- `no_cheaper_candidate` — no configured provider matches the candidate list
+
+Routing only applies to non-streaming requests. Streaming requests always use the original model.
+
+### 37.3 Event Tagging
+
+Routing metadata is appended to event tags before sending to the API:
+
+```json
+{
+  "routing": {
+    "original_model": "claude-sonnet-4-6",
+    "routed_model": "gpt-4o-mini",
+    "intent": "generation",
+    "reason": "cost_optimization",
+    "savings_usd": 0.0042
+  }
+}
+```
+
+The `GET /v1/analytics/savings` endpoint queries these tags via `json_extract(tags,'$.routing.savings_usd')`.
+
+---
+
+## 38. Routing Quality Sampling
+
+**File:** `cohrint-local-proxy/src/proxy-server.ts` — `runQualitySample()` function
+
+### 38.1 Purpose
+
+Quality drift detection: 1–5% of routed requests (where the model was downgraded) are silently re-sent to the premium model. The premium model's response is discarded. Quality scores from both calls (once the LLM judge runs) are compared to detect when the cheaper model is underperforming.
+
+### 38.2 Implementation
+
+- Fire-and-forget: `void runQualitySample(...)` — never blocks the main request path
+- Uses its own AbortController with 30s timeout (longer than main request to ensure completion)
+- Sends to the same upstream provider endpoint using the premium model name
+- Does NOT stream — always uses `stream: false` regardless of original request
+- Event ID is tagged with `"quality_sample": true` to distinguish in analytics
+
+### 38.3 Fallback Behaviour
+
+When the routed model returns 429 or 5xx:
+1. Log routing failure to event tags
+2. Retry original request with the original (user-requested) model
+3. Record `fallback: true` in routing metadata
+4. Quality sampling is skipped for fallback calls
+
+---
+
+## 39. Routing Savings API
+
+**Endpoint:** `GET /v1/analytics/savings?period=N` (default N=30 days)
+
+**Auth:** Bearer token or session cookie (member+ role)
+
+**Response schema:**
+
+```typescript
+{
+  period_days: number,
+  total_events: number,
+  routed_events: number,
+  routing_rate: number,          // 0–1
+  total_savings_usd: number,
+  by_intent: Array<{
+    intent: string,
+    count: number,
+    savings_usd: number
+  }>,
+  by_model: Array<{
+    original_model: string,
+    routed_model: string,
+    count: number,
+    savings_usd: number
+  }>
+}
+```
+
+**D1 queries:** Three batched queries using `json_extract(tags,'$.routing.savings_usd')` and `json_extract(tags,'$.routing.reason')`. Time filter uses `sinceUnix(period)` (INTEGER unixepoch — `events` table).
+
+**Dashboard:** Routing Savings KPI card in `app.html` (id=`kpiRoutingSavings`) renders total saved, rerouted count, and routing rate %. Falls back to "No routing yet — install local proxy" when `routed_events === 0`.
