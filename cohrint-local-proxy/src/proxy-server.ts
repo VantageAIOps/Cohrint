@@ -23,6 +23,8 @@ import { calculateCost, findCheapest } from "./pricing.js";
 import { scanAll } from "./scanners/index.js";
 import type { ToolName } from "./scanners/types.js";
 import { SessionStore, ProxySessionRecord, PersistedEvent } from "./session-store.js";
+import { classifyIntent } from "./intent-classifier.js";
+import { routingDecision } from "./routing-config.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -300,7 +302,7 @@ function sendJson(res: ServerResponse, status: number, data: unknown): void {
 
 // ── Proxy Server ─────────────────────────────────────────────────────────────
 
-export function startProxyServer(config: LocalProxyConfig): void {
+export function startProxyServer(config: LocalProxyConfig): ReturnType<typeof createServer> {
   const {
     port = 4891,
     apiKey,
@@ -482,22 +484,61 @@ export function startProxyServer(config: LocalProxyConfig): void {
 
     const isStreaming = reqBody.stream === true;
 
+    // ── Routing with quality control ────────────────────────────────────
+    const messages = (reqBody.messages as { role: string; content: string | { type: string; text?: string }[] }[] | undefined) ?? [];
+    const systemPrompt = typeof reqBody.system === "string" ? reqBody.system : undefined;
+    const originalModel = String(reqBody.model ?? "unknown");
+    let routing = routingDecision(originalModel, classifyIntent(messages, systemPrompt));
+
+    // Only reroute non-streaming calls (streaming routing is Stage 2)
+    if (!isStreaming && routing.reason === "cost_optimization") {
+      if (debug) process.stderr.write(`[cohrint-proxy] routing ${originalModel} → ${routing.routedModel} (${routing.intent})\n`);
+      reqBody = { ...reqBody, model: routing.routedModel };
+      // If provider changes, update targetBase
+      if (routing.routedProvider !== provider) {
+        provider = routing.routedProvider;
+      }
+    } else {
+      // No routing applied — keep original
+      routing = { ...routing, routedModel: originalModel, reason: "same_model" };
+    }
+
+    const didRoute = routing.routedModel !== originalModel;
+
     try {
-      const targetUrl = `${targetBase}${targetPath}`;
+      const targetUrl = `${PROVIDER_ENDPOINTS[provider] ?? targetBase}${targetPath}`;
       if (debug) process.stderr.write(`[cohrint-proxy] → ${provider} ${targetPath}\n`);
 
-      const fetchController = new AbortController();
-      const fetchTimeout = setTimeout(() => fetchController.abort(), 5 * 60 * 1000);
-      let upstreamRes: Response;
-      try {
-        upstreamRes = await fetch(targetUrl, {
-          method: "POST",
-          headers: forwardHeaders,
-          body: JSON.stringify(reqBody),
-          signal: fetchController.signal,
-        });
-      } finally {
-        clearTimeout(fetchTimeout);
+      // ── Fetch with fallback on 429 / 5xx ─────────────────────────────
+      const doFetch = async (model: string, providerKey: string): Promise<{ res: Response; usedModel: string; usedProvider: string }> => {
+        const fetchController = new AbortController();
+        const fetchTimeout = setTimeout(() => fetchController.abort(), 5 * 60 * 1000);
+        const body = { ...reqBody, model };
+        try {
+          const res = await fetch(`${PROVIDER_ENDPOINTS[providerKey] ?? targetBase}${targetPath}`, {
+            method: "POST",
+            headers: forwardHeaders,
+            body: JSON.stringify(body),
+            signal: fetchController.signal,
+          });
+          return { res, usedModel: model, usedProvider: providerKey };
+        } finally {
+          clearTimeout(fetchTimeout);
+        }
+      };
+
+      let { res: upstreamRes, usedModel, usedProvider } = await doFetch(String(reqBody.model ?? routing.routedModel), provider);
+
+      // Fallback: on 429 or 5xx try original model (if we rerouted) or next candidate
+      if ((upstreamRes.status === 429 || upstreamRes.status >= 500) && didRoute) {
+        if (debug) process.stderr.write(`[cohrint-proxy] fallback: ${upstreamRes.status} from ${usedModel}, retrying with ${originalModel}\n`);
+        const fallbackProvider = routing.originalModel.startsWith("claude-") ? "anthropic"
+          : routing.originalModel.startsWith("gemini-") ? "google" : "openai";
+        const fallbackResult = await doFetch(originalModel, fallbackProvider);
+        upstreamRes = fallbackResult.res;
+        usedModel = fallbackResult.usedModel;
+        usedProvider = fallbackResult.usedProvider;
+        routing = { ...routing, routedModel: originalModel, reason: "same_model" };
       }
 
       const latencyMs = performance.now() - t0;
@@ -553,7 +594,7 @@ export function startProxyServer(config: LocalProxyConfig): void {
       const resBody = await upstreamRes.json() as Record<string, unknown>;
 
       let stats: Record<string, unknown>;
-      if (provider === "anthropic") {
+      if (usedProvider === "anthropic") {
         stats = extractAnthropicStats(reqBody, resBody, latencyMs, upstreamRes.status);
       } else {
         stats = extractOpenAIStats(reqBody, resBody, latencyMs, upstreamRes.status);
@@ -562,6 +603,35 @@ export function startProxyServer(config: LocalProxyConfig): void {
       stats.org_id = orgId;
       stats.team = team;
       stats.environment = environment;
+
+      // Attach routing metadata so the dashboard can show savings
+      if (didRoute) {
+        const promptTokens = typeof stats.prompt_tokens === "number" ? stats.prompt_tokens : 0;
+        const completionTokens = typeof stats.completion_tokens === "number" ? stats.completion_tokens : 0;
+        const { totalCostUsd: originalCost } = calculateCost(originalModel, promptTokens, completionTokens);
+        const { totalCostUsd: routedCost } = calculateCost(usedModel, promptTokens, completionTokens);
+        stats.tags = {
+          ...((stats.tags as Record<string, unknown>) ?? {}),
+          routing: {
+            original_model: originalModel,
+            routed_model: usedModel,
+            intent: routing.intent,
+            reason: routing.reason,
+            savings_usd: Math.max(0, originalCost - routedCost),
+          },
+        };
+      }
+
+      // Quality sampling: fire-and-forget shadow call against premium model
+      if (didRoute && routing.shouldSample) {
+        void runQualitySample(
+          routing.premiumModel,
+          reqBody,
+          forwardHeaders,
+          targetPath,
+          debug,
+        );
+      }
 
       // Queue sanitized stats (privacy engine strips all text)
       statsQueue.enqueue(stats);
@@ -611,4 +681,38 @@ export function startProxyServer(config: LocalProxyConfig): void {
 ╚══════════════════════════════════════════════════════════════╝
 `);
   });
+
+  return server;
+}
+
+/**
+ * Fire-and-forget shadow call against the premium model for quality sampling.
+ * Result is currently discarded — future: compare outputs and log quality delta.
+ */
+async function runQualitySample(
+  premiumModel: string,
+  reqBody: Record<string, unknown>,
+  headers: Record<string, string>,
+  targetPath: string,
+  debug: boolean,
+): Promise<void> {
+  const provider = premiumModel.startsWith("claude-") ? "anthropic"
+    : premiumModel.startsWith("gemini-") ? "google" : "openai";
+  const base: Record<string, string> = {
+    openai: "https://api.openai.com",
+    anthropic: "https://api.anthropic.com",
+    google: "https://generativelanguage.googleapis.com",
+  };
+
+  try {
+    await fetch(`${base[provider] ?? "https://api.openai.com"}${targetPath}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ ...reqBody, model: premiumModel }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (debug) process.stderr.write(`[cohrint-proxy] quality sample sent to ${premiumModel}\n`);
+  } catch {
+    // Sampling is best-effort — never fail the main request path
+  }
 }
