@@ -130,9 +130,11 @@ class ClaudeCliBackend(Backend):
         # Live spinner so the user doesn't think the CLI is stuck during
         # subprocess boot + first-token latency (typically 1-3s). It
         # auto-clears the moment any renderable event arrives below.
+        # Entered inside the try block so any exception path — including
+        # Popen failure before the try, or spinner start failure itself —
+        # is covered by the finally that calls stop_immediate.
         from ..renderer import make_waiting_spinner
         spinner = make_waiting_spinner("Thinking")
-        spinner.__enter__()
 
         proc = subprocess.Popen(
             cmd,
@@ -168,6 +170,7 @@ class ClaudeCliBackend(Backend):
         # subprocess — otherwise a crashed main thread leaves an orphan
         # that eventually hangs on a full pipe buffer (T-CONCUR.subproc).
         try:
+            spinner.__enter__()
             reader = threading.Thread(target=_read_stdout, daemon=True)
             reader.start()
 
