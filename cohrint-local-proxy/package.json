@@ -1,6 +1,6 @@
 {
   "name": "cohrint-local-proxy",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Secure local proxy for LLM cost tracking — keeps API keys and prompts local, sends only anonymized stats to Cohrint dashboard",
   "keywords": [
     "ai",
