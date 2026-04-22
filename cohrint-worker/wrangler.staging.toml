@@ -1,0 +1,70 @@
+name            = "cohrint-api-staging"
+main            = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# No [[routes]] here — staging uses workers.dev only so it can never
+# overwrite the production custom domain (api.cohrint.com).
+
+# ── D1 Database ───────────────────────────────────────────────────────────────
+[[d1_databases]]
+binding         = "DB"
+database_name   = "cohrint-events"
+database_id     = "a1301c2a-19bf-4fa3-8321-bba5e497de10"
+
+# ── KV Namespace ──────────────────────────────────────────────────────────────
+[[kv_namespaces]]
+binding    = "KV"
+id         = "65b5609ad5b747c9b416632a19529f24"
+preview_id = "65b5609ad5b747c9b416632a19529f24"
+
+# ── Workers AI ────────────────────────────────────────────────────────────────
+[ai]
+binding = "AI"
+
+# ── Vectorize ─────────────────────────────────────────────────────────────────
+[[vectorize]]
+binding    = "VECTORIZE"
+index_name = "cohrint-semantic-cache"
+
+# ── R2 Bucket ─────────────────────────────────────────────────────────────────
+[[r2_buckets]]
+binding     = "CACHE_BUCKET"
+bucket_name = "cohrint-cache"
+
+# ── Workers Analytics Engine ──────────────────────────────────────────────────
+[[analytics_engine_datasets]]
+binding = "METRICS"
+dataset = "cohrint_metrics"
+
+# ── Queues ────────────────────────────────────────────────────────────────────
+[[queues.producers]]
+queue   = "cohrint-ingest"
+binding = "INGEST_QUEUE"
+
+[[queues.producers]]
+queue   = "cohrint-ingest-dlq"
+binding = "INGEST_DLQ"
+
+[[queues.consumers]]
+queue              = "cohrint-ingest"
+max_batch_size     = 100
+max_batch_timeout  = 5
+max_retries        = 3
+dead_letter_queue  = "cohrint-ingest-dlq"
+
+[[queues.consumers]]
+queue              = "cohrint-ingest-dlq"
+max_batch_size     = 50
+max_batch_timeout  = 10
+max_retries        = 1
+
+# ── Environment variables ─────────────────────────────────────────────────────
+[vars]
+ENVIRONMENT     = "staging"
+ALLOWED_ORIGINS = "https://main.cohrint.com,https://*.cohrint.pages.dev,http://localhost:*"
+RATE_LIMIT_RPM  = "1000"
+
+# ── Cron Triggers ─────────────────────────────────────────────────────────────
+[triggers]
+crons = ["*/10 * * * *", "0 2 * * *"]

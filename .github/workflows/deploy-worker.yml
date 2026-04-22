@@ -71,7 +71,7 @@ jobs:
           DELAY=30
           for attempt in $(seq 1 $MAX_ATTEMPTS); do
             echo "Deploy attempt $attempt / $MAX_ATTEMPTS (staging)"
-            if npx wrangler deploy --env staging; then
+            if npx wrangler deploy -c wrangler.staging.toml; then
               echo "Staging deploy succeeded on attempt $attempt"
               exit 0
             fi

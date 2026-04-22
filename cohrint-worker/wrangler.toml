@@ -90,20 +90,7 @@ max_batch_size     = 50
 max_batch_timeout  = 10
 max_retries        = 1
 
-# ── Staging environment (main branch → workers.dev only) ─────────────────────
-# Deploy: wrangler deploy --env staging
-# IMPORTANT: workers_dev = true prevents the staging env from inheriting the
-# production [[routes]] entry. Without this, staging deploys overwrite api.cohrint.com.
-[env.staging]
-name        = "cohrint-api-staging"
-workers_dev = true
-[env.staging.vars]
-ENVIRONMENT     = "staging"
-ALLOWED_ORIGINS = "https://main.cohrint.com,https://*.cohrint.pages.dev,http://localhost:*"
-
-# ── Preview environment ───────────────────────────────────────────────────────
-[env.preview]
-name = "cohrint-api-preview"
-[env.preview.vars]
-ENVIRONMENT     = "preview"
-ALLOWED_ORIGINS = "http://localhost:*,https://*.cohrint.com,https://cohrint.pages.dev"
+# ── Staging / Preview ────────────────────────────────────────────────────────
+# Staging uses a separate wrangler.staging.toml (no [[routes]] section) so it
+# cannot inherit and overwrite the production api.cohrint.com custom domain.
+# Deploy staging: npx wrangler deploy -c wrangler.staging.toml
