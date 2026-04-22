@@ -794,4 +794,70 @@ analytics.get('/cost', async (c) => {
   });
 });
 
+// ── GET /v1/analytics/savings ─────────────────────────────────────────────────
+// Aggregates routing savings from events tagged with routing metadata.
+// Tags are stored as JSON: { routing: { savings_usd, intent, original_model, routed_model } }
+analytics.get('/savings', async (c) => {
+  const orgId     = c.get('orgId');
+  const scopeTeam = c.get('scopeTeam');
+  const period    = Math.min(parseInt(c.req.query('period') ?? '30', 10), 365);
+  const since     = sinceUnix(period);
+  const sdb       = scopedDb(c.env.DB, orgId);
+  const { clause, args } = teamScope(scopeTeam);
+
+  const [totalsRow, intentRows, modelRows] = await c.env.DB.batch([
+    // Total savings + routed vs total counts
+    sdb.prepare(`
+      SELECT
+        COUNT(*) AS total_events,
+        SUM(CASE WHEN json_extract(tags,'$.routing') IS NOT NULL THEN 1 ELSE 0 END) AS routed_events,
+        COALESCE(SUM(CAST(json_extract(tags,'$.routing.savings_usd') AS REAL)),0) AS total_savings_usd
+      FROM events e
+      WHERE {{ORG_SCOPE}} AND created_at >= ?${clause}
+    `).bind(since, ...args),
+
+    // Savings by intent
+    sdb.prepare(`
+      SELECT
+        json_extract(tags,'$.routing.intent') AS intent,
+        COUNT(*) AS count,
+        COALESCE(SUM(CAST(json_extract(tags,'$.routing.savings_usd') AS REAL)),0) AS savings_usd
+      FROM events e
+      WHERE {{ORG_SCOPE}} AND created_at >= ? AND json_extract(tags,'$.routing') IS NOT NULL${clause}
+      GROUP BY intent
+      ORDER BY savings_usd DESC
+    `).bind(since, ...args),
+
+    // Savings by original → routed model pair
+    sdb.prepare(`
+      SELECT
+        json_extract(tags,'$.routing.original_model') AS original_model,
+        json_extract(tags,'$.routing.routed_model')   AS routed_model,
+        COUNT(*) AS count,
+        COALESCE(SUM(CAST(json_extract(tags,'$.routing.savings_usd') AS REAL)),0) AS savings_usd
+      FROM events e
+      WHERE {{ORG_SCOPE}} AND created_at >= ? AND json_extract(tags,'$.routing') IS NOT NULL${clause}
+      GROUP BY original_model, routed_model
+      ORDER BY savings_usd DESC
+      LIMIT 10
+    `).bind(since, ...args),
+  ]);
+
+  type TotalsRow = { total_events: number; routed_events: number; total_savings_usd: number };
+  type IntentRow = { intent: string; count: number; savings_usd: number };
+  type ModelRow  = { original_model: string; routed_model: string; count: number; savings_usd: number };
+
+  const totals = (totalsRow.results[0] as TotalsRow | undefined) ?? { total_events: 0, routed_events: 0, total_savings_usd: 0 };
+
+  return c.json({
+    period_days:        period,
+    total_events:       totals.total_events,
+    routed_events:      totals.routed_events,
+    routing_rate:       totals.total_events > 0 ? totals.routed_events / totals.total_events : 0,
+    total_savings_usd:  totals.total_savings_usd,
+    by_intent:          intentRows.results as IntentRow[],
+    by_model:           modelRows.results  as ModelRow[],
+  });
+});
+
 export { analytics };

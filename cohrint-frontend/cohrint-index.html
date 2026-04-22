@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Cohrint Index — AI Coding Efficiency Benchmark</title>
+<meta name="description" content="The first public benchmark of AI coding tool cost efficiency across real engineering teams. Methodology, data, and findings.">
+<link rel="canonical" href="https://cohrint.com/cohrint-index">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#080c0f;--bg2:#0d1318;--bg3:#121920;--bg4:#161d25;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+  --text:#e8edf2;--muted:#6b7b8a;--dim:#3a4550;
+  --accent:#00d4a1;--blue:#0098ff;--amber:#f59e0b;--red:#f87171;
+  --mono:'DM Mono',monospace;--serif:'Instrument Serif',Georgia,serif;--sans:'DM Sans',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:16px;line-height:1.7;overflow-x:hidden}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:18px 48px;border-bottom:1px solid var(--border);background:rgba(8,12,15,.92);backdrop-filter:blur(16px)}
+.nav-logo{font-family:var(--mono);font-size:15px;letter-spacing:.08em;color:var(--text);text-decoration:none}
+.nav-logo span{color:var(--accent)}
+nav a{color:var(--muted);font-size:14px;text-decoration:none}
+nav a:hover{color:var(--text)}
+
+.page{max-width:800px;margin:0 auto;padding:120px 48px 80px}
+
+.badge{display:inline-flex;align-items:center;gap:8px;background:rgba(0,212,161,.08);border:1px solid rgba(0,212,161,.2);border-radius:100px;padding:6px 16px;font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.06em;margin-bottom:32px}
+
+h1{font-family:var(--serif);font-size:clamp(36px,6vw,72px);font-weight:400;line-height:1.1;letter-spacing:-.02em;margin-bottom:24px}
+h1 em{font-style:italic;color:var(--accent)}
+
+.lead{font-size:18px;color:var(--muted);line-height:1.7;max-width:640px;margin-bottom:64px}
+
+.section{margin-bottom:64px}
+.section-label{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--accent);text-transform:uppercase;margin-bottom:16px}
+h2{font-family:var(--serif);font-size:28px;font-weight:400;line-height:1.2;margin-bottom:20px}
+h2 em{font-style:italic;color:var(--accent)}
+p{color:var(--muted);margin-bottom:16px}
+p strong{color:var(--text)}
+
+.metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin:32px 0}
+.metric-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:24px}
+.metric-name{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--muted);margin-bottom:8px}
+.metric-desc{font-size:14px;color:var(--text);line-height:1.5}
+
+.methodology-steps{margin:32px 0;display:flex;flex-direction:column;gap:24px}
+.method-step{display:flex;gap:20px;align-items:flex-start}
+.step-num{font-family:var(--mono);font-size:11px;color:var(--accent);min-width:24px;padding-top:3px}
+.step-body h3{font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px}
+.step-body p{font-size:14px;color:var(--muted);margin:0}
+
+.data-table{width:100%;border-collapse:collapse;margin:32px 0;font-size:14px}
+.data-table th{text-align:left;padding:10px 14px;font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--muted);border-bottom:1px solid var(--border)}
+.data-table td{padding:12px 14px;border-bottom:1px solid var(--border);color:var(--text)}
+.data-table td.muted{color:var(--muted)}
+.data-table tr:last-child td{border-bottom:none}
+
+.placeholder-block{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:40px;text-align:center;margin:32px 0}
+.placeholder-block p{color:var(--muted);font-size:14px;margin:0 0 20px}
+
+.cta-block{background:var(--bg2);border:1px solid rgba(0,212,161,.2);border-radius:16px;padding:40px;margin-top:64px;text-align:center}
+.cta-block h3{font-family:var(--serif);font-size:24px;font-weight:400;margin-bottom:12px}
+.cta-block p{color:var(--muted);font-size:15px;margin-bottom:28px}
+.btn-primary{background:var(--accent);color:#000;padding:12px 28px;border-radius:8px;font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.04em;text-decoration:none;display:inline-block;transition:opacity .2s}
+.btn-primary:hover{opacity:.85;text-decoration:none}
+.btn-ghost{color:var(--muted);padding:12px 24px;border-radius:8px;font-size:14px;border:1px solid var(--border2);text-decoration:none;display:inline-block;transition:color .2s,border-color .2s;margin-left:12px}
+.btn-ghost:hover{color:var(--text);border-color:rgba(255,255,255,.25);text-decoration:none}
+
+.license-note{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:16px}
+
+footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;font-size:13px;color:var(--muted)}
+footer a{color:var(--muted);text-decoration:none}
+footer a:hover{color:var(--text)}
+
+@media(max-width:640px){
+  nav{padding:16px 20px}
+  .page{padding:100px 20px 60px}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">cohrint<span>.</span></a>
+  <div style="display:flex;gap:24px;align-items:center">
+    <a href="/docs">Docs</a>
+    <a href="/blog">Blog</a>
+    <a href="/signup.html" style="color:var(--accent)">Get started →</a>
+  </div>
+</nav>
+
+<div class="page">
+
+  <div class="badge">// cohrint index v0 · coming Q3 2026</div>
+
+  <h1>The first public benchmark of<br><em>AI coding efficiency</em></h1>
+
+  <p class="lead">
+    Every engineering team running AI coding tools is flying blind on cost and quality. The Cohrint Index changes that — anonymized data from real teams, updated quarterly, published under a permissive license.
+  </p>
+
+  <!-- WHAT WE MEASURE -->
+  <div class="section">
+    <div class="section-label">// what it measures</div>
+    <h2>Four metrics that <em>actually matter</em></h2>
+    <p>We deliberately excluded vanity metrics (autocomplete acceptance rate, lines-of-code generated) and focused on what CFOs and platform engineers care about.</p>
+
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-name">COST PER USEFUL OUTPUT</div>
+        <div class="metric-desc">USD spent per accepted code block, merged commit, or resolved task. Normalized by team size and workload type.</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-name">ROUTING EFFICIENCY RATIO</div>
+        <div class="metric-desc">What fraction of spend went to the cheapest model that could handle the task. A score of 1.0 = perfect routing.</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-name">QUALITY DRIFT RATE</div>
+        <div class="metric-desc">How often a cheaper routed model produced output rated equivalent to the premium model. Sampled at 5% of traffic.</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-name">SPEND CONCENTRATION</div>
+        <div class="metric-desc">What % of total AI spend comes from the top 5% of requests. High concentration = addressable waste.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- METHODOLOGY -->
+  <div class="section">
+    <div class="section-label">// methodology</div>
+    <h2>How we collect <em>and protect</em> the data</h2>
+    <p>No prompts. No responses. No PII. Every data point is a number — tokens, cost, latency, quality score — derived from routing decisions the proxy made locally on the engineer's machine.</p>
+
+    <div class="methodology-steps">
+      <div class="method-step">
+        <div class="step-num">01</div>
+        <div class="step-body">
+          <h3>Participating teams install the local proxy</h3>
+          <p>The Cohrint local proxy runs on-device. Prompts and responses never leave the machine. Only aggregated stats — token counts, cost, routing decision, quality delta — are sent.</p>
+        </div>
+      </div>
+      <div class="method-step">
+        <div class="step-num">02</div>
+        <div class="step-body">
+          <h3>Each team's data is anonymized before aggregation</h3>
+          <p>Org IDs are hashed. Team names are replaced with random slugs. No company name, engineer name, or project name appears in the dataset.</p>
+        </div>
+      </div>
+      <div class="method-step">
+        <div class="step-num">03</div>
+        <div class="step-body">
+          <h3>Minimum cohort size of 50 teams before publication</h3>
+          <p>We will not publish v0 until at least 50 teams are represented. This ensures no individual team's data is identifiable through inference.</p>
+        </div>
+      </div>
+      <div class="method-step">
+        <div class="step-num">04</div>
+        <div class="step-body">
+          <h3>Raw anonymized data published under CC0</h3>
+          <p>The full dataset is released under the Creative Commons Zero license — no attribution required, no restrictions. Researchers, analysts, and practitioners can use it freely.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DATASET PREVIEW -->
+  <div class="section">
+    <div class="section-label">// dataset preview</div>
+    <h2>What the data <em>looks like</em></h2>
+    <p>Below is the schema for the anonymized dataset. Values are illustrative — actual data publishes when we reach 50 participating teams.</p>
+
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Field</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>team_slug</td><td class="muted">string</td><td>Random anonymized ID (e.g. "team_7f3a")</td></tr>
+        <tr><td>team_size_bucket</td><td class="muted">string</td><td>1–5, 6–15, 16–50, 50+</td></tr>
+        <tr><td>period</td><td class="muted">string</td><td>YYYY-MM (monthly rollup)</td></tr>
+        <tr><td>total_spend_usd</td><td class="muted">float</td><td>Total AI coding tool spend that month</td></tr>
+        <tr><td>routed_spend_usd</td><td class="muted">float</td><td>Spend that went through Cohrint routing</td></tr>
+        <tr><td>savings_usd</td><td class="muted">float</td><td>Documented savings from routing decisions</td></tr>
+        <tr><td>routing_efficiency</td><td class="muted">float</td><td>0–1 score (1.0 = every call optimally routed)</td></tr>
+        <tr><td>quality_drift_rate</td><td class="muted">float</td><td>% of sampled calls where cheaper model matched premium</td></tr>
+        <tr><td>top_intent</td><td class="muted">string</td><td>Most common intent: autocomplete / generation / refactor / explanation</td></tr>
+        <tr><td>primary_provider</td><td class="muted">string</td><td>openai / anthropic / google</td></tr>
+      </tbody>
+    </table>
+
+    <div class="placeholder-block">
+      <p>Full dataset publishes in Q3 2026 when we reach 50 participating teams.<br>Raw CSV + Parquet will be available at <span style="font-family:var(--mono);color:var(--accent)">cohrint.com/index/data</span></p>
+      <a href="mailto:hello@cohrint.com?subject=Cohrint Index participation" class="btn-primary">Join the cohort →</a>
+    </div>
+    <p class="license-note">Dataset license: CC0 1.0 Universal — no restrictions, no attribution required.</p>
+  </div>
+
+  <!-- PARTICIPATE -->
+  <div class="cta-block">
+    <h3>Help us build the benchmark</h3>
+    <p>We need 50 engineering teams to publish v0. Participation is free. Your data is anonymized. You get early access to the full dataset and findings before anyone else.</p>
+    <a href="mailto:hello@cohrint.com?subject=Cohrint Index participation" class="btn-primary">Apply to participate →</a>
+    <a href="/signup.html" class="btn-ghost">Start using Cohrint →</a>
+  </div>
+
+</div>
+
+<footer>
+  <a href="/" style="font-family:var(--mono);font-size:13px">cohrint.</a>
+  <div style="display:flex;gap:24px">
+    <a href="/docs">Docs</a>
+    <a href="/blog">Blog</a>
+    <a href="/trust.html">Security</a>
+    <a href="/privacy">Privacy</a>
+    <a href="mailto:hello@cohrint.com">Contact</a>
+  </div>
+  <span>© 2026 Cohrint</span>
+</footer>
+
+</body>
+</html>

@@ -960,6 +960,11 @@ button.sb-item .icon { font-size: 16px; width: 20px; text-align: center; }
             <div class="kpi-value" id="kpiStreamingReqs">&mdash;</div>
             <div class="kpi-sub neutral" id="kpiStreamingReqsSub">&nbsp;</div>
           </div>
+          <div class="kpi-card animate-in delay-9" data-insight="Money saved by Cohrint routing your requests to the cheapest model that meets your quality bar. Updated in real time.">
+            <div class="kpi-label" style="color:var(--accent-green)">Routing Savings</div>
+            <div class="kpi-value" id="kpiRoutingSavings" style="color:var(--accent-green);">&mdash;</div>
+            <div class="kpi-sub neutral" id="kpiRoutingSavingsSub">&nbsp;</div>
+          </div>
           <div class="kpi-card animate-in delay-9" data-insight="Projected total spend by end of month based on your daily average so far. Use this to anticipate overage before it happens.">
             <div class="kpi-label">Projected Month-End</div>
             <div class="kpi-value" id="kpiProjected" style="color:var(--accent-amber);">&mdash;</div>
@@ -2104,7 +2109,7 @@ window.addEventListener('offline', function() { _isOnline = false; _setOnlineBan
 // ── Skeleton helpers ──
 var _KPI_IDS = [
   'kpiTotalSpend','kpiTotalSpendSub','kpiCostliestTool','kpiCostliestToolSub',
-  'kpiActiveDev','kpiActiveDevSub','kpiTokenUsage','kpiTokenUsageSub','kpiCacheSavings','kpiCacheSavingsSub',
+  'kpiActiveDev','kpiActiveDevSub','kpiTokenUsage','kpiTokenUsageSub','kpiCacheSavings','kpiCacheSavingsSub','kpiRoutingSavings','kpiRoutingSavingsSub',
   'spendTotal','spendTotalSub','spendTopModel','spendTopModelSub','spendTotalReqs','spendTotalReqsSub','spendAvgCost',
 ];
 function _skelOn() {
@@ -2566,6 +2571,7 @@ function loadOverview() {
     apiFetch('/v1/analytics/kpis?period=' + period).catch(function() { return null; }),
     apiFetch('/v1/analytics/timeseries?period=' + period).catch(function() { return null; }),
     apiFetch('/v1/analytics/summary').catch(function() { return null; }),
+    apiFetch('/v1/analytics/savings?period=' + period).catch(function() { return null; }),
   ]).then(function(results) {
     if (gen !== _renderGen) return; // stale render — a newer one is in flight
     _skelOff();
@@ -2575,6 +2581,7 @@ function loadOverview() {
     var kpis = results[3];
     var timeseries = results[4];
     var analyticsSum = results[5];
+    var savingsData = results[6];
 
     if (!summary) {
       document.getElementById('kpiTotalSpend').textContent = 'Error';
@@ -2692,6 +2699,28 @@ function loadOverview() {
       streamEl.textContent = fmtNum(streamingReqs);
       if (streamSubEl && totalKpiReqs > 0) {
         streamSubEl.textContent = Math.round((streamingReqs / totalKpiReqs) * 100) + '% of all requests';
+      }
+    }
+
+    // Routing savings — sourced from /v1/analytics/savings
+    var routingEl = document.getElementById('kpiRoutingSavings');
+    var routingSubEl = document.getElementById('kpiRoutingSavingsSub');
+    if (routingEl) {
+      var totalSaved = (savingsData && savingsData.total_savings_usd) || 0;
+      var routedCount = (savingsData && savingsData.routed_events) || 0;
+      var routingRate = (savingsData && savingsData.routing_rate) || 0;
+      if (totalSaved > 0) {
+        routingEl.textContent = fmt(totalSaved);
+        if (routingSubEl) {
+          routingSubEl.textContent = fmtNum(routedCount) + ' calls rerouted · ' + Math.round(routingRate * 100) + '% of traffic';
+          routingSubEl.className = 'kpi-sub down'; // green = good (savings)
+        }
+      } else {
+        routingEl.textContent = '$0.00';
+        if (routingSubEl) {
+          routingSubEl.textContent = 'No routing yet — install local proxy';
+          routingSubEl.className = 'kpi-sub neutral';
+        }
       }
     }
 
