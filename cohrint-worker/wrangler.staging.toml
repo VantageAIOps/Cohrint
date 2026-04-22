@@ -37,7 +37,9 @@ bucket_name = "cohrint-cache"
 binding = "METRICS"
 dataset = "cohrint_metrics"
 
-# ── Queues ────────────────────────────────────────────────────────────────────
+# ── Queues (producers only — consumers stay on production worker) ─────────────
+# Staging must NOT register queue consumers — production already owns them.
+# Trying to add a second consumer to the same queue fails with Cloudflare API 409.
 [[queues.producers]]
 queue   = "cohrint-ingest"
 binding = "INGEST_QUEUE"
@@ -45,19 +47,6 @@ binding = "INGEST_QUEUE"
 [[queues.producers]]
 queue   = "cohrint-ingest-dlq"
 binding = "INGEST_DLQ"
-
-[[queues.consumers]]
-queue              = "cohrint-ingest"
-max_batch_size     = 100
-max_batch_timeout  = 5
-max_retries        = 3
-dead_letter_queue  = "cohrint-ingest-dlq"
-
-[[queues.consumers]]
-queue              = "cohrint-ingest-dlq"
-max_batch_size     = 50
-max_batch_timeout  = 10
-max_retries        = 1
 
 # ── Environment variables ─────────────────────────────────────────────────────
 [vars]
