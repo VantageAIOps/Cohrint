@@ -206,10 +206,16 @@ class AgentClient:
 
         Returns the final text response.
         """
-        # Optimize prompt (skip for short/structured input)
+        # Optimize prompt (skip for short/structured input). The result is
+        # stashed on ``self._last_opt_result`` so the REPL's post-response
+        # Cohrint analysis block can cite the savings alongside guardrails
+        # and anomaly signals — keeping the API and Claude-CLI backends
+        # visually identical.
         final_prompt = user_prompt
+        self._last_opt_result = None
         if not no_optimize and self.optimization and len(user_prompt) > 20:
             result = optimize_prompt(user_prompt)
+            self._last_opt_result = result
             if result.saved_tokens > 0:
                 final_prompt = result.optimized
                 # Aggregate session-wide savings for /summary (T-SUMMARY.1).
@@ -217,11 +223,8 @@ class AgentClient:
                 _pricing = MODEL_PRICES.get(self.cost.model, {"input": 3.0})
                 saved_usd = (result.saved_tokens / 1_000_000) * _pricing.get("input", 3.0)
                 self.cost.record_optimization(result.saved_tokens, saved_usd)
-                from rich.console import Console
-                Console().print(
-                    f"  [dim]Optimized: {result.original_tokens} → {result.optimized_tokens} tokens "
-                    f"(saved {result.saved_tokens}, -{result.saved_percent}%)[/dim]"
-                )
+                from .renderer import render_optimization_preview
+                render_optimization_preview(result, self.cost.model)
 
         self.messages.append({"role": "user", "content": final_prompt})
         # Evict oldest turns once history grows past MAX_MESSAGE_HISTORY so

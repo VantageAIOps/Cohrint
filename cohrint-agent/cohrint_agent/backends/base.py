@@ -24,6 +24,7 @@ class BackendResult:
     model: str = "unknown"
     exit_code: int = 0
     cost_usd: float = 0.0
+    cache_read_tokens: int = 0
 
 
 class AgentProcess:

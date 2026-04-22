@@ -20,6 +20,10 @@ from cohrint_agent.renderer import (
     render_cost_summary,
     render_permission_denied,
     render_error,
+    render_optimization_preview,
+    render_cohrint_analysis,
+    render_assistant_header,
+    make_waiting_spinner,
 )
 from cohrint_agent.permissions import PermissionManager
 from cohrint_agent.api_client import AgentClient
@@ -199,9 +203,49 @@ class TestThinkingRendering:
         assert "analyze" in output
 
     def test_truncates_long_thinking(self):
-        long_text = "x" * 300
+        long_text = "x" * 800
         output = _capture_output(render_thinking, long_text)
-        assert "..." in output
+        # Some form of truncation indicator must appear for huge thinking
+        # blocks so we don't flood the terminal.
+        assert "…" in output or "..." in output
+
+    def test_truncates_at_word_boundary(self):
+        # The old 200-char cap sliced sentences mid-word, producing
+        # "never i..." cliffhangers in the terminal. The renderer must
+        # now cut at the nearest whitespace before the cap so the
+        # truncated preview ends with a complete word, never a partial
+        # one like "hallucin" or "i".
+        #
+        # Construct a text where a naive hard cut at max_chars would
+        # definitely land mid-word: concatenate without spaces in the
+        # padding, then insert a known word at the cap position.
+        words = [
+            "alpha", "beta", "gamma", "delta", "epsilon", "zeta",
+            "eta", "theta", "iota", "kappa", "lambda", "mu", "nu",
+        ]
+        # Build text that we know will force truncation with a word at
+        # the boundary — if the renderer slices mid-word, the output
+        # will contain a trailing partial like "epsilo…".
+        text = (" ".join(words) + " ") * 30
+        output = _capture_output(render_thinking, text, 100)
+        assert "…" in output
+        # The string before the ellipsis must end with one of our full
+        # words, never a partial one.
+        idx = output.rfind("…")
+        before = output[:idx].rstrip()
+        last_word = before.rsplit(None, 1)[-1] if before else ""
+        # last_word must either be empty (hit max cap with no spaces)
+        # or one of the original full words — never a truncation like
+        # "alph" or "epsilo".
+        assert last_word == "" or last_word in words, (
+            f"truncated mid-word to {last_word!r} (full output: {output!r})"
+        )
+
+    def test_short_thinking_shown_in_full(self):
+        # Under the cap, no truncation indicator should appear.
+        text = "Short reasoning here."
+        output = _capture_output(render_thinking, text)
+        assert "…" not in output and "..." not in output.replace("Short reasoning here.", "")
 
 
 # ── Section F: Permission Flow (Mock Interactive) ─────────────────────
@@ -560,3 +604,273 @@ def test_exact_cost_no_tilde():
     )
     assert "$0.0150" in out, f"Expected exact cost display, got: {out}"
     assert "~$0.0150" not in out, f"Tilde should not appear for exact costs, got: {out}"
+
+
+# ── Section: Optimization preview (pre-send) ────────────────────────────
+#
+# Shown BEFORE the prompt is dispatched to the backend. The user should see
+# what was stripped and how many tokens/dollars they just saved — the previous
+# UX only showed this afterward, which was too late to be useful.
+
+
+from cohrint_agent.optimizer import OptimizationResult
+
+
+def _opt(original, optimized, original_tokens, optimized_tokens, changes=None):
+    saved = max(0, original_tokens - optimized_tokens)
+    pct = round(saved / original_tokens * 100) if original_tokens else 0
+    return OptimizationResult(
+        original=original, optimized=optimized,
+        original_tokens=original_tokens, optimized_tokens=optimized_tokens,
+        saved_tokens=saved, saved_percent=pct, changes=changes or [],
+    )
+
+
+class TestOptimizationPreview:
+    def test_shows_token_savings(self):
+        result = _opt("verbose", "short", 100, 40, ["removed filler phrases"])
+        out = _capture_output(render_optimization_preview, result, "claude-sonnet-4-6")
+        assert "100" in out and "40" in out
+        assert "60" in out or "60%" in out
+
+    def test_shows_dollar_savings(self):
+        # 60 input tokens saved on sonnet @ $3/M = $0.00018
+        result = _opt("verbose", "short", 100, 40)
+        out = _capture_output(render_optimization_preview, result, "claude-sonnet-4-6")
+        # Render as cents with 4 decimals — user sees "$0.0002" or similar
+        assert "$" in out
+
+    def test_shows_optimized_prompt_text(self):
+        # Post-feedback: we no longer print the bullet list of optimizer
+        # layers ("removed filler phrases: …"). Instead we show the
+        # actual optimized prompt text in dim so the user sees exactly
+        # what's about to be sent to the model.
+        result = _opt(
+            "please could you fix the login bug",
+            "fix the login bug",
+            120, 60,
+            ["removed filler phrases: \"please could you\""],
+        )
+        out = _capture_output(render_optimization_preview, result, "claude-sonnet-4-6")
+        assert "fix the login bug" in out
+
+    def test_does_not_show_algorithm_change_list(self):
+        # Guardrail: algorithmic internals must NOT leak into the preview.
+        # These phrases are the historical render_optimization_preview
+        # bullet-list output that we are now suppressing.
+        result = _opt(
+            "I'd like you to fix the login bug in order to unblock the team",
+            "fix the login bug to unblock the team",
+            200, 90,
+            [
+                "removed filler phrases: \"I'd like you to\"",
+                "rewrote verbose phrases: \"in order to\" → \"to\"",
+                "stripped filler words: really, basically",
+            ],
+        )
+        out = _capture_output(render_optimization_preview, result, "claude-sonnet-4-6")
+        assert "removed filler phrases" not in out.lower()
+        assert "rewrote verbose phrases" not in out.lower()
+        assert "stripped filler words" not in out.lower()
+        # The header's `200→90 tokens` arrow is fine; only the
+        # change-list rewrite arrows like `"in order to" → "to"` must
+        # be absent. Test by asserting no quoted-rewrite pattern lands.
+        assert '" → "' not in out
+        assert "+" + " more" not in out  # "+N more" summary suppressed
+
+    def test_truncates_long_optimized_text(self):
+        # Even after optimization a prompt can be thousands of chars —
+        # we cap the dim preview at a terminal-friendly length and
+        # append an ellipsis so users see the head of their prompt
+        # without drowning the analysis block below it.
+        big = "fix " * 500  # ~2000 chars of optimized prompt
+        result = _opt("x " * 800, big, 800, 500)
+        out = _capture_output(render_optimization_preview, result, "claude-sonnet-4-6")
+        # The preview must be truncated — nowhere near the full 2000
+        # chars should land in terminal output.
+        assert "…" in out or "..." in out
+        # And it must stay far under the full prompt length.
+        assert len(out) < len(big) + 400  # header + dim framing ~ 400 chars
+
+    def test_no_savings_skips_preview(self):
+        # If nothing was saved (already optimal), don't clutter the terminal.
+        result = _opt("fix bug", "fix bug", 3, 3)
+        out = _capture_output(render_optimization_preview, result, "claude-sonnet-4-6")
+        assert out.strip() == "", f"Expected empty output, got: {out!r}"
+
+    def test_sanitizes_optimized_text(self):
+        # The optimized text comes directly from user input, so must be
+        # scrubbed before echoing — an OSC-52 payload smuggled in a
+        # prompt must not reach the terminal (T-SAFETY.5/6/12).
+        optimized = "fix the bug \x1b]52;c;BADSTUFF\x07 now"
+        result = _opt("verbose original", optimized, 120, 60)
+        out = _capture_output(render_optimization_preview, result, "claude-sonnet-4-6")
+        assert "\x1b]52" not in out
+
+
+class TestWaitingSpinner:
+    """The waiting spinner is what prevents users from thinking the CLI is
+    stuck while the backend subprocess (claude / codex / gemini) boots and
+    the model generates its first token. It MUST:
+      - be a context manager (usable with ``with``)
+      - not raise when stdout is not a TTY (non-interactive pipes, CI)
+      - auto-stop when the context exits (so subsequent prints render
+        cleanly below it, not mid-spinner)
+      - expose a ``stop_immediate()`` method for the backend to clear the
+        spinner the moment the first event arrives (before printing text)
+    """
+
+    def test_is_context_manager(self):
+        with make_waiting_spinner("Thinking"):
+            pass  # no crash
+
+    def test_nested_enter_exit_safe(self):
+        # Double enter/exit must not raise — the backend calls stop()
+        # eagerly on first event AND on exit via the `with` block.
+        spinner = make_waiting_spinner("Thinking")
+        with spinner:
+            spinner.stop_immediate()  # safe to call before __exit__
+            spinner.stop_immediate()  # safe to call twice
+
+    def test_noop_when_not_tty(self):
+        # In a non-tty environment the spinner must be a no-op — otherwise
+        # ANSI escapes leak into piped / logged output (`cohrint-agent ...
+        # | tee log`). We verify by capturing stdout: nothing rich-specific
+        # should appear.
+        import sys
+        from io import StringIO
+        import cohrint_agent.renderer as r
+        fake_out = StringIO()
+        buf = Console(file=fake_out, force_terminal=False, width=120, no_color=True)
+        orig = r.console
+        r.console = buf
+        try:
+            with make_waiting_spinner("Thinking"):
+                pass
+        finally:
+            r.console = orig
+        # A real spinner emits dots/ticks via cursor control. In non-tty
+        # Rich suppresses output, so the buffer stays empty or contains
+        # only plain text (no \x1b[ escape).
+        out = fake_out.getvalue()
+        assert "\x1b[" not in out
+
+    def test_custom_label_shown(self):
+        # Label is visible in terminal rendering — we verify the factory
+        # accepts and stores it for later display (we can't easily intercept
+        # the live-updating status text in a test).
+        spinner = make_waiting_spinner("Running tool")
+        assert spinner is not None
+
+
+class TestAssistantHeader:
+    def test_prints_claude_banner(self):
+        out = _capture_output(render_assistant_header, "claude")
+        assert "Claude" in out or "claude" in out
+
+    def test_honors_custom_label(self):
+        out = _capture_output(render_assistant_header, "gpt-4o")
+        assert "gpt-4o" in out
+
+
+class TestCohrintAnalysis:
+    """Post-response analysis block — consolidates optimization savings,
+    guardrails, anomaly, recommendation, and cost/tokens for the turn."""
+
+    def _call(self, **overrides):
+        defaults = dict(
+            optimization=_opt("x", "y", 100, 50, ["removed filler"]),
+            model="claude-sonnet-4-6",
+            guardrail_hedge_detected=False,
+            guardrail_active=["hallucination"],
+            anomaly_line=None,
+            recommendation=None,
+            turn_input_tokens=500,
+            turn_output_tokens=300,
+            turn_cost_usd=0.0045,
+            session_cost_usd=0.0090,
+        )
+        defaults.update(overrides)
+        return _capture_output(render_cohrint_analysis, **defaults)
+
+    def test_shows_cost_saved(self):
+        out = self._call()
+        assert "saved" in out.lower()
+        assert "$" in out
+
+    def test_shows_tokens_and_cost_for_turn(self):
+        out = self._call(turn_input_tokens=500, turn_output_tokens=300, turn_cost_usd=0.0045)
+        assert "800" in out  # total this turn
+        assert "0.0045" in out
+
+    def test_shows_session_total(self):
+        out = self._call(session_cost_usd=0.0090)
+        assert "0.0090" in out
+
+    def test_shows_hedge_detected(self):
+        out = self._call(guardrail_hedge_detected=True, guardrail_active=["hallucination"])
+        assert "declined to fabricate" in out.lower() or "hedge" in out.lower() or "verify independently" in out.lower()
+
+    def test_shows_no_hedge_when_guardrail_active(self):
+        out = self._call(guardrail_hedge_detected=False, guardrail_active=["hallucination"])
+        assert "no hedge" in out.lower() or "double-check" in out.lower()
+
+    def test_omits_guardrail_line_when_not_active(self):
+        out = self._call(guardrail_active=[])
+        assert "hedge" not in out.lower()
+        assert "hallucination" not in out.lower()
+
+    def test_shows_anomaly_when_present(self):
+        out = self._call(anomaly_line="Cost anomaly: $0.05 this turn vs $0.01 avg (5.0x)")
+        assert "anomaly" in out.lower()
+        assert "5.0x" in out
+
+    def test_omits_anomaly_when_absent(self):
+        out = self._call(anomaly_line=None)
+        assert "anomaly" not in out.lower()
+
+    def test_shows_recommendation_when_present(self):
+        out = self._call(recommendation="Use ! prefix for shell commands")
+        assert "Use ! prefix" in out
+
+    def test_omits_optimization_line_when_no_savings(self):
+        # Zero-savings turns should NOT print a misleading "0 tokens saved" row.
+        result = _opt("short", "short", 5, 5)
+        out = self._call(optimization=result)
+        # "saved" still allowed if it appears in an anomaly or recommendation —
+        # we only forbid a spurious "0 tokens saved" row.
+        assert "0 tokens" not in out or "saved" not in out.lower().split("\n")[0]
+
+    def test_analysis_header_present(self):
+        out = self._call()
+        # A visual divider / header identifies this block distinctly from
+        # Claude's answer above it.
+        assert "Cohrint" in out or "cohrint" in out or "analysis" in out.lower()
+
+    def test_shows_cache_saved_when_cache_hit(self):
+        # Semantic cache / prompt-cache hit produced $ savings this turn.
+        out = self._call(cache_saved_usd=0.0034, cache_read_tokens=12000)
+        assert "ache" in out  # "Cache" or "cache"
+        assert "0.0034" in out
+        assert "12,000" in out or "12000" in out
+
+    def test_omits_cache_line_when_no_cache(self):
+        out = self._call(cache_saved_usd=0.0, cache_read_tokens=0)
+        assert "cache saved" not in out.lower()
+
+    def test_combined_savings_shown(self):
+        # Turn with BOTH optimizer + cache savings — both should be visible.
+        opt = OptimizationResult(
+            original="x", optimized="y",
+            original_tokens=500, optimized_tokens=200,
+            saved_tokens=300, saved_percent=60, changes=[],
+        )
+        out = self._call(
+            optimization=opt,
+            cache_saved_usd=0.0050,
+            cache_read_tokens=20000,
+        )
+        assert "Tokens saved" in out
+        assert "Cost saved" in out
+        assert "ache" in out
+        assert "0.0050" in out

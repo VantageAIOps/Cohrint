@@ -121,6 +121,19 @@ AGENT_TIPS: list[Recommendation] = [
         ),
     ),
     Recommendation(
+        id="claude-starter-optimize",
+        priority="low",
+        agent="claude",
+        category="prompt",
+        title="Keep prompts tight for cheaper turns",
+        action="Cohrint strips filler phrases automatically — dropping boilerplate like \"could you please\" saves 10-20% per prompt.",
+        savings_estimate="~10-20% per prompt",
+        condition=lambda m: (
+            m.agent == "claude"
+            and 1 <= m.prompt_count <= 3
+        ),
+    ),
+    Recommendation(
         id="claude-prompt-caching",
         priority="high",
         agent="claude",
