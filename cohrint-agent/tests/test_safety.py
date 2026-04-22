@@ -203,6 +203,7 @@ class TestHttpsOnlyTracker:
         # Redirect spool to isolated tmp_path so we don't touch real ~/.cohrint
         monkeypatch.setattr("cohrint_agent.tracker._SPOOL_DIR", tmp_path)
         monkeypatch.setattr("cohrint_agent.tracker._SPOOL_FILE", tmp_path / "spool.jsonl")
+        monkeypatch.setattr("cohrint_agent.tracker._SPOOL_LOCK_FILE", tmp_path / "spool.lock")
 
         cfg = TrackerConfig(
             api_key="crt_test_abc",
@@ -230,6 +231,7 @@ class TestHttpsOnlyTracker:
     def test_flush_refuses_file_scheme(self, tmp_path, monkeypatch):
         monkeypatch.setattr("cohrint_agent.tracker._SPOOL_DIR", tmp_path)
         monkeypatch.setattr("cohrint_agent.tracker._SPOOL_FILE", tmp_path / "spool.jsonl")
+        monkeypatch.setattr("cohrint_agent.tracker._SPOOL_LOCK_FILE", tmp_path / "spool.lock")
         cfg = TrackerConfig(api_key="crt_x", api_base="file:///etc/passwd", batch_size=100)
         tr = Tracker(cfg)
         tr.record("m", 1, 1, 0.0, 1)
@@ -242,6 +244,7 @@ class TestHttpsOnlyTracker:
         # allows it. Current policy: https-only, no exceptions. Confirm that.
         monkeypatch.setattr("cohrint_agent.tracker._SPOOL_DIR", tmp_path)
         monkeypatch.setattr("cohrint_agent.tracker._SPOOL_FILE", tmp_path / "spool.jsonl")
+        monkeypatch.setattr("cohrint_agent.tracker._SPOOL_LOCK_FILE", tmp_path / "spool.lock")
         cfg = TrackerConfig(api_key="crt_x", api_base="http://127.0.0.1:8787", batch_size=100)
         tr = Tracker(cfg)
         tr.record("m", 1, 1, 0.0, 1)
@@ -388,6 +391,7 @@ class TestTrackerQueueCap:
     def test_queue_caps_at_max_queue_size(self, tmp_path, monkeypatch):
         monkeypatch.setattr("cohrint_agent.tracker._SPOOL_DIR", tmp_path)
         monkeypatch.setattr("cohrint_agent.tracker._SPOOL_FILE", tmp_path / "spool.jsonl")
+        monkeypatch.setattr("cohrint_agent.tracker._SPOOL_LOCK_FILE", tmp_path / "spool.lock")
         from cohrint_agent.tracker import MAX_QUEUE_SIZE
 
         # No api_key → record() still appends but _do_flush short-circuits.
@@ -400,6 +404,7 @@ class TestTrackerQueueCap:
     def test_oldest_dropped_first(self, tmp_path, monkeypatch):
         monkeypatch.setattr("cohrint_agent.tracker._SPOOL_DIR", tmp_path)
         monkeypatch.setattr("cohrint_agent.tracker._SPOOL_FILE", tmp_path / "spool.jsonl")
+        monkeypatch.setattr("cohrint_agent.tracker._SPOOL_LOCK_FILE", tmp_path / "spool.lock")
         from cohrint_agent.tracker import MAX_QUEUE_SIZE
 
         cfg = TrackerConfig(api_key="", api_base="https://api.example.com", batch_size=10_000)
@@ -2186,8 +2191,8 @@ class TestHookScriptSymlink:
         assert not hook_path.is_symlink()
         # Victim must be intact
         assert target.read_text() == "original victim content"
-        # Hook script should contain the expected shebang
-        assert hook_path.read_text().startswith("#!/bin/bash")
+        # Hook script should contain the expected shebang (/bin/bash or /usr/bin/bash)
+        assert "/bin/bash" in hook_path.read_text().splitlines()[0]
 
 
 # ────────── T-SAFETY.settings_symlink (scan 15) ────────────────────────────
@@ -2380,6 +2385,7 @@ class TestSpoolPerms:
         from cohrint_agent import tracker as T
         monkeypatch.setattr(T, "_SPOOL_DIR", tmp_path / "spool_dir")
         monkeypatch.setattr(T, "_SPOOL_FILE", tmp_path / "spool_dir" / "spool.jsonl")
+        monkeypatch.setattr(T, "_SPOOL_LOCK_FILE", tmp_path / "spool_dir" / "spool.lock")
         old_umask = _os.umask(0o000)
         try:
             T._spool_write([{"event_id": "x"}])
@@ -2404,6 +2410,7 @@ class TestSpoolAtomic:
         from cohrint_agent import tracker as T
         monkeypatch.setattr(T, "_SPOOL_DIR", tmp_path / "spool_dir")
         monkeypatch.setattr(T, "_SPOOL_FILE", tmp_path / "spool_dir" / "spool.jsonl")
+        monkeypatch.setattr(T, "_SPOOL_LOCK_FILE", tmp_path / "spool_dir" / "spool.lock")
 
         replace_calls: list[tuple[str, str]] = []
         orig_replace = _os.replace
@@ -3076,7 +3083,7 @@ class TestScan21ReadBounds:
         from cohrint_agent.tools import _exec_read
         f = tmp_path / "x.txt"
         f.write_text("a\nb\nc\n")
-        out = _exec_read({"file_path": str(f), "offset": -1000, "limit": 10})
+        out = _exec_read({"file_path": str(f), "offset": -1000, "limit": 10}, str(tmp_path))
         # First numbered line must be "1\ta" — not a negative-index slice.
         assert out.startswith("1\ta")
 
@@ -3084,7 +3091,7 @@ class TestScan21ReadBounds:
         from cohrint_agent.tools import _exec_read
         f = tmp_path / "y.txt"
         f.write_text("line\n" * 20)
-        out = _exec_read({"file_path": str(f), "limit": 10**18})
+        out = _exec_read({"file_path": str(f), "limit": 10**18}, str(tmp_path))
         # Should return without raising and contain a bounded number of lines.
         assert out.count("\n") < 10001
 
