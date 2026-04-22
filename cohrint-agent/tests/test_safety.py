@@ -2191,8 +2191,8 @@ class TestHookScriptSymlink:
         assert not hook_path.is_symlink()
         # Victim must be intact
         assert target.read_text() == "original victim content"
-        # Hook script should contain the expected shebang
-        assert hook_path.read_text().startswith("#!/bin/bash")
+        # Hook script should contain the expected shebang (/bin/bash or /usr/bin/bash)
+        assert "/bin/bash" in hook_path.read_text().splitlines()[0]
 
 
 # ────────── T-SAFETY.settings_symlink (scan 15) ────────────────────────────
