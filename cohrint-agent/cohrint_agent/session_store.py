@@ -7,6 +7,7 @@ import fcntl
 import json
 import os
 import re
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -85,6 +86,11 @@ class SessionStore:
             os.chmod(self.sessions_dir, 0o700)
         except OSError:
             pass
+        # Serializes concurrent save() calls from threads in the same process.
+        # The file-based flock in save() handles inter-process coordination.
+        # Without this, unlink+recreate of the lockfile lets two threads acquire
+        # flocks on different inodes simultaneously (T-CONCUR.atomic_save).
+        self._lock = threading.Lock()
 
     def _path(self, session_id: str) -> Path:
         if not is_valid_session_id(session_id):
@@ -108,41 +114,39 @@ class SessionStore:
         tmp = path.with_suffix(path.suffix + ".tmp")
         lockfile = path.with_suffix(path.suffix + ".lock")
         from .process_safety import open_lockfile
-        with open_lockfile(lockfile) as lk:
-            fcntl.flock(lk, fcntl.LOCK_EX)
-            try:
-                # Open tmp with explicit 0o600 so session history isn't
-                # readable by anyone but the owner — umask-independent
-                # (T-PRIVACY.sessions_file_0600).
-                # O_EXCL so a stale/attacker-planted <uuid>.json.tmp cannot
-                # be silently reused; unlink any leftover then retry once
-                # (T-SAFETY.tmp_excl).
+        with self._lock:
+            with open_lockfile(lockfile) as lk:
+                fcntl.flock(lk, fcntl.LOCK_EX)
                 try:
-                    fd = os.open(
-                        tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_TRUNC, 0o600
-                    )
-                except FileExistsError:
+                    # Open tmp with explicit 0o600 so session history isn't
+                    # readable by anyone but the owner — umask-independent
+                    # (T-PRIVACY.sessions_file_0600).
+                    # O_EXCL so a stale/attacker-planted <uuid>.json.tmp cannot
+                    # be silently reused; unlink any leftover then retry once
+                    # (T-SAFETY.tmp_excl).
                     try:
-                        os.unlink(tmp)
-                    except OSError:
-                        pass
-                    fd = os.open(
-                        tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_TRUNC, 0o600
-                    )
-                with os.fdopen(fd, "w") as f:
-                    json.dump(data, f, indent=2)
-                    f.flush()
-                    os.fsync(f.fileno())
-                os.replace(tmp, path)
-            finally:
-                fcntl.flock(lk, fcntl.LOCK_UN)
-        # Best-effort cleanup so `sessions/` doesn't accumulate a .lock
-        # file per session. Advisory flock is per-fd; concurrent holders
-        # keep their lock regardless of the path being unlinked.
-        try:
-            os.unlink(lockfile)
-        except OSError:
-            pass
+                        fd = os.open(
+                            tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_TRUNC, 0o600
+                        )
+                    except FileExistsError:
+                        try:
+                            os.unlink(tmp)
+                        except OSError:
+                            pass
+                        fd = os.open(
+                            tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_TRUNC, 0o600
+                        )
+                    with os.fdopen(fd, "w") as f:
+                        json.dump(data, f, indent=2)
+                        f.flush()
+                        os.fsync(f.fileno())
+                    os.replace(tmp, path)
+                finally:
+                    fcntl.flock(lk, fcntl.LOCK_UN)
+            try:
+                os.unlink(lockfile)
+            except OSError:
+                pass
 
     def load(self, session_id: str) -> dict:
         p = self._path(session_id)  # raises InvalidSessionIdError on bad id

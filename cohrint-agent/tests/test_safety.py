@@ -3081,7 +3081,7 @@ class TestScan21ReadBounds:
         from cohrint_agent.tools import _exec_read
         f = tmp_path / "x.txt"
         f.write_text("a\nb\nc\n")
-        out = _exec_read({"file_path": str(f), "offset": -1000, "limit": 10})
+        out = _exec_read({"file_path": str(f), "offset": -1000, "limit": 10}, str(tmp_path))
         # First numbered line must be "1\ta" — not a negative-index slice.
         assert out.startswith("1\ta")
 
@@ -3089,7 +3089,7 @@ class TestScan21ReadBounds:
         from cohrint_agent.tools import _exec_read
         f = tmp_path / "y.txt"
         f.write_text("line\n" * 20)
-        out = _exec_read({"file_path": str(f), "limit": 10**18})
+        out = _exec_read({"file_path": str(f), "limit": 10**18}, str(tmp_path))
         # Should return without raising and contain a bounded number of lines.
         assert out.count("\n") < 10001
 
