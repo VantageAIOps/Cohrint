@@ -1,0 +1,27 @@
+# Cohrint — Code Owners
+# All paths require review from @Amanjain98 (owner).
+# This file auto-assigns the reviewer on every PR.
+
+# Global: every file in the repo
+* @Amanjain98
+
+# CI/CD and deployment — extra scrutiny
+.github/workflows/ @Amanjain98
+wrangler.toml @Amanjain98
+
+# Worker API — all route changes
+cohrint-worker/src/routes/ @Amanjain98
+cohrint-worker/src/middleware/ @Amanjain98
+
+# Published packages — must not ship breaking changes without owner sign-off
+cohrint-js-sdk/ @Amanjain98
+cohrint-mcp/ @Amanjain98
+cohrint-local-proxy/ @Amanjain98
+cohrint-agent/ @Amanjain98
+
+# Database migrations — irreversible in production
+cohrint-worker/migrations/ @Amanjain98
+
+# Strategy and admin docs — internal only
+PRODUCT_STRATEGY.md @Amanjain98
+ADMIN_GUIDE.md @Amanjain98
