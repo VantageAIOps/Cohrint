@@ -79,6 +79,7 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.mcp == 'true'
     runs-on: ubuntu-latest
+    environment: npm-publish
     permissions:
       id-token: write
     steps:
@@ -101,6 +102,7 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.sdk == 'true'
     runs-on: ubuntu-latest
+    environment: npm-publish
     permissions:
       id-token: write
     steps:
@@ -123,6 +125,7 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.proxy == 'true'
     runs-on: ubuntu-latest
+    environment: npm-publish
     permissions:
       id-token: write
     steps:
@@ -148,6 +151,7 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.agent == 'true'
     runs-on: ubuntu-latest
+    environment: pypi-publish
     permissions:
       id-token: write
     steps:
