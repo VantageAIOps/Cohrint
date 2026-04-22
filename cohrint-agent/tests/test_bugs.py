@@ -118,6 +118,7 @@ def test_flush_retains_events_on_network_error(tmp_path, monkeypatch):
     import cohrint_agent.tracker as tracker_mod
     monkeypatch.setattr(tracker_mod, "_SPOOL_DIR", tmp_path)
     monkeypatch.setattr(tracker_mod, "_SPOOL_FILE", tmp_path / "spool.jsonl")
+    monkeypatch.setattr(tracker_mod, "_SPOOL_LOCK_FILE", tmp_path / "spool.lock")
 
     tracker = _make_tracker("full")
     tracker.record(
