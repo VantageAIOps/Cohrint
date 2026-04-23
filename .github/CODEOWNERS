@@ -21,7 +21,3 @@ cohrint-agent/ @Amanjain98
 
 # Database migrations — irreversible in production
 cohrint-worker/migrations/ @Amanjain98
-
-# Strategy and admin docs — internal only
-PRODUCT_STRATEGY.md @Amanjain98
-ADMIN_GUIDE.md @Amanjain98

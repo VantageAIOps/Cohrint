@@ -116,8 +116,6 @@ Cohrint/
 │   └── suites/             # 40+ pytest suites (live integration tests)
 ├── docs/                   # Additional internal docs
 ├── scripts/                # Ops scripts
-├── ADMIN_GUIDE.md          # Deep internal reference (admins/operators)
-├── PRODUCT_STRATEGY.md     # Product direction
 └── CLAUDE.md               # Rules for AI coding agents
 ```
 
@@ -260,11 +258,10 @@ See [`cohrint-worker/DEPLOY.md`](cohrint-worker/DEPLOY.md) for the full runbook.
 ## Contributing
 
 1. Read [`CLAUDE.md`](CLAUDE.md) for code rules and forbidden actions.
-2. Skim [`ADMIN_GUIDE.md`](ADMIN_GUIDE.md) for the area you're touching.
-3. Branch → implement → add tests → PR → wait for CI → merge.
-4. Use conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`.
-5. Don't commit secrets (`.env`, API keys, `crt_*` tokens).
-6. No fake or demo data — real API data or honest empty states only.
+2. Branch → implement → add tests → PR → wait for CI → merge.
+3. Use conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`.
+4. Don't commit secrets (`.env`, API keys, `crt_*` tokens).
+5. No fake or demo data — real API data or honest empty states only.
 
 All API routes require auth (Bearer token or session cookie). SDK/CLI packages have **zero npm runtime dependencies** — keep it that way.
 
@@ -274,8 +271,6 @@ All API routes require auth (Bearer token or session cookie). SDK/CLI packages h
 
 | Doc | Purpose |
 |---|---|
-| [`ADMIN_GUIDE.md`](ADMIN_GUIDE.md) | Deep internal reference — architecture, algorithms, ops runbook |
-| [`PRODUCT_STRATEGY.md`](PRODUCT_STRATEGY.md) | Product direction and roadmap |
 | [`CLAUDE.md`](CLAUDE.md) | Rules and conventions for AI coding agents |
 | [`cohrint-frontend/docs.html`](cohrint-frontend/docs.html) | Public-facing API docs |
 | [`cohrint-worker/DEPLOY.md`](cohrint-worker/DEPLOY.md) | Deployment runbook |
