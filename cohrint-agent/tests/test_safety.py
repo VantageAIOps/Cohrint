@@ -203,6 +203,7 @@ class TestHttpsOnlyTracker:
         # Redirect spool to isolated tmp_path so we don't touch real ~/.cohrint
         monkeypatch.setattr("cohrint_agent.tracker._SPOOL_DIR", tmp_path)
         monkeypatch.setattr("cohrint_agent.tracker._SPOOL_FILE", tmp_path / "spool.jsonl")
+        monkeypatch.setattr("cohrint_agent.tracker._SPOOL_LOCK_FILE", tmp_path / "spool.lock")
 
         cfg = TrackerConfig(
             api_key="crt_test_abc",
@@ -230,6 +231,7 @@ class TestHttpsOnlyTracker:
     def test_flush_refuses_file_scheme(self, tmp_path, monkeypatch):
         monkeypatch.setattr("cohrint_agent.tracker._SPOOL_DIR", tmp_path)
         monkeypatch.setattr("cohrint_agent.tracker._SPOOL_FILE", tmp_path / "spool.jsonl")
+        monkeypatch.setattr("cohrint_agent.tracker._SPOOL_LOCK_FILE", tmp_path / "spool.lock")
         cfg = TrackerConfig(api_key="crt_x", api_base="file:///etc/passwd", batch_size=100)
         tr = Tracker(cfg)
         tr.record("m", 1, 1, 0.0, 1)
@@ -242,6 +244,7 @@ class TestHttpsOnlyTracker:
         # allows it. Current policy: https-only, no exceptions. Confirm that.
         monkeypatch.setattr("cohrint_agent.tracker._SPOOL_DIR", tmp_path)
         monkeypatch.setattr("cohrint_agent.tracker._SPOOL_FILE", tmp_path / "spool.jsonl")
+        monkeypatch.setattr("cohrint_agent.tracker._SPOOL_LOCK_FILE", tmp_path / "spool.lock")
         cfg = TrackerConfig(api_key="crt_x", api_base="http://127.0.0.1:8787", batch_size=100)
         tr = Tracker(cfg)
         tr.record("m", 1, 1, 0.0, 1)
@@ -388,6 +391,7 @@ class TestTrackerQueueCap:
     def test_queue_caps_at_max_queue_size(self, tmp_path, monkeypatch):
         monkeypatch.setattr("cohrint_agent.tracker._SPOOL_DIR", tmp_path)
         monkeypatch.setattr("cohrint_agent.tracker._SPOOL_FILE", tmp_path / "spool.jsonl")
+        monkeypatch.setattr("cohrint_agent.tracker._SPOOL_LOCK_FILE", tmp_path / "spool.lock")
         from cohrint_agent.tracker import MAX_QUEUE_SIZE
 
         # No api_key → record() still appends but _do_flush short-circuits.
@@ -400,6 +404,7 @@ class TestTrackerQueueCap:
     def test_oldest_dropped_first(self, tmp_path, monkeypatch):
         monkeypatch.setattr("cohrint_agent.tracker._SPOOL_DIR", tmp_path)
         monkeypatch.setattr("cohrint_agent.tracker._SPOOL_FILE", tmp_path / "spool.jsonl")
+        monkeypatch.setattr("cohrint_agent.tracker._SPOOL_LOCK_FILE", tmp_path / "spool.lock")
         from cohrint_agent.tracker import MAX_QUEUE_SIZE
 
         cfg = TrackerConfig(api_key="", api_base="https://api.example.com", batch_size=10_000)
@@ -2380,6 +2385,7 @@ class TestSpoolPerms:
         from cohrint_agent import tracker as T
         monkeypatch.setattr(T, "_SPOOL_DIR", tmp_path / "spool_dir")
         monkeypatch.setattr(T, "_SPOOL_FILE", tmp_path / "spool_dir" / "spool.jsonl")
+        monkeypatch.setattr(T, "_SPOOL_LOCK_FILE", tmp_path / "spool_dir" / "spool.lock")
         old_umask = _os.umask(0o000)
         try:
             T._spool_write([{"event_id": "x"}])
@@ -2404,6 +2410,7 @@ class TestSpoolAtomic:
         from cohrint_agent import tracker as T
         monkeypatch.setattr(T, "_SPOOL_DIR", tmp_path / "spool_dir")
         monkeypatch.setattr(T, "_SPOOL_FILE", tmp_path / "spool_dir" / "spool.jsonl")
+        monkeypatch.setattr(T, "_SPOOL_LOCK_FILE", tmp_path / "spool_dir" / "spool.lock")
 
         replace_calls: list[tuple[str, str]] = []
         orig_replace = _os.replace
