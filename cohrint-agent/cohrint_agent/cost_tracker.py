@@ -78,22 +78,31 @@ class SessionCost:
     def record_prompt(self) -> None:
         self.prompt_count += 1
 
-    def record_usage_raw(self, input_tokens: int, output_tokens: int, cost_usd: float) -> TurnUsage:
+    def record_usage_raw(
+        self,
+        input_tokens: int,
+        output_tokens: int,
+        cost_usd: float,
+        cache_read_tokens: int = 0,
+    ) -> TurnUsage:
         """Record pre-computed token counts (used by ClaudeCliBackend with exact counts)."""
         # Clamp to non-negative so a malformed CC `result` event can't
         # decrement the accumulator (T-COST.nonneg). A negative cost
         # poisons both the session total and every budget check.
         input_tokens = max(0, int(input_tokens))
         output_tokens = max(0, int(output_tokens))
+        cache_read_tokens = max(0, int(cache_read_tokens))
         cost_usd = max(0.0, float(cost_usd))
         turn = TurnUsage(
             input_tokens=input_tokens,
             output_tokens=output_tokens,
+            cache_read_tokens=cache_read_tokens,
             cost_usd=cost_usd,
         )
         self.turns.append(turn)
         self.total_input += input_tokens
         self.total_output += output_tokens
+        self.total_cache_read += cache_read_tokens
         self.total_cost_usd += cost_usd
         self.prompt_count += 1
         return turn

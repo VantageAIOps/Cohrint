@@ -99,18 +99,28 @@ FILLER_WORDS_RE = re.compile(
 # ---------------------------------------------------------------------------
 
 def looks_like_structured_data(text: str) -> bool:
-    """Return True if text is JSON, code, or URL-heavy (should skip optimizer)."""
+    """Return True if the text is *dominantly* structured (JSON, code, URL
+    dump) and therefore has no prose worth compressing.
+
+    Prior versions returned True for any prompt containing a single fenced
+    block or inline backtick reference — which meant a technical prose
+    prompt like "confirm that ``validateStream()`` exists in package X"
+    silently skipped optimization. ``_split_code_and_prose`` already
+    preserves code regions during compression, so we only bail out of
+    optimization when the structured part is the *whole* prompt.
+    """
     trimmed = text.strip()
+    # Pure JSON / array payload.
     if trimmed.startswith("{") or trimmed.startswith("["):
         return True
+    # Entire prompt opens with a code fence — no prose preamble to compress.
     if trimmed.startswith("```"):
         return True
-    if re.search(r"```[\s\S]*?```", text):
-        return True
-    if re.search(r"`[^`\n]+`", text):
-        return True
+    # URL-heavy dump (link list / sitemap paste).
     if len(re.findall(r"https?://", text)) > 2:
         return True
+    # Symbol density — if the text is overwhelmingly code-like characters,
+    # treat as structured.
     symbols = len(re.findall(r"[{}()\[\];=<>]", text))
     if symbols > len(text) * 0.1:
         return True
@@ -168,28 +178,62 @@ def _deduplicate_sentences(text: str) -> str:
 
 
 def _compress_prose(prose: str) -> str:
+    """Backward-compat shim — used by tests."""
+    return _compress_prose_tracked(prose)[0]
+
+
+def _compress_prose_tracked(prose: str) -> tuple[str, list[str]]:
+    """Compress prose and return (result, list of human-readable change descriptions)."""
     result = prose
-    # Layer 0: deduplicate
-    result = _deduplicate_sentences(result)
-    # Layer 1: filler phrases
+    changes: list[str] = []
+
+    # Layer 0: deduplicate sentences
+    deduped = _deduplicate_sentences(result)
+    if deduped != result:
+        changes.append("removed duplicate sentences")
+    result = deduped
+
+    # Layer 1: filler phrases — collect unique hits (up to 3 examples)
+    hits: list[str] = []
     for phrase in FILLER_PHRASES:
+        if re.search(re.escape(phrase), result, flags=re.I):
+            hits.append(f'"{phrase}"')
         result = re.sub(re.escape(phrase), "", result, flags=re.I)
-    # Layer 2: verbose rewrites
+    if hits:
+        sample = ", ".join(hits[:3])
+        suffix = f" (+{len(hits)-3} more)" if len(hits) > 3 else ""
+        changes.append(f"removed filler phrases: {sample}{suffix}")
+
+    # Layer 2: verbose rewrites — collect unique hits (up to 3 examples)
+    rewrites: list[str] = []
     for pattern, replacement in VERBOSE_REWRITES:
+        if pattern.search(result):
+            rewrites.append(f'"{pattern.pattern[2:-2]}" → "{replacement}"')
         result = pattern.sub(replacement, result)
-    # Layer 3: filler words
+    if rewrites:
+        sample = ", ".join(rewrites[:3])
+        suffix = f" (+{len(rewrites)-3} more)" if len(rewrites) > 3 else ""
+        changes.append(f"rewrote verbose phrases: {sample}{suffix}")
+
+    # Layer 3: filler words — count hits
+    filler_hits = FILLER_WORDS_RE.findall(result)
     result = FILLER_WORDS_RE.sub("", result)
-    # Layer 4: collapse whitespace
-    result = re.sub(r"\s{2,}", " ", result)
-    # Layer 5: trim
-    return result.strip()
+    if filler_hits:
+        unique = sorted(set(w.lower() for w in filler_hits))
+        sample = ", ".join(unique[:5])
+        suffix = f" (+{len(unique)-5} more)" if len(unique) > 5 else ""
+        changes.append(f"stripped filler words: {sample}{suffix}")
+
+    # Layer 4+5: collapse whitespace and trim
+    result = re.sub(r"\s{2,}", " ", result).strip()
+    return result, changes
 
 
 def compress_prompt(prompt: str) -> str:
-    """Apply 6-layer compression. Code blocks are preserved."""
+    """Apply compression. Code blocks are preserved."""
     segments = _split_code_and_prose(prompt)
     return "".join(
-        content if stype == "code" else _compress_prose(content)
+        content if stype == "code" else _compress_prose_tracked(content)[0]
         for stype, content in segments
     )
 
@@ -206,18 +250,45 @@ class OptimizationResult:
     optimized_tokens: int
     saved_tokens: int
     saved_percent: int
+    changes: list[str]
+
+
+def estimated_cost_saved(result: OptimizationResult, model: str | None) -> float:
+    """Return USD the user did NOT have to spend on input tokens thanks to
+    optimization. Output price is irrelevant — we measure what we stripped
+    from the prompt before send.
+
+    Unknown / None model falls back to the ``default`` rate table so the
+    value is still honest (never silently 0.0, which would mask real
+    savings in dashboards — mirrors calculate_cost T-COST.unknown_model).
+    """
+    saved = max(0, result.saved_tokens)
+    if saved == 0:
+        return 0.0
+    from .pricing import calculate_cost
+    return calculate_cost(model or "default", prompt_tokens=saved, completion_tokens=0)
 
 
 def optimize_prompt(prompt: str) -> OptimizationResult:
-    """Optimize a prompt and return before/after stats. Skips structured data."""
+    """Optimize a prompt and return before/after stats with change list. Skips structured data."""
     if looks_like_structured_data(prompt):
         tokens = count_tokens(prompt)
         return OptimizationResult(
             original=prompt, optimized=prompt,
             original_tokens=tokens, optimized_tokens=tokens,
-            saved_tokens=0, saved_percent=0,
+            saved_tokens=0, saved_percent=0, changes=[],
         )
-    optimized = compress_prompt(prompt)
+    segments = _split_code_and_prose(prompt)
+    parts: list[str] = []
+    all_changes: list[str] = []
+    for stype, content in segments:
+        if stype == "code":
+            parts.append(content)
+        else:
+            compressed, changes = _compress_prose_tracked(content)
+            parts.append(compressed)
+            all_changes.extend(changes)
+    optimized = "".join(parts)
     orig_tokens = count_tokens(prompt)
     opt_tokens = count_tokens(optimized)
     saved = orig_tokens - opt_tokens
@@ -229,4 +300,5 @@ def optimize_prompt(prompt: str) -> OptimizationResult:
         optimized_tokens=opt_tokens,
         saved_tokens=saved,
         saved_percent=pct,
+        changes=all_changes,
     )

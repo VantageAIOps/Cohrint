@@ -112,20 +112,55 @@ def run_pre_hooks(ctx: HookContext) -> HookContext:
 
 
 def run_post_hooks(ctx: HookContext) -> HookContext:
-    """Post-send hooks run after backend returns."""
-    from .anomaly import check_cost_anomaly_structured
+    """Post-send hooks run after backend returns.
 
-    if ctx.result is not None:
-        result = ctx.result
-        cost_usd = getattr(result, "cost_usd", 0.0)
-        anomaly = check_cost_anomaly_structured(
-            current_cost=cost_usd,
-            prior_total=ctx.cost_so_far.total_cost_usd,
-            prior_count=ctx.cost_so_far.prompt_count,
+    Runs anomaly detection and, when the recommendation guardrail is on,
+    prints a single inline tip based on the live session metrics.
+    """
+    from .anomaly import check_cost_anomaly_structured
+    from .recommendations import SessionMetrics, get_inline_tip
+
+    if ctx.result is None:
+        return ctx
+
+    result = ctx.result
+    cost_usd = getattr(result, "cost_usd", 0.0)
+    input_tokens = getattr(result, "input_tokens", 0)
+    output_tokens = getattr(result, "output_tokens", 0)
+
+    anomaly = check_cost_anomaly_structured(
+        current_cost=cost_usd,
+        prior_total=ctx.cost_so_far.total_cost_usd,
+        prior_count=ctx.cost_so_far.prompt_count,
+    )
+    if anomaly.detected:
+        _console.print(
+            f"  [yellow]⚠ Anomaly: this prompt cost ${anomaly.current_cost:.4f} "
+            f"— {anomaly.ratio:.1f}x your session average[/yellow]"
         )
-        if anomaly.detected:
-            _console.print(
-                f"  [yellow]⚠ Anomaly: this prompt cost ${anomaly.current_cost:.4f} "
-                f"— {anomaly.ratio:.1f}x your session average[/yellow]"
+
+    # Inline recommendation tip. Gated on the recommendation guardrail so
+    # users can silence it via `cohrint-agent guardrails off recommendation`.
+    try:
+        from .guardrails import get_settings as _get_guardrails
+        if _get_guardrails().recommendation:
+            total_cost = ctx.cost_so_far.total_cost_usd + cost_usd
+            total_count = ctx.cost_so_far.prompt_count + 1
+            metrics = SessionMetrics(
+                prompt_count=total_count,
+                total_cost_usd=total_cost,
+                total_input_tokens=input_tokens,
+                total_output_tokens=output_tokens,
+                total_cached_tokens=0,
+                agent=ctx.backend_name,
+                model=getattr(result, "model", None),
+                last_prompt_cost_usd=cost_usd,
+                last_prompt_tokens=input_tokens + output_tokens,
+                avg_cost_per_prompt=total_cost / total_count if total_count else 0.0,
             )
+            tip = get_inline_tip(metrics)
+            if tip:
+                _console.print(f"  [dim]{tip}[/dim]")
+    except Exception:  # noqa: BLE001 — recommendations must never break the turn
+        pass
     return ctx

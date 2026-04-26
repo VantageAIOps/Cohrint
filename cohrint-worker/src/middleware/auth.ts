@@ -1,6 +1,7 @@
 import { Context, Next } from 'hono';
 import { Bindings, Variables, OrgRole } from '../types';
 import { logAudit, logAuditRaw } from '../lib/audit';
+import { redisPipeline } from '../lib/upstash';
 
 // ── Role hierarchy ────────────────────────────────────────────────────────────
 // Higher index = higher privilege
@@ -24,16 +25,41 @@ export async function sha256hex(text: string): Promise<string> {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// ── Rate limiter (token bucket via KV, with graceful degradation) ────────────
-async function checkRateLimit(kv: KVNamespace, orgId: string, limitRpm: number): Promise<boolean> {
+// ── Rate limiter (Upstash Redis via HTTP pipeline, graceful degradation) ────
+// is_test=1        → skip entirely (internal/test accounts)
+// rl_org_enabled=1 → also enforce org-level cap (premium accounts only)
+async function checkRateLimit(
+  env: Bindings,
+  orgId: string,
+  keyPrefix: string,
+  isTest: boolean,
+  rlOrgEnabled: boolean,
+): Promise<boolean> {
+  if (isTest) return true;
+
+  const url   = env.UPSTASH_REDIS_REST_URL;
+  const token = env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) return true; // not configured — allow through
+
+  const limitRpm = parseInt(env.RATE_LIMIT_RPM ?? '1000', 10);
+  const bucket   = Math.floor(Date.now() / 60_000);
+  const keyRlKey = `rl:key:${keyPrefix}:${bucket}`;
+
+  const commands: [string, ...string[]][] = [
+    ['INCR', keyRlKey],
+    ['EXPIRE', keyRlKey, '70'],
+  ];
+  if (rlOrgEnabled) {
+    const orgRlKey = `rl:org:${orgId}:${bucket}`;
+    commands.push(['INCR', orgRlKey], ['EXPIRE', orgRlKey, '70']);
+  }
+
   try {
-    const key   = `rl:${orgId}:${Math.floor(Date.now() / 60_000)}`;
-    const raw   = await kv.get(key);
-    const count = raw ? parseInt(raw, 10) : 0;
-    if (count >= limitRpm) return false;
-    await kv.put(key, String(count + 1), { expirationTtl: 70 });
+    const results = await redisPipeline(url, token, commands);
+    if ((results[0].result as number) > limitRpm) return false;
+    if (rlOrgEnabled && (results[2].result as number) > limitRpm * 5) return false;
   } catch {
-    // KV unavailable or quota exceeded — allow request through
+    // Upstash unavailable — allow through
   }
   return true;
 }
@@ -71,10 +97,15 @@ export async function authMiddleware(
 
     const hash = await sha256hex(apiKey);
     const org = await c.env.DB.prepare(
-      'SELECT id, plan, account_type FROM orgs WHERE api_key_hash = ?'
-    ).bind(hash).first<{ id: string; plan: string; account_type: string }>();
+      'SELECT id, plan, account_type, is_test FROM orgs WHERE api_key_hash = ?'
+    ).bind(hash).first<{ id: string; plan: string; account_type: string; is_test: number }>();
+
+    let isTest = false;
+    let rlOrgEnabled = false;
 
     if (org) {
+      isTest       = org.is_test === 1;
+      rlOrgEnabled = org.plan !== 'free';
       c.set('orgId',       org.id);
       c.set('role',        'owner' as OrgRole);
       c.set('accountType', (org.account_type ?? 'organization') as import('../types').AccountType);
@@ -103,17 +134,19 @@ export async function authMiddleware(
       c.set('memberId',    member.id);
       c.set('memberEmail', member.email ?? null);
       const orgMeta2 = await c.env.DB.prepare(
-        'SELECT account_type FROM orgs WHERE id = ?'
-      ).bind(member.org_id).first<{ account_type: string }>();
+        'SELECT account_type, plan, is_test FROM orgs WHERE id = ?'
+      ).bind(member.org_id).first<{ account_type: string; plan: string; is_test: number }>();
       c.set('accountType', (orgMeta2?.account_type ?? 'organization') as import('../types').AccountType);
+      isTest       = orgMeta2?.is_test === 1;
+      rlOrgEnabled = orgMeta2?.plan !== 'free';
     }
 
-    const rpm     = parseInt(c.env.RATE_LIMIT_RPM ?? '1000', 10);
-    const allowed = await checkRateLimit(c.env.KV, c.get('orgId'), rpm);
+    const keyPrefix = apiKey.slice(0, 8);
+    const allowed   = await checkRateLimit(c.env, c.get('orgId'), keyPrefix, isTest, rlOrgEnabled);
     if (!allowed) {
       const retryAt = Math.ceil(Date.now() / 60_000) * 60;
-      c.header('Retry-After', String(retryAt - Math.floor(Date.now() / 1000)));
-      c.header('X-RateLimit-Limit', String(rpm));
+      c.header('Retry-After',       String(retryAt - Math.floor(Date.now() / 1000)));
+      c.header('X-RateLimit-Limit', c.env.RATE_LIMIT_RPM ?? '1000');
       c.header('X-RateLimit-Remaining', '0');
       return c.json({ error: 'Rate limit exceeded', retry_after: retryAt }, 429);
     }
@@ -156,14 +189,17 @@ export async function authMiddleware(
       c.set('memberId',    session.member_id);
       c.set('memberEmail', memberEmail);
 
-      // Resolve accountType for session
+      // Resolve accountType + rate limit flags for session
       const orgMeta = await c.env.DB.prepare(
-        'SELECT account_type FROM orgs WHERE id = ?'
-      ).bind(session.org_id).first<{ account_type: string }>();
+        'SELECT account_type, plan, is_test FROM orgs WHERE id = ?'
+      ).bind(session.org_id).first<{ account_type: string; plan: string; is_test: number }>();
       c.set('accountType', (orgMeta?.account_type ?? 'organization') as import('../types').AccountType);
 
-      const rpm     = parseInt(c.env.RATE_LIMIT_RPM ?? '1000', 10);
-      const allowed = await checkRateLimit(c.env.KV, session.org_id, rpm);
+      const sessPrefix = sessionToken.slice(0, 8);
+      const allowed    = await checkRateLimit(
+        c.env, session.org_id, sessPrefix,
+        orgMeta?.is_test === 1, orgMeta?.plan !== 'free',
+      );
       if (!allowed) {
         const retryAt = Math.ceil(Date.now() / 60_000) * 60;
         c.header('Retry-After', String(retryAt - Math.floor(Date.now() / 1000)));

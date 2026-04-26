@@ -14,7 +14,7 @@
  *   3. Add this script as a Stop hook in ~/.claude/settings.json
  *
  * Environment variables:
- *   COHRINT_API_KEY   — required; your Cohrint API key (VANTAGE_API_KEY accepted for backwards compat)
+ *   COHRINT_API_KEY   — required; your Cohrint API key
  *   COHRINT_API_BASE  — optional; default https://api.cohrint.com
  *   COHRINT_TEAM      — optional; tag events with a team name
  *   COHRINT_PROJECT   — optional; tag events with a project name
@@ -27,16 +27,27 @@ const { readdir, readFile, writeFile } = require('node:fs/promises');
 const { join } = require('node:path');
 const { homedir } = require('node:os');
 
-const API_KEY    = process.env.COHRINT_API_KEY   ?? process.env.VANTAGE_API_KEY   ?? '';
-const API_BASE   = process.env.COHRINT_API_BASE  ?? process.env.VANTAGE_API_BASE  ?? 'https://api.cohrint.com';
-const TEAM       = process.env.COHRINT_TEAM      ?? process.env.VANTAGE_TEAM      ?? null;
-const PROJECT    = process.env.COHRINT_PROJECT   ?? process.env.VANTAGE_PROJECT   ?? null;
-const FEATURE    = process.env.COHRINT_FEATURE   ?? process.env.VANTAGE_FEATURE   ?? null;
+const API_KEY  = process.env.COHRINT_API_KEY  ?? '';
+const API_BASE = normalizeApiBase(process.env.COHRINT_API_BASE ?? 'https://api.cohrint.com');
+
+function normalizeApiBase(raw) {
+  const trimmed = String(raw).replace(/\/+$/, '');
+  if (/^https:\/\//i.test(trimmed)) return trimmed;
+  if (/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/|$)/i.test(trimmed)) return trimmed;
+  // Silent fallback — the hook must never crash Claude Code. Downgrade to the
+  // default endpoint rather than refusing to run, but log to stderr once.
+  process.stderr.write(
+    `[cohrint-track] refusing non-https COHRINT_API_BASE; using default.\n`
+  );
+  return 'https://api.cohrint.com';
+}
+const TEAM     = process.env.COHRINT_TEAM     ?? null;
+const PROJECT  = process.env.COHRINT_PROJECT  ?? null;
+const FEATURE  = process.env.COHRINT_FEATURE  ?? null;
 
 const STATE_FILE = join(homedir(), '.claude', 'cohrint-state.json');
 
-// Token prices per million (USD) — mirrors vantage-worker/src/lib/pricing.ts
-// input/output/cache = read rate, cacheWrite = creation rate
+// Token prices per million (USD). input/output/cache = read rate, cacheWrite = creation rate.
 const PRICES = {
   'claude-opus-4-6':    { input: 15.00, output: 75.00, cache: 1.50,  cacheWrite: 18.75 },
   'claude-sonnet-4-6':  { input:  3.00, output: 15.00, cache: 0.30,  cacheWrite:  3.75 },
@@ -76,16 +87,7 @@ async function loadState() {
     const raw = await readFile(STATE_FILE, 'utf-8');
     return JSON.parse(raw);
   } catch (err) {
-    if (err.code === 'ENOENT') {
-      // One-time migration from old vantage-state.json
-      const oldFile = join(homedir(), '.claude', 'vantage-state.json');
-      try {
-        const old = JSON.parse(await readFile(oldFile, 'utf-8'));
-        await writeFile(STATE_FILE, JSON.stringify(old, null, 2));
-        return old;
-      } catch { /* no old state either — start fresh */ }
-      return { uploadedIds: [] };
-    }
+    if (err.code === 'ENOENT') return { uploadedIds: [] };
     process.stderr.write(`[cohrint-track] WARN: state read error: ${err}\n`);
     return { uploadedIds: [] };
   }
@@ -262,13 +264,19 @@ async function main() {
       await saveState(state);
 
       // 2. Emit OTel metrics so events appear in Cross-Platform Console
-      // Uses its own AbortController — independent of the batch upload timeout
+      // Own timeout — fire-and-forget but capped so a hung server can't keep
+      // the hook process alive past Claude Code's exit.
+      const otelAc = new AbortController();
+      const otelTimer = setTimeout(() => otelAc.abort(), 5000);
       const otelPayload = buildOtelPayload(allNew);
       fetch(`${API_BASE}/v1/otel/v1/metrics`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${API_KEY}` },
         body: JSON.stringify(otelPayload),
-      }).catch(() => {}); // fire-and-forget, don't block exit
+        signal: otelAc.signal,
+      })
+        .catch(() => {})
+        .finally(() => clearTimeout(otelTimer));
 
       // 3. Provide feedback on successful upload
       const totalCost = allNew.reduce((s, e) => s + (e.payload.total_cost_usd ?? 0), 0);

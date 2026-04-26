@@ -1,6 +1,6 @@
 {
   "name": "cohrint",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "LLM cost tracking and AI API monitoring SDK for TypeScript and JavaScript — track OpenAI, Anthropic, Google and Mistral spending",
   "keywords": [
     "ai",
@@ -16,7 +16,7 @@
   "homepage": "https://cohrint.com",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Amanjain98/VantageAI"
+    "url": "https://github.com/VantageAIOps/Cohrint"
   },
   "license": "MIT",
   "type": "module",

@@ -44,6 +44,24 @@ def _resolve_model(model: str) -> str | None:
     return None
 
 
+def cache_read_savings(model: str, cache_read_tokens: int) -> float:
+    """Return USD saved by reading N tokens from prompt/semantic cache instead
+    of paying full input price. Zero when the model has no cache pricing or
+    when cache_read_tokens <= 0.
+    """
+    cache_read_tokens = max(0, int(cache_read_tokens))
+    if cache_read_tokens == 0:
+        return 0.0
+    # Guard against None — _resolve_model calls .startswith() which blows
+    # up on None; cli.py can pass None when the model wasn't negotiated.
+    key = _resolve_model(model) if model else None
+    if key is None:
+        key = "default"
+    prices = MODEL_PRICES[key]
+    delta_per_million = max(0.0, prices["input"] - prices.get("cache_read", prices.get("cache", 0.0)))
+    return cache_read_tokens * delta_per_million / _MILLION
+
+
 def calculate_cost(
     model: str,
     prompt_tokens: int,

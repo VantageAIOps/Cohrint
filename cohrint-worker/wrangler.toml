@@ -4,7 +4,6 @@ compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
 # ── Custom domain — api.cohrint.com → this Worker ────────────────────────────
-# Uses [[custom_domains]] instead of routes[] — no Zone:Workers Routes permission needed
 [[routes]]
 pattern = "api.cohrint.com"
 custom_domain = true
@@ -64,6 +63,10 @@ crons = ["*/10 * * * *", "0 2 * * *"]
 #                              Get a free key at resend.com — 3,000 emails/month
 # TOKEN_ENCRYPTION_SECRET    — AES-256-GCM key material for Copilot PAT encryption
 #                              Generate: openssl rand -base64 32
+# UPSTASH_REDIS_REST_URL     — Upstash Redis REST endpoint (replaces KV for rate limiting)
+#                              From: upstash.com → your database → REST API → UPSTASH_REDIS_REST_URL
+# UPSTASH_REDIS_REST_TOKEN   — Upstash Redis REST token
+#                              From: upstash.com → your database → REST API → UPSTASH_REDIS_REST_TOKEN
 
 # ── Cloudflare Queues (T010 — async event ingest) ────────────────────────────
 [[queues.producers]]
@@ -87,19 +90,7 @@ max_batch_size     = 50
 max_batch_timeout  = 10
 max_retries        = 1
 
-# ── Staging environment (main branch → main.cohrint.com) ─────────────────────
-# Deploy: wrangler deploy --env staging
-# To expose on api-staging.cohrint.com, add a custom domain in Cloudflare dashboard
-# and configure DNS before enabling [[env.staging.routes]].
-[env.staging]
-name = "cohrint-api-staging"
-[env.staging.vars]
-ENVIRONMENT     = "staging"
-ALLOWED_ORIGINS = "https://main.cohrint.com,https://*.cohrint.pages.dev,http://localhost:*"
-
-# ── Preview environment ───────────────────────────────────────────────────────
-[env.preview]
-name = "cohrint-api-preview"
-[env.preview.vars]
-ENVIRONMENT     = "preview"
-ALLOWED_ORIGINS = "http://localhost:*,https://*.cohrint.com,https://cohrint.pages.dev"
+# ── Staging / Preview ────────────────────────────────────────────────────────
+# Staging uses a separate wrangler.staging.toml (no [[routes]] section) so it
+# cannot inherit and overwrite the production api.cohrint.com custom domain.
+# Deploy staging: npx wrangler deploy -c wrangler.staging.toml

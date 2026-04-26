@@ -177,6 +177,29 @@ def _validate_tool_input(tool_name: str, tool_input: dict) -> str | None:
 # Tool execution
 # ---------------------------------------------------------------------------
 
+def _audit_bash(cmd: str, cwd: str, timeout: float) -> None:
+    """Append a single-line JSON audit record for every Bash invocation.
+
+    Lives at ``~/.cohrint-agent/audit/bash.log``. Best-effort: never
+    raise — auditing must not block a legitimate command.
+    """
+    try:
+        home = Path(os.path.expanduser("~")) / ".cohrint-agent" / "audit"
+        home.mkdir(parents=True, exist_ok=True)
+        import json, time
+        rec = {
+            "ts": time.time(),
+            "pid": os.getpid(),
+            "cwd": cwd,
+            "timeout": timeout,
+            "command": cmd[:4096],
+        }
+        with (home / "bash.log").open("a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
 def execute_tool(name: str, tool_input: dict[str, Any], cwd: str) -> str:
     """Execute a tool locally and return the result as a string."""
     error = _validate_tool_input(name, tool_input)
@@ -185,16 +208,39 @@ def execute_tool(name: str, tool_input: dict[str, Any], cwd: str) -> str:
     if name == "Bash":
         return _exec_bash(tool_input, cwd)
     if name == "Read":
-        return _exec_read(tool_input)
+        return _exec_read(tool_input, cwd)
     if name == "Write":
-        return _exec_write(tool_input)
+        return _exec_write(tool_input, cwd)
     if name == "Edit":
-        return _exec_edit(tool_input)
+        return _exec_edit(tool_input, cwd)
     if name == "Glob":
         return _exec_glob(tool_input, cwd)
     if name == "Grep":
         return _exec_grep(tool_input, cwd)
     return f"Unknown tool: {name}"
+
+
+def _confine_to_cwd(file_path: str, cwd: str) -> tuple[Path | None, str | None]:
+    """Resolve file_path and verify it stays inside cwd.
+
+    Prevents the LLM from writing to paths like ~/.ssh/authorized_keys via
+    absolute paths or ../ traversal. Returns (resolved_path, None) on success
+    or (None, error_message) on any rejection.
+    """
+    try:
+        resolved = Path(file_path).expanduser().resolve()
+        cwd_resolved = Path(cwd).expanduser().resolve()
+    except (OSError, ValueError) as e:
+        return None, f"Invalid path: {e}"
+    # is_relative_to exists on 3.9+. The check rejects absolute paths outside
+    # cwd *and* resolved-symlink escapes. No try/except — a False result means
+    # the path is outside cwd, which is itself the error we want.
+    if not resolved.is_relative_to(cwd_resolved):
+        return None, (
+            f"Refused: path escapes working directory "
+            f"({resolved} not under {cwd_resolved})"
+        )
+    return resolved, None
 
 
 def _exec_bash(inp: dict[str, Any], cwd: str) -> str:
@@ -214,6 +260,7 @@ def _exec_bash(inp: dict[str, Any], cwd: str) -> str:
     if _math.isnan(timeout) or _math.isinf(timeout) or timeout <= 0:
         timeout = 120.0
     timeout = min(timeout, 600.0)
+    _audit_bash(cmd, cwd, timeout)
     try:
         result = subprocess.run(
             cmd,
@@ -237,7 +284,7 @@ def _exec_bash(inp: dict[str, Any], cwd: str) -> str:
         return f"Error: {e}"
 
 
-def _exec_read(inp: dict[str, Any]) -> str:
+def _exec_read(inp: dict[str, Any], cwd: str) -> str:
     file_path = inp["file_path"]
     # Clamp offset/limit to sensible bounds. Model-generated values may
     # be negative (slices from tail — leaks end-of-file when start was
@@ -252,8 +299,11 @@ def _exec_read(inp: dict[str, Any]) -> str:
     except (TypeError, ValueError):
         limit = 2000
     limit = max(1, min(10000, limit))
+    p, err = _confine_to_cwd(file_path, cwd)
+    if err:
+        return err
     try:
-        p = Path(file_path)
+        assert p is not None
         if not p.exists():
             return f"File not found: {file_path}"
         if not p.is_file():
@@ -266,11 +316,14 @@ def _exec_read(inp: dict[str, Any]) -> str:
         return f"Error reading {file_path}: {e}"
 
 
-def _exec_write(inp: dict[str, Any]) -> str:
+def _exec_write(inp: dict[str, Any], cwd: str) -> str:
     file_path = inp["file_path"]
     content = inp["content"]
+    p, err = _confine_to_cwd(file_path, cwd)
+    if err:
+        return err
     try:
-        p = Path(file_path)
+        assert p is not None
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(content, encoding="utf-8")
         return f"Written {len(content)} bytes to {file_path}"
@@ -278,12 +331,15 @@ def _exec_write(inp: dict[str, Any]) -> str:
         return f"Error writing {file_path}: {e}"
 
 
-def _exec_edit(inp: dict[str, Any]) -> str:
+def _exec_edit(inp: dict[str, Any], cwd: str) -> str:
     file_path = inp["file_path"]
     old_string = inp["old_string"]
     new_string = inp["new_string"]
+    p, err = _confine_to_cwd(file_path, cwd)
+    if err:
+        return err
     try:
-        p = Path(file_path)
+        assert p is not None
         if not p.exists():
             return f"File not found: {file_path}"
         text = p.read_text(encoding="utf-8")

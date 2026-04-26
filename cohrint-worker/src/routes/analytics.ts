@@ -613,7 +613,14 @@ analytics.get('/business-units', async (c) => {
   return c.json({ business_units: results, by_team_provider: byTeam, period_days: period });
 });
 
-// ── GET /v1/analytics/traces?period=1 ────────────────────────────────────────
+// ── GET /v1/analytics/traces?period=7 ────────────────────────────────────────
+// Defaults to 7 days, max 90. Union-sources from two tables:
+//   - events:       primary trace source populated by SDK/agent ingest
+//   - otel_traces:  span-level rows from OTLP ingest (no cost, no team/dev)
+// otel_traces joins only for admins with no team scope (it lacks team and
+// developer_email columns, so filtering by scope would drop every row).
+// Non-admin filter includes developer_email IS NULL so members still see
+// their own traces when the client ingest path omitted developer_email.
 analytics.get('/traces', async (c) => {
   const orgId      = c.get('orgId');
   const scopeTeam  = c.get('scopeTeam');
@@ -621,33 +628,60 @@ analytics.get('/traces', async (c) => {
   const memberEmail = c.get('memberEmail') as string | undefined;
   const { clause, args } = teamScope(scopeTeam);
   const isPrivileged = hasRole(role, 'admin');
-  const devClause  = isPrivileged ? '' : ' AND developer_email = ?';
+  const devClause  = isPrivileged ? '' : ' AND (developer_email = ? OR developer_email IS NULL)';
   const devArgs    = isPrivileged ? [] : [memberEmail];
-  const period = Math.min(parseInt(c.req.query('period') ?? '1', 10) || 1, 30);
+  const period = Math.min(parseInt(c.req.query('period') ?? '7', 10) || 7, 90);
   const since  = sinceUnix(period);
+  const sinceIso = sinceText(period);
 
   const sdb = scopedDb(c.env.DB, orgId);
 
-  const { results } = await sdb.prepare(`
+  const includeOtel = isPrivileged && !scopeTeam;
+
+  const eventsQuery = `
     SELECT
       trace_id,
       MIN(agent_name)      AS name,
       COUNT(*)             AS spans,
-      SUM(cost_usd)        AS cost,
-      SUM(latency_ms)      AS latency,
+      COALESCE(SUM(cost_usd), 0)   AS cost,
+      COALESCE(SUM(latency_ms), 0) AS latency,
       MAX(CASE WHEN parent_event_id IS NULL THEN 1 ELSE 0 END) AS has_root,
-      MIN(created_at)      AS started_at
+      MIN(created_at)      AS started_at,
+      'events' AS source
     FROM events
     WHERE {{ORG_SCOPE}} AND trace_id IS NOT NULL AND created_at >= ?${clause}${devClause}
     GROUP BY trace_id
-    ORDER BY started_at DESC
-    LIMIT 100
-  `).bind(since, ...args, ...devArgs).all();
+  `;
 
-  return c.json({ traces: results });
+  const otelQuery = `
+    SELECT
+      trace_id,
+      MIN(operation_name)                              AS name,
+      COUNT(*)                                         AS spans,
+      0                                                AS cost,
+      COALESCE(SUM(duration_ms), 0)                    AS latency,
+      MAX(CASE WHEN parent_span_id IS NULL OR parent_span_id = '' THEN 1 ELSE 0 END) AS has_root,
+      CAST(strftime('%s', MIN(created_at)) AS INTEGER) AS started_at,
+      'otel' AS source
+    FROM otel_traces
+    WHERE {{ORG_SCOPE}} AND trace_id IS NOT NULL AND created_at >= ?
+    GROUP BY trace_id
+  `;
+
+  const stmt = includeOtel
+    ? sdb.prepare(`${eventsQuery} UNION ALL ${otelQuery} ORDER BY started_at DESC LIMIT 100`)
+         .bind(since, ...args, ...devArgs, sinceIso)
+    : sdb.prepare(`${eventsQuery} ORDER BY started_at DESC LIMIT 100`)
+         .bind(since, ...args, ...devArgs);
+
+  const { results } = await stmt.all();
+  return c.json({ traces: results, period_days: period, total: results.length });
 });
 
 // ── GET /v1/analytics/traces/:traceId — full span tree for one trace ──────────
+// First tries the events table. Falls back to otel_traces for admins (where
+// the span-level OTLP ingest lives). Non-admin filter includes NULL-email
+// rows so members can see their own agent-generated traces.
 analytics.get('/traces/:traceId', async (c) => {
   const orgId       = c.get('orgId');
   const traceId     = c.req.param('traceId');
@@ -656,7 +690,7 @@ analytics.get('/traces/:traceId', async (c) => {
   const scopeTeam   = c.get('scopeTeam');
   const { clause, args } = teamScope(scopeTeam);
   const isPrivileged = hasRole(role, 'admin');
-  const devClause = isPrivileged ? '' : ' AND developer_email = ?';
+  const devClause = isPrivileged ? '' : ' AND (developer_email = ? OR developer_email IS NULL)';
   const devArgs   = isPrivileged ? [] : [memberEmail];
 
   const sdb = scopedDb(c.env.DB, orgId);
@@ -681,8 +715,33 @@ analytics.get('/traces/:traceId', async (c) => {
     ORDER BY created_at ASC
   `).bind(traceId, ...args, ...devArgs).all();
 
-  if (!results.length) return c.json({ error: 'trace not found' }, 404);
-  return c.json({ trace_id: traceId, spans: results });
+  if (results.length) return c.json({ trace_id: traceId, spans: results, source: 'events' });
+
+  // Fall back to otel_traces (admin + un-scoped only — table lacks team/dev cols)
+  if (isPrivileged && !scopeTeam) {
+    const { results: otelRows } = await sdb.prepare(`
+      SELECT
+        span_id                                          AS id,
+        parent_span_id                                   AS parent_id,
+        operation_name                                   AS agent_name,
+        NULL                                             AS model,
+        NULL                                             AS provider,
+        NULL                                             AS feature,
+        0                                                AS span_depth,
+        0                                                AS prompt_tokens,
+        0                                                AS completion_tokens,
+        0                                                AS cache_tokens,
+        0                                                AS cost_usd,
+        duration_ms                                      AS latency_ms,
+        CAST(strftime('%s', created_at) AS INTEGER)      AS created_at
+      FROM otel_traces
+      WHERE {{ORG_SCOPE}} AND trace_id = ?
+      ORDER BY start_time_ms ASC
+    `).bind(traceId).all();
+    if (otelRows.length) return c.json({ trace_id: traceId, spans: otelRows, source: 'otel' });
+  }
+
+  return c.json({ error: 'trace not found' }, 404);
 });
 
 // ── GET /v1/analytics/today — hourly spend for the current UTC day ───────────

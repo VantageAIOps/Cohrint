@@ -2,8 +2,6 @@
  * Email helper via Resend API.
  * Set RESEND_API_KEY as a Cloudflare Worker secret:
  *   wrangler secret put RESEND_API_KEY
- *
- * If the key is not set, emails are silently skipped (non-blocking).
  */
 
 import { createLogger } from './logger';
@@ -20,32 +18,37 @@ export async function sendEmail(
   opts: EmailOptions,
   kv?: KVNamespace,
 ): Promise<void> {
-  if (!resendKey) return; // silently skip if not configured
+  if (!resendKey) {
+    createLogger(crypto.randomUUID()).warn('sendEmail: RESEND_API_KEY not configured — email not sent', { to: opts.to, subject: opts.subject });
+    return;
+  }
 
   const headers = {
     'Authorization': `Bearer ${resendKey}`,
     'Content-Type': 'application/json',
   };
 
-  // Try custom domain first; fall back to Resend shared domain if not yet verified
-  const senders = [
-    'Cohrint <noreply@cohrint.com>',
-    'Cohrint <onboarding@resend.dev>',
-  ];
-
   const doSend = async (): Promise<void> => {
+    const log = createLogger(crypto.randomUUID());
+    // Try verified domain first; fall back to Resend shared domain if not yet verified
+    const senders = [
+      'Cohrint <noreply@cohrint.com>',
+      'Cohrint <onboarding@resend.dev>',
+    ];
     for (const from of senders) {
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers,
         body: JSON.stringify({ from, to: opts.to, subject: opts.subject, html: opts.html }),
       });
-      if (res.ok) return; // sent successfully
-      const body = await res.json() as { name?: string };
-      // Only retry with fallback sender on domain-not-verified error
-      if (body.name !== 'validation_error') return;
-      createLogger(crypto.randomUUID()).warn('sendEmail: custom domain not verified, retrying with shared sender');
+      if (res.ok) return;
+      const body = await res.json() as { name?: string; message?: string };
+      if (body.name !== 'validation_error') {
+        throw new Error(`Resend error: ${body.name ?? 'unknown'} — ${body.message ?? res.status}`);
+      }
+      log.warn('sendEmail: domain not verified, retrying with shared sender', { from });
     }
+    throw new Error('sendEmail: all senders failed');
   };
 
   if (kv) {
@@ -56,8 +59,8 @@ export async function sendEmail(
   } else {
     try {
       await doSend();
-    } catch {
-      createLogger(crypto.randomUUID()).warn('sendEmail failed — Resend unreachable');
+    } catch (err) {
+      createLogger(crypto.randomUUID()).warn('sendEmail failed', { err: String(err) });
     }
   }
 }
@@ -115,7 +118,7 @@ export function keyRecoveryEmail(opts: {
   orgName:    string;
   keyHint:    string;
   isOwner:    boolean;
-  redeemUrl?: string;  // one-time link to rotate key (owner only)
+  redeemUrl?: string;
 }): { subject: string; html: string } {
   return {
     subject: 'Cohrint — API key recovery',
@@ -142,6 +145,14 @@ export function keyRecoveryEmail(opts: {
     </a>
     <p style="margin:12px 0 0;font-size:11px;color:#888">This link expires in 1 hour and can only be used once.</p>
   </div>
+  ` : opts.isOwner ? `
+  <p style="color:#555;font-size:14px">
+    <strong>Your recovery link could not be generated.</strong><br>
+    Please request a new recovery email — the link is valid for 1 hour.
+  </p>
+  <a href="https://cohrint.com/auth" style="display:inline-block;background:#00d4a1;color:#000;padding:11px 22px;border-radius:7px;text-decoration:none;font-weight:600;font-size:14px;margin-bottom:20px">
+    Try again →
+  </a>
   ` : `
   <p style="color:#555;font-size:14px">
     <strong>To get a new key:</strong><br>

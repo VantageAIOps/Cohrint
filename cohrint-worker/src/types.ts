@@ -29,6 +29,11 @@ export type Bindings = {
   // Demo viewer key used by the Live Demo button — set via: wrangler secret put DEMO_API_KEY
   // Never exposed to the client; /v1/auth/demo reads this server-side.
   DEMO_API_KEY?:       string;
+  // Upstash Redis — rate limiting (replaces KV writes)
+  // Set via: wrangler secret put UPSTASH_REDIS_REST_URL
+  //          wrangler secret put UPSTASH_REDIS_REST_TOKEN
+  UPSTASH_REDIS_REST_URL?:   string;
+  UPSTASH_REDIS_REST_TOKEN?: string;
 };
 
 export type AccountType = 'individual' | 'team' | 'organization';

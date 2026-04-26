@@ -30,6 +30,14 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { VERSION } from './_version.js';
+import {
+  LIMITS,
+  resolveAllowedTools,
+  sanitizeString,
+  escapeMd,
+  redactKey,
+  assertToolAllowed as _assertToolAllowed,
+} from './security.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { homedir } from 'node:os';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync } from 'node:fs';
@@ -44,13 +52,49 @@ import {
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const API_KEY  = process.env.COHRINT_API_KEY  ?? process.env.VANTAGE_API_KEY  ?? '';
-const API_BASE = (process.env.COHRINT_API_BASE ?? process.env.VANTAGE_API_BASE ?? 'https://api.cohrint.com').replace(/\/+$/, '');
-const ORG      = process.env.COHRINT_ORG      ?? process.env.VANTAGE_ORG      ?? parseOrgFromKey(API_KEY);
+const API_KEY  = process.env.COHRINT_API_KEY ?? '';
+const API_BASE = normalizeApiBase(process.env.COHRINT_API_BASE ?? 'https://api.cohrint.com');
+// Sanitise the env-supplied ORG just like the key-derived one — an ORG value
+// containing a pipe or newline would otherwise break every markdown table
+// rendered downstream (e.g. `| Period | {ORG} |`).
+const ORG      = sanitizeOrgSlug(process.env.COHRINT_ORG ?? parseOrgFromKey(API_KEY));
+const SESSION_TRACE_ID = `mcp-session-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+function sanitizeOrgSlug(raw: string): string {
+  const clean = String(raw).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64);
+  return clean || 'default';
+}
+
+function normalizeApiBase(raw: string): string {
+  const trimmed = raw.replace(/\/+$/, '');
+  // Reject http:// (Bearer token would leak). Allow https:// only. Localhost over
+  // http is a common dev convenience — permit 127.0.0.1 / localhost explicitly.
+  if (/^https:\/\//i.test(trimmed)) return trimmed;
+  if (/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/|$)/i.test(trimmed)) return trimmed;
+  throw new Error(
+    `COHRINT_API_BASE must use https:// (got: ${trimmed.split('://')[0]}://…). ` +
+    `Refusing to send Bearer token over an insecure channel.`
+  );
+}
+
+// Permission model — default to read-only + offline tools. Destructive tools
+// (filesystem writes, hook install) must be explicitly enabled.
+const ALLOWED_TOOLS = resolveAllowedTools(process.env.COHRINT_MCP_ALLOWED_TOOLS);
+const ALLOW_SETUP = process.env.COHRINT_MCP_ALLOW_SETUP === '1';
+
+// Hard caps on user-provided string inputs to prevent DoS and runaway regex.
+const MAX_PROMPT_CHARS = LIMITS.MAX_PROMPT_CHARS;
+const MAX_MESSAGE_CHARS = LIMITS.MAX_MESSAGE_CHARS;
+const MAX_MESSAGES = LIMITS.MAX_MESSAGES;
+const MAX_TAG_CHARS = LIMITS.MAX_TAG_CHARS;
 
 function parseOrgFromKey(key: string): string {
   const parts = key.split('_');
-  return parts.length >= 3 ? parts[1] : 'default';
+  const raw = parts.length >= 3 ? parts[1] : 'default';
+  // Org slugs are [a-z0-9-] in our system. Strip anything else defensively so a
+  // malformed key can't inject markdown/control chars into rendered output.
+  const clean = raw.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64);
+  return clean || 'default';
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -65,8 +109,11 @@ function safeNum(v: unknown, fallback = 0): number {
 function errorLog(context: string, err: unknown): void {
   const msg = err instanceof Error ? err.message : String(err);
   const ts = new Date().toISOString();
-  const safe = msg.replace(new RegExp(API_KEY.slice(8), 'g'), '****');
-  process.stderr.write(`[cohrint-mcp] ${ts} ERROR ${context}: ${safe}\n`);
+  process.stderr.write(`[cohrint-mcp] ${ts} ERROR ${context}: ${redactKey(msg, API_KEY)}\n`);
+}
+
+function assertToolAllowed(name: string): void {
+  _assertToolAllowed(name, ALLOWED_TOOLS);
 }
 
 // ── API client ────────────────────────────────────────────────────────────────
@@ -444,8 +491,7 @@ const server = new Server(
 
 // ── Tool definitions ──────────────────────────────────────────────────────────
 
-server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: [
+const ALL_TOOLS = [
     {
       name: 'track_llm_call',
       description: 'Track an LLM API call — logs cost, tokens, latency, model, and team to Cohrint. Call this after every LLM completion.',
@@ -465,7 +511,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           trace_id:         { type: 'string', description: 'Trace ID for grouping multi-step agent calls' },
           span_depth:       { type: 'number', description: 'Depth in agent call tree (0 = root)' },
           tags:             { type: 'object', description: 'Arbitrary key-value tags for filtering' },
-          session_id:       { type: 'string', description: 'Session ID — links this event to a vantage-agent or local-proxy session' },
+          session_id:       { type: 'string', description: 'Session ID — links this event to a cohrint-agent or local-proxy session' },
         },
         required: ['model', 'provider', 'prompt_tokens', 'completion_tokens', 'total_cost_usd'],
       },
@@ -632,7 +678,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         required: ['agent'],
       },
     },
-  ],
+  ];
+
+server.setRequestHandler(ListToolsRequestSchema, async () => ({
+  tools: ALL_TOOLS.filter(t => ALLOWED_TOOLS.has(t.name)),
 }));
 
 // ── Tool handlers ─────────────────────────────────────────────────────────────
@@ -641,11 +690,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args = {} } = request.params;
 
   try {
+    assertToolAllowed(name);
     switch (name) {
 
       case 'track_llm_call': {
-        const model = String(args.model ?? '').trim();
-        const provider = String(args.provider ?? '').trim();
+        const model = sanitizeString(args.model, MAX_TAG_CHARS).trim();
+        const provider = sanitizeString(args.provider, MAX_TAG_CHARS).trim();
         if (!model) throw new Error('model is required (e.g. "gpt-4o", "claude-sonnet-4")');
         if (!provider) throw new Error('provider is required (e.g. "openai", "anthropic")');
 
@@ -655,6 +705,26 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const latency = safeNum(args.latency_ms);
         const spanDepth = safeNum(args.span_depth, 0);
 
+        const team = args.team != null ? sanitizeString(args.team, 100).trim() : '';
+        const environment = args.environment != null ? sanitizeString(args.environment, 50).trim() : '';
+        const traceId = args.trace_id != null ? sanitizeString(args.trace_id, MAX_TAG_CHARS).trim() : SESSION_TRACE_ID;
+        const sessionId = args.session_id != null ? sanitizeString(args.session_id, MAX_TAG_CHARS).trim() : '';
+        const promptHash = args.prompt_hash != null ? sanitizeString(args.prompt_hash, 64).trim() : '';
+
+        // Tags: accept only flat {string: string|number|boolean}, sanitise both.
+        let safeTags: Record<string, string | number | boolean> | undefined;
+        if (args.tags && typeof args.tags === 'object' && !Array.isArray(args.tags)) {
+          safeTags = {};
+          let n = 0;
+          for (const [k, v] of Object.entries(args.tags as Record<string, unknown>)) {
+            if (n++ >= 32) break;
+            const safeKey = sanitizeString(k, 64).trim();
+            if (!safeKey) continue;
+            if (typeof v === 'number' || typeof v === 'boolean') safeTags[safeKey] = v;
+            else safeTags[safeKey] = sanitizeString(v, MAX_TAG_CHARS);
+          }
+        }
+
         const event: Record<string, unknown> = {
           event_id: `mcp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           model,
@@ -663,18 +733,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           completion_tokens: completionTokens,
           total_cost_usd: totalCost,
           ...(latency > 0 ? { latency_ms: latency } : {}),
-          ...(args.team ? { team: String(args.team).slice(0, 100) } : {}),
-          ...(args.environment ? { environment: String(args.environment).slice(0, 50) } : {}),
-          ...(args.trace_id ? { trace_id: String(args.trace_id).slice(0, 256) } : {}),
+          ...(team ? { team } : {}),
+          ...(environment ? { environment } : {}),
+          ...(traceId ? { trace_id: traceId } : {}),
           ...(spanDepth > 0 ? { span_depth: spanDepth } : {}),
-          ...(args.tags && typeof args.tags === 'object' ? { tags: args.tags } : {}),
-          ...(args.session_id ? { session_id: String(args.session_id).slice(0, 256) } : {}),
+          ...(safeTags ? { tags: safeTags } : {}),
+          ...(sessionId ? { session_id: sessionId } : {}),
           ...(safeNum(args.cache_tokens, 0) > 0 ? { cache_tokens: safeNum(args.cache_tokens, 0) } : {}),
-          ...(args.prompt_hash ? { prompt_hash: String(args.prompt_hash).slice(0, 64) } : {}),
+          ...(promptHash ? { prompt_hash: promptHash } : {}),
         };
         const trackResp = await api('/v1/events', { method: 'POST', body: JSON.stringify(event) }) as Record<string, unknown>;
-        const cacheWarning = trackResp?.cache_warning ? String(trackResp.cache_warning) : null;
-        const baseText = `✅ Tracked: ${model} | ${promptTokens}→${completionTokens} tokens | $${totalCost.toFixed(4)} | ${latency > 0 ? `${latency}ms` : 'no latency recorded'}`;
+        const cacheWarning = trackResp?.cache_warning
+          ? escapeMd(sanitizeString(trackResp.cache_warning, 500))
+          : null;
+        const baseText = `✅ Tracked: ${escapeMd(model)} | ${promptTokens}→${completionTokens} tokens | $${totalCost.toFixed(4)} | ${latency > 0 ? `${latency}ms` : 'no latency recorded'}`;
         return {
           content: [{
             type: 'text',
@@ -731,7 +803,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const resp = await api(`/v1/analytics/models?period=${days}`) as { models: Record<string, unknown>[] };
         const models = resp.models ?? [];
         const rows = models.map((r) =>
-          `| ${r.model} | ${r.provider} | $${Number(r.cost_usd).toFixed(4)} | ${Number(r.requests).toLocaleString()} | ${Number(r.avg_latency_ms ?? 0).toFixed(0)}ms |`
+          `| ${escapeMd(sanitizeString(r.model, 128))} | ${escapeMd(sanitizeString(r.provider, 64))} | $${Number(r.cost_usd).toFixed(4)} | ${Number(r.requests).toLocaleString()} | ${Number(r.avg_latency_ms ?? 0).toFixed(0)}ms |`
         );
         const text = [
           `🤖 **Model Breakdown** (last ${days} days)`,
@@ -748,7 +820,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const resp = await api(`/v1/analytics/teams?period=${days}`) as { teams: Record<string, unknown>[] };
         const teams = resp.teams ?? [];
         const rows = teams.map((r) =>
-          `| ${r.team || '(untagged)'} | $${Number(r.cost_usd).toFixed(4)} | ${Number(r.requests).toLocaleString()} |`
+          `| ${escapeMd(sanitizeString(r.team, 128)) || '(untagged)'} | $${Number(r.cost_usd).toFixed(4)} | ${Number(r.requests).toLocaleString()} |`
         );
         const text = [
           `👥 **Team Breakdown** (last ${days} days)`,
@@ -792,7 +864,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           return { content: [{ type: 'text', text: 'No traces found. Make sure to pass `trace_id` when calling `track_llm_call`.' }] };
         }
         const rows = traces.map((t) =>
-          `| ${String(t.trace_id).slice(0, 16)}… | ${t.spans} spans | $${Number(t.cost ?? 0).toFixed(4)} | ${t.name ?? 'N/A'} |`
+          `| ${escapeMd(sanitizeString(t.trace_id, 64)).slice(0, 16)}… | ${Number(t.spans ?? 0)} spans | $${Number(t.cost ?? 0).toFixed(4)} | ${escapeMd(sanitizeString(t.name, 128)) || 'N/A'} |`
         );
         const text = [
           `🔍 **Recent Agent Traces** (last ${traces.length})`,
@@ -805,7 +877,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'get_cost_gate': {
-        const periodArg = String(args?.period ?? 'today');
+        // Enum-whitelist: anything other than the three known periods falls
+        // back to "today". Prevents arbitrary text being echoed back into
+        // markdown table cells from `args.period`.
+        const rawPeriod = String(args?.period ?? 'today');
+        const periodArg = (rawPeriod === 'today' || rawPeriod === 'week' || rawPeriod === 'month')
+          ? rawPeriod : 'today';
         const days = periodArg === 'today' ? 1 : periodArg === 'week' ? 7 : 30;
         const [costData, summary] = await Promise.all([
           api(`/v1/analytics/cost?period=${days}`) as Promise<Record<string, number>>,
@@ -832,10 +909,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       // ── Optimizer tool handlers (work offline — no API key needed) ────────
 
       case 'optimize_prompt': {
-        const prompt = typeof args.prompt === 'string' ? args.prompt : '';
+        const prompt = sanitizeString(args.prompt, MAX_PROMPT_CHARS);
         if (!prompt.trim()) throw new Error('prompt is required — pass a non-empty string to optimize');
-        const model = (args.model as string) || 'gpt-4o';
-        const systemPrompt = typeof args.system_prompt === 'string' ? args.system_prompt : undefined;
+        const model = sanitizeString(args.model, MAX_TAG_CHARS).trim() || 'gpt-4o';
+        const systemPrompt = args.system_prompt != null
+          ? sanitizeString(args.system_prompt, MAX_PROMPT_CHARS)
+          : undefined;
         const originalTokens = countTokens(prompt);
         const compressed = compressPrompt(prompt, systemPrompt);
         const compressedTokens = countTokens(compressed);
@@ -873,9 +952,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'analyze_tokens': {
-        const text = typeof args.text === 'string' ? args.text : '';
+        const text = sanitizeString(args.text, MAX_PROMPT_CHARS);
         if (!text.trim()) throw new Error('text is required — pass a non-empty string to analyze');
-        const model = (typeof args.model === 'string' && args.model) || 'gpt-4o';
+        const model = sanitizeString(args.model, MAX_TAG_CHARS).trim() || 'gpt-4o';
         const inputTokens = countTokens(text);
         const outputTokens = safeNum(args.output_tokens, inputTokens);
         const cost = calcCost(model, inputTokens, outputTokens);
@@ -911,7 +990,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'estimate_costs': {
-        const estPrompt = typeof args.prompt === 'string' ? args.prompt : '';
+        const estPrompt = sanitizeString(args.prompt, MAX_PROMPT_CHARS);
         if (!estPrompt.trim()) throw new Error('prompt is required — pass a non-empty string to estimate costs');
         const inputTokens = countTokens(estPrompt);
         const outputTokens = safeNum(args.completion_tokens, inputTokens);
@@ -950,14 +1029,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (!messages || !Array.isArray(messages)) throw new Error('messages is required — pass an array of {role, content} objects');
         const maxTokens = safeNum(args.max_tokens, 4000);
 
-        // Sanitise: filter out non-object entries and coerce content to string
+        // Cap array length to stop pathological inputs, then strip control
+        // chars + truncate per-message content to MAX_MESSAGE_CHARS.
         const safeMsgs = messages
-          .filter((m: unknown): m is { role: string; content: string } =>
+          .slice(0, MAX_MESSAGES)
+          .filter((m: unknown): m is { role: unknown; content: unknown } =>
             m != null && typeof m === 'object' && 'content' in (m as Record<string, unknown>))
-          .map((m: { role?: unknown; content?: unknown }) => ({
-            role: String(m.role ?? 'user'),
-            content: String(m.content ?? ''),
-          }));
+          .map((m: { role?: unknown; content?: unknown }) => {
+            const role = sanitizeString(m.role, 32).trim() || 'user';
+            return {
+              role: ['user', 'assistant', 'system'].includes(role) ? role : 'user',
+              content: sanitizeString(m.content, MAX_MESSAGE_CHARS),
+            };
+          });
 
         const totalBefore = safeMsgs.reduce((s, m) => s + countTokens(m.content), 0);
         const compressed: Array<{ role: string; content: string }> = [];
@@ -1010,8 +1094,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'find_cheapest_model': {
         const inputTokens = safeNum(args.input_tokens, 1000);
         const outputTokens = safeNum(args.output_tokens, 500);
-        const tierFilter = args.tier as string | undefined;
-        const providerFilter = args.provider as string | undefined;
+        const tierFilter = args.tier != null ? sanitizeString(args.tier, 64).trim() || undefined : undefined;
+        const providerFilter = args.provider != null ? sanitizeString(args.provider, 64).trim() || undefined : undefined;
 
         const filtered = Object.entries(MODEL_RATES)
           .filter(([, r]) => !tierFilter || r.tier === tierFilter)
@@ -1024,26 +1108,28 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           .sort((a, b) => a.totalCost - b.totalCost);
 
         if (!filtered.length) {
-          return { content: [{ type: 'text', text: `No models found matching tier=${tierFilter ?? 'any'}, provider=${providerFilter ?? 'any'}` }] };
+          return { content: [{ type: 'text', text: `No models found matching tier=${escapeMd(tierFilter ?? 'any')}, provider=${escapeMd(providerFilter ?? 'any')}` }] };
         }
 
         const top3 = filtered.slice(0, 3);
+        const tierLabel = tierFilter ? `, tier: ${escapeMd(tierFilter)}` : '';
+        const providerLabel = providerFilter ? `, provider: ${escapeMd(providerFilter)}` : '';
         const lines = [
-          `🏆 **Cheapest Models** (${inputTokens} in + ${outputTokens} out tokens${tierFilter ? `, tier: ${tierFilter}` : ''}${providerFilter ? `, provider: ${providerFilter}` : ''})`,
+          `🏆 **Cheapest Models** (${inputTokens} in + ${outputTokens} out tokens${tierLabel}${providerLabel})`,
           ``,
           `| Rank | Model | Provider | Tier | Cost |`,
           `|------|-------|----------|------|------|`,
-          ...top3.map((m, i) => `| ${i + 1} | **${m.model}** | ${m.provider} | ${m.tier} | $${m.totalCost.toFixed(6)} |`),
+          ...top3.map((m, i) => `| ${i + 1} | **${escapeMd(m.model)}** | ${escapeMd(m.provider)} | ${escapeMd(m.tier)} | $${m.totalCost.toFixed(6)} |`),
           ``,
-          `**Recommendation:** Use **${top3[0].model}** (${top3[0].provider}) at $${top3[0].totalCost.toFixed(6)} per call`,
+          `**Recommendation:** Use **${escapeMd(top3[0].model)}** (${escapeMd(top3[0].provider)}) at $${top3[0].totalCost.toFixed(6)} per call`,
         ];
         return { content: [{ type: 'text', text: lines.join('\n') }] };
       }
 
       case 'get_recommendations': {
-        const agent = String(args.agent ?? '').toLowerCase().trim();
+        const agent = sanitizeString(args.agent, 64).toLowerCase().trim();
         if (!agent) throw new Error('agent is required (claude, gemini, codex, cursor, aider, copilot)');
-        const recModel = typeof args.model === 'string' ? args.model.toLowerCase().trim() : '';
+        const recModel = sanitizeString(args.model, MAX_TAG_CHARS).toLowerCase().trim();
         const sessionCost = safeNum(args.session_cost_usd, 0);
         const promptCount = safeNum(args.prompt_count, 0);
 
@@ -1162,10 +1248,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         });
 
         const priorityEmoji = { high: '🔴', medium: '🟡', low: '🟢' };
-        const agentLabel = agentKey ? agentKey.charAt(0).toUpperCase() + agentKey.slice(1) : agent;
+        const agentLabel = agentKey ? agentKey.charAt(0).toUpperCase() + agentKey.slice(1) : escapeMd(agent);
+        const recModelLabel = recModel ? escapeMd(recModel) : '';
 
         const lines = [
-          `**Cost Optimization Recommendations** — ${agentLabel}${recModel ? ` (${recModel})` : ''}`,
+          `**Cost Optimization Recommendations** — ${agentLabel}${recModelLabel ? ` (${recModelLabel})` : ''}`,
           ``,
           ...(sessionCost > 0 ? [`Session spend: **$${sessionCost.toFixed(4)}**${promptCount > 0 ? ` | ${promptCount} prompts | ~$${(sessionCost / promptCount).toFixed(4)}/prompt` : ''}`, ``] : []),
         ];
@@ -1213,6 +1300,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'setup_claude_hook': {
+        if (!ALLOW_SETUP) {
+          return {
+            content: [{
+              type: 'text',
+              text: [
+                '❌ setup_claude_hook is disabled by default — it writes to ~/.claude/',
+                '   outside the MCP sandbox. To enable:',
+                '     export COHRINT_MCP_ALLOW_SETUP=1',
+                '     export COHRINT_MCP_ALLOWED_TOOLS=setup_claude_hook,<other tools>',
+                '   then restart the MCP server. Only enable if you trust the client calling this tool.',
+              ].join('\n'),
+            }],
+            isError: true,
+          };
+        }
         const home = homedir();
         const claudeDir = join(home, '.claude');
         const hooksDir = join(claudeDir, 'hooks');
@@ -1326,7 +1428,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
           text: [
             `API Base : ${API_BASE}`,
             `Org      : ${ORG}`,
-            `API Key  : ${API_KEY ? `${API_KEY.slice(0, 8)}${'*'.repeat(Math.max(0, API_KEY.length - 8))}` : '(not set)'}`,
+            `API Key  : ${API_KEY ? `${API_KEY.slice(0, 4)}…**** (len=${API_KEY.length})` : '(not set)'}`,
           ].join('\n'),
         }],
       };
@@ -1339,6 +1441,23 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
 // ── Setup subcommand ──────────────────────────────────────────────────────────
 
 async function runSetup(): Promise<void> {
+  // Consent gate: this mutates ~/.claude/ outside the MCP sandbox. Require an
+  // explicit CLI flag OR COHRINT_MCP_ALLOW_SETUP=1 so setup cannot be triggered
+  // silently by an automated install script.
+  const hasYes = process.argv.slice(2).some(a => a === '--yes' || a === '-y');
+  if (!hasYes && !ALLOW_SETUP) {
+    process.stderr.write(
+      [
+        '✗ setup requires explicit consent (writes to ~/.claude/).',
+        '  Re-run with --yes:',
+        '    npx cohrint-mcp setup --yes',
+        '  Or export COHRINT_MCP_ALLOW_SETUP=1 before running.',
+        '',
+      ].join('\n'),
+    );
+    process.exit(2);
+  }
+
   const home = homedir();
   const claudeDir = join(home, '.claude');
   const hooksDir = join(claudeDir, 'hooks');

@@ -59,8 +59,9 @@ BANNER = """
   [bold]Cohrint Agent[/bold] [dim]v{version}[/dim]
   [dim]AI coding agent with per-tool permissions, cost tracking & optimization[/dim]
   [dim]Model: {model}  |  CWD: {cwd}[/dim]
+  [dim]Optimization: {optimization}  |  Guardrails: {guardrails}[/dim]
 
-  [dim]Commands:[/dim]
+  [dim]REPL commands:[/dim]
     [bold]/help[/bold]              Show commands
     [bold]/allow[/bold] Tool        Approve a tool (e.g. /allow Bash,Write,Edit)
     [bold]/allow all[/bold]         Approve all tools
@@ -70,8 +71,42 @@ BANNER = """
     [bold]/tier[/bold]              Change tool permission tier
     [bold]/reset[/bold]             Reset permissions & history
     [bold]/model[/bold] name        Switch model
+    [bold]/guardrails[/bold] on|off Toggle recommendation + hallucination guardrails
+    [bold]/verbs[/bold]             Show all verbs (mcp/skills/agents/…)
     [bold]/quit[/bold]              Exit
+
+  [dim]Shell verbs — also invokable in REPL as `/<verb> …` or `cohrint-agent <verb>`:[/dim]
+{verbs}
+  [dim]Run `cohrint-agent help` for full catalog.[/dim]
 """
+
+
+_HEDGE_PHRASES = (
+    "i don't know", "i do not know", "i'm not sure", "i am not sure",
+    "i can't verify", "i cannot verify", "i can't confirm", "i cannot confirm",
+    "i'm unable to verify", "i am unable to verify", "i cannot guarantee",
+    "doesn't exist", "does not exist", "isn't a real", "is not a real",
+    "no such", "not a valid", "not an actual", "fabricat", "hallucin",
+    "i don't have access", "i do not have access", "i recommend verifying",
+    "please verify", "you should verify", "i'd recommend checking",
+    "i would recommend checking", "i suggest verifying", "check the official",
+    "refer to the official", "consult the documentation",
+)
+
+
+def _detect_hedge(text: str) -> bool:
+    """Return True if the response contains hallucination-avoidance language."""
+    lower = text.lower()
+    return any(phrase in lower for phrase in _HEDGE_PHRASES)
+
+
+def _verb_summary_lines() -> str:
+    """Render one line per verb from the catalog — shown in the REPL banner."""
+    from .commands import CATALOG
+    lines: list[str] = []
+    for spec in CATALOG.values():
+        lines.append(f"    [bold]{spec.name:<12}[/bold] {spec.summary}")
+    return "\n".join(lines)
 
 
 def parse_args() -> argparse.Namespace:
@@ -139,11 +174,36 @@ class _ClaudeCliClient:
         self.optimization = True
 
     def send(self, prompt: str, no_optimize: bool = False) -> str:
-        result = self.backend.send(prompt=prompt, history=[], cwd=self.cwd)
+        actual_prompt = prompt
+        # Run optimization silently — results stored for post-response display
+        self._last_opt_result: object = None
+
+        if self.optimization and not no_optimize:
+            opt = optimize_prompt(prompt)
+            actual_prompt = opt.optimized
+            self._last_opt_result = opt
+
+        from .guardrails import get_settings as _get_gs, system_preamble as _preamble
+        _gs = _get_gs()
+        _active = [k for k, v in (("hallucination", _gs.hallucination), ("recommendation", _gs.recommendation)) if v]
+        self._last_guardrail_active = _active
+        if _active:
+            preamble = _preamble()
+            if preamble:
+                actual_prompt = preamble + "\n\n" + actual_prompt
+
+        # Pre-send: show what the optimizer stripped — only emits when there
+        # were real savings, so clean prompts stay visually quiet.
+        from .renderer import render_optimization_preview
+        if isinstance(self._last_opt_result, OptimizationResult):
+            render_optimization_preview(self._last_opt_result, self.model)
+
+        result = self.backend.send(prompt=actual_prompt, history=[], cwd=self.cwd)
         self.cost.record_usage_raw(
             input_tokens=result.input_tokens,
             output_tokens=result.output_tokens,
             cost_usd=result.cost_usd,
+            cache_read_tokens=getattr(result, "cache_read_tokens", 0),
         )
         return result.output_text
 
@@ -245,7 +305,15 @@ def _handle_command(line: str, client: AgentClient) -> bool:
 
     # Bare "/" prints help — avoids "Unknown command: /" dead-end (T-DISPATCH.2).
     if stripped in ("/", "/help"):
-        console.print(BANNER.format(version=__version__, model=client.model, cwd=client.cwd))
+        from .guardrails import get_settings as _gs
+        _g = _gs()
+        _guardrail_state = "on" if (_g.recommendation and _g.hallucination) else "partial/off"
+        console.print(BANNER.format(
+            version=__version__, model=client.model, cwd=client.cwd,
+            verbs=_verb_summary_lines(),
+            optimization="on" if client.optimization else "off",
+            guardrails=_guardrail_state,
+        ))
         return True
 
     if stripped == "/tools":
@@ -325,13 +393,58 @@ def _handle_command(line: str, client: AgentClient) -> bool:
     if stripped.startswith("/model"):
         parts = stripped.split(None, 1)
         if len(parts) < 2:
+            # Bare `/model` opens a TUI picker grouped by backend. On non-TTY
+            # (piped/scripted REPL) we fall through to a flat print instead.
+            from .pricing import MODEL_PRICES
+            from .tui import is_tty, select_one
+            if is_tty():
+                choices = [m for m in sorted(MODEL_PRICES) if m != "default"]
+                picked = select_one(
+                    f"Current: {client.model}. Pick a model:",
+                    choices,
+                    default=client.model if client.model in choices else None,
+                )
+                if picked and picked != client.model:
+                    client.model = picked
+                    client.cost = SessionCost(model=picked)
+                    console.print(f"  [green]Switched to {picked}[/green]")
+                return True
             console.print(f"  [dim]Current model: {client.model}[/dim]")
+            console.print("  [dim]Supported: run `cohrint-agent models` to list all.[/dim]")
             return True
         new_model = parts[1].strip()
         client.model = new_model
         client.cost = SessionCost(model=new_model)
         console.print(f"  [green]Switched to {new_model}[/green]")
         console.print("  [dim]Cost tracking reset for new model[/dim]")
+        return True
+
+    if stripped == "/verbs":
+        from .commands import render_catalog
+        console.print(render_catalog())
+        return True
+
+    if stripped.startswith("/guardrails"):
+        from .guardrails import get_settings, set_kind
+        parts = stripped.split()
+        if len(parts) == 1:
+            s = get_settings()
+            console.print(
+                f"  [dim]guardrails:[/dim] "
+                f"recommendation=[{'green' if s.recommendation else 'red'}]{s.recommendation}[/], "
+                f"hallucination=[{'green' if s.hallucination else 'red'}]{s.hallucination}[/]"
+            )
+            return True
+        action = parts[1].lower()
+        kind = parts[2] if len(parts) >= 3 else "all"
+        if action not in ("on", "off"):
+            console.print("  [red]Usage: /guardrails [on|off] [recommendation|hallucination|all][/red]")
+            return True
+        try:
+            set_kind(kind, enabled=(action == "on"))
+            console.print(f"  [green]guardrails {action} ({kind})[/green]")
+        except ValueError as e:
+            console.print(f"  [red]{e}[/red]")
         return True
 
     if stripped == "/tier":
@@ -357,6 +470,23 @@ def _handle_command(line: str, client: AgentClient) -> bool:
         return True
 
     if stripped.startswith("/"):
+        # Route /<verb> [...args] to the same subcommand modules that power
+        # `cohrint-agent <verb>`. Keeps one source of truth for verb output
+        # and avoids duplicating per-verb REPL handlers.
+        from .commands import VERBS
+        from .subcommands import dispatch as _verb_dispatch
+        parts = stripped[1:].split()
+        if parts and parts[0] in VERBS:
+            try:
+                _verb_dispatch(["cohrint-agent", *parts])
+            except SystemExit:
+                # argparse inside verb modules calls sys.exit on --help / bad
+                # args. Swallow so the REPL keeps running.
+                pass
+            except Exception as e:  # noqa: BLE001 — verb crash must not kill REPL
+                console.print(f"  [red]/{parts[0]} failed: {e}[/red]")
+            return True
+
         # Dispatcher gate (T-DISPATCH.1): unknown slash commands never fall
         # through to agent/prompt dispatch — they terminate here.
         # scrub_token guards T-SAFETY.5/6/12: OSC-52 in "/...\x1b]52;..." must
@@ -370,18 +500,44 @@ def _handle_command(line: str, client: AgentClient) -> bool:
 
 def run_repl(client: AgentClient, tracker: Tracker | None = None) -> None:
     """Interactive REPL."""
-    console.print(BANNER.format(version=__version__, model=client.model, cwd=client.cwd))
+    # Tab-completion + history. No-op on non-TTY / missing readline.
+    from .repl_completer import install as _install_completer
+    _install_completer()
 
+    from .guardrails import get_settings as _gs
+    _g = _gs()
+    _guardrail_state = "on" if (_g.recommendation and _g.hallucination) else "partial/off"
+    console.print(BANNER.format(
+        version=__version__, model=client.model, cwd=client.cwd,
+        verbs=_verb_summary_lines(),
+        optimization="on" if client.optimization else "off",
+        guardrails=_guardrail_state,
+    ))
+
+    from .repl_input import read_prompt
     while True:
-        try:
-            console.print()
-            line = console.input("[bold cyan]cohrint>[/bold cyan] ")
-        except (EOFError, KeyboardInterrupt):
+        console.print()
+        line = read_prompt()
+        # read_prompt returns None on Ctrl-D / Ctrl-C with empty buffer —
+        # signals quit. Empty string means "user pressed Enter on blank"
+        # — re-prompt silently without spending a backend turn.
+        if line is None:
             console.print("\n  [dim]Goodbye.[/dim]")
             break
-
         if not line.strip():
             continue
+
+        # Nudge: a bare single-word CLI verb (`mcp`, `plugins`, …) is almost
+        # never a real prompt — redirect before we spend tokens on the LLM.
+        _stripped_line = line.strip()
+        if " " not in _stripped_line and not _stripped_line.startswith("/"):
+            from .commands import VERBS as _VERBS
+            if _stripped_line in _VERBS:
+                console.print(
+                    f"  [dim]Did you mean [bold]/{_stripped_line}[/bold]? "
+                    f"(bare verbs aren't auto-dispatched; prefix with `/`)[/dim]"
+                )
+                continue
 
         # Handle /commands
         if line.strip().startswith("/"):
@@ -414,16 +570,70 @@ def run_repl(client: AgentClient, tracker: Tracker | None = None) -> None:
             if budget > 0 and get_global_budget_used() >= budget:
                 console.print(f"[red]Global budget of ${budget:.2f} reached across all sessions.[/red]")
                 continue
+            # Capture the completed-prompt state BEFORE send() increments
+            # prompt_count inside SessionCost.record_prompt(). Any offset
+            # here (e.g. `- 1`) delays anomaly detection by one full turn.
             prior_total = client.cost.total_cost_usd
-            prior_count = client.cost.prompt_count - 1  # before this prompt
-            client.send(line)
-            # Show per-turn cost + anomaly check
+            prior_count = client.cost.prompt_count
+            response_text = client.send(line)
+            # ── Post-response: Cohrint analysis block ─────────────────────
+            # Aggregates optimization savings, hallucination guardrail,
+            # anomaly detection, recommendation tip, and per-turn / session
+            # cost into one uniformly-rendered block via renderer.py.
             if client.cost.turns:
                 last = client.cost.turns[-1]
-                console.print(
-                    f"  [dim]↳ {last.input_tokens + last.output_tokens:,} tokens · ${last.cost_usd:.4f}[/dim]"
+
+                from .anomaly import check_cost_anomaly_structured
+                _anomaly = check_cost_anomaly_structured(last.cost_usd, prior_total, prior_count)
+                anomaly_line = (
+                    f"${_anomaly.current_cost:.4f} this turn vs "
+                    f"${_anomaly.avg_cost:.4f} avg ({_anomaly.ratio:.1f}x)"
+                ) if _anomaly.detected else None
+
+                _active = getattr(client, "_last_guardrail_active", [])
+                recommendation: str | None = None
+                if "recommendation" in _active:
+                    try:
+                        from .recommendations import SessionMetrics, get_inline_tip
+                        _total_count = prior_count + 1
+                        _total_cost = prior_total + last.cost_usd
+                        _tip = get_inline_tip(SessionMetrics(
+                            prompt_count=_total_count,
+                            total_cost_usd=_total_cost,
+                            total_input_tokens=last.input_tokens,
+                            total_output_tokens=last.output_tokens,
+                            total_cached_tokens=0,
+                            agent="claude",
+                            model=client.model,
+                            last_prompt_cost_usd=last.cost_usd,
+                            last_prompt_tokens=last.input_tokens + last.output_tokens,
+                            avg_cost_per_prompt=_total_cost / _total_count if _total_count else 0.0,
+                        ))
+                        if _tip:
+                            recommendation = _tip.lstrip("💡").strip().split(chr(10))[0]
+                    except Exception:
+                        pass
+
+                from .renderer import render_cohrint_analysis
+                from .pricing import cache_read_savings
+                _cache_saved_usd = cache_read_savings(client.model, last.cache_read_tokens)
+                render_cohrint_analysis(
+                    optimization=getattr(client, "_last_opt_result", None),
+                    model=client.model,
+                    guardrail_hedge_detected=(
+                        "hallucination" in _active and bool(response_text)
+                        and _detect_hedge(response_text)
+                    ),
+                    guardrail_active=_active,
+                    anomaly_line=anomaly_line,
+                    recommendation=recommendation,
+                    turn_input_tokens=last.input_tokens,
+                    turn_output_tokens=last.output_tokens,
+                    turn_cost_usd=last.cost_usd,
+                    session_cost_usd=client.cost.total_cost_usd,
+                    cache_saved_usd=_cache_saved_usd,
+                    cache_read_tokens=last.cache_read_tokens,
                 )
-                check_cost_anomaly(last.cost_usd, prior_total, prior_count)
                 if tracker:
                     tracker.record(
                         model=client.model,
@@ -521,6 +731,14 @@ def main() -> None:
     if len(sys.argv) == 2 and sys.argv[1] == "summary":
         _print_summary()
         return
+
+    # Dispatch verb subcommands (mcp, skills, agents, models, hooks, etc.)
+    # BEFORE argparse so they don't collide with the prompt-positional arg.
+    # A user typing `cohrint-agent "fix the bug"` still hits the prompt path —
+    # dispatcher only claims known verbs. Catalog: cohrint_agent.commands.CATALOG
+    from .subcommands import dispatch, is_subcommand
+    if is_subcommand(sys.argv):
+        raise SystemExit(dispatch(sys.argv))
 
     args = parse_args()
 

@@ -21,6 +21,19 @@
     tbody.appendChild(tr);
   }
 
+  function setCountHeader(text) {
+    var el = document.getElementById('tracesCount');
+    if (el) el.textContent = text;
+  }
+
+  function formatStarted(v) {
+    if (!v) return '—';
+    var ms = Number(v) > 9999999999 ? Number(v) : Number(v) * 1000;
+    var d = new Date(ms);
+    if (isNaN(d.getTime())) return String(v).slice(0, 16);
+    return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
   function makeCell(text, extraStyle) {
     var td = document.createElement('td');
     td.style.cssText = 'padding:10px 14px;font-size:13px;' + (extraStyle || '');
@@ -35,13 +48,19 @@
     var period = periodEl ? periodEl.value : '7';
     var tbody = document.getElementById('tracesBody');
     if (!tbody) return;
+    setCountHeader('');
     tbodyMsg('Loading\u2026');
 
     window.apiFetch('/v1/analytics/traces?period=' + encodeURIComponent(period))
       .then(function(data) {
+        var periodDays = (data && data.period_days) || period;
         var traces = (data && data.traces) || [];
-        if (!traces.length) { tbodyMsg('No traces found for this period.'); return; }
+        if (!traces.length) {
+          tbodyMsg('No traces recorded in the last ' + periodDays + ' days. Make sure your SDK or agent is sending trace_id with events.');
+          return;
+        }
 
+        setCountHeader(traces.length + ' trace' + (traces.length !== 1 ? 's' : ''));
         while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
         traces.forEach(function(t) {
           var tr = document.createElement('tr');
@@ -62,7 +81,7 @@
             'text-align:right;'
           ));
           tr.appendChild(makeCell(
-            t.started_at ? String(t.started_at).slice(0, 16) : '\u2014',
+            formatStarted(t.started_at),
             'font-size:12px;color:var(--text-muted);'
           ));
 
@@ -79,7 +98,16 @@
           tbody.appendChild(tr);
         });
       })
-      .catch(function() { tbodyMsg('Failed to load traces.'); });
+      .catch(function(err) {
+        var msg = err && err.message ? err.message : '';
+        if (/401|403|unauthori[sz]ed|forbidden/i.test(msg)) {
+          tbodyMsg('Session expired or insufficient permissions. Please sign in again.');
+        } else if (/network|fetch|timeout|failed to fetch/i.test(msg)) {
+          tbodyMsg('Network error — check your connection and try again.');
+        } else {
+          tbodyMsg('Failed to load traces.' + (msg ? ' (' + msg.slice(0, 80) + ')' : ''));
+        }
+      });
   };
 
   // ── openDag / closeDag ───────────────────────────────────────────────────────

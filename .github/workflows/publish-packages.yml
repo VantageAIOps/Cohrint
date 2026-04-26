@@ -79,6 +79,9 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.mcp == 'true'
     runs-on: ubuntu-latest
+    environment: npm-publish
+    permissions:
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -90,7 +93,7 @@ jobs:
         run: |
           npm ci
           npm run build
-          npm publish --access public
+          npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -99,6 +102,9 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.sdk == 'true'
     runs-on: ubuntu-latest
+    environment: npm-publish
+    permissions:
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -110,7 +116,7 @@ jobs:
         run: |
           npm ci
           npm run build
-          npm publish --access public
+          npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -119,6 +125,9 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.proxy == 'true'
     runs-on: ubuntu-latest
+    environment: npm-publish
+    permissions:
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -130,7 +139,7 @@ jobs:
         run: |
           npm ci
           npm run build
-          npm publish --access public
+          npm publish --access public --provenance
           NEW_VER=$(node -e "console.log(require('./package.json').version)")
           npm deprecate "cohrint-local-proxy@<${NEW_VER}" "Upgrade to ${NEW_VER}: run npm install -g cohrint-local-proxy"
         env:
@@ -142,20 +151,24 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.agent == 'true'
     runs-on: ubuntu-latest
+    environment: pypi-publish
+    permissions:
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Build and publish to PyPI
+      - name: Build
         working-directory: cohrint-agent
         run: |
-          pip install build twine
+          pip install build
           python -m build
-          twine upload dist/*
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: cohrint-agent/dist/
+          password: ${{ secrets.PYPI_TOKEN }}
 
   summary:
     name: Publish Summary

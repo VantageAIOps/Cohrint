@@ -51,10 +51,19 @@ def _prompt_for_api_key() -> str:
         f"{note}\n"
         "Get your API key at: https://console.anthropic.com/settings/keys\n"
     )
+    # Use getpass so the key isn't echoed to the terminal / tmux scrollback /
+    # CI transcripts. Fall back to input() if getpass can't access the tty
+    # (rare — e.g. some embedded runners).
+    import getpass
     try:
-        key = input("Paste your API key (or press Enter to skip): ").strip()
+        key = getpass.getpass("Paste your API key (hidden, or press Enter to skip): ").strip()
     except (EOFError, KeyboardInterrupt):
         return ""
+    except Exception:  # noqa: BLE001 — getpass may raise on exotic TTYs
+        try:
+            key = input("Paste your API key (or press Enter to skip): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            return ""
     if not key:
         return ""
     save_path = os.path.expanduser("~/.cohrint-agent/api_key")
@@ -169,12 +178,22 @@ class AgentClient:
         self._available_tools = self._build_tool_list()
 
     def _default_system(self) -> str:
-        return (
+        base = (
             "You are an expert coding assistant. You have access to tools for "
             "reading, writing, and editing files, running shell commands, and "
             "searching codebases. Use tools when needed to accomplish tasks. "
             f"Working directory: {self.cwd}"
         )
+        # Prepend cohrint guardrails if any are active. Read lazily so tests
+        # that monkey-patch the HOME or config path work without extra setup.
+        try:
+            from .guardrails import system_preamble
+            preamble = system_preamble()
+            if preamble:
+                return preamble + "\n\n" + base
+        except Exception:  # noqa: BLE001
+            pass
+        return base
 
     def _build_tool_list(self) -> list[dict[str, Any]]:
         """Return tool definitions for all known tools."""
@@ -187,10 +206,16 @@ class AgentClient:
 
         Returns the final text response.
         """
-        # Optimize prompt (skip for short/structured input)
+        # Optimize prompt (skip for short/structured input). The result is
+        # stashed on ``self._last_opt_result`` so the REPL's post-response
+        # Cohrint analysis block can cite the savings alongside guardrails
+        # and anomaly signals — keeping the API and Claude-CLI backends
+        # visually identical.
         final_prompt = user_prompt
+        self._last_opt_result = None
         if not no_optimize and self.optimization and len(user_prompt) > 20:
             result = optimize_prompt(user_prompt)
+            self._last_opt_result = result
             if result.saved_tokens > 0:
                 final_prompt = result.optimized
                 # Aggregate session-wide savings for /summary (T-SUMMARY.1).
@@ -198,11 +223,8 @@ class AgentClient:
                 _pricing = MODEL_PRICES.get(self.cost.model, {"input": 3.0})
                 saved_usd = (result.saved_tokens / 1_000_000) * _pricing.get("input", 3.0)
                 self.cost.record_optimization(result.saved_tokens, saved_usd)
-                from rich.console import Console
-                Console().print(
-                    f"  [dim]Optimized: {result.original_tokens} → {result.optimized_tokens} tokens "
-                    f"(saved {result.saved_tokens}, -{result.saved_percent}%)[/dim]"
-                )
+                from .renderer import render_optimization_preview
+                render_optimization_preview(result, self.cost.model)
 
         self.messages.append({"role": "user", "content": final_prompt})
         # Evict oldest turns once history grows past MAX_MESSAGE_HISTORY so

@@ -62,7 +62,7 @@ def get_config(config_dir: Path | None = None) -> dict:
     default rather than propagate into the bash hook's string compare
     (T-INPUT.config_shape)."""
     cfg_path = _config_dir(config_dir) / _CONFIG_FILE
-    defaults: dict = {"hook_fail_policy": "allow", "default_tier": None}
+    defaults: dict = {"hook_fail_policy": "deny", "default_tier": None}
     if not cfg_path.exists():
         return defaults
     try:
