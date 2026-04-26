@@ -58,6 +58,7 @@ const API_BASE = normalizeApiBase(process.env.COHRINT_API_BASE ?? 'https://api.c
 // containing a pipe or newline would otherwise break every markdown table
 // rendered downstream (e.g. `| Period | {ORG} |`).
 const ORG      = sanitizeOrgSlug(process.env.COHRINT_ORG ?? parseOrgFromKey(API_KEY));
+const SESSION_TRACE_ID = `mcp-session-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 function sanitizeOrgSlug(raw: string): string {
   const clean = String(raw).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64);
@@ -706,7 +707,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         const team = args.team != null ? sanitizeString(args.team, 100).trim() : '';
         const environment = args.environment != null ? sanitizeString(args.environment, 50).trim() : '';
-        const traceId = args.trace_id != null ? sanitizeString(args.trace_id, MAX_TAG_CHARS).trim() : '';
+        const traceId = args.trace_id != null ? sanitizeString(args.trace_id, MAX_TAG_CHARS).trim() : SESSION_TRACE_ID;
         const sessionId = args.session_id != null ? sanitizeString(args.session_id, MAX_TAG_CHARS).trim() : '';
         const promptHash = args.prompt_hash != null ? sanitizeString(args.prompt_hash, 64).trim() : '';
 

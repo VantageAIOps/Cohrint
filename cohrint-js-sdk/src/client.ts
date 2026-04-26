@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { VantageEvent } from "./models/event.js";
 import { EventQueue } from "./utils/queue.js";
 
@@ -28,6 +29,7 @@ export class VantageClient {
   readonly team: string;
   readonly project: string;
   readonly privacy: PrivacyMode;
+  readonly traceId: string;
   private readonly queue: EventQueue;
   private readonly debug: boolean;
 
@@ -47,6 +49,7 @@ export class VantageClient {
     this.team = opts.team ?? "";
     this.project = opts.project ?? "";
     this.privacy = opts.privacy ?? "full";
+    this.traceId = randomUUID();
     this.debug = opts.debug ?? false;
 
     this.queue = new EventQueue(
@@ -65,6 +68,7 @@ export class VantageClient {
     if (!event.environment) event.environment = this.environment;
     if (!event.team) event.team = this.team;
     if (!event.project) event.project = this.project;
+    if (!event.traceId) event.traceId = this.traceId;
 
     // Apply privacy mode — strip sensitive text before queueing
     if (this.privacy === "stats-only") {

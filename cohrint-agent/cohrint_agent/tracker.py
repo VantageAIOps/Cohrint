@@ -267,6 +267,11 @@ class DashboardEvent:
     agent_name: str = "cohrint-agent"
     team: str = "default"
     session_id: str = ""
+    # Trace fields — one trace per Tracker instance (per agent session);
+    # spans chain via parent_event_id so the UI can render a DAG.
+    trace_id: str = ""
+    parent_event_id: str = ""
+    span_depth: int = 0
 
 
 PROVIDER_MAP = {
@@ -290,6 +295,12 @@ class Tracker:
         # Separate from _lock to avoid grabbing the large queue lock just
         # to flip a boolean.
         self._state_lock = threading.Lock()
+        # One trace per Tracker — every event in this process belongs to the
+        # same agent session. Spans chain via parent_event_id so the DAG view
+        # renders a linear-or-branching structure.
+        self._trace_id = uuid.uuid4().hex
+        self._last_event_id: str = ""
+        self._span_depth: int = 0
 
     def start(self) -> None:
         if (
@@ -347,6 +358,9 @@ class Tracker:
                 agent_name="",
                 team="",
                 session_id=hashed_session,
+                trace_id=self._trace_id,
+                parent_event_id=self._last_event_id,
+                span_depth=self._span_depth,
             )
         else:
             event = DashboardEvent(
@@ -360,7 +374,14 @@ class Tracker:
                 latency_ms=latency_ms,
                 agent_name=agent_name,
                 session_id=session_id,
+                trace_id=self._trace_id,
+                parent_event_id=self._last_event_id,
+                span_depth=self._span_depth,
             )
+        # Chain: next span points back at this one. Depth increments so the
+        # DAG view can stack vertically rather than collapsing to a flat row.
+        self._last_event_id = event.event_id
+        self._span_depth += 1
         with self._lock:
             # Drop oldest once the ceiling is hit rather than letting the
             # queue grow unboundedly when the endpoint is wedged (T-BOUNDS.queue).
@@ -404,6 +425,9 @@ class Tracker:
                     "environment": e.environment,
                     "agent_name": e.agent_name,
                     "team": e.team,
+                    **({"trace_id": e.trace_id} if e.trace_id else {}),
+                    **({"parent_event_id": e.parent_event_id} if e.parent_event_id else {}),
+                    **({"span_depth": e.span_depth} if e.span_depth else {}),
                     # Tag with the privacy level at spool time so a later
                     # downgrade (full → anonymized) can re-strip on drain
                     # (T-PRIVACY.spool_privacy_tag).
@@ -431,6 +455,15 @@ class Tracker:
                 "agent_name": e.agent_name,
                 "team": e.team,
             }
+            # trace_id / parent_event_id / span_depth are non-sensitive
+            # (random UUIDs, not PII) so emit at every privacy level —
+            # they're what makes the traces dashboard non-empty.
+            if e.trace_id:
+                data["trace_id"] = e.trace_id
+            if e.parent_event_id:
+                data["parent_event_id"] = e.parent_event_id
+            if e.span_depth:
+                data["span_depth"] = e.span_depth
             if self.config.privacy == "strict":
                 data.pop("agent_name", None)
             events.append(data)

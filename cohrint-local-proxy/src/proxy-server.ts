@@ -141,6 +141,8 @@ class StatsQueue {
     };
   }
 
+  get sessionId(): string { return this.currentSession.id; }
+
   start(): void {
     if (this.timer) return;
     this.timer = setInterval(() => this.flush(), this.flushInterval);
@@ -322,6 +324,7 @@ export function startProxyServer(config: LocalProxyConfig): void {
     orgId, team, environment, resumeSessionId, sessionId,
   );
   statsQueue.start();
+  const proxySessionId = statsQueue.sessionId;
 
   const server = createServer(async (req, res) => {
     const url = req.url ?? "/";
@@ -510,6 +513,7 @@ export function startProxyServer(config: LocalProxyConfig): void {
           prompt_tokens: 0, completion_tokens: 0, total_tokens: 0,
           cache_tokens: 0, cost_total_usd: 0, cost_input_usd: 0, cost_output_usd: 0,
           org_id: orgId, team, environment,
+          session_id: proxySessionId, trace_id: proxySessionId,
         });
 
         // Forward headers — strip hop-by-hop and sensitive upstream headers
@@ -562,6 +566,8 @@ export function startProxyServer(config: LocalProxyConfig): void {
       stats.org_id = orgId;
       stats.team = team;
       stats.environment = environment;
+      stats.session_id = proxySessionId;
+      stats.trace_id = proxySessionId;
 
       // Queue sanitized stats (privacy engine strips all text)
       statsQueue.enqueue(stats);
@@ -579,6 +585,7 @@ export function startProxyServer(config: LocalProxyConfig): void {
         error: errorMsg.split("\n")[0],
         prompt_tokens: 0, completion_tokens: 0, cost_total_usd: 0,
         org_id: orgId, team, environment,
+        session_id: proxySessionId, trace_id: proxySessionId,
       });
 
       return sendJson(res, 502, { error: `Proxy error: ${errorMsg}` });
