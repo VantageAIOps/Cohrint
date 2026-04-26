@@ -57,6 +57,8 @@ export interface VantageEvent {
   responsePreview: string;
   systemPreview: string;
   promptHash: string;
+  traceId?: string;
+  parentEventId?: string;
 }
 
 export function defaultTokenUsage(): TokenUsage {
@@ -140,5 +142,7 @@ export function flattenEvent(e: VantageEvent): Record<string, unknown> {
     response_preview: e.responsePreview,
     system_preview: e.systemPreview,
     prompt_hash: e.promptHash,
+    trace_id: e.traceId ?? "",
+    parent_event_id: e.parentEventId ?? "",
   };
 }
