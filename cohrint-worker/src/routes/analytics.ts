@@ -668,13 +668,21 @@ analytics.get('/traces', async (c) => {
     GROUP BY trace_id
   `;
 
-  const stmt = includeOtel
-    ? sdb.prepare(`${eventsQuery} UNION ALL ${otelQuery} ORDER BY started_at DESC LIMIT 100`)
-         .bind(since, ...args, ...devArgs, sinceIso)
-    : sdb.prepare(`${eventsQuery} ORDER BY started_at DESC LIMIT 100`)
-         .bind(since, ...args, ...devArgs);
+  if (includeOtel) {
+    const [eventsResult, otelResult] = await Promise.all([
+      sdb.prepare(`${eventsQuery} ORDER BY started_at DESC LIMIT 100`)
+         .bind(since, ...args, ...devArgs).all<Record<string, unknown>>(),
+      sdb.prepare(`${otelQuery} ORDER BY started_at DESC LIMIT 100`)
+         .bind(sinceIso).all<Record<string, unknown>>(),
+    ]);
+    const merged = [...eventsResult.results, ...otelResult.results]
+      .sort((a, b) => (b.started_at as number) - (a.started_at as number))
+      .slice(0, 100);
+    return c.json({ traces: merged, period_days: period, total: merged.length });
+  }
 
-  const { results } = await stmt.all();
+  const { results } = await sdb.prepare(`${eventsQuery} ORDER BY started_at DESC LIMIT 100`)
+    .bind(since, ...args, ...devArgs).all();
   return c.json({ traces: results, period_days: period, total: results.length });
 });
 
@@ -697,7 +705,7 @@ analytics.get('/traces/:traceId', async (c) => {
 
   const { results } = await sdb.prepare(`
     SELECT
-      event_id          AS id,
+      id,
       parent_event_id   AS parent_id,
       agent_name,
       model,
