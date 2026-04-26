@@ -668,22 +668,24 @@ analytics.get('/traces', async (c) => {
     GROUP BY trace_id
   `;
 
+  const eventsResult = await sdb.prepare(`${eventsQuery} ORDER BY started_at DESC LIMIT 100`)
+    .bind(since, ...args, ...devArgs).all<Record<string, unknown>>();
+  let eventsRows = eventsResult.results;
+
   if (includeOtel) {
-    const [eventsResult, otelResult] = await Promise.all([
-      sdb.prepare(`${eventsQuery} ORDER BY started_at DESC LIMIT 100`)
-         .bind(since, ...args, ...devArgs).all<Record<string, unknown>>(),
-      sdb.prepare(`${otelQuery} ORDER BY started_at DESC LIMIT 100`)
-         .bind(sinceIso).all<Record<string, unknown>>(),
-    ]);
-    const merged = [...eventsResult.results, ...otelResult.results]
-      .sort((a, b) => (b.started_at as number) - (a.started_at as number))
-      .slice(0, 100);
-    return c.json({ traces: merged, period_days: period, total: merged.length });
+    try {
+      const otelResult = await sdb.prepare(`${otelQuery} ORDER BY started_at DESC LIMIT 100`)
+        .bind(sinceIso).all<Record<string, unknown>>();
+      const merged = [...eventsRows, ...otelResult.results]
+        .sort((a, b) => (b.started_at as number) - (a.started_at as number))
+        .slice(0, 100);
+      return c.json({ traces: merged, period_days: period, total: merged.length });
+    } catch {
+      // otel_traces unavailable — return events-only results
+    }
   }
 
-  const { results } = await sdb.prepare(`${eventsQuery} ORDER BY started_at DESC LIMIT 100`)
-    .bind(since, ...args, ...devArgs).all();
-  return c.json({ traces: results, period_days: period, total: results.length });
+  return c.json({ traces: eventsRows, period_days: period, total: eventsRows.length });
 });
 
 // ── GET /v1/analytics/traces/:traceId — full span tree for one trace ──────────
