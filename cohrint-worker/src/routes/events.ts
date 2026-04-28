@@ -199,34 +199,7 @@ events.post('/', async (c) => {
     } catch { /* KV unavailable — proceed without dedup */ }
   }
 
-  // ── Queue path (T010): async ingest via Cloudflare Queue ──────────────────
-  if (c.env.INGEST_QUEUE) {
-    // Write prompt_hash to KV for future dedup before queuing (best-effort)
-    if (body.prompt_hash) {
-      const phashKey = `phash:${orgId}:${body.prompt_hash}`;
-      const costUsd = body.total_cost_usd ?? body.cost_total_usd ?? 0;
-      try {
-        await c.env.KV.put(phashKey, JSON.stringify({
-          event_id: body.event_id,
-          cost_usd: costUsd,
-          model: body.model ?? '',
-          ts: Math.floor(Date.now() / 1000),
-        }), { expirationTtl: 86400 });
-      } catch { /* best-effort */ }
-    }
-    await c.env.INGEST_QUEUE.send({ type: 'event', orgId, event: body });
-    const response: Record<string, unknown> = {
-      ok:       true,
-      id:       body.event_id,
-      accepted: true,
-      status:   'queued',
-    };
-    if (cacheWarning) response.cache_warning = cacheWarning;
-    if (isBudgetThrottled) response.budget_warning = `Budget threshold exceeded (${Math.round(budgetCheck.pct)}% used). Events are being throttled.`;
-    return c.json(response, 202);
-  }
-
-  // ── Sync fallback path (local dev / no queue binding) ─────────────────────
+  // ── Direct ingest path ────────────────────────────────────────────────────
   let result;
   try {
     result = await insertEvent(c.env.DB, orgId, body);
@@ -238,9 +211,13 @@ events.post('/', async (c) => {
   // INSERT OR IGNORE: changes() == 1 → inserted, 0 → duplicate (PK collision)
   const wasInserted = (result.meta?.changes ?? 1) > 0;
 
-  // Increment free-tier KV counter for new insertions (fire-and-forget)
-  // NOTE: in the queue path the consumer is sole writer; here we keep sync path working
-  if (wasInserted) incrementFreeTierCount(c.env.KV, orgId);
+  if (wasInserted) {
+    incrementFreeTierCount(c.env.KV, orgId);
+    // Rollup upsert — best-effort, non-fatal
+    try {
+      await buildRollupStmt(c.env.DB, orgId, body).run();
+    } catch { /* non-fatal — backfill can repair */ }
+  }
 
   // Write prompt_hash to KV for future dedup (TTL: 24h)
   if (body.prompt_hash) {
@@ -357,31 +334,7 @@ events.post('/batch', async (c) => {
     } catch { /* KV unavailable — proceed without dedup */ }
   }
 
-  // ── Queue path (T010): async ingest via Cloudflare Queue ──────────────────
-  if (c.env.INGEST_QUEUE) {
-    const submittedIds = body.events.map(ev => ev.event_id ?? '').filter(Boolean);
-    await c.env.INGEST_QUEUE.sendBatch(
-      body.events.map(ev => ({
-        body: {
-          type:  'event' as const,
-          orgId,
-          event: {
-            ...ev,
-            sdk_language: ev.sdk_language ?? body.sdk_language,
-            sdk_version:  ev.sdk_version  ?? body.sdk_version,
-          },
-        },
-      })),
-    );
-    return c.json({
-      ok:            true,
-      submitted_ids: submittedIds,
-      count:         submittedIds.length,
-      status:        'queued',
-    }, 202);
-  }
-
-  // ── Sync fallback path (local dev / no queue binding) ─────────────────────
+  // ── Direct ingest path ────────────────────────────────────────────────────
   let stmts;
   try {
     stmts = body.events.map(ev =>
@@ -408,6 +361,19 @@ events.post('/batch', async (c) => {
     } else {
       duplicateIds.push(eventId);
     }
+  }
+
+  // Rollup upsert for accepted events — best-effort, non-fatal
+  const acceptedEvents = body.events.filter((_, i) => (results[i]?.meta?.changes ?? 0) > 0);
+  if (acceptedEvents.length > 0) {
+    try {
+      const rollupStmts = acceptedEvents.map(ev =>
+        buildRollupStmt(c.env.DB, orgId, { ...ev, sdk_language: ev.sdk_language ?? body.sdk_language, sdk_version: ev.sdk_version ?? body.sdk_version })
+      );
+      await c.env.DB.batch(rollupStmts);
+    } catch { /* non-fatal — backfill can repair */ }
+    // Fire-and-forget KV counter for each accepted event
+    for (const _ of acceptedEvents) incrementFreeTierCount(c.env.KV, orgId);
   }
 
   // Broadcast last event for live stream
@@ -529,6 +495,43 @@ events.patch('/:id/scores', async (c) => {
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+function buildRollupStmt(db: D1Database, orgId: string, ev: EventIn): D1PreparedStatement {
+  const ts = ev.timestamp
+    ? Math.floor(new Date(ev.timestamp).getTime() / 1000)
+    : Math.floor(Date.now() / 1000)
+  const dayUnix = Math.floor(ts / 86400) * 86400
+  const r = ev as unknown as Record<string, unknown>
+  const prompt = Number(ev.prompt_tokens ?? r.usage_prompt_tokens ?? 0)
+  const completion = Number(ev.completion_tokens ?? r.usage_completion_tokens ?? 0)
+  return db.prepare(`
+    INSERT INTO events_daily_rollup
+      (org_id, date_unix_day, model, provider, team, cost_usd, prompt_tokens, completion_tokens,
+       cache_tokens, total_tokens, requests, cache_hits, latency_ms_sum)
+    VALUES (?,?,?,?,?,?,?,?,?,?,1,?,?)
+    ON CONFLICT(org_id, date_unix_day, model, team) DO UPDATE SET
+      cost_usd          = cost_usd + excluded.cost_usd,
+      prompt_tokens     = prompt_tokens + excluded.prompt_tokens,
+      completion_tokens = completion_tokens + excluded.completion_tokens,
+      cache_tokens      = cache_tokens + excluded.cache_tokens,
+      total_tokens      = total_tokens + excluded.total_tokens,
+      requests          = requests + 1,
+      cache_hits        = cache_hits + excluded.cache_hits,
+      latency_ms_sum    = latency_ms_sum + excluded.latency_ms_sum
+  `).bind(
+    orgId, dayUnix,
+    ev.model ?? 'unknown',
+    ev.provider ?? '',
+    ev.team ?? '',
+    Number(ev.total_cost_usd ?? ev.cost_total_usd ?? r.cost_total_cost_usd ?? r.cost_usd ?? 0),
+    prompt,
+    completion,
+    Number(ev.cache_tokens ?? r.usage_cached_tokens ?? 0),
+    Number(ev.total_tokens ?? r.usage_total_tokens ?? (prompt + completion)),
+    (ev.cache_hit ?? 0) ? 1 : 0,
+    ev.latency_ms ?? 0,
+  )
+}
+
 function buildInsertStmt(
   db: D1Database,
   orgId: string,
