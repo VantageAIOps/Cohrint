@@ -59,7 +59,8 @@ analytics.get('/summary', async (c) => {
 
   // KV cache — 2 min TTL (reduced from 5 min since rollup data is already aggregated).
   // Agent-filtered requests bypass cache (low-volume, targeted).
-  const cacheKey = `analytics:summary:${orgId}:${scopeTeam ?? 'all'}:${isPrivileged ? 'all' : (memberEmail ?? 'anon')}`;
+  const cacheBucket = Math.floor(Date.now() / 120_000); // 2-min bucket — rotates instead of explicit delete
+  const cacheKey = `analytics:summary:${orgId}:${scopeTeam ?? 'all'}:${isPrivileged ? 'all' : (memberEmail ?? 'anon')}:t${cacheBucket}`;
   if (!agentFilter) {
     try {
       const cached = await c.env.KV.get(cacheKey);
@@ -234,7 +235,8 @@ analytics.get('/kpis', async (c) => {
   const period = Math.min(parseInt(c.req.query('period') ?? '30', 10) || 30, 365);
   const since  = sinceUnix(period);
 
-  const kpisCacheKey = `analytics:kpis:${orgId}:${period}:${scopeTeam ?? 'all'}:${isPrivileged ? 'all' : (memberEmail ?? 'anon')}`;
+  const kpisBucket = Math.floor(Date.now() / 300_000); // 5-min bucket
+  const kpisCacheKey = `analytics:kpis:${orgId}:${period}:${scopeTeam ?? 'all'}:${isPrivileged ? 'all' : (memberEmail ?? 'anon')}:t${kpisBucket}`;
   try {
     const cached = await c.env.KV.get(kpisCacheKey);
     if (cached) return c.json(JSON.parse(cached));
@@ -363,7 +365,8 @@ analytics.get('/timeseries', async (c) => {
   const devClause = isPrivileged ? '' : ' AND developer_email = ?';
   const devArgs   = isPrivileged ? [] : [memberEmail];
 
-  const tsCacheKey = `analytics:timeseries:${orgId}:${period}:${scopeTeam ?? 'all'}:${isPrivileged ? 'all' : (memberEmail ?? 'anon')}`;
+  const tsBucket = Math.floor(Date.now() / 300_000); // 5-min bucket
+  const tsCacheKey = `analytics:timeseries:${orgId}:${period}:${scopeTeam ?? 'all'}:${isPrivileged ? 'all' : (memberEmail ?? 'anon')}:t${tsBucket}`;
   try {
     const cached = await c.env.KV.get(tsCacheKey);
     if (cached) return c.json(JSON.parse(cached));

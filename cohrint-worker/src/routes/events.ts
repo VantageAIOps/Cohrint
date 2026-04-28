@@ -9,22 +9,6 @@ import { emitMetric } from '../lib/metrics';
 
 const events = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
-// Invalidate all analytics KV cache keys for an org — including team-scoped
-// variants (e.g. analytics:summary:orgId:engineering). Uses KV.list so new
-// team names never cause stale data.
-async function invalidateOrgAnalyticsCache(kv: KVNamespace, orgId: string): Promise<void> {
-  const prefixes = [
-    `analytics:summary:${orgId}:`,
-    `analytics:kpis:${orgId}:`,
-    `analytics:timeseries:${orgId}:`,
-  ];
-  await Promise.all(prefixes.map(async (prefix) => {
-    const listed = await kv.list({ prefix });
-    if (listed.keys.length > 0) {
-      await Promise.all(listed.keys.map(k => kv.delete(k.name)));
-    }
-  }));
-}
 
 events.use('*', authMiddleware);
 
@@ -199,34 +183,7 @@ events.post('/', async (c) => {
     } catch { /* KV unavailable — proceed without dedup */ }
   }
 
-  // ── Queue path (T010): async ingest via Cloudflare Queue ──────────────────
-  if (c.env.INGEST_QUEUE) {
-    // Write prompt_hash to KV for future dedup before queuing (best-effort)
-    if (body.prompt_hash) {
-      const phashKey = `phash:${orgId}:${body.prompt_hash}`;
-      const costUsd = body.total_cost_usd ?? body.cost_total_usd ?? 0;
-      try {
-        await c.env.KV.put(phashKey, JSON.stringify({
-          event_id: body.event_id,
-          cost_usd: costUsd,
-          model: body.model ?? '',
-          ts: Math.floor(Date.now() / 1000),
-        }), { expirationTtl: 86400 });
-      } catch { /* best-effort */ }
-    }
-    await c.env.INGEST_QUEUE.send({ type: 'event', orgId, event: body });
-    const response: Record<string, unknown> = {
-      ok:       true,
-      id:       body.event_id,
-      accepted: true,
-      status:   'queued',
-    };
-    if (cacheWarning) response.cache_warning = cacheWarning;
-    if (isBudgetThrottled) response.budget_warning = `Budget threshold exceeded (${Math.round(budgetCheck.pct)}% used). Events are being throttled.`;
-    return c.json(response, 202);
-  }
-
-  // ── Sync fallback path (local dev / no queue binding) ─────────────────────
+  // ── Direct ingest path ────────────────────────────────────────────────────
   let result;
   try {
     result = await insertEvent(c.env.DB, orgId, body);
@@ -238,9 +195,13 @@ events.post('/', async (c) => {
   // INSERT OR IGNORE: changes() == 1 → inserted, 0 → duplicate (PK collision)
   const wasInserted = (result.meta?.changes ?? 1) > 0;
 
-  // Increment free-tier KV counter for new insertions (fire-and-forget)
-  // NOTE: in the queue path the consumer is sole writer; here we keep sync path working
-  if (wasInserted) incrementFreeTierCount(c.env.KV, orgId);
+  if (wasInserted) {
+    incrementFreeTierCount(c.env.KV, orgId);
+    // Rollup upsert — best-effort, non-fatal
+    try {
+      await buildRollupStmt(c.env.DB, orgId, body).run();
+    } catch { /* non-fatal — backfill can repair */ }
+  }
 
   // Write prompt_hash to KV for future dedup (TTL: 24h)
   if (body.prompt_hash) {
@@ -275,9 +236,6 @@ events.post('/', async (c) => {
       }
     } catch { /* non-critical */ }
   })());
-
-  // Invalidate all analytics caches (all scopes including team-scoped variants)
-  try { await invalidateOrgAnalyticsCache(c.env.KV, orgId); } catch { /* best-effort */ }
 
   const response: Record<string, unknown> = {
     ok:       true,
@@ -357,31 +315,7 @@ events.post('/batch', async (c) => {
     } catch { /* KV unavailable — proceed without dedup */ }
   }
 
-  // ── Queue path (T010): async ingest via Cloudflare Queue ──────────────────
-  if (c.env.INGEST_QUEUE) {
-    const submittedIds = body.events.map(ev => ev.event_id ?? '').filter(Boolean);
-    await c.env.INGEST_QUEUE.sendBatch(
-      body.events.map(ev => ({
-        body: {
-          type:  'event' as const,
-          orgId,
-          event: {
-            ...ev,
-            sdk_language: ev.sdk_language ?? body.sdk_language,
-            sdk_version:  ev.sdk_version  ?? body.sdk_version,
-          },
-        },
-      })),
-    );
-    return c.json({
-      ok:            true,
-      submitted_ids: submittedIds,
-      count:         submittedIds.length,
-      status:        'queued',
-    }, 202);
-  }
-
-  // ── Sync fallback path (local dev / no queue binding) ─────────────────────
+  // ── Direct ingest path ────────────────────────────────────────────────────
   let stmts;
   try {
     stmts = body.events.map(ev =>
@@ -410,13 +344,23 @@ events.post('/batch', async (c) => {
     }
   }
 
+  // Rollup upsert for accepted events — best-effort, non-fatal
+  const acceptedEvents = body.events.filter((_, i) => (results[i]?.meta?.changes ?? 0) > 0);
+  if (acceptedEvents.length > 0) {
+    try {
+      const rollupStmts = acceptedEvents.map(ev =>
+        buildRollupStmt(c.env.DB, orgId, { ...ev, sdk_language: ev.sdk_language ?? body.sdk_language, sdk_version: ev.sdk_version ?? body.sdk_version })
+      );
+      await c.env.DB.batch(rollupStmts);
+    } catch { /* non-fatal — backfill can repair */ }
+    // Fire-and-forget KV counter for each accepted event
+    for (const _ of acceptedEvents) incrementFreeTierCount(c.env.KV, orgId);
+  }
+
   // Broadcast last event for live stream
   if (body.events.length > 0) {
     await broadcastEvent(c.env.KV, orgId, body.events[body.events.length - 1]);
   }
-
-  // Invalidate all analytics caches (all scopes including team-scoped variants)
-  try { await invalidateOrgAnalyticsCache(c.env.KV, orgId); } catch { /* best-effort */ }
 
   return c.json({
     ok:           true,
@@ -529,6 +473,43 @@ events.patch('/:id/scores', async (c) => {
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+function buildRollupStmt(db: D1Database, orgId: string, ev: EventIn): D1PreparedStatement {
+  const ts = ev.timestamp
+    ? Math.floor(new Date(ev.timestamp).getTime() / 1000)
+    : Math.floor(Date.now() / 1000)
+  const dayUnix = Math.floor(ts / 86400) * 86400
+  const r = ev as unknown as Record<string, unknown>
+  const prompt = Number(ev.prompt_tokens ?? r.usage_prompt_tokens ?? 0)
+  const completion = Number(ev.completion_tokens ?? r.usage_completion_tokens ?? 0)
+  return db.prepare(`
+    INSERT INTO events_daily_rollup
+      (org_id, date_unix_day, model, provider, team, cost_usd, prompt_tokens, completion_tokens,
+       cache_tokens, total_tokens, requests, cache_hits, latency_ms_sum)
+    VALUES (?,?,?,?,?,?,?,?,?,?,1,?,?)
+    ON CONFLICT(org_id, date_unix_day, model, team) DO UPDATE SET
+      cost_usd          = cost_usd + excluded.cost_usd,
+      prompt_tokens     = prompt_tokens + excluded.prompt_tokens,
+      completion_tokens = completion_tokens + excluded.completion_tokens,
+      cache_tokens      = cache_tokens + excluded.cache_tokens,
+      total_tokens      = total_tokens + excluded.total_tokens,
+      requests          = requests + 1,
+      cache_hits        = cache_hits + excluded.cache_hits,
+      latency_ms_sum    = latency_ms_sum + excluded.latency_ms_sum
+  `).bind(
+    orgId, dayUnix,
+    ev.model ?? 'unknown',
+    ev.provider ?? '',
+    ev.team ?? '',
+    Number(ev.total_cost_usd ?? ev.cost_total_usd ?? r.cost_total_cost_usd ?? r.cost_usd ?? 0),
+    prompt,
+    completion,
+    Number(ev.cache_tokens ?? r.usage_cached_tokens ?? 0),
+    Number(ev.total_tokens ?? r.usage_total_tokens ?? (prompt + completion)),
+    (ev.cache_hit ?? 0) ? 1 : 0,
+    ev.latency_ms ?? 0,
+  )
+}
+
 function buildInsertStmt(
   db: D1Database,
   orgId: string,
@@ -658,16 +639,18 @@ async function broadcastEvent(kv: KVNamespace, orgId: string, ev: EventIn) {
     };
     const payload = JSON.stringify(streamEv);
 
-    // Write latest (backwards compat for SSE reader during transition)
-    await kv.put(`stream:${orgId}:latest`, payload, { expirationTtl: 60 });
-
-    // Write circular buffer (max 25 events, newest first)
+    // Write circular buffer (max 25 events, newest first).
+    // Throttle: skip if the most recent buffer entry is < 5s old to bound KV writes.
     const bufKey = `stream:${orgId}:buf`;
     const rawBuf = await kv.get(bufKey);
     const buf: StreamEvent[] = rawBuf ? JSON.parse(rawBuf) : [];
-    buf.unshift(streamEv);
-    if (buf.length > 25) buf.length = 25;
-    await kv.put(bufKey, JSON.stringify(buf), { expirationTtl: 300 });
+    if (buf.length === 0 || seqno - buf[0].seqno >= 5_000) {
+      buf.unshift(streamEv);
+      if (buf.length > 25) buf.length = 25;
+      await kv.put(bufKey, JSON.stringify(buf), { expirationTtl: 300 });
+      // Write latest only when buffer is updated (SSE reader uses buf; latest is legacy)
+      await kv.put(`stream:${orgId}:latest`, payload, { expirationTtl: 60 });
+    }
   } catch {
     // KV unavailable — event still recorded in D1, live feed skipped
   }
