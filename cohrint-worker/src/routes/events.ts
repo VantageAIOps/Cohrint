@@ -9,22 +9,6 @@ import { emitMetric } from '../lib/metrics';
 
 const events = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
-// Invalidate all analytics KV cache keys for an org — including team-scoped
-// variants (e.g. analytics:summary:orgId:engineering). Uses KV.list so new
-// team names never cause stale data.
-async function invalidateOrgAnalyticsCache(kv: KVNamespace, orgId: string): Promise<void> {
-  const prefixes = [
-    `analytics:summary:${orgId}:`,
-    `analytics:kpis:${orgId}:`,
-    `analytics:timeseries:${orgId}:`,
-  ];
-  await Promise.all(prefixes.map(async (prefix) => {
-    const listed = await kv.list({ prefix });
-    if (listed.keys.length > 0) {
-      await Promise.all(listed.keys.map(k => kv.delete(k.name)));
-    }
-  }));
-}
 
 events.use('*', authMiddleware);
 
@@ -253,9 +237,6 @@ events.post('/', async (c) => {
     } catch { /* non-critical */ }
   })());
 
-  // Invalidate all analytics caches (all scopes including team-scoped variants)
-  try { await invalidateOrgAnalyticsCache(c.env.KV, orgId); } catch { /* best-effort */ }
-
   const response: Record<string, unknown> = {
     ok:       true,
     id:       body.event_id,
@@ -380,9 +361,6 @@ events.post('/batch', async (c) => {
   if (body.events.length > 0) {
     await broadcastEvent(c.env.KV, orgId, body.events[body.events.length - 1]);
   }
-
-  // Invalidate all analytics caches (all scopes including team-scoped variants)
-  try { await invalidateOrgAnalyticsCache(c.env.KV, orgId); } catch { /* best-effort */ }
 
   return c.json({
     ok:           true,
@@ -661,16 +639,18 @@ async function broadcastEvent(kv: KVNamespace, orgId: string, ev: EventIn) {
     };
     const payload = JSON.stringify(streamEv);
 
-    // Write latest (backwards compat for SSE reader during transition)
-    await kv.put(`stream:${orgId}:latest`, payload, { expirationTtl: 60 });
-
-    // Write circular buffer (max 25 events, newest first)
+    // Write circular buffer (max 25 events, newest first).
+    // Throttle: skip if the most recent buffer entry is < 5s old to bound KV writes.
     const bufKey = `stream:${orgId}:buf`;
     const rawBuf = await kv.get(bufKey);
     const buf: StreamEvent[] = rawBuf ? JSON.parse(rawBuf) : [];
-    buf.unshift(streamEv);
-    if (buf.length > 25) buf.length = 25;
-    await kv.put(bufKey, JSON.stringify(buf), { expirationTtl: 300 });
+    if (buf.length === 0 || seqno - buf[0].seqno >= 5_000) {
+      buf.unshift(streamEv);
+      if (buf.length > 25) buf.length = 25;
+      await kv.put(bufKey, JSON.stringify(buf), { expirationTtl: 300 });
+      // Write latest only when buffer is updated (SSE reader uses buf; latest is legacy)
+      await kv.put(`stream:${orgId}:latest`, payload, { expirationTtl: 60 });
+    }
   } catch {
     // KV unavailable — event still recorded in D1, live feed skipped
   }
