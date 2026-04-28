@@ -34,6 +34,7 @@ import { Hono } from 'hono';
 import type { Bindings, Variables } from '../types';
 import { estimateCostUsd } from '../lib/pricing';
 import { createLogger } from '../lib/logger';
+import { redisPipeline } from '../lib/upstash';
 
 const otel = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -235,10 +236,23 @@ function extractAuth(c: any): string | null {
   return null;
 }
 
-// KV-based rate limiter — mirrors auth.ts but for OTel ingest (higher limit: 3000 RPM)
-async function otelRateLimit(kv: KVNamespace, orgId: string, limitRpm: number): Promise<boolean> {
+// Rate limiter for OTel ingest — uses Upstash Redis when configured (avoids CF KV writes),
+// falls back to KV for compatibility.
+async function otelRateLimit(kv: KVNamespace, orgId: string, limitRpm: number, env?: { UPSTASH_REDIS_REST_URL?: string; UPSTASH_REDIS_REST_TOKEN?: string }): Promise<boolean> {
+  const bucket = Math.floor(Date.now() / 60_000);
+  const key    = `rl:otel:${orgId}:${bucket}`;
+
+  const upstashUrl   = env?.UPSTASH_REDIS_REST_URL;
+  const upstashToken = env?.UPSTASH_REDIS_REST_TOKEN;
+
+  if (upstashUrl && upstashToken) {
+    try {
+      const res = await redisPipeline(upstashUrl, upstashToken, [['INCR', key], ['EXPIRE', key, '70']]);
+      return (res[0].result as number) <= limitRpm;
+    } catch { /* Upstash unavailable — fall through to KV */ }
+  }
+
   try {
-    const key   = `rl:otel:${orgId}:${Math.floor(Date.now() / 60_000)}`;
     const raw   = await kv.get(key);
     const count = raw ? parseInt(raw, 10) : 0;
     if (count >= limitRpm) return false;
@@ -298,7 +312,7 @@ otel.post('/v1/metrics', async (c) => {
 
   // Rate limit: 3000 OTel ingest requests per minute per org
   const otelRpm = parseInt(c.env.RATE_LIMIT_RPM ?? '1000', 10) * 3;
-  const allowed = await otelRateLimit(c.env.KV, orgId, otelRpm);
+  const allowed = await otelRateLimit(c.env.KV, orgId, otelRpm, c.env);
   if (!allowed) {
     const retryAt = Math.ceil(Date.now() / 60_000) * 60;
     c.header('Retry-After', String(retryAt - Math.floor(Date.now() / 1000)));
@@ -708,34 +722,28 @@ otel.post('/v1/metrics', async (c) => {
       }
     }
 
-    // Invalidate analytics cache for this org (all prefixes including team-scoped variants)
-    try {
-      const prefixes = [`analytics:summary:${orgId}:`, `analytics:kpis:${orgId}:`, `analytics:timeseries:${orgId}:`];
-      await Promise.all(prefixes.map(async (p) => {
-        const listed = await c.env.KV.list({ prefix: p });
-        if (listed.keys.length > 0) await Promise.all(listed.keys.map(k => c.env.KV.delete(k.name)));
-      }));
-    } catch { /* best-effort */ }
-
-    // Broadcast all token records to KV circular buffer for SSE live feed
-    for (const r of tokenRecords) {
+    // Broadcast last token record to KV circular buffer for SSE live feed (throttled: ≤1/5s)
+    const lastRecord = tokenRecords[tokenRecords.length - 1];
+    if (lastRecord) {
       try {
         const seqno = Date.now();
         const streamEv = {
           seqno,
           ts: seqno,
-          provider: r.provider,
-          cost_usd: r.cost_usd,
-          model: r.model,
-          tokens: (r.input_tokens ?? 0) + (r.output_tokens ?? 0),
+          provider: lastRecord.provider,
+          cost_usd: lastRecord.cost_usd,
+          model: lastRecord.model,
+          tokens: (lastRecord.input_tokens ?? 0) + (lastRecord.output_tokens ?? 0),
         };
-        await c.env.KV.put(`stream:${orgId}:latest`, JSON.stringify(streamEv), { expirationTtl: 60 });
         const bufKey = `stream:${orgId}:buf`;
         const rawBuf = await c.env.KV.get(bufKey);
         const buf: typeof streamEv[] = rawBuf ? JSON.parse(rawBuf) : [];
-        buf.unshift(streamEv);
-        if (buf.length > 25) buf.length = 25;
-        await c.env.KV.put(bufKey, JSON.stringify(buf), { expirationTtl: 300 });
+        if (buf.length === 0 || seqno - buf[0].seqno >= 5_000) {
+          buf.unshift(streamEv);
+          if (buf.length > 25) buf.length = 25;
+          await c.env.KV.put(bufKey, JSON.stringify(buf), { expirationTtl: 300 });
+          await c.env.KV.put(`stream:${orgId}:latest`, JSON.stringify(streamEv), { expirationTtl: 60 });
+        }
       } catch {
         // KV unavailable — event still in D1, SSE broadcast skipped
       }
@@ -761,7 +769,7 @@ otel.post('/v1/logs', async (c) => {
 
   // Rate limit: shared OTel bucket with /v1/metrics
   const otelRpm = parseInt(c.env.RATE_LIMIT_RPM ?? '1000', 10) * 3;
-  const allowed = await otelRateLimit(c.env.KV, orgId, otelRpm);
+  const allowed = await otelRateLimit(c.env.KV, orgId, otelRpm, c.env);
   if (!allowed) {
     const retryAt = Math.ceil(Date.now() / 60_000) * 60;
     c.header('Retry-After', String(retryAt - Math.floor(Date.now() / 1000)));
@@ -872,25 +880,20 @@ otel.post('/v1/logs', async (c) => {
           // otel_events table may not exist yet — non-critical
         }
 
-        // Broadcast api_request events to KV circular buffer for SSE live feed
+        // Broadcast api_request events to KV circular buffer for SSE live feed (throttled: ≤1/5s)
         if (eventName === 'api_request' || eventName === 'claude_code.api_request') {
           try {
             const seqno = Date.now();
-            const streamEv = {
-              seqno,
-              ts: seqno,
-              provider,
-              cost_usd: costUsd,
-              model,
-              tokens: inputTokens + outputTokens,
-            };
-            await c.env.KV.put(`stream:${orgId}:latest`, JSON.stringify(streamEv), { expirationTtl: 60 });
+            const streamEv = { seqno, ts: seqno, provider, cost_usd: costUsd, model, tokens: inputTokens + outputTokens };
             const bufKey = `stream:${orgId}:buf`;
             const rawBuf = await c.env.KV.get(bufKey);
             const buf: typeof streamEv[] = rawBuf ? JSON.parse(rawBuf) : [];
-            buf.unshift(streamEv);
-            if (buf.length > 25) buf.length = 25;
-            await c.env.KV.put(bufKey, JSON.stringify(buf), { expirationTtl: 300 });
+            if (buf.length === 0 || seqno - buf[0].seqno >= 5_000) {
+              buf.unshift(streamEv);
+              if (buf.length > 25) buf.length = 25;
+              await c.env.KV.put(bufKey, JSON.stringify(buf), { expirationTtl: 300 });
+              await c.env.KV.put(`stream:${orgId}:latest`, JSON.stringify(streamEv), { expirationTtl: 60 });
+            }
           } catch {
             // KV unavailable — non-critical
           }
